@@ -5,7 +5,7 @@ import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUt
 
 export default function ProductCard({
     product: p,
-    effectiveUsdtRate,
+    effectiveRate,
     streetRate,
     categories,
     onAdjustStock,
@@ -13,7 +13,7 @@ export default function ProductCard({
     onEdit,
     onDelete
 }) {
-    const valBs = p.priceUsdt * effectiveUsdtRate;
+    const valBs = p.priceUsdt * effectiveRate;
     const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
     const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
     const catInfo = categories.find(c => c.id === p.category);

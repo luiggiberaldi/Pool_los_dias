@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const DEFAULT_RATES = {
-    usdt: { price: 37.10, source: 'Promedio P2P', type: 'p2p', change: 0.12 },
     bcv: { price: 36.35, source: 'BCV Oficial', change: 0.05 },
     euro: { price: 39.80, source: 'Euro BCV', change: -0.02 },
     lastUpdate: new Date().toISOString()
@@ -13,15 +12,17 @@ const UPDATE_INTERVAL = 30000;
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxT9sKz_XWRWuQx_XP-BJ33T0hoAgJsLwhZA00v6nPt4Ij4jRjq-90mDGLVCsS6FXwW9Q/exec?token=Lvbp1994';
 
-const CONNECTION_STRATEGIES = [
-    { name: 'Directo', buildUrl: (target) => target },
-    { name: 'Proxy A (AllOrigins)', buildUrl: (target) => `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}` },
-    { name: 'Proxy B (CodeTabs)', buildUrl: (target) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}` }
-];
-
 export function useRates() {
     const [rates, setRates] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('monitor_rates_v12')) || null; }
+        try {
+            const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
+            if (saved) {
+                // Migrar datos guardados: eliminar usdt si existe
+                if (saved.usdt) delete saved.usdt;
+                return saved;
+            }
+            return null;
+        }
         catch { return null; }
     });
 
@@ -29,7 +30,6 @@ export function useRates() {
     const [isOffline, setIsOffline] = useState(false);
     const [logs, setLogs] = useState([]);
 
-    // [PERFORMANCE] useRef impides re-renders inside updateData dependencies
     const ratesRef = useRef(rates);
 
     useEffect(() => {
@@ -61,8 +61,7 @@ export function useRates() {
     };
 
     const updateData = useCallback(async (isAutoUpdate = false) => {
-        if (!isAutoUpdate) setLoading(true); // Don't block UI on auto-update
-        // setIsOffline(false); // Avoid flickering
+        if (!isAutoUpdate) setLoading(true);
 
         const log = (msg, type) => !isAutoUpdate && addLog(msg, type);
 
@@ -90,16 +89,6 @@ export function useRates() {
             return DEFAULT_EUR_USD_RATIO;
         };
 
-        const calculateP2PAverage = (dataField) => {
-            if (typeof dataField === 'number') return dataField;
-            if (Array.isArray(dataField) && dataField.length > 0) {
-                const top3 = dataField.slice(0, 3);
-                const getPrice = (item) => (typeof item === 'object' && item.price ? parseSafeFloat(item.price) : (typeof item === 'number' ? item : 0));
-                return top3.reduce((acc, curr) => acc + getPrice(curr), 0) / top3.length;
-            }
-            return 0;
-        };
-
         const getMeta = (newP, oldP, oldChange = 0, apiChange = null) => {
             let p = parseSafeFloat(newP);
             const o = parseSafeFloat(oldP);
@@ -112,39 +101,14 @@ export function useRates() {
             return { price: p, change: (p > 0 && o > 0) ? ((p - o) / o) * 100 : 0 };
         };
 
-        const fetchUSDT = async () => {
-            const targetUrl = `https://criptoya.com/api/binancep2p/USDT/VES/1`;
-            for (const strategy of CONNECTION_STRATEGIES) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
-                    const res = await fetch(strategy.buildUrl(targetUrl), { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                    if (!res.ok) continue;
-
-                    const result = await res.json();
-                    const avgAsk = calculateP2PAverage(result.ask);
-                    const avgBid = calculateP2PAverage(result.bid);
-
-                    if (avgAsk > 0 || avgBid > 0) {
-                        let finalPrice = (avgAsk > 0 && avgBid > 0) ? (avgAsk + avgBid) / 2 : (avgAsk || avgBid);
-                        return { price: finalPrice, source: `Binance P2P (${strategy.name})` };
-                    }
-                } catch (err) { continue; }
-            }
-            return null;
-        };
-
         try {
-            // [PERFORMANCE] Parallel Execution
+            // Fetch en paralelo: datos privados (Google Script), dolarapi fallback, y factor euro
             const taskPrivate = fetchGeneric(GOOGLE_SCRIPT_URL);
-            const taskUSDT = fetchUSDT();
             const taskDolarApi = fetchGeneric('https://ve.dolarapi.com/v1/dolares');
             const taskEuroFactor = getEuroFactorFallback();
 
-            const [privateData, usdtResult, bcvFallbackData, euroFactor] = await Promise.all([
+            const [privateData, bcvFallbackData, euroFactor] = await Promise.all([
                 taskPrivate.catch(() => null),
-                taskUSDT.catch(() => null),
                 taskDolarApi.catch(() => null),
                 taskEuroFactor.catch(() => DEFAULT_EUR_USD_RATIO)
             ]);
@@ -152,17 +116,13 @@ export function useRates() {
             if (privateData) log("✅ Datos Privados Recibidos", "success");
 
             let newRates = { ...(ratesRef.current || DEFAULT_RATES) };
-
-            // Procesar USDT
-            if (usdtResult) {
-                const meta = getMeta(usdtResult.price, newRates.usdt.price, newRates.usdt.change);
-                newRates.usdt = { ...newRates.usdt, price: usdtResult.price, change: meta.change, source: usdtResult.source, type: 'p2p' };
-            }
+            // Limpiar campo usdt legacy si existe
+            if (newRates.usdt) delete newRates.usdt;
 
             let newBcvPrice = 0;
             let newEuroPrice = 0;
 
-            // Procesar BCV/Euro
+            // Procesar BCV/Euro desde datos privados (Google Script)
             if (privateData) {
                 const rawBcv = privateData.bcv || privateData.usd;
                 const rawEuro = privateData.euro || privateData.eur;
@@ -173,21 +133,20 @@ export function useRates() {
                 let apiBcvChange = typeof rawBcv === 'object' ? rawBcv.change : null;
                 let apiEuroChange = typeof rawEuro === 'object' ? rawEuro.change : null;
 
-                const alignMagnitude = (val, anchor) => {
-                    if (!val || val <= 0 || !anchor || anchor <= 0) return val;
-                    let corrected = val;
-                    while (corrected < (anchor * 0.20)) corrected *= 10;
-                    while (corrected > (anchor * 5.0)) corrected /= 10;
-                    return corrected;
+                // Validación de magnitud: si el precio es irrazonablemente bajo o alto, corregir
+                const validateMagnitude = (val) => {
+                    if (!val || val <= 0) return val;
+                    // Las tasas BCV venezolanas están típicamente entre 10 y 200
+                    if (val < 1) {
+                        while (val < 10) val *= 10;
+                    } else if (val > 1000) {
+                        while (val > 200) val /= 10;
+                    }
+                    return val;
                 };
 
-                if (newRates.usdt.price > 0) {
-                    newBcvPrice = alignMagnitude(bcvP, newRates.usdt.price);
-                    newEuroPrice = alignMagnitude(euroP, newRates.usdt.price);
-                } else {
-                    newBcvPrice = bcvP;
-                    newEuroPrice = euroP;
-                }
+                newBcvPrice = validateMagnitude(bcvP);
+                newEuroPrice = validateMagnitude(euroP);
 
                 if (newBcvPrice > 0) {
                     const meta = getMeta(newBcvPrice, newRates.bcv.price, newRates.bcv.change, apiBcvChange);
@@ -199,20 +158,11 @@ export function useRates() {
                 }
 
             } else if (bcvFallbackData) {
-                // Fallback Logic
+                // Fallback: DolarApi
                 const oficial = Array.isArray(bcvFallbackData) ? bcvFallbackData.find(d => d.fuente === 'oficial' || d.nombre === 'Oficial') : null;
 
                 if (oficial?.promedio > 0) {
                     let bcvP = parseSafeFloat(oficial.promedio);
-                    if (newRates.usdt.price > 0) {
-                        const alignMagnitude = (val, anchor) => {
-                            let corrected = val;
-                            while (corrected < (anchor * 0.20)) corrected *= 10;
-                            while (corrected > (anchor * 5.0)) corrected /= 10;
-                            return corrected;
-                        };
-                        bcvP = alignMagnitude(bcvP, newRates.usdt.price);
-                    }
                     newBcvPrice = bcvP;
                     const meta = getMeta(newBcvPrice, newRates.bcv.price, newRates.bcv.change);
                     newRates.bcv = { ...newRates.bcv, ...meta, source: 'BCV Oficial (Respaldo)' };
@@ -224,8 +174,6 @@ export function useRates() {
                     }
                 }
             }
-
-
 
             newRates.lastUpdate = new Date();
             setRates(newRates);
@@ -241,9 +189,7 @@ export function useRates() {
     }, [addLog]);
 
     useEffect(() => {
-        // Initial load
         updateData(false);
-        // Interval
         const intervalId = setInterval(() => { updateData(true); }, UPDATE_INTERVAL);
         return () => clearInterval(intervalId);
     }, [updateData]);

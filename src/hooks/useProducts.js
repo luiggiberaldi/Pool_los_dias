@@ -23,7 +23,7 @@ export function useProducts(rates) {
         return saved && parseFloat(saved) > 0 ? saved : '';
     });
 
-    const effectiveUsdtRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
+    const effectiveRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
 
     // Initial Load
     useEffect(() => {
@@ -41,12 +41,12 @@ export function useProducts(rates) {
         return () => { isMounted = false; };
     }, []);
 
-    // Set Initial Street Rate
+    // Set Initial Street Rate (from BCV)
     useEffect(() => {
-        if (!streetRate && rates.usdt.price > 0 && !localStorage.getItem('street_rate_bs')) {
-            setStreetRate(rates.usdt.price);
+        if (!streetRate && rates.bcv?.price > 0 && !localStorage.getItem('street_rate_bs')) {
+            setStreetRate(rates.bcv.price);
         }
-    }, [rates.usdt.price, streetRate]);
+    }, [rates.bcv?.price, streetRate]);
 
     // Auto-save products and categories
     useEffect(() => {
@@ -105,7 +105,7 @@ export function useProducts(rates) {
         setUseAutoRate,
         customRate,
         setCustomRate,
-        effectiveUsdtRate,
+        effectiveRate,
         adjustStock
     };
 }

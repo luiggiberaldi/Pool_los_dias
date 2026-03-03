@@ -142,7 +142,7 @@ export default function WalletView({ rates }) {
         } else if (account.type === 'zelle') {
             message = `🇺🇸 *Datos Zelle*\n\n✉️ Correo: ${account.email}\n👤 Titular: ${account.holder}\n\n`;
             if (amountBs && rates) {
-                const rateVal = selectedRate === 'bcv' ? rates.bcv.price : rates.usdt.price;
+                const rateVal = rates.bcv.price;
                 if (rateVal > 0) {
                     const amountUSD = parseFloat(amountBs) / rateVal;
                     message += `💵 Monto a enviar: $${amountUSD.toFixed(2)}\n(Ref: ${fmt(amountBs)} Bs a tasa ${selectedRate.toUpperCase()} ${fmt(rateVal)})`;
@@ -151,10 +151,10 @@ export default function WalletView({ rates }) {
         } else if (account.type === 'binance') {
             message = `🟡 *Datos Binance Pay*\n\n🆔 Pay ID / Correo: ${account.email}\n👤 Alias: ${account.holder || account.alias}\n\n`;
             if (amountBs && rates) {
-                const rateVal = selectedRate === 'bcv' ? rates.bcv.price : rates.usdt.price;
+                const rateVal = rates.bcv.price;
                 if (rateVal > 0) {
                     const amountUSD = parseFloat(amountBs) / rateVal;
-                    message += `💵 Monto a enviar: ${amountUSD.toFixed(2)} USDT\n(Ref: ${fmt(amountBs)} Bs a tasa ${selectedRate.toUpperCase()} ${fmt(rateVal)})`;
+                    message += `💵 Monto a enviar: ${amountUSD.toFixed(2)} USD\n(Ref: ${fmt(amountBs)} Bs a tasa BCV ${fmt(rateVal)})`;
                 }
             }
         }
@@ -394,15 +394,11 @@ export default function WalletView({ rates }) {
 
                                 {(showShareModal.type === 'zelle' || showShareModal.type === 'binance') && amountBs && rates && (
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl space-y-3">
-                                        <p className="text-xs font-bold text-slate-500 uppercase">Calcular a Tasa:</p>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button onClick={() => setSelectedRate('bcv')} className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${selectedRate === 'bcv' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-emerald-500' : 'bg-white dark:bg-slate-800 border-transparent text-slate-400'}`}>🏛️ BCV ({rates.bcv.price})</button>
-                                            <button onClick={() => setSelectedRate('usdt')} className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${selectedRate === 'usdt' ? 'bg-emerald-50 border-emerald-200 text-emerald-700 ring-1 ring-emerald-500' : 'bg-white dark:bg-slate-800 border-transparent text-slate-400'}`}>📈 USDT ({rates.usdt.price})</button>
-                                        </div>
+                                        <p className="text-xs font-bold text-slate-500 uppercase">Calcular a tasa BCV:</p>
                                         <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                                            <span className="text-xs text-slate-500">Recibirás ({showShareModal.type === 'binance' ? 'USDT' : 'USD'}):</span>
+                                            <span className="text-xs text-slate-500">Recibirás (USD):</span>
                                             <span className="text-xl font-black text-slate-800 dark:text-white">
-                                                {(parseFloat(amountBs) / (selectedRate === 'bcv' ? rates.bcv.price : rates.usdt.price)).toFixed(2)}
+                                                {(parseFloat(amountBs) / rates.bcv.price).toFixed(2)}
                                             </span>
                                         </div>
                                     </div>

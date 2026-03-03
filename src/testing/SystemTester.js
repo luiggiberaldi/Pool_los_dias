@@ -163,14 +163,14 @@ async function suiteCatalogoTasas() {
     ];
 
     for (const p of mockProducts) {
-        const precioBs = p.priceUsdt * rates.usdt.price;
+        const precioBs = p.priceUsdt * rates.bcv.price;
         const precioBcv = precioBs / rates.bcv.price;
 
         assert(!isNaN(precioBs) && precioBs !== undefined, `Precio en Bs para ${p.name} no es válido`);
         assert(!isNaN(precioBcv) && precioBcv !== undefined, `Precio BCV para ${p.name} no es válido`);
 
         // Sensibilidad
-        const tasaUsdtAlta = rates.usdt.price * 1.10; // +10%
+        const tasaUsdtAlta = rates.bcv.price * 1.10; // +10%
         const precioBsAlto = p.priceUsdt * tasaUsdtAlta;
         assert(precioBsAlto > precioBs, `Precio Bs no subió con aumento de tasa USDT (base: ${precioBs}, nuevo: ${precioBsAlto})`);
     }

@@ -42,8 +42,8 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
     };
 
     // Cálculos matemáticos
-    const spread = rates.bcv.price > 0 ? ((rates.usdt.price - rates.bcv.price) / rates.bcv.price) * 100 : 0;
-    const diffBs = rates.usdt.price - rates.bcv.price;
+    const spread = rates.euro.price > 0 && rates.bcv.price > 0 ? ((rates.euro.price - rates.bcv.price) / rates.bcv.price) * 100 : 0;
+    const diffBs = rates.euro.price - rates.bcv.price;
 
     const renderChange = (change) => {
         if (!change || change === 0) return null;
@@ -125,7 +125,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
                 {/* PRECIO GIGANTE (Responsive con vw) */}
                 <div className="flex flex-col items-center justify-center -mt-8">
                     <h1 className="text-[18vw] sm:text-[10rem] font-black font-mono leading-none tracking-tighter text-brand drop-shadow-[0_0_40px_rgba(255,204,0,0.2)]">
-                        {formatExactRate(rates.usdt.price)}
+                        {formatExactRate(rates.bcv.price)}
                     </h1>
                     <p className="text-xl sm:text-3xl text-slate-500 font-mono font-medium tracking-widest mt-2">1 USD = BS</p>
                 </div>
@@ -170,7 +170,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
     }
 
     // --- SKELETON LOADING (Carga inicial) ---
-    if (loading && (!rates || !rates.usdt || rates.usdt.price === 0)) {
+    if (loading && (!rates || !rates.bcv || rates.bcv.price === 0)) {
         return (
             <div className="space-y-8 pt-6 px-1 animate-pulse">
                 <div className="flex justify-between items-center mb-8 px-2">
@@ -241,7 +241,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
             {/* CONTENEDOR TARJETAS (FLEX-1 PARA OCUPAR ESPACIO Y CENTRAR) */}
             <div className="flex-1 flex flex-col justify-center gap-4 min-h-0">
 
-                {/* Tarjeta Principal USDT */}
+                {/* Tarjeta Principal BCV */}
                 <div className="relative group shrink-0">
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-brand/30 to-purple-500/30 rounded-[2.2rem] blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
                     <div className="relative bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-2xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-800 overflow-hidden">
@@ -249,28 +249,25 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex flex-col gap-1">
-                                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">Promedio P2P</span>
+                                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">Tasa Oficial</span>
                                 <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
-                                    Tasa USD {rates.usdt.type === 'p2p' && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                                    Dólar BCV <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                 </h2>
                             </div>
-                            {renderChange(rates.usdt.change)}
+                            {renderChange(rates.bcv.change)}
                         </div>
 
                         <div className="flex items-baseline gap-1 mb-4 select-none">
                             <span className="text-2xl text-slate-300 dark:text-slate-600 font-bold font-sans transform -translate-y-4">$</span>
                             <div className="text-[12vw] sm:text-[4rem] lg:text-[3.5rem] xl:text-[4rem] leading-none font-black text-slate-900 dark:text-white tracking-tighter font-mono">
-                                {formatExactRate(rates.usdt.price).split(',')[0]}
-                                <span className="text-3xl text-slate-400 dark:text-slate-600">,{formatExactRate(rates.usdt.price).split(',')[1]}</span>
+                                {formatExactRate(rates.bcv.price).split(',')[0]}
+                                <span className="text-3xl text-slate-400 dark:text-slate-600">,{formatExactRate(rates.bcv.price).split(',')[1]}</span>
                             </div>
                             <span className="text-xl font-bold text-slate-400 ml-2">Bs</span>
                         </div>
 
                         <div className="flex items-center gap-3 pt-4 border-t border-slate-50 dark:border-slate-800">
-                            <div className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${spread > 10 ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/20' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>
-                                Brecha: {spread.toFixed(2)}%
-                            </div>
-                            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 truncate">Diferencia: {formatVES(diffBs)} Bs</span>
+                            <span className="text-xs font-medium text-slate-400 dark:text-slate-500 truncate">Fuente: {rates.bcv.source || 'BCV Oficial'}</span>
                         </div>
                     </div>
                 </div>

@@ -81,7 +81,7 @@ export const standardTests = [
             const result = aiResult.convertedAmount;
             // [PDA v3.0] Realidad: Cash usa Tasa USDT como Proxy seguro (Fallback) o Tasa Calibrada.
             // Asumimos Fallback (USDT) para el test estándar.
-            const expected = Math.ceil(100 * rates.usdt.price);
+            const expected = Math.ceil(100 * rates.bcv.price);
 
             // Tolerancia del 10% por si hay tasa calibrada residual válida
             const diff = Math.abs(result - expected);
@@ -98,7 +98,7 @@ export const standardTests = [
         premium: true,
         validator: (aiResult, rates) => {
             const analysis = aiResult.analysis?.toLowerCase() || "";
-            if (analysis.includes('brecha') || (rates.usdt.price / rates.bcv.price > 1)) {
+            if (analysis.includes('brecha') || (rates.bcv.price / rates.bcv.price > 1)) {
                 return { ok: true, msg: 'Análisis de brecha detectado y coherente.' };
             }
             return { ok: false, msg: 'ERROR: El análisis no mencionó la brecha cambiaria.' };

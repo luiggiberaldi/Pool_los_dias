@@ -5,14 +5,13 @@ import { CurrencyService } from '../services/CurrencyService'; // [NEW]
 export function useCalculator(rates) {
   const [amountTop, setAmountTop] = useState('');
   const [amountBot, setAmountBot] = useState('');
-  const [from, setFrom] = useState('USDT');
+  const [from, setFrom] = useState('BCV');
   const [to, setTo] = useState('VES');
   const [lastEdited, setLastEdited] = useState('top');
 
   const currencies = [
     { id: 'VES', label: 'Bs.', icon: '🇻🇪', rate: 1 },
-    { id: 'USDT', label: 'USD', icon: '💵', rate: rates.usdt.price },
-    { id: 'BCV', label: '$ BCV', icon: '🏛️', rate: rates.bcv.price },
+    { id: 'BCV', label: 'USD', icon: '💵', rate: rates.bcv.price },
     { id: 'EUR', label: 'Euro', icon: '💶', rate: rates.euro.price },
   ];
 

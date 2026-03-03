@@ -24,7 +24,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         streetRate, setStreetRate,
         useAutoRate, setUseAutoRate,
         customRate, setCustomRate,
-        effectiveUsdtRate,
+        effectiveRate,
         adjustStock: baseAdjustStock
     } = useProducts(rates);
 
@@ -142,25 +142,25 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handlePriceUsdChange = (val) => {
         setPriceUsd(val);
         if (!val || parseFloat(val) <= 0) { setPriceBs(''); return; }
-        setPriceBs((parseFloat(val) * effectiveUsdtRate).toFixed(2));
+        setPriceBs((parseFloat(val) * effectiveRate).toFixed(2));
     };
 
     const handlePriceBsChange = (val) => {
         setPriceBs(val);
         if (!val || parseFloat(val) <= 0) { setPriceUsd(''); return; }
-        setPriceUsd((parseFloat(val) / effectiveUsdtRate).toFixed(2));
+        setPriceUsd((parseFloat(val) / effectiveRate).toFixed(2));
     };
 
     const handleCostUsdChange = (val) => {
         setCostUsd(val);
         if (!val || parseFloat(val) <= 0) { setCostBs(''); return; }
-        setCostBs((parseFloat(val) * effectiveUsdtRate).toFixed(2));
+        setCostBs((parseFloat(val) * effectiveRate).toFixed(2));
     };
 
     const handleCostBsChange = (val) => {
         setCostBs(val);
         if (!val || parseFloat(val) <= 0) { setCostUsd(''); return; }
-        setCostUsd((parseFloat(val) / effectiveUsdtRate).toFixed(2));
+        setCostUsd((parseFloat(val) / effectiveRate).toFixed(2));
     };
 
     // ─── CRUD ───────────────────────────────────────────────
@@ -170,9 +170,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         if (!name || (!priceUsd && !priceBs)) return showToast('Nombre y precio requeridos', 'warning');
 
         const formattedName = name.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
-        const finalPriceUsd = priceUsd ? parseFloat(priceUsd) : (priceBs ? parseFloat(priceBs) / effectiveUsdtRate : 0);
-        const finalCostUsd = costUsd ? parseFloat(costUsd) : (costBs ? parseFloat(costBs) / effectiveUsdtRate : 0);
-        const finalCostBs = costBs ? parseFloat(costBs) : (costUsd ? parseFloat(costUsd) * effectiveUsdtRate : 0);
+        const finalPriceUsd = priceUsd ? parseFloat(priceUsd) : (priceBs ? parseFloat(priceBs) / effectiveRate : 0);
+        const finalCostUsd = costUsd ? parseFloat(costUsd) : (costBs ? parseFloat(costBs) / effectiveRate : 0);
+        const finalCostBs = costBs ? parseFloat(costBs) : (costUsd ? parseFloat(costUsd) * effectiveRate : 0);
 
         // Map packagingType → unit legacy
         let legacyUnit = 'unidad';
@@ -228,12 +228,12 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
         const currentPriceUsd = product.priceUsdt || 0;
         setPriceUsd(currentPriceUsd > 0 ? currentPriceUsd.toString() : '');
-        setPriceBs(currentPriceUsd > 0 ? (currentPriceUsd * effectiveUsdtRate).toFixed(2) : '');
+        setPriceBs(currentPriceUsd > 0 ? (currentPriceUsd * effectiveRate).toFixed(2) : '');
 
-        const currentCostUsd = product.costUsd || (product.costBs ? product.costBs / effectiveUsdtRate : 0);
+        const currentCostUsd = product.costUsd || (product.costBs ? product.costBs / effectiveRate : 0);
         setCostUsd(currentCostUsd > 0 ? currentCostUsd.toFixed(2) : '');
 
-        const currentCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveUsdtRate : 0);
+        const currentCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
         setCostBs(currentCostBs > 0 ? currentCostBs.toFixed(2) : '');
 
         setStock(product.stock ?? '');
@@ -450,7 +450,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 <ProductCard
                                     key={p.id}
                                     product={p}
-                                    effectiveUsdtRate={effectiveUsdtRate}
+                                    effectiveRate={effectiveRate}
                                     streetRate={streetRate}
                                     categories={categories}
                                     onAdjustStock={adjustStock}
@@ -507,7 +507,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             <ProductShareModal
                 isOpen={!!shareProduct} onClose={() => setShareProduct(null)}
                 product={shareProduct} accounts={accounts} streetRate={streetRate}
-                rates={{ ...rates, usdt: { ...rates.usdt, price: effectiveUsdtRate } }}
+                rates={{ ...rates, bcv: { ...rates.bcv, price: effectiveRate } }}
             />
 
             {/* Delete Modal */}

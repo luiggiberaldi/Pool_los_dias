@@ -160,7 +160,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
     const cartTotalBs = cartTotalUsd * effectiveRate;
     const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
-    // Add to cart — Convierte priceUsdt a $ BCV para uniformidad
+    // Add to cart — usa priceUsdt (legacy field name = precio en USD)
     const addToCart = useCallback((product, qtyOverride = null, forceMode = null) => {
         triggerHaptic && triggerHaptic();
         playAdd();
@@ -177,7 +177,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
             return;
         }
 
-        const usdtRate = effectiveRate;
         let priceToUse = product.priceUsdt;
         let cartId = product.id;
         let cartName = product.name;
@@ -190,7 +189,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
             cartName = product.name + ' (Ud.)';
         }
 
-        const priceInBcvUsd = (priceToUse * usdtRate) / effectiveRate;
+        const priceInBcvUsd = priceToUse;
 
         setCart(prev => {
             const existing = prev.find(i => i.id === cartId);

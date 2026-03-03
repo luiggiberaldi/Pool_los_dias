@@ -33,7 +33,7 @@ export const MessageService = {
         const rateFrom = currencies.find(c => c.id === from)?.rate;
 
         const isBsAccount = selectedAccount.currency === 'VES';
-        const automaticRefRate = isBsAccount ? rates.bcv.price : rates.usdt.price;
+        const automaticRefRate = rates.bcv.price;
 
         // Calcular Total Real
         let totalBsRaw = 0;

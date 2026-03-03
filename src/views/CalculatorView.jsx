@@ -2,7 +2,7 @@ import React from 'react';
 import { ManualMode } from '../components/calculator/ManualMode';
 import { useWallet } from '../hooks/useWallet';
 
-const SAFE_RATES = { usdt: { price: 0 }, bcv: { price: 0 }, euro: { price: 0 } };
+const SAFE_RATES = { bcv: { price: 0 }, euro: { price: 0 } };
 
 export default function CalculatorView({ rates, theme, triggerHaptic, isKeyboardOpen }) {
   const currentRates = rates || SAFE_RATES;
