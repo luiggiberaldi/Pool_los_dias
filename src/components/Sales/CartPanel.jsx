@@ -15,7 +15,7 @@ export default function CartPanel({
     triggerHaptic,
 }) {
     return (
-        <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm mb-14 sm:mb-0">
 
             {/* Header Lista */}
             <div className="px-4 pb-2 pt-3 sm:py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/50 rounded-t-2xl sm:rounded-t-3xl shrink-0">
