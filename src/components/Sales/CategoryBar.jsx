@@ -10,7 +10,7 @@ export default function CategoryBar({
     searchTerm = ''
 }) {
     return (
-        <div className={`${selectedCategory !== 'todos' && searchTerm.length === 0 ? 'flex-1 overflow-hidden flex flex-col min-h-0' : ''}`}>
+        <div className={`${selectedCategory !== 'todos' && searchTerm.length === 0 ? 'lg:flex-1 lg:overflow-hidden lg:flex lg:flex-col lg:min-h-0' : ''}`}>
             {/* Category Chips */}
             <div className="shrink-0 flex gap-1.5 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
                 {BODEGA_CATEGORIES.map(cat => {

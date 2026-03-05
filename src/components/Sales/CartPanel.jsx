@@ -15,7 +15,7 @@ export default function CartPanel({
     triggerHaptic,
 }) {
     return (
-        <div className="flex-1 min-h-0 flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div className="lg:flex-1 lg:min-h-0 flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
 
             {/* Header */}
             <div className="shrink-0 px-4 pb-2 pt-3 sm:py-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/50 rounded-t-2xl sm:rounded-t-3xl">
@@ -32,7 +32,7 @@ export default function CartPanel({
 
             {/* Cart Items — scrollable area with touch support */}
             <div
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2 sm:p-3"
+                className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto overscroll-contain p-2 sm:p-3"
                 style={{ WebkitOverflowScrolling: 'touch' }}
             >
                 {cart.length === 0 ? (
