@@ -172,7 +172,7 @@ export async function generateDailyClosePDF({
 
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
-            doc.text(`${p.qty} vendidos · Bs ${formatBs(p.revenue)}`, M + 5, y);
+            doc.text(`${p.qty} vendidos · $${p.revenue.toFixed(2)} · Bs ${formatBs(p.revenue * bcvRate)}`, M + 5, y);
             y += 5;
         });
 

@@ -174,9 +174,9 @@ export async function generateTicketPDF(sale, bcvRate) {
 
         if (sale.payments && sale.payments.length > 0) {
             sale.payments.forEach(p => {
-                const isBs = p.methodId.includes('_bs') || p.methodId === 'pago_movil';
+                const isBs = p.currency ? p.currency !== 'USD' : (p.methodId.includes('_bs') || p.methodId === 'pago_movil');
                 const val = isBs
-                    ? 'Bs ' + formatBs(p.amountUsd * rate)
+                    ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
                     : '$' + (p.amountUsd || 0).toFixed(2);
 
                 doc.setFont('helvetica', 'normal');

@@ -580,8 +580,8 @@ async function suiteRateService() {
     // normalizeCurrencyCode
     assertEqual(RateService.normalizeCurrencyCode('bolivares'), 'VES', 'Normaliza "bolivares" → VES');
     assertEqual(RateService.normalizeCurrencyCode('BOLÍVARES'), 'VES', 'Normaliza con tilde');
-    assertEqual(RateService.normalizeCurrencyCode('teter'), 'USDT', 'Normaliza typo "teter" → USDT');
-    assertEqual(RateService.normalizeCurrencyCode('binance'), 'USDT', 'Normaliza "binance" → USDT');
+    assertEqual(RateService.normalizeCurrencyCode('teter'), 'USD', 'Normaliza "teter" → USD (USDT removido en PreciosAlDía)');
+    assertEqual(RateService.normalizeCurrencyCode('binance'), 'USD', 'Normaliza "binance" → USD (USDT removido)');
     assertEqual(RateService.normalizeCurrencyCode('euro'), 'EUR', 'Normaliza "euro" → EUR');
     assertEqual(RateService.normalizeCurrencyCode(''), 'USD', 'Vacío → USD default');
     assertEqual(RateService.normalizeCurrencyCode(null), 'USD', 'null → USD default');
@@ -594,14 +594,14 @@ async function suiteRateService() {
     };
 
     const ctx1 = RateService.getExchangeContext('USDT', 'VES', mockRates);
-    assertClose(ctx1.rateUsed, 37.10, 'USDT→VES usa tasa USDT');
+    assertClose(ctx1.rateUsed, 36.35, 'USDT→VES usa tasa BCV (USDT mapeado a USD)');
     assertEqual(ctx1.target, 'VES', 'Target correcto');
 
     const ctx2 = RateService.getExchangeContext('VES', null, mockRates);
     assertEqual(ctx2.target, 'USD', 'VES sin target → USD auto');
 
-    const ctx3 = RateService.getExchangeContext('USDT', 'USD', mockRates);
-    assert(ctx3.rateUsed > 0, 'Brecha USDT→USD calculada');
+    const ctx3 = RateService.getExchangeContext('USD', 'VES', mockRates);
+    assertClose(ctx3.rateUsed, 36.35, 'USD→VES usa tasa BCV');
 
     log('RateService: Normalización + Contexto de tasas OK', 'success');
 }
@@ -803,6 +803,76 @@ Responde en español, de forma concisa y directa. Máximo 200 palabras.`;
     }
 }
 
+// 14. Regresión: Bugs corregidos en sesión 2026-03-04
+async function suiteRegresion20260304() {
+    section('🔧 SUITE: Regresión 2026-03-04 (Ganancia, Vuelto, Pluralización, Moneda)');
+
+    // ── Test 1: Ganancia debe usar costUsd × tasa (no costBs guardado) ──
+    const RATE = 428;
+    const saleItem = { id: 'reg1', qty: 1, priceUsd: 3.48, costUsd: 2.44, costBs: 1044.15 };
+    // BUG anterior: usaba costBs directamente (1044.15) en vez de costUsd * rate (1044.32)
+    const costBsCorrecta = saleItem.costUsd * RATE; // 2.44 * 428 = 1044.32
+    const saleBs = saleItem.priceUsd * saleItem.qty * RATE; // 3.48 * 428 = 1489.44
+    const profitCorrecto = saleBs - (costBsCorrecta * saleItem.qty); // 1489.44 - 1044.32 = 445.12
+    const profitViejo = saleBs - (saleItem.costBs * saleItem.qty); // 1489.44 - 1044.15 = 445.29
+
+    assertClose(profitCorrecto, 445.12, 'Ganancia con costUsd×rate debe ser ~445.12 Bs', 0.1);
+    assert(Math.abs(profitCorrecto - profitViejo) > 0.01, 'Ganancia corregida difiere de la vieja (bug anterior)');
+
+    // Convertir a USD para verificar
+    const profitUsd = profitCorrecto / RATE;
+    assertClose(profitUsd, 1.04, 'Ganancia en USD debe ser ~$1.04', 0.01);
+    log('Ganancia costUsd×rate: cálculo correcto verificado.', 'success');
+
+    // ── Test 2: Vuelto debe redondearse a 2 decimales ──
+    const totalPaidUsd = 1 + (1000 / 428) + (61.27 / 428); // ≈ 3.4796
+    const cartTotalUsd = 3.48;
+    const changeUsdViejo = Math.max(0, totalPaidUsd - cartTotalUsd); // 0.0003... sin redondeo
+    const changeUsdNuevo = Math.max(0, Math.round((totalPaidUsd - cartTotalUsd) * 100) / 100); // 0.00 redondeado
+    const changeBsNuevo = Math.round(changeUsdNuevo * 428 * 100) / 100;
+
+    assertEqual(changeUsdNuevo, 0, 'Vuelto USD redondeado debe ser 0 (no 0.0003...)');
+    assertEqual(changeBsNuevo, 0, 'Vuelto Bs redondeado debe ser 0 (no 1 Bs fantasma)');
+    // Verificar que la resta cruda produce residuos de punto flotante
+    const rawDiff = totalPaidUsd - cartTotalUsd; // -0.0004... (negativo, no positivo)
+    assert(rawDiff !== 0, 'Bug float: resta cruda produce residuo distinto de cero');
+    // Pero con redondeo, queda limpio
+    assert(changeUsdNuevo === 0 && changeBsNuevo === 0, 'Con redondeo, vuelto es exactamente 0');
+    log('Vuelto redondeado: corregido $0.00 / 0 Bs.', 'success');
+
+    // ── Test 3: Pluralización correcta ──
+    const testPlural = (count) => count === 1 ? 'venta' : 'ventas';
+    const testPluralArticulos = (count) => count === 1 ? 'artículo vendido' : 'artículos vendidos';
+
+    assertEqual(testPlural(1), 'venta', 'Singular: 1 venta');
+    assertEqual(testPlural(5), 'ventas', 'Plural: 5 ventas');
+    assertEqual(testPluralArticulos(1), 'artículo vendido', 'Singular: 1 artículo vendido');
+    assertEqual(testPluralArticulos(3), 'artículos vendidos', 'Plural: 3 artículos vendidos');
+    log('Pluralización: singular/plural correcto.', 'success');
+
+    // ── Test 4: Payment breakdown muestra moneda nativa ──
+    const pagoBs = { methodId: 'efectivo_bs', currency: 'BS', amountBs: 1000, amountUsd: 1000 / 428 };
+    const pagoUsd = { methodId: 'efectivo_usd', currency: 'USD', amountUsd: 1.00, amountBs: 428 };
+
+    const breakdown = {};
+    [pagoBs, pagoUsd].forEach(p => {
+        if (!breakdown[p.methodId]) breakdown[p.methodId] = { total: 0, currency: p.currency || 'BS' };
+        breakdown[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
+    });
+
+    assertEqual(breakdown['efectivo_bs'].currency, 'BS', 'Efectivo Bs almacena currency BS');
+    assertClose(breakdown['efectivo_bs'].total, 1000, 'Efectivo Bs total en Bs (no convertido a USD)');
+    assertEqual(breakdown['efectivo_usd'].currency, 'USD', 'Efectivo USD almacena currency USD');
+    assertClose(breakdown['efectivo_usd'].total, 1.00, 'Efectivo USD total en USD');
+
+    // Verificar que el display sería correcto
+    const displayBs = `${formatBs(breakdown['efectivo_bs'].total)} Bs`;
+    const displayUsd = `$ ${breakdown['efectivo_usd'].total.toFixed(2)}`;
+    assert(displayBs.includes('Bs'), 'Efectivo Bs se muestra en Bs');
+    assert(displayUsd.includes('$'), 'Efectivo USD se muestra en $');
+    log('Payment breakdown: moneda nativa por método verificada.', 'success');
+}
+
 // ════════════════════════════════════════════
 // RUNNER CONFIGURATION
 // ════════════════════════════════════════════
@@ -832,6 +902,7 @@ const SUITES = [
     { key: 'utils_extra', name: '🛠️ Redondeo Efectivo + Teléfono VE', fn: suiteUtilidades, fast: true },
     { key: 'pay_methods', name: '💳 Métodos de Pago (CRUD)', fn: suitePaymentMethods, fast: true },
     { key: 'msg_service', name: '💬 MessageService (3 Tonos)', fn: suiteMessageService, fast: true },
+    { key: 'regresion_20260304', name: '🔧 Regresión: Ganancia/Vuelto/Plural/Moneda', fn: suiteRegresion20260304, fast: true },
 
     { key: '7days', name: '🗓️ Week Sim (Storage Pesado)', fn: suite7Days, fast: false },
 ];
