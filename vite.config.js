@@ -15,8 +15,8 @@ export default defineConfig({
         clientsClaim: true,
       },
       manifest: {
-        name: 'Precios al Día - Punto de Venta',
-        short_name: 'Bodega PV',
+        name: 'Precios Al Día — Bodegas',
+        short_name: 'PreciosAlDía Bodegas',
         description: 'Punto de venta bimoneda y gestor de inventario para bodegas de Venezuela',
         theme_color: '#10B981', // Emerald 500
         background_color: '#10B981', // Verde esmeralda de la marca

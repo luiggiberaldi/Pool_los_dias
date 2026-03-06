@@ -81,7 +81,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
             const dateStr = new Date().toLocaleDateString('es-VE').replace(/\//g, '-');
             const timeStr = new Date().toLocaleTimeString('es-VE', { hour12: false }).replace(/:/g, '');
 
-            link.download = `TasasAlDía_${dateStr}_${timeStr}.jpg`;
+            link.download = `PreciosAlDía_${dateStr}_${timeStr}.jpg`;
             link.href = image;
             document.body.appendChild(link);
             link.click();
@@ -116,7 +116,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
                 {/* Encabezado Kiosco */}
                 <div className="flex flex-col items-center mt-12 gap-4">
-                    <img src="/logodark.png" alt="TasasAlDía" className="h-20 w-auto object-contain drop-shadow-lg" />
+                    <img src="/logodark.png" alt="PreciosAlDía" className="h-20 w-auto object-contain drop-shadow-lg" />
                     <div className="bg-slate-800/60 px-4 py-1.5 rounded-full border border-slate-700/50 backdrop-blur-md">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">MONITOR EN TIEMPO REAL</p>
                     </div>
@@ -195,14 +195,12 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
             {/* HEADER */}
             <header className="flex items-center justify-between pt-[env(safe-area-inset-top)] pb-2 px-3 sm:px-4 shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}>
-                <div className="flex flex-col items-start gap-1">
+                <div className="flex items-center gap-1">
                     <button onClick={handleSecretDebug} className="active:scale-95 transition-transform outline-none">
-                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="TasasAlDía" className="h-10 sm:h-12 w-auto object-contain animate-in fade-in slide-in-from-left-2 duration-500 drop-shadow-sm" />
+                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="PreciosAlDía" className="h-10 sm:h-12 w-auto object-contain drop-shadow-sm" />
                     </button>
-                    <div className="flex items-center gap-2 ml-1 mt-0.5">
-                        <div className="bg-slate-100 dark:bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm pointer-events-none">
-                            <p className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.15em] leading-none">V3.0 FÉNIX</p>
-                        </div>
+                    <div className="flex items-center gap-1.5 ml-1">
+                        <span className="bg-emerald-600 dark:bg-emerald-500/10 text-white dark:text-emerald-400 px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-[0.12em] leading-none border border-emerald-700 dark:border-emerald-500/20">Bodegas</span>
                         <button
                             onClick={() => { triggerHaptic && triggerHaptic(); toggleTheme(); }}
                             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity active:scale-90 outline-none"

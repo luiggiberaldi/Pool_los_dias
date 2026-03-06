@@ -167,7 +167,7 @@ export const runAudit = async (rates, logCallback) => {
     logCallback(`📊 Score Final: ${finalScore.toFixed(0)}% (${passed}/${standardTests.length})`);
 
     if (finalScore === 100) {
-        logCallback('🏆 SISTEMA CERTIFICADO: TasasAlDía es apto para despliegue.');
+        logCallback('🏆 SISTEMA CERTIFICADO: PreciosAlDía es apto para despliegue.');
     } else {
         logCallback('⚠️ ATENCIÓN: Se requieren ajustes en el prompt o lógica del sistema.');
     }

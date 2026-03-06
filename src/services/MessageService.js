@@ -111,7 +111,7 @@ export const MessageService = {
 
         if (!selectedAccount) {
             // Fallback más limpio si falla la data
-            return `${greeting} ${intro}\n\n[Datos de cuenta no cargados]\n\nGenerado con TasasAlDía`;
+            return `${greeting} ${intro}\n\n[Datos de cuenta no cargados]\n\nGenerado con PreciosAlDía`;
         }
 
         let details = '';
@@ -135,9 +135,9 @@ export const MessageService = {
 
         // Final Assembly
         if (tone === 'direct') {
-            return `${greeting}\n\n${intro}\n\n${details}\n\nTasasAlDía`;
+            return `${greeting}\n\n${intro}\n\n${details}\n\nPreciosAlDía`;
         }
 
-        return `${greeting} ${intro}\n\n${details}\n\nGenerado con TasasAlDía`;
+        return `${greeting} ${intro}\n\n${details}\n\nGenerado con PreciosAlDía`;
     }
 };
