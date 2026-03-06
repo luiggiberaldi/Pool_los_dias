@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
@@ -21,6 +21,12 @@ import { useOfflineQueue } from './hooks/useOfflineQueue';
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [showIOSInstall, setShowIOSInstall] = useState(false);
+
+  // Detectar iOS Safari (no standalone) para mostrar instrucciones manuales
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const showIOSButton = isIOS && !isStandalone && !localStorage.getItem('ios_install_dismissed');
 
   // Admin Panel States
   const [adminClicks, setAdminClicks] = useState(0);
@@ -269,6 +275,47 @@ export default function App() {
                 <Download size={20} strokeWidth={3} />
               </button>
             )}
+
+            {/* iOS: botón manual de instalación */}
+            {!installPrompt && showIOSButton && activeTab === 'inicio' && (
+              <button onClick={() => { triggerHaptic(); setShowIOSInstall(true); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-emerald-500 text-white shadow-md animate-pulse">
+                <Download size={20} strokeWidth={3} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* iOS Install Instructions Modal */}
+      {showIOSInstall && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/60 backdrop-blur-sm flex items-end justify-center p-0 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-t-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-200">
+            <div className="flex justify-between items-start mb-5">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 dark:text-white">Instalar App</h3>
+                <p className="text-xs text-slate-400 mt-1">Sigue estos pasos en Safari</p>
+              </div>
+              <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-sm">1</div>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Toca el botón <strong>Compartir</strong> <span className="inline-block w-5 h-5 align-middle">⬆️</span> en la barra de Safari</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-sm">2</div>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Busca y toca <strong>"Agregar a la pantalla de inicio"</strong></p>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center shrink-0 text-emerald-600 font-bold text-sm">✓</div>
+                <p className="text-sm text-slate-600 dark:text-slate-300">¡Listo! La app aparecerá como un ícono en tu teléfono</p>
+              </div>
+            </div>
+            <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="w-full mt-6 py-3 bg-emerald-500 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
+              Entendido
+            </button>
           </div>
         </div>
       )}
