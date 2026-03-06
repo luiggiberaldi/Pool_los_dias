@@ -411,18 +411,19 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6 pt-2">
-                <div className="relative h-14 sm:h-16">
-                    <img src="/logo.png" alt="Logo Precios al Día" className={`h-14 sm:h-16 w-auto object-contain drop-shadow-md transition-opacity duration-200 ${theme === 'dark' ? 'opacity-0 absolute' : 'opacity-100'}`} />
-                    <img src="/logodark.png" alt="Logo Precios al Día" className={`h-14 sm:h-16 w-auto object-contain drop-shadow-md transition-opacity duration-200 ${theme === 'dark' ? 'opacity-100' : 'opacity-0 absolute'}`} />
+            <div className="flex items-center justify-between mb-4 pt-2">
+                <div className="flex flex-col items-start gap-0.5">
+                    <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
+                    <div className="flex items-center gap-1.5 pl-3">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>
+                        <button
+                            onClick={() => { triggerHaptic(); toggleTheme(); }}
+                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity active:scale-90 outline-none"
+                        >
+                            {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
+                        </button>
+                    </div>
                 </div>
-                <button
-                    onClick={() => { triggerHaptic(); toggleTheme(); }}
-                    className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-90 transition-all"
-                    title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-                >
-                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
             </div>
 
             {/* Acciones Rápidas */}

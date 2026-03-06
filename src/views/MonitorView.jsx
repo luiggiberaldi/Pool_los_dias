@@ -195,17 +195,17 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
             {/* HEADER */}
             <header className="flex items-center justify-between pt-[env(safe-area-inset-top)] pb-2 px-3 sm:px-4 shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col items-start gap-0.5">
                     <button onClick={handleSecretDebug} className="active:scale-95 transition-transform outline-none">
-                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="PreciosAlDía" className="h-10 sm:h-12 w-auto object-contain drop-shadow-sm" />
+                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
                     </button>
-                    <div className="flex items-center gap-1.5 ml-1">
-                        <span className="bg-emerald-600 dark:bg-emerald-500/10 text-white dark:text-emerald-400 px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-[0.12em] leading-none border border-emerald-700 dark:border-emerald-500/20">Bodegas</span>
+                    <div className="flex items-center gap-1.5 pl-3">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>
                         <button
                             onClick={() => { triggerHaptic && triggerHaptic(); toggleTheme(); }}
                             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity active:scale-90 outline-none"
                         >
-                            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                            {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
                         </button>
                     </div>
                 </div>
