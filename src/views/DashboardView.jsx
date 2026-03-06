@@ -413,7 +413,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* Header */}
             <div className="flex items-center justify-between mb-4 pt-2">
                 <div className="flex flex-col items-start gap-0.5">
-                    <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
+                    <img src={theme === 'dark' ? '/logodark.png' : '/logo.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
                     <div className="flex items-center gap-1.5 pl-3">
                         <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>
                         <button
