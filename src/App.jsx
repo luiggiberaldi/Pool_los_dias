@@ -216,7 +216,7 @@ export default function App() {
         <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <PremiumGuard featureName="Punto de Venta" isShop={true}>
-              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} />
+              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
             </PremiumGuard>
           </ErrorBoundary>
         </div>

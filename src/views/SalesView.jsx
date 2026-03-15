@@ -20,7 +20,7 @@ import { buildReceiptWhatsAppUrl } from '../components/Sales/ReceiptShareHelper'
 
 const SALES_KEY = 'bodega_sales_v1';
 
-export default function SalesView({ rates, triggerHaptic, onNavigate }) {
+export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }) {
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
     const { notifySaleComplete, notifyLowStock } = useNotifications();
 
@@ -150,6 +150,15 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, []);
+
+    // Refresh products when tab becomes active (fix: both views always mounted)
+    useEffect(() => {
+        if (isActive && !isLoading) {
+            storageService.getItem('bodega_products_v1', []).then(saved => {
+                setProducts(saved);
+            });
+        }
+    }, [isActive]);
 
     // Return focus after closing modals
     useEffect(() => { if (!showCheckout && !showReceipt && searchInputRef.current) searchInputRef.current.focus(); }, [showCheckout, showReceipt]);
