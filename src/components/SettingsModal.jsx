@@ -182,6 +182,30 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                         </button>
                     </div>
 
+                    {/* Vender Sin Stock Toggle */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 flex items-center justify-between">
+                        <div>
+                            <h4 className="font-bold text-sm text-slate-700 dark:text-slate-200">Vender sin Stock</h4>
+                            <p className="text-[10px] text-slate-400 mt-1">Permitir ventas si el inventario es 0</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                const current = localStorage.getItem('allow_negative_stock') !== 'false';
+                                localStorage.setItem('allow_negative_stock', (!current).toString());
+                                forceHeartbeat();
+                                showToast("Configuración guardada", "success");
+                                if (triggerHaptic) triggerHaptic();
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                localStorage.getItem('allow_negative_stock') !== 'false' ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                            }`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                localStorage.getItem('allow_negative_stock') !== 'false' ? 'translate-x-6' : 'translate-x-1'
+                            }`} />
+                        </button>
+                    </div>
+
                     {/* Share Catalog Button */}
                     {onImport && (
                         <button

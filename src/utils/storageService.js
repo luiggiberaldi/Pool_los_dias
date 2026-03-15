@@ -93,11 +93,17 @@ export const storageService = {
     async setItem(key, value) {
         try {
             await localforage.setItem(key, value);
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
+            }
         } catch (error) {
             console.error(`[Storage Error] Guardando ${key}:`, error);
             // Fallback de emergencia a localStorage si falla algo catastrófico
             try {
                 localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
+                }
             } catch (e) {
                 console.error(`[Storage Error CRÍTICO] Ni IndexedDB ni LocalStorage funcionan para ${key}`, e);
             }

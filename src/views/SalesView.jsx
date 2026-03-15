@@ -268,6 +268,15 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             return;
         }
 
+        // Validación temprana de stock (si la configuración lo exige)
+        const allowNegativeStock = localStorage.getItem('allow_negative_stock') !== 'false';
+        const currentStock = parseFloat(product.stock) || 0;
+        if (!allowNegativeStock && currentStock <= 0) {
+            playError();
+            showToast(`Sin stock disponible para: ${product.name}`, 'error');
+            return;
+        }
+
         playAdd();
 
         if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) { setHierarchyPending(product); return; }
