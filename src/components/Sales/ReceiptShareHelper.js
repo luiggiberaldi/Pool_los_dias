@@ -47,12 +47,30 @@ export function buildReceiptWhatsAppUrl(receipt) {
         : '';
 
     // Cliente
-    const clienteLine = r.customerName && r.customerName !== 'Consumidor Final'
-        ? `Cliente: ${r.customerName}\n`
-        : '';
+    let clienteStrContent = '';
+    if (r.customerName && r.customerName !== 'Consumidor Final') {
+        clienteStrContent += `Cliente: ${r.customerName}\n`;
+        if (r.customerDocument) {
+            clienteStrContent += `Documento: ${r.customerDocument}\n`;
+        }
+    }
+    const clienteLine = clienteStrContent;
+
+    const bName = localStorage.getItem('business_name');
+    const bRif = localStorage.getItem('business_rif');
+
+    let headerBlocks = [];
+    if (bName) {
+        headerBlocks.push(`*${bName.toUpperCase()}*`);
+        if (bRif) headerBlocks.push(`RIF: ${bRif}`);
+        headerBlocks.push(sep2);
+        headerBlocks.push(`COMPROBANTE DE VENTA`);
+    } else {
+        headerBlocks.push(`COMPROBANTE DE VENTA | PRECIOS AL DIA`);
+    }
 
     const text = [
-        `COMPROBANTE DE VENTA | PRECIOS AL DIA`,
+        ...headerBlocks,
         sep2,
         `Orden: #${saleNum}`,
         `${clienteLine}Fecha: ${fecha}`,

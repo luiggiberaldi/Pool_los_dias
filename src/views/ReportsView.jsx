@@ -96,7 +96,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
                 const p = products.find(p => p.id === item.id || p.id === item._originalId || p.name === item.name);
                 if (p) {
                     costBs = p.costUsd ? p.costUsd * saleRate : (p.costBs || 0);
-                    if (item.id && item.id.endsWith('_unit')) costBs = costBs / (p.unitsPerPackage || 1);
+                    if (item.id && typeof item.id === 'string' && item.id.endsWith('_unit')) costBs = costBs / (p.unitsPerPackage || 1);
                 } else {
                     costBs = 0;
                 }

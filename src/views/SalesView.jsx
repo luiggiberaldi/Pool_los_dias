@@ -278,6 +278,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
             changeBs: fiadoAmountUsd > 0 ? 0 : changeBs,
             customerId: selectedCustomerId || null,
             customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
+            customerDocument: selectedCustomer?.documentId || null,
             customerPhone: selectedCustomer?.phone || null,
             fiadoUsd: fiadoAmountUsd
         };
@@ -309,8 +310,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
         setCart([]); setShowCheckout(false); setSelectedCustomerId('');
     };
 
-    const handleCreateCustomer = async (name, phone) => {
-        const newCustomer = { id: crypto.randomUUID(), name, phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
+    const handleCreateCustomer = async (name, documentId, phone) => {
+        const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
         const updated = [...customers, newCustomer];
         setCustomers(updated);
         await storageService.setItem('my_customers_v1', updated);

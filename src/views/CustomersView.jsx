@@ -380,11 +380,18 @@ function CustomerCard({ customer, bcvRate, onClick }) {
             </div>
             <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-slate-800 dark:text-white text-sm truncate">{customer.name}</h3>
-                {customer.phone && (
-                    <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Phone size={10} /> {customer.phone}
-                    </p>
-                )}
+                <div className="flex items-center gap-2 mt-0.5">
+                    {customer.documentId && (
+                        <p className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                            {customer.documentId}
+                        </p>
+                    )}
+                    {customer.phone && (
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <Phone size={10} /> {customer.phone}
+                        </p>
+                    )}
+                </div>
             </div>
             <div className="text-right shrink-0">
                 {customer.deuda > 0 ? (
@@ -440,13 +447,20 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onRe
                         </div>
                         <div>
                             <h3 className="text-lg font-black text-slate-800 dark:text-white">{customer.name}</h3>
-                            {customer.phone && (
-                                <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                                    <Phone size={12} /> {customer.phone}
-                                </p>
-                            )}
+                            <div className="flex items-center gap-2 mt-0.5">
+                                {customer.documentId && (
+                                    <p className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                                        {customer.documentId}
+                                    </p>
+                                )}
+                                {customer.phone && (
+                                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                                        <Phone size={12} /> {customer.phone}
+                                    </p>
+                                )}
+                            </div>
                             {createdDate && (
-                                <p className="text-[10px] text-slate-400 mt-0.5">Cliente desde {createdDate}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Cliente desde {createdDate}</p>
                             )}
                         </div>
                     </div>
@@ -571,12 +585,13 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onDeuda, onAbono, onRe
 // ─── Sub-componente: Editar Cliente ───────────────────────
 function EditCustomerModal({ customer, onClose, onSave }) {
     const [name, setName] = useState(customer.name);
+    const [documentId, setDocumentId] = useState(customer.documentId || '');
     const [phone, setPhone] = useState(customer.phone || '');
 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        onSave({ ...customer, name: name.trim(), phone: phone.trim() });
+        onSave({ ...customer, name: name.trim(), documentId: documentId.trim(), phone: phone.trim() });
     };
 
     return (
@@ -600,6 +615,16 @@ function EditCustomerModal({ customer, onClose, onSave }) {
                             onChange={(e) => setName(e.target.value)}
                             className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
                             autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Cédula / RIF (Opcional)</label>
+                        <input
+                            type="text"
+                            value={documentId}
+                            onChange={(e) => setDocumentId(e.target.value.toUpperCase())}
+                            placeholder="V-12345678"
+                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium uppercase"
                         />
                     </div>
                     <div>
@@ -634,6 +659,7 @@ function EditCustomerModal({ customer, onClose, onSave }) {
 
 function AddCustomerModal({ onClose, onSave }) {
     const [name, setName] = useState('');
+    const [documentId, setDocumentId] = useState('');
     const [phone, setPhone] = useState('');
 
     const handleSubmit = (e) => {
@@ -643,6 +669,7 @@ function AddCustomerModal({ onClose, onSave }) {
         onSave({
             id: crypto.randomUUID(),
             name: name.trim(),
+            documentId: documentId.trim(),
             phone: phone.trim(),
             deuda: 0,
             favor: 0,
@@ -673,6 +700,16 @@ function AddCustomerModal({ onClose, onSave }) {
                             placeholder="Ej. María Pérez"
                             className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
                             autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Cédula / RIF (Opcional)</label>
+                        <input
+                            type="text"
+                            value={documentId}
+                            onChange={(e) => setDocumentId(e.target.value.toUpperCase())}
+                            placeholder="V-12345678"
+                            className="w-full form-input bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/50 transition-all font-medium uppercase"
                         />
                     </div>
                     <div>

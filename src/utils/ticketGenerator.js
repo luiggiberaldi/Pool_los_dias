@@ -83,6 +83,17 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.text(sale.customerName || 'Consumidor Final', M + 14, y);
     y += 6;
 
+    if (sale.customerDocument) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...INK);
+        doc.text('C.I/RIF:', M, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...BODY);
+        doc.text(sale.customerDocument, M + 14, y);
+        y += 6;
+    }
+
     dash(y); y += 5;
 
     // ════════════════════════════════════

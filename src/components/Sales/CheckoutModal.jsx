@@ -26,6 +26,7 @@ export default function CheckoutModal({
     const [showCustomerPicker, setShowCustomerPicker] = useState(false);
     const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
     const [newClientName, setNewClientName] = useState('');
+    const [newClientDocument, setNewClientDocument] = useState('');
     const [newClientPhone, setNewClientPhone] = useState('');
     const [savingClient, setSavingClient] = useState(false);
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
@@ -107,9 +108,10 @@ export default function CheckoutModal({
         if (!newClientName.trim() || !onCreateCustomer) return;
         setSavingClient(true);
         try {
-            const newCustomer = await onCreateCustomer(newClientName.trim(), newClientPhone.trim());
+            const newCustomer = await onCreateCustomer(newClientName.trim(), newClientDocument.trim(), newClientPhone.trim());
             setSelectedCustomerId(newCustomer.id);
             setNewClientName('');
+            setNewClientDocument('');
             setNewClientPhone('');
             setShowNewCustomerForm(false);
             setShowCustomerPicker(false);
@@ -364,20 +366,6 @@ export default function CheckoutModal({
                                 >
                                     Consumidor Final
                                 </button>
-                                {customers.map(c => (
-                                    <button
-                                        key={c.id}
-                                        onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); }}
-                                        className={`w-full text-left px-4 py-2.5 text-sm font-medium border-t border-slate-100 dark:border-slate-800 transition-colors ${selectedCustomerId === c.id ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                    >
-                                        {c.name}
-                                        {c.deuda !== 0 && (
-                                            <span className={`ml-2 text-xs font-bold ${c.deuda > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                {c.deuda > 0 ? `Debe $${c.deuda.toFixed(2)}` : `Favor $${Math.abs(c.deuda).toFixed(2)}`}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
 
                                 {/* Separador */}
                                 <div className="border-t border-slate-100 dark:border-slate-800" />
@@ -402,6 +390,14 @@ export default function CheckoutModal({
                                             onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
                                             className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
                                         />
+                                        <input
+                                            type="text"
+                                            placeholder="Cédula / RIF (Opcional)"
+                                            value={newClientDocument}
+                                            onChange={e => setNewClientDocument(e.target.value.toUpperCase())}
+                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 uppercase"
+                                        />
                                         <div className="w-full flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all overflow-hidden">
                                             <span className="px-2 py-2 text-xs font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shrink-0 select-none">+58</span>
                                             <input
@@ -418,7 +414,7 @@ export default function CheckoutModal({
                                         </div>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientPhone(''); }}
+                                                onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientDocument(''); setNewClientPhone(''); }}
                                                 className="flex-1 py-1.5 text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                             >
                                                 Cancelar
@@ -434,6 +430,24 @@ export default function CheckoutModal({
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Separador */}
+                                <div className="border-t border-slate-100 dark:border-slate-800" />
+
+                                {customers.map(c => (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => { setSelectedCustomerId(c.id); setShowCustomerPicker(false); }}
+                                        className={`w-full text-left px-4 py-2.5 text-sm font-medium border-t border-slate-100 dark:border-slate-800 transition-colors ${selectedCustomerId === c.id ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                    >
+                                        {c.name}
+                                        {c.deuda !== 0 && (
+                                            <span className={`ml-2 text-xs font-bold ${c.deuda > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                                {c.deuda > 0 ? `Debe $${c.deuda.toFixed(2)}` : `Favor $${Math.abs(c.deuda).toFixed(2)}`}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>

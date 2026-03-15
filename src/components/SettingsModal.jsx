@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Download, AlertTriangle, Check, X, Database, Share2, Fingerprint, Copy } from 'lucide-react';
+import { Upload, Download, AlertTriangle, Check, X, Database, Share2, Fingerprint, Copy, Store } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from './Settings/PaymentMethodsManager';
@@ -12,6 +12,22 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
     const fileInputRef = useRef(null);
     const { deviceId } = useSecurity();
     const [idCopied, setIdCopied] = useState(false);
+
+    // Configuración del negocio (Ticket WhatsApp)
+    const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
+    const [businessRif, setBusinessRif] = useState(() => localStorage.getItem('business_rif') || '');
+
+    const handleNameChange = (e) => {
+        const val = e.target.value;
+        setBusinessName(val);
+        localStorage.setItem('business_name', val);
+    };
+
+    const handleRifChange = (e) => {
+        const val = e.target.value;
+        setBusinessRif(val);
+        localStorage.setItem('business_rif', val);
+    };
 
     if (!isOpen) return null;
 
@@ -35,7 +51,9 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                     catalog_use_auto_usdt: localStorage.getItem('catalog_use_auto_usdt'),
                     catalog_custom_usdt_price: localStorage.getItem('catalog_custom_usdt_price'),
                     catalog_show_cash_price: localStorage.getItem('catalog_show_cash_price'),
-                    monitor_rates_v12: localStorage.getItem('monitor_rates_v12')
+                    monitor_rates_v12: localStorage.getItem('monitor_rates_v12'),
+                    business_name: localStorage.getItem('business_name'),
+                    business_rif: localStorage.getItem('business_rif')
                 }
             };
 
@@ -89,6 +107,8 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                 if (json.data.catalog_custom_usdt_price) localStorage.setItem('catalog_custom_usdt_price', json.data.catalog_custom_usdt_price);
                 if (json.data.catalog_show_cash_price) localStorage.setItem('catalog_show_cash_price', json.data.catalog_show_cash_price);
                 if (json.data.monitor_rates_v12) localStorage.setItem('monitor_rates_v12', json.data.monitor_rates_v12);
+                if (json.data.business_name) localStorage.setItem('business_name', json.data.business_name);
+                if (json.data.business_rif) localStorage.setItem('business_rif', json.data.business_rif);
 
                 setImportStatus('success');
                 setStatusMessage('Datos restaurados. Recargando...');
@@ -120,6 +140,36 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
 
                 {/* Body */}
                 <div className="p-5 space-y-3 overflow-y-auto">
+
+                    {/* Datos del Ticket (WhatsApp) */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Store size={14} className="text-slate-500" />
+                            <h4 className="font-bold text-xs text-slate-700 dark:text-slate-200">Datos para Ticket WhatsApp</h4>
+                        </div>
+                        
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nombre del Negocio</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: Mi Bodega C.A." 
+                                value={businessName}
+                                onChange={handleNameChange}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">RIF o Documento</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: J-12345678" 
+                                value={businessRif}
+                                onChange={handleRifChange}
+                                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            />
+                        </div>
+                    </div>
 
                     {/* Share Catalog Button */}
                     {onImport && (
