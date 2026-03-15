@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
 
-const STORAGE_KEY = 'my_accounts_v2';
+const STORAGE_KEY = 'bodega_accounts_v2';
 
 export function useWallet() {
   const [accounts, setAccounts] = useState([]);

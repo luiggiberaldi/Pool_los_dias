@@ -73,9 +73,16 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
     });
 
     // ── Derived (memos) ───────────────────────────
-    const searchResults = useMemo(() => searchTerm.length >= 1
-        ? products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.barcode?.includes(searchTerm)).slice(0, 6)
-        : [], [searchTerm, products]);
+    const searchResults = useMemo(() => {
+        if (searchTerm.length < 1) return [];
+        const normalizedTerm = searchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        return products.filter(p => {
+            if (p.barcode?.includes(searchTerm)) return true;
+            const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return normalizedName.includes(normalizedTerm);
+        }).slice(0, 6);
+    }, [searchTerm, products]);
 
     const filteredByCategory = useMemo(() => selectedCategory === 'todos'
         ? products
@@ -105,8 +112,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
         let mounted = true;
         const load = async () => {
             const [saved, savedCustomers, methods] = await Promise.all([
-                storageService.getItem('my_products_v1', []),
-                storageService.getItem('my_customers_v1', []),
+                storageService.getItem('bodega_products_v1', []),
+                storageService.getItem('bodega_customers_v1', []),
                 getActivePaymentMethods()
             ]);
             if (mounted) {
@@ -139,7 +146,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
 
     // Refresh products on window focus
     useEffect(() => {
-        const handleFocus = async () => { setProducts(await storageService.getItem('my_products_v1', [])); };
+        const handleFocus = async () => { setProducts(await storageService.getItem('bodega_products_v1', [])); };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }, []);
@@ -293,7 +300,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
             return cartItem ? { ...p, stock: Math.max(0, (p.stock ?? 0) - cartItem.qty) } : p;
         });
         setProducts(updatedProducts);
-        await storageService.setItem('my_products_v1', updatedProducts);
+        await storageService.setItem('bodega_products_v1', updatedProducts);
 
         // Update customer debt
         const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
@@ -301,7 +308,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
         if (selectedCustomer && debtIncurred > 0) {
             const updatedCustomers = customers.map(c => c.id === selectedCustomer.id ? { ...c, deuda: c.deuda + debtIncurred } : c);
             setCustomers(updatedCustomers);
-            await storageService.setItem('my_customers_v1', updatedCustomers);
+            await storageService.setItem('bodega_customers_v1', updatedCustomers);
         }
 
         setShowReceipt(sale); playCheckout(); setShowConfetti(true);
@@ -314,7 +321,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate }) {
         const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
         const updated = [...customers, newCustomer];
         setCustomers(updated);
-        await storageService.setItem('my_customers_v1', updated);
+        await storageService.setItem('bodega_customers_v1', updated);
         return newCustomer;
     };
 

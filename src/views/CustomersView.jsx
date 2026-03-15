@@ -31,7 +31,7 @@ export default function CustomersView({ triggerHaptic }) {
     }, []);
 
     const loadCustomers = async () => {
-        const saved = await storageService.getItem('my_customers_v1', []);
+        const saved = await storageService.getItem('bodega_customers_v1', []);
         setCustomers(saved);
     };
 
@@ -42,7 +42,7 @@ export default function CustomersView({ triggerHaptic }) {
 
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);
-        await storageService.setItem('my_customers_v1', updatedCustomers);
+        await storageService.setItem('bodega_customers_v1', updatedCustomers);
     };
 
     const filteredCustomers = customers.filter(c =>

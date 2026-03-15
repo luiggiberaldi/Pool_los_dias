@@ -2,9 +2,9 @@ import localforage from 'localforage';
 
 // Configuración inicial de IndexedDB
 localforage.config({
-    name: 'TasasAlDiaApp',
-    storeName: 'app_data',
-    description: 'Almacenamiento local optimizado para PWA'
+    name: 'BodegaApp',
+    storeName: 'bodega_app_data',
+    description: 'Almacenamiento local optimizado para PWA de Bodega'
 });
 
 /**

@@ -37,15 +37,15 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
             setImportStatus('loading');
             setStatusMessage('Generando backup...');
 
-            const allProducts = await storageService.getItem('my_products_v1', []);
-            const accounts = await storageService.getItem('my_accounts_v2', []);
+            const allProducts = await storageService.getItem('bodega_products_v1', []);
+            const accounts = await storageService.getItem('bodega_accounts_v2', []);
 
             const backupData = {
                 timestamp: new Date().toISOString(),
                 version: '1.0',
                 data: {
-                    my_products_v1: JSON.stringify(allProducts),
-                    my_accounts_v2: JSON.stringify(accounts),
+                    bodega_products_v1: JSON.stringify(allProducts),
+                    bodega_accounts_v2: JSON.stringify(accounts),
                     premium_token: localStorage.getItem('premium_token'),
                     street_rate_bs: localStorage.getItem('street_rate_bs'),
                     catalog_use_auto_usdt: localStorage.getItem('catalog_use_auto_usdt'),
@@ -91,15 +91,15 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                 setStatusMessage('Restaurando datos...');
                 const json = JSON.parse(e.target.result);
 
-                if (!json.data || (!json.data.my_products_v1 && !json.data.my_accounts_v2)) {
+                if (!json.data || (!json.data.bodega_products_v1 && !json.data.bodega_accounts_v2)) {
                     throw new Error('Formato de archivo inválido.');
                 }
 
-                if (json.data.my_products_v1) {
-                    await storageService.setItem('my_products_v1', typeof json.data.my_products_v1 === 'string' ? JSON.parse(json.data.my_products_v1) : json.data.my_products_v1);
+                if (json.data.bodega_products_v1) {
+                    await storageService.setItem('bodega_products_v1', typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1);
                 }
-                if (json.data.my_accounts_v2) {
-                    await storageService.setItem('my_accounts_v2', typeof json.data.my_accounts_v2 === 'string' ? JSON.parse(json.data.my_accounts_v2) : json.data.my_accounts_v2);
+                if (json.data.bodega_accounts_v2) {
+                    await storageService.setItem('bodega_accounts_v2', typeof json.data.bodega_accounts_v2 === 'string' ? JSON.parse(json.data.bodega_accounts_v2) : json.data.bodega_accounts_v2);
                 }
 
                 if (json.data.street_rate_bs) localStorage.setItem('street_rate_bs', json.data.street_rate_bs);

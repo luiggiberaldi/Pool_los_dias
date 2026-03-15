@@ -27,7 +27,7 @@ class ErrorBoundary extends React.Component {
             <button 
               onClick={() => {
                 localStorage.removeItem('calc_history');
-                localStorage.removeItem('my_accounts_v2');
+                localStorage.removeItem('bodega_accounts_v2');
                 window.location.reload();
               }} 
               className="px-6 py-3 bg-brand text-slate-900 rounded-xl font-bold hover:brightness-110 transition-all"

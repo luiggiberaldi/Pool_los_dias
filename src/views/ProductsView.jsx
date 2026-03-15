@@ -565,7 +565,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             triggerHaptic && triggerHaptic();
                             if (deleteAllConfirmText.trim().toUpperCase() === 'BORRAR') {
                                 setProducts([]);
-                                storageService.removeItem('my_products_v1');
+                                storageService.removeItem('bodega_products_v1');
                                 setIsDeleteAllModalOpen(false);
                                 setDeleteAllConfirmText('');
                             }
@@ -582,7 +582,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
             <ShareInventoryModal
                 isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} products={products}
-                onImport={(imported) => { setProducts(imported); storageService.setItem('my_products_v1', imported); }}
+                onImport={(imported) => { setProducts(imported); storageService.setItem('bodega_products_v1', imported); }}
             />
             <CategoryManagerModal
                 isOpen={isCategoryManagerOpen}

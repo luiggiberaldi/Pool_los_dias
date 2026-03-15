@@ -43,7 +43,7 @@ export default function WalletView({ rates }) {
     // Load accounts from storageService on mount
     useEffect(() => {
         let mounted = true;
-        storageService.getItem('my_accounts_v2', []).then(saved => {
+        storageService.getItem('bodega_accounts_v2', []).then(saved => {
             if (mounted) {
                 setAccounts(saved || []);
                 isLoaded.current = true;
@@ -85,7 +85,7 @@ export default function WalletView({ rates }) {
     // Save accounts to storageService (IndexedDB) whenever they change
     useEffect(() => {
         if (isLoaded.current) {
-            storageService.setItem('my_accounts_v2', accounts);
+            storageService.setItem('bodega_accounts_v2', accounts);
         }
     }, [accounts]);
 

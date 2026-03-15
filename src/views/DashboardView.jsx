@@ -41,8 +41,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         const load = async () => {
             const [savedSales, savedProducts, savedCustomers] = await Promise.all([
                 storageService.getItem(SALES_KEY, []),
-                storageService.getItem('my_products_v1', []),
-                storageService.getItem('my_customers_v1', []),
+                storageService.getItem('bodega_products_v1', []),
+                storageService.getItem('bodega_customers_v1', []),
             ]);
             if (mounted) {
                 setSales(savedSales);
@@ -78,8 +78,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             // 2. Revertir Stock
             const [savedProducts, savedCustomers] = await Promise.all([
-                storageService.getItem('my_products_v1', []),
-                storageService.getItem('my_customers_v1', [])
+                storageService.getItem('bodega_products_v1', []),
+                storageService.getItem('bodega_customers_v1', [])
             ]);
 
             let updatedProducts = savedProducts;
@@ -110,8 +110,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             // 4. Guardar todo
             await storageService.setItem(SALES_KEY, updatedSales);
-            await storageService.setItem('my_products_v1', updatedProducts);
-            await storageService.setItem('my_customers_v1', finalCustomers);
+            await storageService.setItem('bodega_products_v1', updatedProducts);
+            await storageService.setItem('bodega_customers_v1', finalCustomers);
 
             setSales(updatedSales);
             setProducts(updatedProducts); // actualizar kpi
@@ -189,7 +189,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         // 2. Guardar cliente en storage
         const updatedCustomers = [...customers, newCustomer];
         setCustomers(updatedCustomers);
-        await storageService.setItem('my_customers_v1', updatedCustomers);
+        await storageService.setItem('bodega_customers_v1', updatedCustomers);
 
         // 3. Actualizar la venta con el cliente nuevo
         const updatedSale = {
@@ -382,8 +382,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             setIsRefreshing(true);
             const [savedSales, savedProducts, savedCustomers] = await Promise.all([
                 storageService.getItem(SALES_KEY, []),
-                storageService.getItem('my_products_v1', []),
-                storageService.getItem('my_customers_v1', []),
+                storageService.getItem('bodega_products_v1', []),
+                storageService.getItem('bodega_customers_v1', []),
             ]);
             setSales(savedSales);
             setProducts(savedProducts);

@@ -29,7 +29,7 @@ export function useProducts(rates) {
     useEffect(() => {
         let isMounted = true;
         const loadData = async () => {
-            const savedProducts = await storageService.getItem('my_products_v1', []);
+            const savedProducts = await storageService.getItem('bodega_products_v1', []);
             const savedCategories = await storageService.getItem('my_categories_v1', BODEGA_CATEGORIES);
             if (isMounted) {
                 setProducts(savedProducts);
@@ -52,9 +52,9 @@ export function useProducts(rates) {
     useEffect(() => {
         if (!isLoadingProducts) {
             if (products.length > 0) {
-                storageService.setItem('my_products_v1', products);
+                storageService.setItem('bodega_products_v1', products);
             } else {
-                storageService.removeItem('my_products_v1');
+                storageService.removeItem('bodega_products_v1');
             }
             storageService.setItem('my_categories_v1', categories);
         }
