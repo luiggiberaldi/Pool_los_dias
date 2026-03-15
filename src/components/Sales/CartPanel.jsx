@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 
 export default function CartPanel({
@@ -45,17 +45,26 @@ export default function CartPanel({
                     <div className="space-y-2">
                         {cart.map(item => {
                             const qtyDisplay = item.isWeight ? `${item.qty.toFixed(3)} Kg` : item.qty;
+                            const isCustomProduct = item.id.toString().startsWith('custom_') || item.name === 'Venta Libre';
                             return (
                                 <div key={item.id} className="group bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2 pr-6 sm:p-3 sm:pr-10 border border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2 hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors relative">
                                     <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-slate-50 dark:bg-slate-950 flex items-center justify-center shrink-0 overflow-hidden">
-                                            {item.image ? <img src={item.image} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" /> : <Package size={16} className="text-slate-300 sm:w-[18px] sm:h-[18px]" />}
+                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${isCustomProduct ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600' : 'bg-slate-50 dark:bg-slate-950'}`}>
+                                            {item.image ? (
+                                                <img src={item.image} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+                                            ) : isCustomProduct ? (
+                                                <DollarSign size={20} className="sm:w-[22px] sm:h-[22px]" />
+                                            ) : (
+                                                <Package size={16} className="text-slate-300 sm:w-[18px] sm:h-[18px]" />
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0 pr-1">
                                             <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5 sm:mb-1 truncate">{item.name}</p>
                                             <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
                                                 <p className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
-                                                <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">{formatBs(item.priceUsd * effectiveRate)} Bs</p>
+                                                <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
+                                                    {item.exactBs != null ? formatBs(item.exactBs) : formatBs(item.priceUsd * effectiveRate)} Bs
+                                                </p>
                                             </div>
                                         </div>
                                     </div>

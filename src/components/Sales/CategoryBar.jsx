@@ -1,4 +1,4 @@
-import { Package } from 'lucide-react';
+import { Package, Calculator } from 'lucide-react';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS } from '../../config/categories';
 
 export default function CategoryBar({
@@ -7,12 +7,25 @@ export default function CategoryBar({
     filteredByCategory,
     addToCart,
     triggerHaptic,
-    searchTerm = ''
+    searchTerm = '',
+    onOpenCustomAmount
 }) {
     return (
         <div className={`${selectedCategory !== 'todos' && searchTerm.length === 0 ? 'lg:flex-1 lg:overflow-hidden lg:flex lg:flex-col lg:min-h-0' : ''}`}>
             {/* Category Chips */}
             <div className="shrink-0 flex gap-1.5 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide">
+                {/* Monto Libre Button */}
+                <button
+                    onClick={() => { triggerHaptic && triggerHaptic(); onOpenCustomAmount && onOpenCustomAmount(); }}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 shadow-sm"
+                >
+                    <Calculator size={14} />
+                    Monto Libre
+                </button>
+
+                {/* Divider */}
+                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 my-auto mx-0.5 rounded-full shrink-0" />
+
                 {BODEGA_CATEGORIES.map(cat => {
                     const isActive = selectedCategory === cat.id;
                     const CatIcon = CATEGORY_ICONS[cat.id];

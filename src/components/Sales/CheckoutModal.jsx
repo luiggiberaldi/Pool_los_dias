@@ -50,8 +50,11 @@ export default function CheckoutModal({
         , [barValues, paymentMethods, effectiveRate]);
 
     const remainingUsd = Math.max(0, cartTotalUsd - totalPaidUsd);
-    const remainingBs = remainingUsd * effectiveRate;
+    // Para remainingBs, tomamos la diferencia exacta de cartTotalBs - totalPaidBs para no perder decimales por tasa de cambio
+    const remainingBs = Math.max(0, cartTotalBs - totalPaidBs);
+    
     const changeUsd = Math.max(0, Math.round((totalPaidUsd - cartTotalUsd) * 100) / 100);
+    // Similar a remaining Bs, changeBs debería reflejar el redondeado a 2 decimales natural en Bs.
     const changeBs = Math.max(0, Math.round((totalPaidBs - cartTotalBs) * 100) / 100);
     const isPaid = remainingUsd < 0.009;
 
@@ -380,52 +383,63 @@ export default function CheckoutModal({
                                         Nuevo cliente...
                                     </button>
                                 ) : (
-                                    <div className="p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-1 duration-150">
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            placeholder="Nombre del cliente *"
-                                            value={newClientName}
-                                            onChange={e => setNewClientName(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
-                                        />
-                                        <input
-                                            type="text"
-                                            placeholder="Cédula / RIF (Opcional)"
-                                            value={newClientDocument}
-                                            onChange={e => setNewClientDocument(e.target.value.toUpperCase())}
-                                            onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                            className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 uppercase"
-                                        />
-                                        <div className="w-full flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all overflow-hidden">
-                                            <span className="px-2 py-2 text-xs font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shrink-0 select-none">+58</span>
-                                            <input
-                                                type="tel"
-                                                placeholder="0412 1234567"
-                                                value={newClientPhone}
-                                                onChange={e => {
-                                                    const clean = e.target.value.replace(/^\+?58/, '');
-                                                    setNewClientPhone(clean);
-                                                }}
-                                                onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
-                                                className="flex-1 bg-transparent px-2 py-2 text-sm text-slate-700 dark:text-white outline-none placeholder:text-slate-400"
-                                            />
+                                    <div className="p-4 space-y-3 bg-slate-50 dark:bg-slate-900/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="space-y-3 rounded-xl border border-emerald-100 dark:border-emerald-900/30 p-3 bg-emerald-50/50 dark:bg-emerald-900/10">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-emerald-700 dark:text-emerald-500 uppercase mb-1">Nombre del cliente *</label>
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    placeholder="Ej: Juan Pérez"
+                                                    value={newClientName}
+                                                    onChange={e => setNewClientName(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Cédula / RIF (Opcional)</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: V-12345678"
+                                                    value={newClientDocument}
+                                                    onChange={e => setNewClientDocument(e.target.value.toUpperCase())}
+                                                    onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                                    className="w-full text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all uppercase"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Teléfono (Opcional)</label>
+                                                <div className="w-full flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus-within:ring-2 focus-within:ring-emerald-500/50 transition-all overflow-hidden">
+                                                    <span className="px-3 py-2.5 text-xs font-black text-blue-500 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 shrink-0 select-none">+58</span>
+                                                    <input
+                                                        type="tel"
+                                                        placeholder="0412 1234567"
+                                                        value={newClientPhone}
+                                                        onChange={e => {
+                                                            const clean = e.target.value.replace(/^\+?58/, '');
+                                                            setNewClientPhone(clean);
+                                                        }}
+                                                        onKeyDown={e => e.key === 'Enter' && handleCreateClient()}
+                                                        className="flex-1 bg-transparent px-3 py-2.5 text-sm text-slate-700 dark:text-white outline-none placeholder:text-slate-400 font-medium"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 pt-1">
                                             <button
                                                 onClick={() => { setShowNewCustomerForm(false); setNewClientName(''); setNewClientDocument(''); setNewClientPhone(''); }}
-                                                className="flex-1 py-1.5 text-xs font-bold text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                                className="flex-1 py-2 text-sm font-bold text-slate-600 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all"
                                             >
                                                 Cancelar
                                             </button>
                                             <button
                                                 onClick={handleCreateClient}
                                                 disabled={!newClientName.trim() || savingClient}
-                                                className="flex-1 py-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                                                className="flex-1 py-2 text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-xl disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
                                             >
-                                                <Check size={13} />
-                                                {savingClient ? 'Guardando...' : 'Crear'}
+                                                <Check size={16} />
+                                                {savingClient ? 'Guardando...' : 'Crear y Usar'}
                                             </button>
                                         </div>
                                     </div>

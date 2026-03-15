@@ -54,6 +54,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     // Form State (Product Edit/Create)
     const [editingId, setEditingId] = useState(null);
     const [name, setName] = useState('');
+    const [barcode, setBarcode] = useState('');
     const [priceUsd, setPriceUsd] = useState('');
     const [priceBs, setPriceBs] = useState('');
     const [costUsd, setCostUsd] = useState('');
@@ -192,6 +193,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
         const productData = {
             name: formattedName,
+            barcode: barcode ? barcode.trim() : null,
             priceUsdt: finalPriceUsd,
             costUsd: finalCostUsd,
             costBs: finalCostBs,
@@ -225,6 +227,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         triggerHaptic && triggerHaptic();
         setEditingId(product.id);
         setName(product.name);
+        setBarcode(product.barcode || '');
 
         const currentPriceUsd = product.priceUsdt || 0;
         setPriceUsd(currentPriceUsd > 0 ? currentPriceUsd.toString() : '');
@@ -278,7 +281,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     const handleClose = () => {
-        setName(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
+        setName(''); setBarcode(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
         setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
     };
 
@@ -484,6 +487,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 isOpen={isModalOpen} onClose={handleClose} isEditing={!!editingId}
                 image={image} setImage={setImage}
                 name={name} setName={setName}
+                barcode={barcode} setBarcode={setBarcode}
                 category={category} setCategory={setCategory}
                 unit={unit} setUnit={setUnit}
                 priceUsd={priceUsd} handlePriceUsdChange={handlePriceUsdChange}

@@ -27,6 +27,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [ticketPendingSale, setTicketPendingSale] = useState(null);
     const [ticketClientName, setTicketClientName] = useState('');
     const [ticketClientPhone, setTicketClientPhone] = useState('');
+    const [ticketClientDocument, setTicketClientDocument] = useState('');
     const [recycleOffer, setRecycleOffer] = useState(null);
     const [pullDistance, setPullDistance] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -180,6 +181,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         const newCustomer = {
             id: crypto.randomUUID(),
             name: ticketClientName.trim(),
+            documentId: ticketClientDocument.trim() || '',
             phone: ticketClientPhone.trim() || '',
             deuda: 0,
             favor: 0,
@@ -206,6 +208,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         setTicketPendingSale(null);
         setTicketClientName('');
         setTicketClientPhone('');
+        setTicketClientDocument('');
 
         // 5. Enviar ticket por WhatsApp automáticamente
         handleShareWhatsApp(updatedSale);
@@ -628,7 +631,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {ticketPendingSale && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); }}
+                    onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
                 >
                     <div
                         className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
@@ -661,6 +664,18 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
+                                        Cédula / RIF (Opcional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={ticketClientDocument}
+                                        onChange={(e) => setTicketClientDocument(e.target.value.toUpperCase())}
+                                        placeholder="Ej: V-12345678"
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 flex items-center gap-1">
                                         <Phone size={10} /> Teléfono / WhatsApp
                                     </label>
                                     <input
@@ -675,7 +690,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </div>
                         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
                             <button
-                                onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); }}
+                                onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
                                 className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
                             >
                                 Cancelar

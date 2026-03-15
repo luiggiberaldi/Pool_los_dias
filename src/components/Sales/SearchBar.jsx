@@ -8,15 +8,16 @@ const SearchBar = forwardRef(function SearchBar({
     searchTerm,
     onSearchChange,
     onKeyDown,
+    onPasteBarcode,
     searchResults,
     selectedIndex,
     setSelectedIndex,
     effectiveRate,
     addToCart,
-    // Voice
     isRecording,
     isProcessingAudio,
-    toggleRecording,
+    startRecording,
+    stopRecording,
     // Popups
     hierarchyPending,
     setHierarchyPending,
@@ -32,6 +33,12 @@ const SearchBar = forwardRef(function SearchBar({
                 value={searchTerm}
                 onChange={e => onSearchChange(e.target.value)}
                 onKeyDown={onKeyDown}
+                onPaste={(e) => {
+                    const pastedData = e.clipboardData.getData('Text').trim();
+                    if (pastedData) {
+                        onPasteBarcode?.(pastedData);
+                    }
+                }}
                 placeholder="Buscar producto..."
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl sm:rounded-2xl py-3 pl-10 sm:pl-12 pr-14 sm:pr-20 text-slate-800 dark:text-white font-medium outline-none focus:ring-2 focus:ring-emerald-500/50 shadow-inner text-sm sm:text-base transition-all" />
 
@@ -42,14 +49,18 @@ const SearchBar = forwardRef(function SearchBar({
                     </button>
                 )}
                 <button
-                    onClick={(e) => { e.preventDefault(); toggleRecording(); }}
-                    className={`p-1.5 rounded-full transition-all flex items-center justify-center ${isRecording
-                        ? 'bg-red-100 text-red-500 shadow-inner animate-pulse'
+                    onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
+                    onPointerUp={(e) => { e.preventDefault(); stopRecording(); }}
+                    onPointerLeave={(e) => { if (isRecording) stopRecording(); }}
+                    // Prevenir el menú contextual en móvil al mantener presionado
+                    onContextMenu={(e) => e.preventDefault()}
+                    className={`p-1.5 rounded-full transition-all flex items-center justify-center select-none ${isRecording
+                        ? 'bg-red-100 text-red-500 shadow-inner animate-pulse scale-110'
                         : isProcessingAudio
                             ? 'bg-amber-100 text-amber-500'
                             : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30'
                         }`}
-                    title={isRecording ? "Detener grabación" : "Búsqueda por voz"}
+                    title={isRecording ? "Mantén presionado y habla" : "Mantén presionado para hablar"}
                 >
                     {isProcessingAudio ? (
                         <div className="w-[18px] h-[18px] border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />

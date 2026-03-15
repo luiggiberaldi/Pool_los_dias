@@ -6,14 +6,8 @@ export function useVoiceSearch({ onResult, triggerHaptic }) {
     const [isProcessingAudio, setIsProcessingAudio] = useState(false);
     const recognitionRef = useRef(null);
 
-    const toggleRecording = () => {
-        if (isRecording) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
-            setIsRecording(false);
-            return;
-        }
+    const startRecording = () => {
+        if (isRecording) return;
 
         // Web Speech API (nativa del navegador, sin necesidad de API key)
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -26,8 +20,10 @@ export function useVoiceSearch({ onResult, triggerHaptic }) {
             const recognition = new SpeechRecognition();
             recognition.lang = 'es-VE';
             recognition.continuous = false;
-            recognition.interimResults = false;
+            recognition.interimResults = true; // Permite ver resultados parciales
             recognition.maxAlternatives = 1;
+
+            let finalTranscript = '';
 
             recognition.onstart = () => {
                 setIsRecording(true);
@@ -35,12 +31,20 @@ export function useVoiceSearch({ onResult, triggerHaptic }) {
             };
 
             recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                const cleanText = transcript.replace(/[.,!?]$/, '').trim();
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                const currentText = finalTranscript || interimTranscript;
+                const cleanText = currentText.replace(/[.,!?]$/, '').trim();
+                
                 if (cleanText) {
                     onResult(cleanText);
                 }
-                setIsProcessingAudio(false);
             };
 
             recognition.onerror = (event) => {
@@ -57,6 +61,7 @@ export function useVoiceSearch({ onResult, triggerHaptic }) {
 
             recognition.onend = () => {
                 setIsRecording(false);
+                setIsProcessingAudio(false);
             };
 
             recognitionRef.current = recognition;
@@ -69,5 +74,12 @@ export function useVoiceSearch({ onResult, triggerHaptic }) {
         }
     };
 
-    return { isRecording, isProcessingAudio, toggleRecording };
+    const stopRecording = () => {
+        if (recognitionRef.current && isRecording) {
+            recognitionRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    return { isRecording, isProcessingAudio, startRecording, stopRecording };
 }

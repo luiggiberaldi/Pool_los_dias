@@ -3,6 +3,7 @@ import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useNotifications } from '../hooks/useNotifications';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 import { showToast } from '../components/Toast';
 
@@ -13,6 +14,7 @@ import CategoryBar from '../components/Sales/CategoryBar';
 import CartPanel from '../components/Sales/CartPanel';
 import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
+import CustomAmountModal from '../components/Sales/CustomAmountModal';
 
 import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
@@ -31,6 +33,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [isLoading, setIsLoading] = useState(true);
     const [showConfetti, setShowConfetti] = useState(false);
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+    const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
 
     // Cart
     const [cart, setCart] = useState(() => {
@@ -67,10 +70,82 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Voice
     const handleSetSearchTerm = (text) => { setSearchTerm(text); setSelectedIndex(0); };
-    const { isRecording, isProcessingAudio, toggleRecording } = useVoiceSearch({
-        onResult: (text) => { handleSetSearchTerm(text); searchInputRef.current?.focus(); },
+    const { isRecording, isProcessingAudio, startRecording, stopRecording } = useVoiceSearch({
+        onResult: (text) => { 
+            if (!text) return;
+            const normalizedTerm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const bestMatches = products.filter(p => {
+                const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return normalizedName.includes(normalizedTerm);
+            });
+
+            if (bestMatches.length > 0) {
+                // Auto-agregar la primera (mejor) coincidencia
+                addToCart(bestMatches[0]);
+                handleSetSearchTerm('');
+            } else {
+                playError();
+                showToast(`No encontré ningún producto parecido a "${text}"`, 'warning');
+                // Al menos dejamos el texto en el buscador por si el usuario quiere corregirlo manualmente
+                handleSetSearchTerm(text);
+                searchInputRef.current?.focus();
+            }
+        },
         triggerHaptic,
     });
+
+    // Barcode Scanner Global
+    useBarcodeScanner({
+        onScan: (barcode) => {
+            if (showCheckout || showReceipt || showClearCartConfirm) return;
+
+            // Pesa electrónica con PLU
+            if (barcode.startsWith('21') && barcode.length >= 13) {
+                const pluCode = parseInt(barcode.substring(2, 7), 10).toString();
+                const weightKg = parseInt(barcode.substring(7, 12), 10) / 1000;
+                const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(barcode.substring(0, 7)));
+                if (p) { addToCart({ ...p, isWeight: true }, weightKg); return; }
+            }
+
+            // Producto regular
+            const product = products.find(p => p.barcode === barcode || p.id === barcode);
+            if (product) {
+                addToCart(product);
+            } else {
+                playError();
+                showToast(`Producto no encontrado (${barcode})`, 'warning');
+            }
+        },
+        enabled: !isLoading && isActive
+    });
+
+    // Paste Barcode Handler (Para cuando el usuario hace Ctrl+V en la barra de búsqueda)
+    const handlePasteBarcode = (pastedText) => {
+        // Ignoramos si hay popups activos
+        if (showCheckout || showReceipt || showClearCartConfirm) return;
+
+        // Intentar Pesa Electrónica
+        if (pastedText.startsWith('21') && pastedText.length >= 13) {
+            const pluCode = parseInt(pastedText.substring(2, 7), 10).toString();
+            const weightKg = parseInt(pastedText.substring(7, 12), 10) / 1000;
+            const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(pastedText.substring(0, 7)));
+            if (p) { 
+                addToCart({ ...p, isWeight: true }, weightKg); 
+                // Limpiamos el texto que se acaba de pegar
+                setTimeout(() => setSearchTerm(''), 10);
+                return; 
+            }
+        }
+
+        // Buscar producto regular por código de barras o ID exactamente
+        const product = products.find(p => p.barcode === pastedText || p.id === pastedText);
+        if (product) {
+            addToCart(product);
+            // Limpiamos la barra tras pegarse
+            setTimeout(() => setSearchTerm(''), 10);
+        }
+        // Si no es un código exacto, no hacemos nada extra, el navegador lo pegará como texto normal para buscar.
+    };
 
     // ── Derived (memos) ───────────────────────────
     const searchResults = useMemo(() => {
@@ -89,7 +164,13 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         : products.filter(p => p.category === selectedCategory), [selectedCategory, products]);
 
     const cartTotalUsd = cart.reduce((sum, item) => sum + (item.priceUsd * item.qty), 0);
-    const cartTotalBs = cartTotalUsd * effectiveRate;
+    // Calcular el total en Bs usando exactBs cuando esté disponible, para evitar problemas de redondeo
+    const cartTotalBs = cart.reduce((sum, item) => {
+        if (item.exactBs != null) {
+            return sum + (item.exactBs * item.qty);
+        }
+        return sum + (item.priceUsd * item.qty * effectiveRate);
+    }, 0);
     const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -211,6 +292,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             const itemCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
             return [...prev, {
                 ...product, id: cartId, name: cartName, priceUsd: priceToUse,
+                exactBs: product.exactBs || null, // Guardar el valor exacto de Bs si existe (para montos libres)
                 costBs: forceMode === 'unit' ? itemCostBs / (product.unitsPerPackage || 1) : itemCostBs,
                 costUsd: forceMode === 'unit' ? (product.costUsd || 0) / (product.unitsPerPackage || 1) : (product.costUsd || 0),
                 qty: qtyToAdd, isWeight: !!qtyOverride,
@@ -334,6 +416,26 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         return newCustomer;
     };
 
+    const handleAddCustomAmount = (amountBs) => {
+        const amountUsd = parseFloat((amountBs / effectiveRate).toFixed(2));
+        if (amountUsd <= 0) return;
+        
+        const customProduct = {
+            id: `custom_${Date.now()}`,
+            name: 'Venta Libre',
+            priceUsdt: amountUsd, // Usamos priceUsdt para que la validación temprana lo acepte
+            exactBs: parseFloat(amountBs), // Monto exacto original en Bs
+            costBs: 0,
+            costUsd: 0,
+            unit: 'unidad',
+            category: 'otros',
+            stock: 9999,
+        };
+
+        addToCart(customProduct);
+        setShowCustomAmountModal(false);
+    };
+
     // ── Loading ───────────────────────────────────
     if (isLoading) {
         return (
@@ -368,11 +470,12 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                             searchTerm={searchTerm}
                             onSearchChange={handleSetSearchTerm}
                             onKeyDown={handleSearchKeyDown}
+                            onPasteBarcode={handlePasteBarcode}
                             searchResults={searchResults}
                             selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
                             effectiveRate={effectiveRate}
                             addToCart={addToCart}
-                            isRecording={isRecording} isProcessingAudio={isProcessingAudio} toggleRecording={toggleRecording}
+                            isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
                             hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
                             weightPending={weightPending} setWeightPending={setWeightPending}
                         />
@@ -386,6 +489,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                             addToCart={addToCart}
                             triggerHaptic={triggerHaptic}
                             searchTerm={searchTerm}
+                            onOpenCustomAmount={() => setShowCustomAmountModal(true)}
                         />
                     )}
 
@@ -434,6 +538,16 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
                 onShareWhatsApp={(r) => { window.open(buildReceiptWhatsAppUrl(r), '_blank'); }}
             />
+
+            {/* Custom Amount Modal */}
+            {showCustomAmountModal && (
+                <CustomAmountModal
+                    onClose={() => setShowCustomAmountModal(false)}
+                    onConfirm={handleAddCustomAmount}
+                    effectiveRate={effectiveRate}
+                    triggerHaptic={triggerHaptic}
+                />
+            )}
 
             {/* Clear Cart Confirm */}
             <ConfirmModal

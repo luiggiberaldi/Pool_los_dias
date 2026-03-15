@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode } from 'lucide-react';
 import { Modal } from '../Modal';
 
 const PACKAGING_TYPES = [
@@ -15,6 +15,7 @@ export default function ProductFormModal({
 
     image, setImage,
     name, setName,
+    barcode, setBarcode,
     category, setCategory,
     unit, setUnit,
     priceUsd, handlePriceUsdChange,
@@ -93,6 +94,16 @@ export default function ProductFormModal({
                         <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Nombre</label>
                         <input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Ej: Harina PAN 1kg"
                             className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 capitalize" />
+                    </div>
+
+                    {/* Barcode */}
+                    <div>
+                        <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Cód. de Barras (Opcional)</label>
+                        <div className="relative">
+                            <input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="Ej: 7591111222233"
+                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 pl-10 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
+                            <Barcode size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        </div>
                     </div>
 
                     {/* Category (full width) */}
@@ -357,6 +368,7 @@ export default function ProductFormModal({
                                     {isLote && <div className="flex justify-between"><span className="text-slate-400">Uds/Lote:</span><span className="font-bold text-indigo-500">{parsedUnits}</span></div>}
                                     {isLote && sellByUnit && <div className="flex justify-between"><span className="text-slate-400">Venta suelta:</span><span className="font-bold text-indigo-500">Sí — ${effectiveUnitPrice.toFixed(2)}/ud</span></div>}
                                     <div className="flex justify-between"><span className="text-slate-400">Stock:</span><span className="font-bold text-slate-700 dark:text-white">{isLote ? `${parsedStockLotes} lotes (${stockUnitsCalc} uds)` : `${stock || 0}`}</span></div>
+                                    {barcode && <div className="flex justify-between"><span className="text-slate-400">Código:</span><span className="font-bold text-slate-700 dark:text-white">{barcode}</span></div>}
                                 </div>
                             )}
                         </div>
