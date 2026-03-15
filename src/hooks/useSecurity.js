@@ -108,7 +108,8 @@ export function useSecurity() {
             // Auto-registro: registrar dispositivo si no existe (sin importar licencia)
             try {
                 if (import.meta.env.VITE_SUPABASE_URL) {
-                    await supabase.rpc('auto_register_device', { p_device_id: storedId, p_product_id: PRODUCT_ID });
+                    const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
+                    await supabase.rpc('auto_register_device', { p_device_id: storedId, p_product_id: PRODUCT_ID, p_client_name: clientName });
                 }
             } catch (e) { /* silencioso */ }
 
@@ -173,7 +174,8 @@ export function useSecurity() {
             verifyStatus(); // Chequeo constante
             try {
                 // Actualizar last_seen
-                await supabase.rpc('heartbeat_device', { p_device_id: deviceId, p_product_id: PRODUCT_ID });
+                const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
+                await supabase.rpc('heartbeat_device', { p_device_id: deviceId, p_product_id: PRODUCT_ID, p_client_name: clientName });
             } catch (e) { }
         };
 
@@ -360,14 +362,17 @@ export function useSecurity() {
             const migrateToSupabase = async () => {
                 try {
                     // Registrar dispositivo si no existe (RPC seguro, no INSERT directo)
+                    const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
                     await supabase.rpc('auto_register_device', {
                         p_device_id: currentDeviceId,
-                        p_product_id: PRODUCT_ID
+                        p_product_id: PRODUCT_ID,
+                        p_client_name: clientName
                     });
                     // Enviar heartbeat para actualizar last_seen
                     await supabase.rpc('heartbeat_device', {
                         p_device_id: currentDeviceId,
-                        p_product_id: PRODUCT_ID
+                        p_product_id: PRODUCT_ID,
+                        p_client_name: clientName
                     });
                 } catch (e) {
                     // Silencioso — nunca afecta la app

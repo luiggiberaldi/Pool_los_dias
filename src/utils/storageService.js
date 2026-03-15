@@ -26,6 +26,32 @@ export const storageService = {
                 return value;
             }
 
+            // --- INTENTO DE RECUPERAR DATOS ANTERIORES AUTOMÁTICAMENTE ---
+            try {
+                if (key === 'bodega_products_v1' || key === 'bodega_customers_v1' || key === 'bodega_accounts_v2') {
+                    const oldKeyMap = {
+                        'bodega_products_v1': 'my_products_v1',
+                        'bodega_customers_v1': 'my_customers_v1',
+                        'bodega_accounts_v2': 'my_accounts_v2',
+                    };
+                    const oldKey = oldKeyMap[key];
+                    if (oldKey) {
+                        const oldStore = localforage.createInstance({
+                            name: 'TasasAlDiaApp',
+                            storeName: 'app_data'
+                        });
+                        const oldVal = await oldStore.getItem(oldKey);
+                        if (oldVal !== null) {
+                            await localforage.setItem(key, oldVal);
+                            console.log(`[Migración Auto] Recuperado ${oldKey} -> ${key}`);
+                            return oldVal;
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error("Error intentando recuperar datos antiguos", e);
+            }
+
             // 2. Si no existe, revisar LocalStorage (Migración al vuelo)
             const fallbackValue = localStorage.getItem(key);
             if (fallbackValue !== null) {
