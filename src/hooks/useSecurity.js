@@ -318,6 +318,30 @@ export function useSecurity() {
             if (tokenObj && tokenObj.deviceId === currentDeviceId) {
                 // Token belongs to this device
                 const isTimeLimited = tokenObj.type === 'demo7' || tokenObj.isDemo; // retrocompatibilidad
+                // Verificar estado remoto antes de confiar en el token local
+                let revokedRemotely = false;
+                try {
+                    const { data: remoteLicense } = await supabase
+                        .from('licenses')
+                        .select('active, expires_at')
+                        .eq('device_id', currentDeviceId)
+                        .eq('product_id', PRODUCT_ID)
+                        .maybeSingle();
+
+                    if (remoteLicense && remoteLicense.active === false) {
+                        revokedRemotely = true;
+                    }
+                } catch (e) { /* Sin red → confiar en token local */ }
+
+                if (revokedRemotely) {
+                    localStorage.removeItem('pda_premium_token');
+                    setIsPremium(false);
+                    setIsDemo(false);
+                    setDemoExpiredMsg("Tu licencia ha sido desactivada por el administrador.");
+                    setLoading(false);
+                    return;
+                }
+
                 if (isTimeLimited) {
                     if (Date.now() < tokenObj.expires) {
                         setIsPremium(true);
@@ -513,10 +537,23 @@ export function useSecurity() {
         }
     };
 
-    /**
-     * Ya no se generan códigos en cliente.
-     */
     const generateCodeForClient = async () => null;
+
+    /**
+     * Fuerza un heartbeat manual para sincronizar cambios como el nombre del negocio de inmediato.
+     */
+    const forceHeartbeat = async () => {
+        const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
+        try {
+            await supabase.rpc('heartbeat_device', {
+                p_device_id: deviceId || localStorage.getItem('pda_device_id'),
+                p_product_id: PRODUCT_ID,
+                p_client_name: clientName
+            });
+        } catch(e) {
+            console.error('Error forcing heartbeat:', e);
+        }
+    };
 
     return {
         deviceId,
@@ -532,5 +569,6 @@ export function useSecurity() {
         dismissExpiredMsg: () => setDemoExpiredMsg(''),
         // FIX 3: demoUsed desde estado (IndexedDB)
         demoUsed,
+        forceHeartbeat,
     };
 }

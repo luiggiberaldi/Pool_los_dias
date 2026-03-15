@@ -10,7 +10,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
     const [importStatus, setImportStatus] = useState(null);
     const [statusMessage, setStatusMessage] = useState('');
     const fileInputRef = useRef(null);
-    const { deviceId } = useSecurity();
+    const { deviceId, forceHeartbeat } = useSecurity();
     const [idCopied, setIdCopied] = useState(false);
 
     // Configuración del negocio (Ticket WhatsApp)
@@ -18,15 +18,19 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
     const [businessRif, setBusinessRif] = useState(() => localStorage.getItem('business_rif') || '');
 
     const handleNameChange = (e) => {
-        const val = e.target.value;
-        setBusinessName(val);
-        localStorage.setItem('business_name', val);
+        setBusinessName(e.target.value);
     };
 
     const handleRifChange = (e) => {
-        const val = e.target.value;
-        setBusinessRif(val);
-        localStorage.setItem('business_rif', val);
+        setBusinessRif(e.target.value);
+    };
+
+    const handleSaveBusinessData = () => {
+        localStorage.setItem('business_name', businessName);
+        localStorage.setItem('business_rif', businessRif);
+        forceHeartbeat();
+        showToast("Datos del negocio guardados correctamente", "success");
+        if (triggerHaptic) triggerHaptic();
     };
 
     if (!isOpen) return null;
@@ -169,6 +173,13 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                             />
                         </div>
+                        <button
+                            onClick={handleSaveBusinessData}
+                            className="w-full flex items-center justify-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors mt-2"
+                        >
+                            <Check size={16} />
+                            Aceptar Cambios
+                        </button>
                     </div>
 
                     {/* Share Catalog Button */}
