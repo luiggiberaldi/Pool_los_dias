@@ -477,7 +477,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     return sum + item.qty; // Paquetes enteros
                 }, 0);
                 
-                return { ...p, stock: Math.max(0, (p.stock ?? 0) - totalDeducted) };
+                const allowNeg = localStorage.getItem('allow_negative_stock') !== 'false';
+                const newStock = (p.stock ?? 0) - totalDeducted;
+                return { ...p, stock: allowNeg ? newStock : Math.max(0, newStock) };
             }
             return p;
         });
