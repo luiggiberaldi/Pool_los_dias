@@ -93,18 +93,23 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
                     </div>
                 </div>
 
-                {/* Botones sticky en la parte inferior */}
-                <div className="p-4 bg-slate-50 flex flex-wrap gap-2 relative z-20 shrink-0 border-t border-slate-200/50">
+                {/* Botones de acción — diseño premium */}
+                <div className="p-4 sm:p-5 bg-white flex gap-2.5 relative z-20 shrink-0 border-t border-slate-100">
+                    {/* Imprimir */}
                     <button onClick={() => printThermalTicket(receipt, receipt.rate)}
-                        className="flex-1 min-w-[30%] py-4 bg-violet-100 text-violet-700 font-black rounded-xl hover:bg-violet-200 transition-colors uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-1.5 focus:outline-none active:scale-95">
-                        <Printer size={16} /> Imprimir
+                        className="flex-1 py-3.5 bg-gradient-to-b from-slate-700 to-slate-800 text-white font-bold rounded-2xl hover:from-slate-600 hover:to-slate-700 transition-all shadow-lg shadow-slate-800/20 hover:shadow-xl hover:shadow-slate-800/30 text-sm flex items-center justify-center gap-2 focus:outline-none active:scale-[0.97] hover:-translate-y-0.5">
+                        <Printer size={17} strokeWidth={2.5} /> Imprimir
                     </button>
+
+                    {/* WhatsApp */}
                     <button onClick={() => onShareWhatsApp(receipt)}
-                        className="flex-1 py-4 bg-emerald-100 text-emerald-700 font-black rounded-xl hover:bg-emerald-200 transition-colors uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-1.5 focus:outline-none active:scale-95">
-                        <Send size={16} /> WhatsApp
+                        className="flex-1 py-3.5 bg-gradient-to-b from-emerald-500 to-emerald-600 text-white font-bold rounded-2xl hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/35 text-sm flex items-center justify-center gap-2 focus:outline-none active:scale-[0.97] hover:-translate-y-0.5">
+                        <Send size={17} strokeWidth={2.5} /> WhatsApp
                     </button>
+
+                    {/* Nueva Venta — Primary CTA */}
                     <button onClick={onClose}
-                        className="w-full sm:flex-1 py-4 bg-slate-200 text-slate-700 font-black rounded-xl hover:bg-slate-300 transition-colors uppercase tracking-widest text-xs sm:text-sm focus:outline-none active:scale-95">
+                        className="flex-[1.3] py-3.5 bg-gradient-to-b from-blue-500 to-blue-600 text-white font-extrabold rounded-2xl hover:from-blue-400 hover:to-blue-500 transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/35 text-sm flex items-center justify-center gap-2 focus:outline-none active:scale-[0.97] hover:-translate-y-0.5 ring-2 ring-blue-400/30 ring-offset-2 ring-offset-white">
                         Nueva Venta
                     </button>
                 </div>
