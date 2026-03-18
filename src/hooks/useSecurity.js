@@ -128,7 +128,7 @@ export function useSecurity() {
 
     // Heartbeat + chequeo de revocación en tiempo real
     useEffect(() => {
-        if (!isPremium || !deviceId || !import.meta.env.VITE_SUPABASE_URL) return;
+        if (!deviceId || !import.meta.env.VITE_SUPABASE_URL) return;
 
         // Función de chequeo rápido de estado
         const verifyStatus = async () => {
@@ -227,7 +227,7 @@ export function useSecurity() {
             document.removeEventListener('visibilitychange', handleVisibility);
             if (subscription) subscription.unsubscribe();
         };
-    }, [isPremium, deviceId]);
+    }, [isPremium, isDemo, deviceId]);
 
     // Countdown timer para demo
     useEffect(() => {
@@ -530,7 +530,7 @@ export function useSecurity() {
      */
     const unlockApp = async (inputCode) => {
         try {
-            const cleanCode = (inputCode || "").trim();
+            const cleanCode = (inputCode || "").trim().toUpperCase().replace(/O/g, '0');
             // FIX: Validar el código directamente contra la base de datos para ignorar fallos de Edge Functions
             const { data: license, error } = await supabase
                 .from('licenses')
