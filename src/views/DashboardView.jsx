@@ -3,7 +3,7 @@ import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, Moon, Sun, UserPlus, Phone, FileText, Recycle, Key, Settings } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon } from '../config/paymentMethods';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
@@ -310,7 +310,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         return allTodayTransactions.reduce((acc, s) => {
             if (s.payments && s.payments.length > 0) {
                 s.payments.forEach(p => {
-                    if (!acc[p.methodId]) acc[p.methodId] = { total: 0, currency: p.currency || 'BS' };
+                    if (!acc[p.methodId]) acc[p.methodId] = { total: 0, currency: p.currency || 'BS', label: p.methodLabel };
                     acc[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
                 });
             } else {
@@ -570,7 +570,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Pagos del día</h3>
                     <div className="space-y-2">
                         {Object.entries(paymentBreakdown).map(([method, data]) => {
-                            const label = getPaymentLabel(method);
+                            const label = toTitleCase(data.label || getPaymentLabel(method));
                             const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
                             const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
                             const pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;

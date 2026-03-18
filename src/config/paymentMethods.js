@@ -39,6 +39,8 @@ export async function savePaymentMethods(methods) {
         return rest;
     });
     await storageService.setItem(PM_KEY, serializable);
+    // Refresh in-memory cache immediately
+    _customMethodsCache = serializable;
 }
 
 /** Agregar un método custom */
@@ -71,22 +73,43 @@ export const toTitleCase = (str) => {
     return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
+// In-memory cache for synchronous lookups (populated from IndexedDB)
+let _customMethodsCache = null;
+let _cacheInitPromise = null;
+
+async function _initCache() {
+    try {
+        const saved = await storageService.getItem(PM_KEY, null);
+        _customMethodsCache = saved || [];
+    } catch (e) {
+        _customMethodsCache = [];
+    }
+}
+
+// Call this early in the app lifecycle to warm up the cache
+export function initPaymentMethodsCache() {
+    if (!_cacheInitPromise) {
+        _cacheInitPromise = _initCache();
+    }
+    return _cacheInitPromise;
+}
+
+// Auto-init on module load
+initPaymentMethodsCache();
+
+function _findCustom(id) {
+    if (!_customMethodsCache) return null;
+    return _customMethodsCache.find(m => m.id === id) || null;
+}
+
 export const getPaymentLabel = (id) => {
     // Check factory methods first
     const factory = FACTORY_PAYMENT_METHODS.find(m => m.id === id);
     if (factory) return toTitleCase(factory.label);
 
-    // Synchronously check custom methods from localStorage
-    try {
-        const stored = localStorage.getItem('bodega_payment_methods_v1');
-        if (stored) {
-            const customMethods = JSON.parse(stored);
-            const custom = customMethods.find(m => m.id === id);
-            if (custom && custom.label) return toTitleCase(custom.label);
-        }
-    } catch (e) {
-        console.warn('Error reading custom payment methods synchronously', e);
-    }
+    // Check in-memory cache (populated from IndexedDB)
+    const custom = _findCustom(id);
+    if (custom && custom.label) return toTitleCase(custom.label);
     
     return toTitleCase(id);
 };
@@ -96,17 +119,9 @@ export const getPaymentIcon = (id) => {
     const factory = FACTORY_PAYMENT_METHODS.find(m => m.id === id);
     if (factory) return factory.Icon;
 
-    // Check custom
-    try {
-        const stored = localStorage.getItem('bodega_payment_methods_v1');
-        if (stored) {
-            const customMethods = JSON.parse(stored);
-            const custom = customMethods.find(m => m.id === id);
-            if (custom && custom.icon) return ICON_COMPONENTS[custom.icon] || null;
-        }
-    } catch (e) {
-        console.warn('Error reading custom payment icons', e);
-    }
+    // Check in-memory cache
+    const custom = _findCustom(id);
+    if (custom && custom.icon) return ICON_COMPONENTS[custom.icon] || null;
     
     return null;
 };
@@ -128,14 +143,11 @@ export const ICON_COMPONENTS = {
 export const getPaymentMethod = (id) => {
     const factory = FACTORY_PAYMENT_METHODS.find(m => m.id === id);
     if (factory) return factory;
-    try {
-        const stored = localStorage.getItem('bodega_payment_methods_v1');
-        if (stored) {
-            const customMethods = JSON.parse(stored);
-            const custom = customMethods.find(m => m.id === id);
-            if (custom) return { ...custom, Icon: ICON_COMPONENTS[custom.icon] || null };
-        }
-    } catch (e) {}
+
+    // Check in-memory cache
+    const custom = _findCustom(id);
+    if (custom) return { ...custom, Icon: ICON_COMPONENTS[custom.icon] || null };
+
     return FACTORY_PAYMENT_METHODS[0];
 };
 
