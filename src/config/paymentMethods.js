@@ -66,10 +66,29 @@ export async function removePaymentMethod(id) {
 
 // ── HELPERS ──
 
+export const toTitleCase = (str) => {
+    if (!str) return '';
+    return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+};
+
 export const getPaymentLabel = (id) => {
-    const all = FACTORY_PAYMENT_METHODS;
-    const method = all.find(m => m.id === id);
-    return method ? method.label : id;
+    // Check factory methods first
+    const factory = FACTORY_PAYMENT_METHODS.find(m => m.id === id);
+    if (factory) return toTitleCase(factory.label);
+
+    // Synchronously check custom methods from localStorage
+    try {
+        const stored = localStorage.getItem('bodega_payment_methods_v1');
+        if (stored) {
+            const customMethods = JSON.parse(stored);
+            const custom = customMethods.find(m => m.id === id);
+            if (custom) return toTitleCase(custom.label);
+        }
+    } catch (e) {
+        console.warn('Error reading custom payment methods synchronously', e);
+    }
+    
+    return toTitleCase(id);
 };
 
 // Icon lookup for React components

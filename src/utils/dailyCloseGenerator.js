@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { formatBs } from './calculatorUtils';
-import { getPaymentLabel } from '../config/paymentMethods';
+import { getPaymentLabel, toTitleCase } from '../config/paymentMethods';
 
 /**
  * Genera un PDF de Cierre del Día con reporte detallado.
@@ -133,7 +133,7 @@ export async function generateDailyClosePDF({
         y = sectionTitle('PAGOS POR MÉTODO', y);
 
         Object.entries(paymentBreakdown).forEach(([methodId, data]) => {
-            const label = getPaymentLabel(methodId);
+            const label = data.label ? toTitleCase(data.label) : getPaymentLabel(methodId);
             const val = data.currency === 'USD'
                 ? `$${data.total.toFixed(2)}`
                 : `Bs ${formatBs(data.total)}`;
@@ -226,7 +226,7 @@ export async function generateDailyClosePDF({
         if (s.payments && s.payments.length > 1) {
             methodStr = 'Pago Mixto';
         } else if (s.payments && s.payments.length === 1) {
-            methodStr = s.payments[0].methodLabel;
+            methodStr = toTitleCase(s.payments[0].methodLabel);
         } else if (s.paymentMethod) {
             methodStr = getPaymentLabel(s.paymentMethod);
         }

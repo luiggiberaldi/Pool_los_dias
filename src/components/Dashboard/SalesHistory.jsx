@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Clock, Send, Ban, ChevronDown, ChevronUp, Trash2, Shuffle, Recycle, Receipt, Printer } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
-import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS } from '../../config/paymentMethods';
+import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase } from '../../config/paymentMethods';
 import EmptyState from '../EmptyState';
 
 export default function SalesHistory({
@@ -55,7 +55,7 @@ export default function SalesHistory({
                     let PayMethodIcon = PAYMENT_ICONS['efectivo_bs'];
 
                     if (s.payments && s.payments.length === 1) {
-                        methodLabel = s.payments[0].methodLabel;
+                        methodLabel = toTitleCase(s.payments[0].methodLabel);
                         const m = getPaymentMethod(s.payments[0].methodId);
                         if (m) PayMethodIcon = PAYMENT_ICONS[m.id] || m.Icon || null;
                     } else if (s.payments && s.payments.length > 1) {
@@ -64,7 +64,7 @@ export default function SalesHistory({
                     } else if (s.paymentMethod) {
                         const m = getPaymentMethod(s.paymentMethod);
                         if (m) {
-                            methodLabel = m.label;
+                            methodLabel = toTitleCase(m.label);
                             PayMethodIcon = PAYMENT_ICONS[m.id] || m.Icon || null;
                         }
                     }

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { formatBs } from '../utils/calculatorUtils';
-import { getPaymentLabel, PAYMENT_ICONS } from '../config/paymentMethods';
+import { getPaymentLabel, PAYMENT_ICONS, toTitleCase } from '../config/paymentMethods';
 import { useProductContext } from '../context/ProductContext';
 import EmptyState from '../components/EmptyState';
 
@@ -111,7 +111,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
     const paymentBreakdown = {};
     filteredSales.forEach(s => {
         (s.payments || []).forEach(p => {
-            if (!paymentBreakdown[p.methodId]) paymentBreakdown[p.methodId] = { total: 0, currency: p.currency || 'BS' };
+            if (!paymentBreakdown[p.methodId]) paymentBreakdown[p.methodId] = { total: 0, currency: p.currency || 'BS', label: p.methodLabel };
             paymentBreakdown[p.methodId].total += (p.currency === 'USD' ? p.amountUsd : p.amountBs) || 0;
         });
     });
@@ -284,7 +284,7 @@ export default function ReportsView({ rates, triggerHaptic }) {
                     </h3>
                     <div className="space-y-3">
                         {Object.entries(paymentBreakdown).map(([method, data]) => {
-                            const label = getPaymentLabel(method);
+                            const label = toTitleCase(data.label || getPaymentLabel(method));
                             const PayIcon = PAYMENT_ICONS[method];
                             const totalBsEquiv = data.currency === 'USD' ? data.total * bcvRate : data.total;
                             const pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;

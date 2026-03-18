@@ -161,16 +161,16 @@ export function useSecurity() {
                     }
 
                     // Si el backend cambio el tipo de licencia, actualizar estado local sin recargar
-                    if (license.type === 'permanent' && isDemo) {
-                        // Demo -> Permanente: actualizar token y estado
+                    if (license.type === 'permanent' && (!isPremium || isDemo)) {
+                        // Demo (o Expirado) -> Permanente: actualizar token y estado
                         const token = { deviceId, type: 'permanent' };
                         localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
                         setIsPremium(true);
                         setIsDemo(false);
                         setDemoExpires(null);
                         setDemoTimeLeft('');
-                    } else if (license.type === 'demo7' && !isDemo && license.expires_at) {
-                        // Permanente -> Demo: actualizar token y estado
+                    } else if (license.type === 'demo7' && (!isPremium || !isDemo) && license.expires_at) {
+                        // Permanente (o Expirado) -> Demo: actualizar token y estado
                         const expiresAt = new Date(license.expires_at).getTime();
                         if (Date.now() < expiresAt) {
                             const token = { deviceId, type: 'demo7', expires: expiresAt, isDemo: true };
