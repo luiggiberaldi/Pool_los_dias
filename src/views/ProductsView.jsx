@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, Settings, AlertTriangle, Box } from 'lucide-react';
+import { Package, Plus, Trash2, X, Store, Tag, Pencil, Banknote, Search, ChevronLeft, ChevronRight, Settings, AlertTriangle, Box, LayoutGrid, List, Minus, ArrowUpDown } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
 import SettingsModal from '../components/SettingsModal';
@@ -52,12 +52,39 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('todos');
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth >= 1024 ? 12 : 8);
+    const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
+    const [sortField, setSortField] = useState(null);
+    const [sortDir, setSortDir] = useState('asc');
+    const [itemsPerPage, setItemsPerPage] = useState(() => {
+        const mode = localStorage.getItem('bodega_inventory_view') || 'grid';
+        return mode === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8);
+    });
     useEffect(() => {
-        const handleResize = () => setItemsPerPage(window.innerWidth >= 1024 ? 12 : 8);
+        const handleResize = () => {
+            if (viewMode === 'grid') setItemsPerPage(window.innerWidth >= 1024 ? 12 : 8);
+        };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [viewMode]);
+
+    const toggleViewMode = () => {
+        const next = viewMode === 'grid' ? 'list' : 'grid';
+        setViewMode(next);
+        localStorage.setItem('bodega_inventory_view', next);
+        setCurrentPage(1);
+        setItemsPerPage(next === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8));
+        triggerHaptic && triggerHaptic();
+    };
+
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDir('asc');
+        }
+        setCurrentPage(1);
+    };
 
     // Form State (Product Edit/Create)
     const [editingId, setEditingId] = useState(null);
@@ -132,14 +159,37 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     // ─── FILTERING & PAGINATION ─────────────────────────────
 
-    const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-        if (activeCategory === 'bajo-stock') {
-            return matchesSearch && (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
+    const filteredProducts = useMemo(() => {
+        let result = products.filter(p => {
+            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+            if (activeCategory === 'bajo-stock') {
+                return matchesSearch && (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
+            }
+            const matchesCategory = activeCategory === 'todos' || p.category === activeCategory;
+            return matchesSearch && matchesCategory;
+        });
+
+        // Apply sort if active
+        if (sortField) {
+            result = [...result].sort((a, b) => {
+                let valA, valB;
+                switch (sortField) {
+                    case 'name': valA = a.name.toLowerCase(); valB = b.name.toLowerCase(); break;
+                    case 'price': valA = a.priceUsdt || 0; valB = b.priceUsdt || 0; break;
+                    case 'stock': valA = a.stock ?? 0; valB = b.stock ?? 0; break;
+                    case 'margin':
+                        valA = a.costBs > 0 ? ((a.priceUsdt * effectiveRate - a.costBs) / a.costBs * 100) : -999;
+                        valB = b.costBs > 0 ? ((b.priceUsdt * effectiveRate - b.costBs) / b.costBs * 100) : -999;
+                        break;
+                    default: valA = 0; valB = 0;
+                }
+                if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+                if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
         }
-        const matchesCategory = activeCategory === 'todos' || p.category === activeCategory;
-        return matchesSearch && matchesCategory;
-    });
+        return result;
+    }, [products, searchTerm, activeCategory, sortField, sortDir, effectiveRate]);
 
     const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
     const paginatedProducts = filteredProducts.slice(
@@ -414,7 +464,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     </div>
                 </div>
 
-                {/* Fila 2: Stats clicables */}
+                {/* Fila 2: Stats clicables + View Toggle */}
                 <div className="flex items-center gap-2">
                     <span className="text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 px-2.5 py-1 rounded-full">
                         {products.length} productos
@@ -429,6 +479,14 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             </button>
                         </>
                     )}
+                    <div className="ml-auto" />
+                    <button
+                        onClick={toggleViewMode}
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-emerald-500 hover:border-emerald-300 transition-all active:scale-95"
+                        title={viewMode === 'grid' ? 'Cambiar a vista lista' : 'Cambiar a vista cuadrícula'}
+                    >
+                        {viewMode === 'grid' ? <List size={16} /> : <LayoutGrid size={16} />}
+                    </button>
                 </div>
 
                 {/* Category Filter Pills — horizontal scroll with fade */}
@@ -524,6 +582,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                         </div>
                     )}
                     <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
+                        {viewMode === 'grid' ? (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {paginatedProducts.map(p => (
                                 <SwipeableItem 
@@ -550,6 +609,94 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 </SwipeableItem>
                             ))}
                         </div>
+                        ) : (
+                        /* ── LIST VIEW ── */
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            {/* Table Header — desktop */}
+                            <div className="hidden sm:grid sm:grid-cols-[1fr_100px_100px_70px_80px_90px] gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors text-left">
+                                    Producto {sortField === 'name' && <ArrowUpDown size={10} />}
+                                </button>
+                                <button onClick={() => handleSort('price')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                    Precio {sortField === 'price' && <ArrowUpDown size={10} />}
+                                </button>
+                                <span>Costo</span>
+                                <button onClick={() => handleSort('margin')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                    Margen {sortField === 'margin' && <ArrowUpDown size={10} />}
+                                </button>
+                                <button onClick={() => handleSort('stock')} className="flex items-center gap-1 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                                    Stock {sortField === 'stock' && <ArrowUpDown size={10} />}
+                                </button>
+                                <span className="text-right">Acciones</span>
+                            </div>
+                            {/* Rows */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {paginatedProducts.map(p => {
+                                    const valBs = p.priceUsdt * effectiveRate;
+                                    const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
+                                    const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
+                                    const catInfo = categories.find(c => c.id === p.category);
+                                    return (
+                                        <div key={p.id} className={`grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_100px_100px_70px_80px_90px] gap-2 px-4 py-3 items-center hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${isLowStock ? 'bg-amber-50/50 dark:bg-amber-900/5' : ''}`}>
+                                            {/* Product Info (always visible) */}
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                                    {p.image ? <img src={p.image} className="w-full h-full object-contain" alt={p.name} loading="lazy" /> : <Tag size={16} className="text-slate-300 dark:text-slate-600" />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        {catInfo && catInfo.id !== 'todos' && (
+                                                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{catInfo.label}</span>
+                                                        )}
+                                                        {isLowStock && <span className="text-[9px] font-bold text-amber-500 flex items-center gap-0.5"><AlertTriangle size={9} /> Bajo</span>}
+                                                        {/* Mobile: show price inline */}
+                                                        <span className="sm:hidden text-[11px] font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile: compact actions */}
+                                            <div className="flex items-center gap-1.5 sm:hidden">
+                                                <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-lg">
+                                                    <button onClick={() => adjustStock(p.id, -1)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Minus size={14} /></button>
+                                                    <span className={`text-xs font-black min-w-[28px] text-center ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>{p.stock ?? 0}</span>
+                                                    <button onClick={() => adjustStock(p.id, 1)} className="p-1.5 text-slate-400 hover:text-emerald-500 transition-colors"><Plus size={14} /></button>
+                                                </div>
+                                                <button onClick={() => handleEdit(p)} className="p-1.5 text-slate-300 hover:text-amber-500 transition-colors"><Pencil size={14} /></button>
+                                                <button onClick={() => handleDelete(p.id)} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                                            </div>
+
+                                            {/* Desktop columns */}
+                                            <div className="hidden sm:block">
+                                                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${(p.priceUsdt || 0).toFixed(2)}</p>
+                                                <p className="text-[10px] text-slate-400 font-medium">{formatBs(valBs)} Bs</p>
+                                            </div>
+                                            <div className="hidden sm:block">
+                                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{p.costUsd ? `$${p.costUsd.toFixed(2)}` : '-'}</p>
+                                            </div>
+                                            <div className="hidden sm:block">
+                                                {margin !== null ? (
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+                                                        {margin >= 0 ? '+' : ''}{margin.toFixed(0)}%
+                                                    </span>
+                                                ) : <span className="text-[10px] text-slate-300">-</span>}
+                                            </div>
+                                            <div className="hidden sm:flex items-center gap-1">
+                                                <button onClick={() => adjustStock(p.id, -1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors active:scale-90"><Minus size={14} /></button>
+                                                <span className={`text-sm font-black min-w-[32px] text-center ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>{p.stock ?? 0}</span>
+                                                <button onClick={() => adjustStock(p.id, 1)} className="w-7 h-7 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-emerald-500 transition-colors active:scale-90"><Plus size={14} /></button>
+                                            </div>
+                                            <div className="hidden sm:flex items-center justify-end gap-1">
+                                                <button onClick={() => handleEdit(p)} className="p-1.5 rounded-lg text-slate-300 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"><Pencil size={14} /></button>
+                                                <button onClick={() => handleDelete(p.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"><Trash2 size={14} /></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        )}
 
                         {/* Pagination */}
                         {totalPages > 1 && (
