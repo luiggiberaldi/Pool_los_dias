@@ -203,6 +203,7 @@ export async function generateTicketPDF(sale, bcvRate) {
 
         if (hasFiado) {
             y += 2;
+            const fiadoRate = bcvRate || rate; // Usar tasa actual para deuda pendiente
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(...RED);
@@ -211,7 +212,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             y += 4;
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6.5);
-            doc.text('Bs ' + formatBs(sale.fiadoUsd * rate), RIGHT, y, { align: 'right' });
+            doc.text('Bs ' + formatBs(sale.fiadoUsd * fiadoRate) + ' (tasa actual)', RIGHT, y, { align: 'right' });
             y += 6;
         }
 
@@ -320,6 +321,7 @@ export function printThermalTicket(sale, bcvRate) {
             </tr>`;
     }).join('');
 
+    const fiadoRate = bcvRate || rate; // Usar tasa actual para deuda pendiente
     const fiadoHtml = hasFiado ? `
         <div style="margin-top:6px;padding:4px 0;border-top:1px dashed #ccc;">
             <table style="width:100%"><tr>
@@ -327,7 +329,7 @@ export function printThermalTicket(sale, bcvRate) {
                 <td style="color:#dc3545;font-weight:bold;font-size:11px;text-align:right;">$${sale.fiadoUsd.toFixed(2)}</td>
             </tr><tr>
                 <td></td>
-                <td style="color:#dc3545;font-size:9px;text-align:right;">Bs ${formatBs(sale.fiadoUsd * rate)}</td>
+                <td style="color:#dc3545;font-size:9px;text-align:right;">Bs ${formatBs(sale.fiadoUsd * fiadoRate)} (tasa actual)</td>
             </tr></table>
         </div>` : '';
 

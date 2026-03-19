@@ -3,7 +3,7 @@
  * @param {object} receipt - The sale/receipt object
  * @returns {string} WhatsApp URL with pre-filled message
  */
-export function buildReceiptWhatsAppUrl(receipt) {
+export function buildReceiptWhatsAppUrl(receipt, currentRate) {
     const r = receipt;
     const fecha = new Date(r.timestamp).toLocaleDateString('es-VE', {
         day: '2-digit', month: '2-digit', year: 'numeric',
@@ -42,8 +42,9 @@ export function buildReceiptWhatsAppUrl(receipt) {
         : '';
 
     // Fiado
+    const fiadoRate = currentRate || r.rate || 1;
     const fiadoLine = r.fiadoUsd > 0.005
-        ? `\nPENDIENTE (fiado): $${parseFloat(r.fiadoUsd).toFixed(2)}`
+        ? `\nPENDIENTE (fiado): $${parseFloat(r.fiadoUsd).toFixed(2)} / Bs ${Math.ceil(r.fiadoUsd * fiadoRate)}`
         : '';
 
     // Cliente

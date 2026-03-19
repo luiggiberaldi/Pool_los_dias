@@ -3,7 +3,7 @@ import { CheckCircle, Wallet, Send, X, Printer } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { printThermalTicket } from '../../utils/ticketGenerator';
 
-export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
+export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, currentRate }) {
     if (!receipt) return null;
 
     return (
@@ -82,7 +82,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
                                 {receipt.fiadoUsd > 0 && (
                                     <div className="flex justify-between text-amber-600 font-bold mt-2 pt-2 border-t border-slate-200">
                                         <span>Pendiente (Fiado):</span>
-                                        <span>${receipt.fiadoUsd.toFixed(2)} / {formatBs(receipt.fiadoUsd * receipt.rate)} Bs</span>
+                                        <span>${receipt.fiadoUsd.toFixed(2)} / {formatBs(receipt.fiadoUsd * (currentRate || receipt.rate))} Bs</span>
                                     </div>
                                 )}
                             </div>
@@ -96,7 +96,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp }) {
                 {/* Botones de acción — diseño premium */}
                 <div className="p-4 sm:p-5 bg-white flex gap-2.5 relative z-20 shrink-0 border-t border-slate-100">
                     {/* Imprimir */}
-                    <button onClick={() => printThermalTicket(receipt, receipt.rate)}
+                    <button onClick={() => printThermalTicket(receipt, currentRate || receipt.rate)}
                         className="flex-1 py-3.5 bg-gradient-to-b from-slate-700 to-slate-800 text-white font-bold rounded-2xl hover:from-slate-600 hover:to-slate-700 transition-all shadow-lg shadow-slate-800/20 hover:shadow-xl hover:shadow-slate-800/30 text-sm flex items-center justify-center gap-2 focus:outline-none active:scale-[0.97] hover:-translate-y-0.5">
                         <Printer size={17} strokeWidth={2.5} /> Imprimir
                     </button>

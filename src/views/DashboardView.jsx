@@ -162,6 +162,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
         if (sale.fiadoUsd > 0) {
             text += `\n*SALDO PENDIENTE (FIADO): $${sale.fiadoUsd.toFixed(2)}*\n`;
+            if (bcvRate > 0) text += ` Equivalente: ${formatBs(sale.fiadoUsd * bcvRate)} Bs (tasa actual)\n`;
         }
         text += `\n===================================\n`;
         text += `*¡Gracias por su compra!*\n\n`;

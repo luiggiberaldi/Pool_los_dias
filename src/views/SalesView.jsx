@@ -788,7 +788,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             <ReceiptModal
                 receipt={showReceipt}
                 onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
-                onShareWhatsApp={(r) => { window.open(buildReceiptWhatsAppUrl(r), '_blank'); }}
+                onShareWhatsApp={(r) => { window.open(buildReceiptWhatsAppUrl(r, effectiveRate), '_blank'); }}
+                currentRate={effectiveRate}
             />
 
             {/* Custom Amount Modal */}
