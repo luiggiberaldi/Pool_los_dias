@@ -18,13 +18,11 @@ export default function BulkPriceAdjustModal({
     const [isApplying, setIsApplying] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
 
-    if (!isOpen) return null;
-
     const effectivePercent = direction === 'up' ? percent : -percent;
     const multiplier = 1 + effectivePercent / 100;
 
     // Products that will be affected
-    const affectedProducts = products.filter(p => {
+    const affectedProducts = (products || []).filter(p => {
         if (selectedCategory === 'todos') return true;
         return p.category === selectedCategory;
     });
@@ -39,6 +37,8 @@ export default function BulkPriceAdjustModal({
         }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [affectedProducts.length, multiplier, selectedCategory]);
+
+    if (!isOpen) return null;
 
     const handleApply = () => {
         if (affectedProducts.length === 0) return;
