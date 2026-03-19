@@ -7,6 +7,20 @@ import {
 // Categorías predefinidas para el Inventario
 export const BODEGA_CATEGORIES = [
     { id: 'todos', label: 'Todos', icon: '◉', color: 'slate' },
+    // --- Repuestos de Motos ---
+    { id: 'motor', label: 'Motor', icon: '◆', color: 'red' },
+    { id: 'electrico', label: 'Eléctrico', icon: '◆', color: 'yellow' },
+    { id: 'carroceria', label: 'Carrocería', icon: '◆', color: 'blue' },
+    { id: 'transmision', label: 'Transmisión', icon: '◆', color: 'orange' },
+    { id: 'frenos', label: 'Frenos', icon: '◆', color: 'red' },
+    { id: 'cauchos', label: 'Cauchos/Tripas', icon: '◆', color: 'slate' },
+    { id: 'suspension', label: 'Suspensión', icon: '◆', color: 'cyan' },
+    { id: 'escape', label: 'Escape', icon: '◆', color: 'gray' },
+    { id: 'accesorios', label: 'Accesorios', icon: '◆', color: 'green' },
+    { id: 'aceites', label: 'Aceites', icon: '◆', color: 'amber' },
+    { id: 'baterias', label: 'Baterías', icon: '◆', color: 'yellow' },
+    { id: 'guayas', label: 'Guayas', icon: '◆', color: 'slate' },
+    // --- Abastos General ---
     { id: 'bebidas', label: 'Bebidas', icon: '◆', color: 'blue' },
     { id: 'limpieza', label: 'Limpieza', icon: '◆', color: 'cyan' },
     { id: 'charcuteria', label: 'Charcutería', icon: '◆', color: 'amber' },

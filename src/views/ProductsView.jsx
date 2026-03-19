@@ -889,8 +889,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 isOpen={isCategoryManagerOpen}
                 onClose={() => setIsCategoryManagerOpen(false)}
                 categories={categories}
-                handleAddCategory={handleAddCategory}
-                handleDeleteCategory={handleDeleteCategory}
+                onAddCategory={handleAddCategory}
+                onDeleteCategory={handleDeleteCategory}
                 newCategoryIcon={newCategoryIcon}
                 setNewCategoryIcon={setNewCategoryIcon}
                 newCategoryName={newCategoryName}
