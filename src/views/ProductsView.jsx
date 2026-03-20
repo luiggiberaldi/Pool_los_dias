@@ -870,8 +870,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onImport={() => setIsShareOpen(true)} />
 
             <ShareInventoryModal
-                isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} products={products}
-                onImport={(imported) => { setProducts(imported); storageService.setItem('bodega_products_v1', imported); }}
+                isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} products={products} categories={categories}
+                onImport={async ({ products: imported, categories: importedCats }) => {
+                    await storageService.setItem('bodega_products_v1', imported);
+                    setProducts(imported);
+                    if (importedCats && importedCats.length > 0) {
+                        await storageService.setItem('my_categories_v1', importedCats);
+                        await new Promise(r => setTimeout(r, 100));
+                        await storageService.setItem('my_categories_v1', importedCats);
+                        window.location.reload();
+                    }
+                }}
             />
             <BulkPriceAdjustModal
                 isOpen={isBulkPriceOpen}

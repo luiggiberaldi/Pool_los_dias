@@ -23,7 +23,7 @@ function compressImageForShare(base64) {
     });
 }
 
-export default function ShareInventoryModal({ isOpen, onClose, products, onImport }) {
+export default function ShareInventoryModal({ isOpen, onClose, products, categories = [], onImport }) {
     const [tab, setTab] = useState('share'); // 'share' | 'import'
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -54,7 +54,7 @@ export default function ShareInventoryModal({ isOpen, onClose, products, onImpor
             const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ products: compressedProducts }),
+                body: JSON.stringify({ products: compressedProducts, categories }),
             });
 
             const data = await res.json();
@@ -98,7 +98,7 @@ export default function ShareInventoryModal({ isOpen, onClose, products, onImpor
 
     const confirmImport = () => {
         if (importResult?.products) {
-            onImport(importResult.products);
+            onImport({ products: importResult.products, categories: importResult.categories || null });
             setImportResult(null);
             setImportCode('');
             onClose();
