@@ -18,6 +18,7 @@ import ReceiptModal from '../components/Sales/ReceiptModal';
 import CheckoutModal from '../components/Sales/CheckoutModal';
 import CustomAmountModal from '../components/Sales/CustomAmountModal';
 import KeyboardHelpModal from '../components/Sales/KeyboardHelpModal';
+import DiscountModal from '../components/Sales/DiscountModal';
 import { useProductContext } from '../context/ProductContext';
 
 import ConfirmModal from '../components/ConfirmModal';
@@ -45,7 +46,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
 
     // Cart (from global context)
-    const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate } = useCart();
+    const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
+    const [showDiscountModal, setShowDiscountModal] = useState(false);
 
     // Search
     const searchInputRef = useRef(null);
@@ -172,14 +174,41 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         ? products
         : products.filter(p => p.category === selectedCategory), [selectedCategory, products]);
 
-    const cartTotalUsd = cart.reduce((sum, item) => sum + (item.priceUsd * item.qty), 0);
-    // Calcular el total en Bs usando exactBs cuando esté disponible, para evitar problemas de redondeo
-    const cartTotalBs = cart.reduce((sum, item) => {
+    const cartSubtotalUsd = cart.reduce((sum, item) => sum + (item.priceUsd * item.qty), 0);
+    
+    // Calcular descuento global
+    let discountAmountUsd = 0;
+    if (discount?.value > 0) {
+        if (discount.type === 'percentage') {
+            discountAmountUsd = cartSubtotalUsd * (discount.value / 100);
+        } else {
+            discountAmountUsd = discount.value;
+        }
+    }
+    // Asegurar que no quede negativo o mayor al subtotal
+    if (discountAmountUsd > cartSubtotalUsd) discountAmountUsd = cartSubtotalUsd;
+
+    const cartTotalUsd = cartSubtotalUsd - discountAmountUsd;
+
+    const cartSubtotalBs = cart.reduce((sum, item) => {
         if (item.exactBs != null) {
             return sum + (item.exactBs * item.qty);
         }
         return sum + (item.priceUsd * item.qty * effectiveRate);
     }, 0);
+
+    const discountAmountBs = discountAmountUsd * effectiveRate;
+    const cartTotalBs = Math.max(0, cartSubtotalBs - discountAmountBs);
+    
+    // Variables estáticas para pasar a los componentes hijos
+    const discountData = {
+        active: discount?.value > 0,
+        amountUsd: discountAmountUsd,
+        amountBs: discountAmountBs,
+        type: discount?.type,
+        value: discount?.value
+    };
+
     const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
     const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
@@ -464,6 +493,10 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
             status: 'COMPLETADA',
             items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
+            cartSubtotalUsd: cartSubtotalUsd,
+            discountType: discountData?.type || null,
+            discountValue: discountData?.value || 0,
+            discountAmountUsd: discountData?.amountUsd || 0,
             totalUsd: cartTotalUsd, 
             totalBs: cartTotalBs, 
             totalCop: copEnabled && tasaCop > 0 ? cartTotalUsd * tasaCop : 0,
@@ -583,7 +616,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     useEffect(() => {
         const handleGlobalKeys = (e) => {
             // Block shortcuts if any modal is open
-            if (showCheckout || showReceipt || hierarchyPending || weightPending || showClearCartConfirm || showCustomAmountModal || showRateConfig || showKeyboardHelp) return;
+            if (showCheckout || showReceipt || hierarchyPending || weightPending || showClearCartConfirm || showCustomAmountModal || showRateConfig || showKeyboardHelp || showDiscountModal) return;
 
             const isTyping = document.activeElement === searchInputRef.current || document.activeElement?.tagName === 'INPUT';
 
@@ -668,7 +701,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
         window.addEventListener('keydown', handleGlobalKeys);
         return () => window.removeEventListener('keydown', handleGlobalKeys);
-    }, [showCheckout, showReceipt, hierarchyPending, weightPending, showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, cartSelectedIndex, updateQty, removeFromCart, cart.length]);
+    }, [showCheckout, showReceipt, hierarchyPending, weightPending, showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, showDiscountModal, cartSelectedIndex, updateQty, removeFromCart, cart.length]);
 
     // ── Loading ───────────────────────────────────
     if (isLoading) {
@@ -734,7 +767,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 <div className="hidden lg:flex lg:w-[380px] lg:shrink-0 lg:flex-col">
                     <CartPanel
                         cart={cart} effectiveRate={effectiveRate}
+                        cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
                         cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                        discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
                         updateQty={updateQty} removeFromCart={removeFromCart}
                         onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
                         onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
@@ -791,7 +826,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                             <div className="flex-1 overflow-y-auto">
                                 <CartPanel
                                     cart={cart} effectiveRate={effectiveRate}
+                                    cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
                                     cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                                    discountData={discountData} onOpenDiscount={() => setIsCartSheetOpen(false) || setShowDiscountModal(true)}
                                     updateQty={updateQty} removeFromCart={removeFromCart}
                                     onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
                                     onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
@@ -810,7 +847,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             {showCheckout && (
                 <CheckoutModal
                     onClose={() => { setShowCheckout(false); setSelectedCustomerId(''); }}
-                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} effectiveRate={effectiveRate}
+                    cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
+                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} 
+                    discountData={discountData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
                     onConfirmSale={handleCheckout} onCreateCustomer={handleCreateCustomer}
@@ -842,12 +881,28 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             <ConfirmModal
                 isOpen={showClearCartConfirm}
                 onClose={() => setShowClearCartConfirm(false)}
-                onConfirm={() => { setCart([]); setShowClearCartConfirm(false); setCartSelectedIndex(-1); }}
+                onConfirm={() => { setCart([]); setDiscount({ type: 'percentage', value: 0 }); setShowClearCartConfirm(false); setCartSelectedIndex(-1); }}
                 title="¿Vaciar toda la cesta?"
                 message="Todos los productos serán eliminados de la cesta actual. Esta acción no se puede deshacer."
                 confirmText="Sí, vaciar"
                 variant="cart"
             />
+
+            {/* Discount Modal */}
+            {showDiscountModal && (
+                <DiscountModal
+                    currentDiscount={discount}
+                    onApply={(newDiscount) => {
+                        setDiscount(newDiscount);
+                        setShowDiscountModal(false);
+                    }}
+                    onClose={() => setShowDiscountModal(false)}
+                    cartSubtotalUsd={cartSubtotalUsd}
+                    effectiveRate={effectiveRate}
+                    tasaCop={tasaCop}
+                    copEnabled={copEnabled}
+                />
+            )}
 
             {/* Confetti */}
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}

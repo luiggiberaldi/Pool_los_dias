@@ -9,8 +9,11 @@ import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
  */
 export default function CheckoutModal({
     onClose,
+    cartSubtotalUsd,
+    cartSubtotalBs,
     cartTotalUsd,
     cartTotalBs,
+    discountData,
     effectiveRate,
     customers,
     selectedCustomerId,
@@ -252,11 +255,35 @@ export default function CheckoutModal({
 
                 {/* ── TOTAL BIMONEDA ── */}
                 <div className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center mb-1">Total a Pagar</p>
+                    {discountData?.active && (
+                        <div className="flex flex-col items-center justify-center space-y-1 mb-3 pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
+                            <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+                                <span>Subtotal:</span>
+                                <span>${cartSubtotalUsd.toFixed(2)}</span>
+                                <span className="text-[10px]">&bull;</span>
+                                <span className="text-xs">Bs {formatBs(cartSubtotalBs)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm font-black text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-lg">
+                                <span>Descuento ({discountData.type === 'percentage' ? `${discountData.value}%` : 'Fijo'}):</span>
+                                <span>-${discountData.amountUsd.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
+                    <p className={`text-[11px] font-bold uppercase tracking-widest text-center mb-1 ${discountData?.active ? 'text-emerald-500' : 'text-slate-400'}`}>
+                        {discountData?.active ? 'Total Final' : 'Total a Pagar'}
+                    </p>
                     <div className="text-center">
-                        <span className="text-3xl font-black text-slate-900 dark:text-white">${cartTotalUsd.toFixed(2)}</span>
-                        <span className="block text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">Bs {formatBs(cartTotalBs)}</span>
-                        {copEnabled && <span className="block text-sm font-bold text-amber-600 dark:text-amber-400 mt-0.5">COP {(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+                        <span className={`text-4xl sm:text-5xl font-black ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'}`}>
+                            ${cartTotalUsd.toFixed(2)}
+                        </span>
+                        <span className="block text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                            Bs {formatBs(cartTotalBs)}
+                        </span>
+                        {copEnabled && (
+                            <span className="block text-sm sm:text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                                COP {(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        )}
                     </div>
                 </div>
 

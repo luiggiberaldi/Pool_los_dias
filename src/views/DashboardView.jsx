@@ -275,25 +275,29 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const todayExpensesUsd = useMemo(() => todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0), [todayExpenses]);
 
     const todayProfit = useMemo(() =>
-        todaySales.reduce((sum, s) => sum + s.items.reduce((is, item) => {
+        todaySales.reduce((sum, s) => {
             const saleRate = s.rate || bcvRate;
-            let costBs;
-            if (item.costUsd) {
-                costBs = item.costUsd * saleRate;
-            } else if (item.costBs) {
-                costBs = item.costBs;
-            } else {
-                const p = products.find(p => p.id === item.id || p.id === item._originalId || p.name === item.name);
-                if (p) {
-                    costBs = p.costUsd ? p.costUsd * saleRate : (p.costBs || 0);
-                    if (item.id && typeof item.id === 'string' && item.id.endsWith('_unit')) costBs = costBs / (p.unitsPerPackage || 1);
+            const itemsProfit = s.items.reduce((is, item) => {
+                let costBs;
+                if (item.costUsd) {
+                    costBs = item.costUsd * saleRate;
+                } else if (item.costBs) {
+                    costBs = item.costBs;
                 } else {
-                    costBs = 0;
+                    const p = products.find(p => p.id === item.id || p.id === item._originalId || p.name === item.name);
+                    if (p) {
+                        costBs = p.costUsd ? p.costUsd * saleRate : (p.costBs || 0);
+                        if (item.id && typeof item.id === 'string' && item.id.endsWith('_unit')) costBs = costBs / (p.unitsPerPackage || 1);
+                    } else {
+                        costBs = 0;
+                    }
                 }
-            }
-            const saleBs = item.priceUsd * item.qty * saleRate;
-            return is + (saleBs - (costBs * item.qty));
-        }, 0), 0),
+                const saleBs = item.priceUsd * item.qty * saleRate;
+                return is + (saleBs - (costBs * item.qty));
+            }, 0);
+            const discountBs = (s.discountAmountUsd || 0) * saleRate;
+            return sum + (itemsProfit - discountBs);
+        }, 0),
         [todaySales, bcvRate, products]
     );
 

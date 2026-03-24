@@ -157,8 +157,8 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
     const totalItems = filteredSales.reduce((s, sale) => s + sale.items.reduce((is, i) => is + i.qty, 0), 0);
 
     const profit = filteredSales.reduce((sum, s) => {
-        return sum + s.items.reduce((is, item) => {
-            const saleRate = s.rate || bcvRate;
+        const saleRate = s.rate || bcvRate;
+        const itemsProfit = s.items.reduce((is, item) => {
             let costBs;
             if (item.costUsd) {
                 costBs = item.costUsd * saleRate;
@@ -176,6 +176,8 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate }) {
             const saleBs = item.priceUsd * item.qty * saleRate;
             return is + (saleBs - (costBs * item.qty));
         }, 0);
+        const discountBs = (s.discountAmountUsd || 0) * saleRate;
+        return sum + (itemsProfit - discountBs);
     }, 0);
 
     // Desglose por método de pago

@@ -157,6 +157,19 @@ export async function generateTicketPDF(sale, bcvRate) {
     // ════════════════════════════════════
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
+    
+    if (sale.discountAmountUsd > 0) {
+        doc.setTextColor(...BODY);
+        doc.text('SUBTOTAL:', M, y);
+        doc.text('$' + (sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)), RIGHT, y, { align: 'right' });
+        y += 5;
+        doc.setTextColor(...RED);
+        const discountLabel = sale.discountType === 'percentage' ? `DESCUENTO (${sale.discountValue}%):` : 'DESCUENTO:';
+        doc.text(discountLabel, M, y);
+        doc.text('-$' + sale.discountAmountUsd.toFixed(2), RIGHT, y, { align: 'right' });
+        y += 7;
+    }
+
     doc.setTextColor(...BODY);
     doc.text('TOTAL A PAGAR', CX, y, { align: 'center' });
     y += 8;
@@ -457,6 +470,18 @@ export function printThermalTicket(sale, bcvRate) {
 
     <!-- Total -->
     <div style="margin:8px 0;">
+        ${sale.discountAmountUsd > 0 ? `
+        <table style="margin-bottom:6px; font-size:${fTiny}; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
+            <tr>
+                <td style="text-align:left; color:#555; font-weight:bold;">SUBTOTAL:</td>
+                <td style="text-align:right; color:#555; font-weight:bold;">$${sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td style="text-align:left; color:#dc3545; font-weight:bold;">${sale.discountType === 'percentage' ? `DESCUENTO (${sale.discountValue}%):` : 'DESCUENTO:'}</td>
+                <td style="text-align:right; color:#dc3545; font-weight:bold;">-$${sale.discountAmountUsd.toFixed(2)}</td>
+            </tr>
+        </table>
+        ` : ''}
         <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
         <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>

@@ -10,6 +10,9 @@ export function CartProvider({ children }) {
     // Navegacion destino tras cargar carrito reciclado
     const [pendingNavigate, setPendingNavigate] = useState(null);
 
+    // Estado del descuento global
+    const [discount, setDiscount] = useState({ type: 'percentage', value: 0 });
+
     /**
      * Carga un carrito reciclado desde cualquier parte de la app.
      * @param {Array} items - Array de items de la venta original
@@ -29,10 +32,17 @@ export function CartProvider({ children }) {
         setPendingNavigate(navigateTo);
     };
 
-    const clearCart = () => setCart([]);
+    const clearCart = () => {
+        setCart([]);
+        setDiscount({ type: 'percentage', value: 0 });
+    };
 
     return (
-        <CartContext.Provider value={{ cart, setCart, cartRef, loadCart, clearCart, pendingNavigate, setPendingNavigate }}>
+        <CartContext.Provider value={{ 
+            cart, setCart, cartRef, loadCart, clearCart, 
+            pendingNavigate, setPendingNavigate,
+            discount, setDiscount
+        }}>
             {children}
         </CartContext.Provider>
     );

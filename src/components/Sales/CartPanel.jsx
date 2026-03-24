@@ -1,13 +1,17 @@
 import React from 'react';
-import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign, Percent } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 
 export default function CartPanel({
     cart,
     effectiveRate,
+    cartSubtotalUsd,
+    cartSubtotalBs,
     cartTotalUsd,
     cartTotalBs,
     cartItemCount,
+    discountData,
+    onOpenDiscount,
     updateQty,
     removeFromCart,
     onCheckout,
@@ -140,14 +144,48 @@ export default function CartPanel({
 
             {/* Footer — shrink-0, always visible at bottom of flex container */}
             <div className="shrink-0 p-3 sm:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 rounded-b-2xl sm:rounded-b-3xl space-y-2 sm:space-y-3">
-                <div className="flex justify-between items-end px-1 sm:px-0">
-                    <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">Total Venta</span>
+                
+                {/* Botón de Descuento */}
+                <button
+                    onClick={() => { triggerHaptic && triggerHaptic(); onOpenDiscount(); }}
+                    disabled={cart.length === 0}
+                    className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl flex items-center justify-between transition-all outline-none focus:ring-2 focus:ring-emerald-500/50 ${discountData?.active ? 'bg-amber-100/80 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Percent size={16} className={discountData?.active ? 'text-amber-600 dark:text-amber-500' : ''} />
+                        <span className="text-[13px] sm:text-sm font-bold">
+                            {discountData?.active ? 'Descuento Aplicado' : 'Añadir Descuento'}
+                        </span>
+                    </div>
+                    {discountData?.active && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] sm:text-xs font-bold bg-amber-200 dark:bg-amber-800/80 px-2 py-0.5 rounded-md">
+                                {discountData.type === 'percentage' ? `${discountData.value}%` : 'Fijo'}
+                            </span>
+                            <span className="font-black">-${discountData.amountUsd.toFixed(2)}</span>
+                        </div>
+                    )}
+                </button>
+
+                <div className="flex justify-between items-end px-1 sm:px-0 pt-1">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">Total Venta</span>
+                        {discountData?.active && (
+                            <div className="flex flex-col mt-0.5 fade-in slide-in-from-left-2 animate-in duration-300">
+                                <span className="text-[11px] sm:text-xs font-bold text-slate-400 line-through decoration-red-400/70">
+                                    Subtotal: ${cartSubtotalUsd.toFixed(2)}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                     <div className="text-right flex items-center gap-3 sm:block w-full sm:w-auto justify-between">
                         <div className="flex flex-col items-start sm:items-end">
                             <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase sm:hidden">Total (Ref)</span>
                             <span className="text-[11px] font-bold text-slate-500 sm:hidden">{formatBs(cartTotalBs)} Bs</span>
                         </div>
-                        <p className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white leading-none tracking-tight">${cartTotalUsd.toFixed(2)}</p>
+                        <p className={`text-2xl sm:text-3xl font-black leading-none tracking-tight transition-colors ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
+                            ${cartTotalUsd.toFixed(2)}
+                        </p>
                     </div>
                 </div>
 
