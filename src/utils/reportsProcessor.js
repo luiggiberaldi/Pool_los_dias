@@ -63,3 +63,62 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
         salesByDay
     };
 }
+
+export function groupSalesByCierreId(allSales, from, to) {
+    // 1. Encontrar ventas/aperturas que caen en el rango y tienen cierreId
+    const entitiesInDateRange = allSales.filter(s => {
+        const dateStr = getLocalISODate(new Date(s.timestamp));
+        return dateStr >= from && dateStr <= to && s.cierreId;
+    });
+
+    // 2. Agrupar por cierreId
+    const cMap = {};
+    entitiesInDateRange.forEach(entity => {
+        const cId = entity.cierreId;
+        if (!cMap[cId]) {
+            cMap[cId] = {
+                cierreId: cId,
+                timestamp: cId,
+                apertura: null,
+                sales: [],
+            };
+        }
+        if (entity.tipo === 'APERTURA_CAJA') {
+            cMap[cId].apertura = entity;
+        } else {
+            cMap[cId].sales.push(entity);
+        }
+    });
+
+    // 3. Calcular resumen y ordenar desc
+    const result = Object.values(cMap)
+        .filter(c => c.sales.length > 0)
+        .map(c => {
+            const dateObj = new Date(c.cierreId);
+
+            // Filtrar para métricas generales (stats) y flujo de caja (cashflow)
+            const salesForStats = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA');
+            const salesForCashFlow = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'PAGO_PROVEEDOR');
+
+            const totalUsd = salesForStats.reduce((acc, s) => acc + (s.totalUsd || 0), 0);
+            const totalBs = salesForStats.reduce((acc, s) => acc + (s.totalBs || 0), 0);
+            const totalItems = salesForStats.reduce((acc, s) => acc + (s.items ? s.items.reduce((is, it) => is + it.qty, 0) : 0), 0);
+            
+            // Reconstruir desglose de pago de esta caja
+            const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
+
+            return {
+                ...c,
+                dateObj,
+                salesForStats,
+                salesForCashFlow,
+                totalUsd,
+                totalBs,
+                totalItems,
+                paymentBreakdown,
+            };
+        })
+        .sort((a, b) => b.cierreId - a.cierreId);
+
+    return result;
+}

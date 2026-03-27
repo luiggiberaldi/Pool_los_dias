@@ -10,8 +10,9 @@ import { useCart } from '../context/CartContext';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
 import { getLocalISODate, getDateRange } from '../utils/dateHelpers';
-import { calculateReportsData } from '../utils/reportsProcessor';
+import { calculateReportsData, groupSalesByCierreId } from '../utils/reportsProcessor';
 import { processVoidSale } from '../utils/voidSaleProcessor';
+import CierreHistoryCard from '../components/Reports/CierreHistoryCard';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -28,6 +29,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
+    const [activeTab, setActiveTab] = useState('metrics');
     const [selectedRange, setSelectedRange] = useState('week');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
@@ -92,6 +94,13 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
         salesByDay 
     } = useMemo(() => calculateReportsData(allSales, from, to, bcvRate, products), [allSales, from, to, bcvRate, products]);
 
+    const groupedClosings = useMemo(() => {
+        if (activeTab === 'history') {
+            return groupSalesByCierreId(allSales, from, to);
+        }
+        return [];
+    }, [allSales, from, to, activeTab]);
+
     const maxDayTotal = Math.max(...salesByDay.map(d => d.total), 1);
 
     // ── PDF Export ──
@@ -154,6 +163,22 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                 </button>
             </div>
 
+            {/* Tab Selector */}
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button
+                    onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('metrics'); }}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'metrics' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                >
+                    <BarChart3 size={16} className="inline mr-1.5 align-text-bottom"/> Métricas de Ventas
+                </button>
+                <button
+                    onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('history'); }}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                >
+                    <LockIcon size={16} className="inline mr-1.5 align-text-bottom"/> Cierres de Caja
+                </button>
+            </div>
+
             {/* Range Selector */}
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
                 {RANGE_OPTIONS.map(opt => (
@@ -194,15 +219,17 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                 </div>
             )}
 
-            {/* Summary Cards — Responsive grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
-                <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={`${formatBs(totalBs)} Bs`} color="blue" />
-                <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={`${formatBs(profit)} Bs`} color="indigo" />
-                <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
-            </div>
+            {activeTab === 'metrics' ? (
+                <>
+                    {/* Summary Cards — Responsive grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <StatCard icon={ShoppingBag} label="Ventas" value={salesForStats.length} color="emerald" />
+                        <StatCard icon={DollarSign} label="Ingresos" value={`$${totalUsd.toFixed(2)}`} sub={`${formatBs(totalBs)} Bs`} color="blue" />
+                        <StatCard icon={TrendingUp} label="Ganancia" value={bcvRate > 0 ? `$${(profit / bcvRate).toFixed(2)}` : '$0.00'} sub={`${formatBs(profit)} Bs`} color="indigo" />
+                        <StatCard icon={Package} label="Artículos" value={totalItems} color="amber" />
+                    </div>
 
-            {/* Mini bar chart per day */}
+                    {/* Mini bar chart per day */}
             {salesByDay.length > 1 && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm mt-4">
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
@@ -491,6 +518,24 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                         title="Sin ventas en este periodo"
                         description="Selecciona otro rango de fechas o usa el boton Personalizado para buscar mas atras."
                     />
+                </div>
+            )}
+            </>
+            ) : (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {groupedClosings.length > 0 ? (
+                        groupedClosings.map(cierre => (
+                            <CierreHistoryCard key={cierre.cierreId} cierre={cierre} bcvRate={bcvRate} products={products} />
+                        ))
+                    ) : (
+                        <div className="mt-8">
+                            <EmptyState
+                                icon={LockIcon}
+                                title="Sin cierres de caja registrados"
+                                description="No se encontraron operaciones de cierre en el rango de fechas seleccionado."
+                            />
+                        </div>
+                    )}
                 </div>
             )}
             {/* Recycle Offer Modal */}
