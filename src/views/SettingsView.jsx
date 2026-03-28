@@ -577,90 +577,21 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                             </div>
                                         </div>
 
-                                        {/* Tabs tipo abasto 2.0 */}
-                                        <div className="flex bg-rose-100/50 dark:bg-slate-900/50 p-1 rounded-xl mb-4 border border-rose-200/50 dark:border-rose-800/20 shadow-inner">
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsCloudLogin(false); }}
-                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${!isCloudLogin ? 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                                            >
-                                                Registrar
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsCloudLogin(true); }}
-                                                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all duration-300 ${isCloudLogin ? 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}`}
-                                            >
-                                                Entrar
-                                            </button>
-                                        </div>
-
-                                        <div className="space-y-4 mb-4">
-                                            {/* Correo Field */}
-                                            <div>
-                                                <div className="relative group">
-                                                    <input 
-                                                        type="email" 
-                                                        inputMode="email"
-                                                        placeholder="admin@miabasto.com" 
-                                                        value={inputEmail} 
-                                                        onChange={(e) => {
-                                                            setInputEmail(e.target.value);
-                                                            if (emailError) setEmailError('');
-                                                        }} 
-                                                        className={`w-full bg-white dark:bg-slate-900 border-2 ${emailError ? 'border-rose-400 focus:border-rose-500' : 'border-rose-100 dark:border-rose-900/50 focus:border-rose-400'} rounded-xl px-4 py-3 pl-11 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all shadow-sm`}
-                                                    />
-                                                    <Mail size={18} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${emailError ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-rose-500'}`} />
-                                                </div>
-                                                {emailError ? (
-                                                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 ml-1 animate-in slide-in-from-top-1">{emailError}</p>
-                                                ) : (
-                                                    <p className="text-[10px] text-slate-400 mt-1.5 ml-1">Usaremos este correo para identificar tu base de datos</p>
-                                                )}
+                                        {/* Bloqueado Temporalmente - Próximamente */}
+                                        <div className="bg-rose-100/50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 rounded-xl p-5 text-center mt-3 shadow-inner">
+                                            <div className="w-12 h-12 bg-white dark:bg-slate-900 shadow border border-rose-100 dark:border-rose-900/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <Database size={24} className="text-rose-500" />
                                             </div>
-
-                                            {/* Password Field */}
-                                            <div>
-                                                <div className="relative group">
-                                                    <input 
-                                                        type={showPassword ? 'text' : 'password'}
-                                                        placeholder="Mínimo 6 caracteres" 
-                                                        value={inputPassword} 
-                                                        onChange={(e) => {
-                                                            setInputPassword(e.target.value);
-                                                            if (passwordError) setPasswordError('');
-                                                        }} 
-                                                        className={`w-full bg-white dark:bg-slate-900 border-2 ${passwordError ? 'border-rose-400 focus:border-rose-500' : 'border-rose-100 dark:border-rose-900/50 focus:border-rose-400'} rounded-xl px-4 py-3 pl-11 pr-11 text-sm font-bold text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all shadow-sm tracking-wide`}
-                                                    />
-                                                    <Lock size={18} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? 'text-rose-500' : 'text-slate-400 group-focus-within:text-rose-500'}`} />
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => setShowPassword(!showPassword)}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
-                                                    >
-                                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                                    </button>
-                                                </div>
-                                                {passwordError ? (
-                                                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 ml-1 animate-in slide-in-from-top-1">{passwordError}</p>
-                                                ) : null}
+                                            <h4 className="text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest mb-2">¡Próximamente!</h4>
+                                            <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 font-medium leading-relaxed max-w-[250px] mx-auto mb-3">
+                                                Estamos finalizando la integración en la nube. Muy pronto podrás vincular tu cuenta, tener respaldos automáticos en tiempo real y sincronizar tu inventario con otras estaciones al instante.
+                                            </p>
+                                            <div className="flex items-center justify-center gap-1.5 opacity-60">
+                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                             </div>
                                         </div>
-                                        
-                                        <button 
-                                            onClick={handleSaveCloudAccount}
-                                            disabled={importStatus === 'loading'}
-                                            className="w-full bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-black py-3.5 rounded-xl text-xs uppercase tracking-widest active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 group disabled:opacity-70 disabled:active:scale-100 disabled:cursor-not-allowed"
-                                        >
-                                            {importStatus === 'loading' ? (
-                                                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                            ) : (
-                                                <>
-                                                    {isCloudLogin ? <ShieldCheck size={16} className="text-white/80" /> : <Upload size={16} className="text-white/80 group-hover:-translate-y-0.5 transition-transform" />}
-                                                    {isCloudLogin ? 'Entrar y Sincronizar' : 'Registrar y Subir'}
-                                                </>
-                                            )}
-                                        </button>
                                     </div>
                                 )}
 
