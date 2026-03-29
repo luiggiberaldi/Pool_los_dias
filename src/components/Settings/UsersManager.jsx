@@ -3,7 +3,7 @@ import { useAuthStore } from '../../hooks/store/useAuthStore';
 import { showToast } from '../Toast';
 import {
     UserPlus, Trash2, KeyRound, Shield, ShoppingCart,
-    Crown, X, Check, Eye, EyeOff, AlertTriangle
+    Crown, X, Check, Eye, EyeOff, AlertTriangle, Edit2
 } from 'lucide-react';
 
 const ROLE_CONFIG = {
@@ -69,7 +69,7 @@ function PinInput({ value, onChange, label }) {
 }
 
 // ─── User Row ──────────────────────────────────────
-function UserRow({ user, currentUserId, onChangePin, onDelete, triggerHaptic }) {
+function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, triggerHaptic }) {
     const roleConf = ROLE_CONFIG[user.rol] || ROLE_CONFIG.CAJERO;
     const RoleIcon = roleConf.icon;
     const isCurrentUser = user.id === currentUserId;
@@ -81,7 +81,7 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, triggerHaptic }) 
             <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${roleConf.gradient} flex items-center justify-center shrink-0 shadow-sm relative`}>
                 <span className="text-white font-black text-lg">{(user.nombre || 'U')[0].toUpperCase()}</span>
                 {isAdmin && (
-                    <div className="absolute -top-1.5 -right-1.5">
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2">
                         <Crown size={12} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" />
                     </div>
                 )}
@@ -112,6 +112,13 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, triggerHaptic }) 
                 >
                     <KeyRound size={16} />
                 </button>
+                <button
+                    onClick={() => { triggerHaptic?.(); onEditName(user); }}
+                    className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-90"
+                    title="Editar Nombre"
+                >
+                    <Edit2 size={16} />
+                </button>
                 {!isCurrentUser && (
                     <button
                         onClick={() => { triggerHaptic?.(); onDelete(user); }}
@@ -128,7 +135,7 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, triggerHaptic }) 
 
 // ═══════════════════════════════════════════════════ MAIN
 export default function UsersManager({ triggerHaptic }) {
-    const { usuarios, usuarioActivo, agregarUsuario, eliminarUsuario, cambiarPin } = useAuthStore();
+    const { usuarios, usuarioActivo, agregarUsuario, eliminarUsuario, cambiarPin, editarUsuario } = useAuthStore();
 
     // States
     const [showAddForm, setShowAddForm] = useState(false);
@@ -141,6 +148,9 @@ export default function UsersManager({ triggerHaptic }) {
     const [showPin, setShowPin] = useState(false);
 
     const [deleteUser, setDeleteUser] = useState(null);
+
+    const [editNameUser, setEditNameUser] = useState(null);
+    const [editNameValue, setEditNameValue] = useState('');
 
     // ─── Handlers ────────────────────────────────────
     const handleAdd = () => {
@@ -180,6 +190,15 @@ export default function UsersManager({ triggerHaptic }) {
         setDeleteUser(null);
     };
 
+    const handleEditName = () => {
+        if (!editNameValue.trim()) return showToast('Ingresa un nombre válido', 'error');
+        editarUsuario(editNameUser.id, { nombre: editNameValue.trim() });
+        showToast(`Nombre actualizado a ${editNameValue.trim()}`, 'success');
+        triggerHaptic?.();
+        setEditNameUser(null);
+        setEditNameValue('');
+    };
+
     return (
         <div className="space-y-4">
             {/* User List */}
@@ -190,6 +209,7 @@ export default function UsersManager({ triggerHaptic }) {
                         user={user}
                         currentUserId={usuarioActivo?.id}
                         onChangePin={u => { setChangePinUser(u); setPinValue(''); setShowPin(false); }}
+                        onEditName={u => { setEditNameUser(u); setEditNameValue(u.nombre); }}
                         onDelete={u => setDeleteUser(u)}
                         triggerHaptic={triggerHaptic}
                     />
@@ -335,6 +355,49 @@ export default function UsersManager({ triggerHaptic }) {
                                 className="flex-1 py-3 text-sm font-bold text-white bg-red-500 rounded-xl hover:bg-red-600 active:scale-95 transition-all"
                             >
                                 Si, eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Edit Name Modal ────────────────────── */}
+            {editNameUser && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEditNameUser(null)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="text-center mb-6">
+                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[editNameUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
+                                <span className="text-white font-black text-2xl">{(editNameUser.nombre || 'U')[0].toUpperCase()}</span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white">Cambiar Nombre</h3>
+                            <p className="text-xs text-slate-400 mt-1">{editNameUser.rol}</p>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5 ml-1">Nuevo Nombre</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={editNameValue}
+                                onChange={e => setEditNameValue(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-800 dark:text-white transition-all text-center"
+                                placeholder="..."
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setEditNameUser(null)}
+                                className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleEditName}
+                                disabled={!editNameValue.trim()}
+                                className="flex-1 py-3 text-sm font-bold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Guardar
                             </button>
                         </div>
                     </div>

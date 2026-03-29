@@ -104,12 +104,23 @@ export class FinancialEngine {
             }
 
             if (!sale.payments || sale.payments.length === 0) {
-                // V1 Legacy Sales
+                // V1 Legacy Sales & Cobro Deudas
                 const method = sale.paymentMethod || 'efectivo_bs';
-                if (!breakdown[method]) {
-                    breakdown[method] = { total: 0, currency: 'BS', label: method };
+                let currency = 'BS';
+                let valueToSum = sale.totalBs || 0;
+
+                if (method.includes('usd') || method.includes('zelle') || method.includes('binance')) {
+                    currency = 'USD';
+                    valueToSum = sale.totalUsd || 0;
+                } else if (method.includes('cop')) {
+                    currency = 'COP';
+                    valueToSum = sale.totalCop || 0;
                 }
-                breakdown[method].total += (sale.totalBs || 0);
+
+                if (!breakdown[method]) {
+                    breakdown[method] = { total: 0, currency: currency, label: method };
+                }
+                breakdown[method].total += valueToSum;
             } else {
                 // Aggregate incoming payments (V2 sales)
                 sale.payments.forEach(p => {

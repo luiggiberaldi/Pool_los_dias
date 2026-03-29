@@ -10,6 +10,7 @@ export default function SuppliersList({
     tasaCop,
     copEnabled,
     triggerHaptic, 
+    isAdmin,
     onAddSupplier, 
     onSelectSupplier, 
     onDeleteSupplier 
@@ -45,12 +46,14 @@ export default function SuppliersList({
                                 {copEnabled && tasaCop > 0 && <p className="text-sm font-bold text-amber-200">{(totalDebtUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>}
                             </div>
                         </div>
-                        <button
-                            onClick={() => { triggerHaptic && triggerHaptic(); onAddSupplier(); }}
-                            className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl p-2.5 shadow-sm active:scale-95 transition-all"
-                        >
-                            <Plus size={20} />
-                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={() => { triggerHaptic && triggerHaptic(); onAddSupplier(); }}
+                                className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl p-2.5 shadow-sm active:scale-95 transition-all"
+                            >
+                                <Plus size={20} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -92,8 +95,8 @@ export default function SuppliersList({
                         icon={Truck}
                         title="Sin Proveedores"
                         description="Registra a tus distribuidores y proveedores para llevar control de cuentas por pagar."
-                        actionLabel="NUEVO PROVEEDOR"
-                        onAction={() => { triggerHaptic && triggerHaptic(); onAddSupplier(); }}
+                        actionLabel={isAdmin ? "NUEVO PROVEEDOR" : undefined}
+                        onAction={isAdmin ? () => { triggerHaptic && triggerHaptic(); onAddSupplier(); } : undefined}
                     />
                 ) : filteredSuppliers.length === 0 ? (
                     <EmptyState
@@ -107,7 +110,7 @@ export default function SuppliersList({
                     filteredSuppliers.map(supplier => (
                         <SwipeableItem
                             key={supplier.id}
-                            onDelete={() => onDeleteSupplier && onDeleteSupplier(supplier)}
+                            onDelete={isAdmin ? () => onDeleteSupplier && onDeleteSupplier(supplier) : undefined}
                             triggerHaptic={triggerHaptic}
                         >
                             <div 

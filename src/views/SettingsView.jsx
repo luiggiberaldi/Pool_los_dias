@@ -27,6 +27,7 @@ function Toggle({ enabled, onChange, color = 'emerald' }) {
         emerald: enabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600',
         amber: enabled ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600',
         indigo: enabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600',
+        rose: enabled ? 'bg-rose-500' : 'bg-slate-300 dark:bg-slate-600',
     };
     return (
         <button
@@ -96,12 +97,14 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [inputEmail, setInputEmail] = useState(adminEmail || '');
     const [inputPassword, setInputPassword] = useState(adminPassword || '');
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
-    const [isCloudLogin, setIsCloudLogin] = useState(false);
+    const [isCloudLogin, setIsCloudLogin] = useState(true);
     
     // UI states for Auth form
+    const [inputPhone, setInputPhone] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
     // Business Data
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
@@ -144,6 +147,11 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             hasError = true;
         }
 
+        if (!isCloudLogin && !inputPhone.trim()) {
+            showToast('El teléfono es obligatorio para registrarse', 'error');
+            hasError = true;
+        }
+
         if (hasError) {
             triggerHaptic?.();
             return;
@@ -167,15 +175,28 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                         email: emailToUse,
                         password: inputPassword,
                         options: {
-                            data: { full_name: businessName || 'Bodega' },
+                            data: { 
+                                full_name: businessName || 'Bodega',
+                                phone: inputPhone
+                            },
                         },
                     });
                     if (err) {
                         // Si ya existe, dar mensaje amigable
-                        if (err.message.includes('already registered')) {
+                        if (err.message.includes('already registered') || err.message.includes('User already registered')) {
                             throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
                         }
                         throw new Error('Error en el registro: ' + err.message);
+                    }
+                    if (data?.user && data.user.identities && data.user.identities.length === 0) {
+                         throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
+                    }
+                    if (data?.user && !data.session) {
+                        // Email confirmation required!
+                        showToast('Por favor, revisa tu correo y confirma tu cuenta.', 'success');
+                        setImportStatus('awaiting_email_confirmation');
+                        setStatusMessage('Por favor confirma tu correo...');
+                        return; // Stop here, do not backup yet!
                     }
                 }
             }
@@ -217,24 +238,40 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                 data: { idb: idbData, ls: lsData }
             };
 
-            // 2. Subir a Supabase (usando el correo como clave primaria)
+            // 3. Subir a Supabase (usando el correo como clave primaria)
             if (supabaseCloud) {
                 const { error } = await supabaseCloud
                     .from('cloud_backups')
                     .upsert({
-                        email: inputEmail,
-                        password_hash: inputPassword, // En produccion idealmente un hash, o delegarlo a Auth
+                        email: inputEmail.toLowerCase(),
+                        password_hash: inputPassword, // En produccion idealmente omitimos, pero lo dejamos por compatibilidad
                         backup_data: backupData,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'email' });
 
                 if (error) throw error;
+                
+                // --- PREPARATIVO PARA ESTACION MAESTRA (NUEVA BASE DE DATOS) ---
+                // Registramos o actualizamos la licencia inicial y roles
+                try {
+                     await supabaseCloud.from('cloud_licenses').upsert({
+                         email: inputEmail.toLowerCase(),
+                         device_id: deviceId || 'UNKNOWN_DEVICE',
+                         license_type: 'trial', // 'trial', 'permanent', 'days'
+                         days_remaining: 15,
+                         business_name: businessName || 'Bodega',
+                         phone: inputPhone || '',
+                         updated_at: new Date().toISOString()
+                     }, { onConflict: 'email' });
+                } catch(licErr) {
+                     console.warn('Licencia cloud skip: La tabla cloud_licenses no existe todavía, preparado para Estación Maestra.', licErr);
+                }
             }
 
             // 4. Establecer como exitoso localmente
             setAdminCredentials(inputEmail, inputPassword);
-            showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta creada y backup enviado', 'success');
-            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización para: ${inputEmail}`);
+            showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta confirmada y sincronizada', 'success');
+            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización completa para: ${inputEmail}`);
             triggerHaptic?.();
             setImportStatus(null);
             
@@ -242,6 +279,32 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             console.error('Error sincronizando con la nube:', error);
             showToast(error.message || 'Hubo un error contactando la nube', 'error');
             setImportStatus('error');
+        }
+    };
+
+    const handleResetPasswordRequest = async () => {
+        setEmailError('');
+        if (!inputEmail.includes('@')) {
+            setEmailError('Ingresa un correo válido');
+            return;
+        }
+
+        setImportStatus('loading');
+        setStatusMessage('Enviando enlace...');
+        try {
+            const { error } = await supabaseCloud.auth.resetPasswordForEmail(inputEmail.toLowerCase().trim(), {
+                redirectTo: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
+            });
+            if (error) throw error;
+            showToast('Enlace enviado. Por favor revisa tu correo.', 'success');
+            setIsRecoveringPassword(false);
+            setImportStatus(null);
+            setStatusMessage('');
+        } catch (error) {
+            console.error('Error al resetear password:', error);
+            showToast(error.message || 'Error al enviar recuperación', 'error');
+            setImportStatus('error');
+            setStatusMessage('Error al enviar correo.');
         }
     };
 
@@ -577,27 +640,208 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                             </div>
                                         </div>
 
-                                        {/* Bloqueado Temporalmente - Próximamente */}
-                                        <div className="bg-rose-100/50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 rounded-xl p-5 text-center mt-3 shadow-inner">
-                                            <div className="w-12 h-12 bg-white dark:bg-slate-900 shadow border border-rose-100 dark:border-rose-900/50 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                <Database size={24} className="text-rose-500" />
+                                        {/* Formulario de Auth Nube Real */}
+                                        <div className="bg-white dark:bg-slate-900 border border-rose-200/60 dark:border-rose-900/40 rounded-xl p-4 mt-3 shadow-inner">
+                                            {/* Tabs Login/Registro */}
+                                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-4">
+                                                <button
+                                                    onClick={() => setIsCloudLogin(true)}
+                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${isCloudLogin ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700'}`}
+                                                >
+                                                    Entrar
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsCloudLogin(false)}
+                                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!isCloudLogin ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700'}`}
+                                                >
+                                                    Registrarse
+                                                </button>
                                             </div>
-                                            <h4 className="text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-widest mb-2">¡Próximamente!</h4>
-                                            <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 font-medium leading-relaxed max-w-[250px] mx-auto mb-3">
-                                                Estamos finalizando la integración en la nube. Muy pronto podrás vincular tu cuenta, tener respaldos automáticos en tiempo real y sincronizar tu inventario con otras estaciones al instante.
-                                            </p>
-                                            <div className="flex items-center justify-center gap-1.5 opacity-60">
-                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <div className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                            </div>
+
+                                            {importStatus === 'awaiting_email_confirmation' ? (
+                                                <div className="text-center py-6 px-4 animate-in fade-in zoom-in">
+                                                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                        <Mail size={32} className="text-indigo-500" />
+                                                    </div>
+                                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">¡Revisa tu correo!</h3>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+                                                        Hemos enviado un enlace de confirmación a <strong className="text-slate-700 dark:text-slate-300">{inputEmail}</strong>. 
+                                                        Por favor haz clic en él para verificar tu identidad y luego regresa aquí para Iniciar Sesión.
+                                                    </p>
+                                                    <button
+                                                        onClick={() => {
+                                                            setImportStatus(null);
+                                                            setIsCloudLogin(true); // Cambiamos a Login para cuando regrese
+                                                        }}
+                                                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors active:scale-95"
+                                                    >
+                                                        Ya lo confirmé, Iniciar Sesión
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {!isCloudLogin && (
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Teléfono Móvil</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="tel"
+                                                                    placeholder="Ej: 0414..."
+                                                                    value={inputPhone}
+                                                                    onChange={e => setInputPhone(e.target.value)}
+                                                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
+                                                                />
+                                                                <Database size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Correo Electrónico</label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="email"
+                                                                placeholder="tu@correo.com"
+                                                                value={inputEmail}
+                                                                onChange={e => {
+                                                                    setInputEmail(e.target.value);
+                                                                    setEmailError('');
+                                                                }}
+                                                                className={`w-full bg-slate-50 dark:bg-slate-950 border ${emailError ? 'border-red-400' : 'border-slate-200 dark:border-slate-800'} rounded-xl pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all`}
+                                                            />
+                                                            <Mail size={16} className={`absolute left-3.5 top-3 ${emailError ? 'text-red-400' : 'text-slate-400'}`} />
+                                                        </div>
+                                                        {emailError && <p className="text-[10px] text-red-500 mt-1 ml-1 font-medium">{emailError}</p>}
+                                                    </div>
+
+                                                    {!isRecoveringPassword && (
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Contraseña</label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type={showPassword ? 'text' : 'password'}
+                                                                    placeholder="Mínimo 6 caracteres"
+                                                                    value={inputPassword}
+                                                                    onChange={e => {
+                                                                        setInputPassword(e.target.value);
+                                                                        setPasswordError('');
+                                                                    }}
+                                                                    className={`w-full bg-slate-50 dark:bg-slate-950 border ${passwordError ? 'border-red-400' : 'border-slate-200 dark:border-slate-800'} rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all`}
+                                                                />
+                                                                <Lock size={16} className={`absolute left-3.5 top-3 ${passwordError ? 'text-red-400' : 'text-slate-400'}`} />
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => setShowPassword(!showPassword)}
+                                                                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                                                >
+                                                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                                </button>
+                                                            </div>
+                                                            {passwordError && <p className="text-[10px] text-red-500 mt-1 ml-1 font-medium">{passwordError}</p>}
+                                                        </div>
+                                                    )}
+
+                                                    {importStatus === 'error' && (
+                                                        <div className="p-2.5 mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex items-center gap-2">
+                                                            <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                                                            <p className="text-[10px] text-red-600 dark:text-red-400 font-medium">{statusMessage}</p>
+                                                        </div>
+                                                    )}
+
+                                                    <button
+                                                        onClick={isRecoveringPassword ? handleResetPasswordRequest : handleSaveCloudAccount}
+                                                        disabled={importStatus === 'loading'}
+                                                        className="w-full mt-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 dark:disabled:bg-indigo-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                                                    >
+                                                        {importStatus === 'loading' ? (
+                                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        ) : (
+                                                            <ShieldCheck size={18} />
+                                                        )}
+                                                        {importStatus === 'loading' ? 'Procesando...' : (
+                                                            isRecoveringPassword ? 'Enviar enlace de recuperación' :
+                                                            (isCloudLogin ? 'Entrar y Sincronizar' : 'Crear Cuenta Segura')
+                                                        )}
+                                                    </button>
+                                                    
+                                                    <div className="flex flex-col items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                        {isCloudLogin && !isRecoveringPassword && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setIsRecoveringPassword(true);
+                                                                    setImportStatus(null);
+                                                                    setStatusMessage('');
+                                                                    setEmailError('');
+                                                                    setPasswordError('');
+                                                                }}
+                                                                className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline mb-2"
+                                                            >
+                                                                ¿Olvidaste tu contraseña?
+                                                            </button>
+                                                        )}
+
+                                                        {isRecoveringPassword && (
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setIsRecoveringPassword(false);
+                                                                    setImportStatus(null);
+                                                                    setStatusMessage('');
+                                                                    setEmailError('');
+                                                                }}
+                                                                className="text-[11px] text-slate-500 font-bold hover:underline mb-2"
+                                                            >
+                                                                Volver a Iniciar Sesión
+                                                            </button>
+                                                        )}
+
+                                                        {!isCloudLogin && !isRecoveringPassword && (
+                                                            <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 leading-relaxed">
+                                                                Al registrarte, enviaremos un correo de validación. Tu información será encriptada y quedará lista para la próxima <strong>Estación Maestra</strong>.
+                                                            </p>
+                                                        )}
+
+                                                        {isRecoveringPassword && (
+                                                            <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 leading-relaxed max-w-[200px]">
+                                                                Ingresa el correo de tu cuenta. Te enviaremos un mensaje con un enlace para crear una contraseña nueva.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
 
-                                <div className={`transition-all duration-300 ${!isCloudConfigured ? 'opacity-40 grayscale pointer-events-none blur-[1px]' : ''}`}>
+                                {isCloudConfigured && (
+                                    <div className="mb-5 p-3.5 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-full flex items-center justify-center">
+                                                <Database size={20} className="text-indigo-600 dark:text-indigo-400" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Sincronización Activa</p>
+                                                <p className="text-[10px] text-slate-500">{adminEmail}</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                if (window.confirm('¿Seguro que deseas cerrar la sesión en la nube?')) {
+                                                    setAdminCredentials('', '');
+                                                    if (supabaseCloud) await supabaseCloud.auth.signOut();
+                                                    showToast('Sesión de nube cerrada', 'success');
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 bg-white dark:bg-slate-800 text-red-500 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition-all"
+                                        >
+                                            Cerrar Sesión
+                                        </button>
+                                    </div>
+                                )}
+
                                     {/* Login Opcional */}
-                                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+                                    <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-4 mt-6">
                                         <div>
                                             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Pedir PIN al iniciar</p>
                                             <p className="text-[10px] text-slate-400 mt-0.5">Si se desactiva, entrará directo como Administrador.</p>
@@ -606,7 +850,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                             enabled={requireLogin}
                                             color="rose"
                                             onChange={() => {
-                                                if (!isCloudConfigured) return;
                                                 const newVal = !requireLogin;
                                                 if (setRequireLogin) setRequireLogin(newVal);
                                                 triggerHaptic?.();
@@ -642,10 +885,9 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                                 {opt.label}
                                             </button>
                                         ))}
+                                        </div>
                                     </div>
-                                </div>
-                                </div>
-                            </SectionCard>
+                                </SectionCard>
                         </>
                     )}
 

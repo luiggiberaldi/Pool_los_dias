@@ -15,7 +15,8 @@ export default function SalesHistory({
     onOpenDeleteModal,
     onRequestClientForTicket,
     onRecycleSale,
-    onPrintTicket
+    onPrintTicket,
+    isAdmin
 }) {
     const [expandedSaleId, setExpandedSaleId] = useState(null);
 
@@ -39,13 +40,15 @@ export default function SalesHistory({
                 </h3>
                 <div className="flex items-center gap-2">
                     <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{totalSalesCount} histórico</span>
-                    <button
-                        onClick={onOpenDeleteModal}
-                        className="text-slate-300 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-1.5 rounded-lg"
-                        title="Borrar historial"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    {isAdmin && (
+                        <button
+                            onClick={onOpenDeleteModal}
+                            className="text-slate-300 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-1.5 rounded-lg"
+                            title="Borrar historial"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
             <div className="space-y-3">
@@ -156,7 +159,7 @@ export default function SalesHistory({
                                             </button>
                                         )}
 
-                                        {!isCanceled && !s.cajaCerrada && (
+                                        {isAdmin && !isCanceled && !s.cajaCerrada && (
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onVoidSale(s); }}
                                                 className="py-2 px-3 bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-900/30 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 shadow-sm active:scale-95">

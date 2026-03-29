@@ -159,9 +159,11 @@ export default function App() {
   const requireLogin = useAuthStore(s => s.requireLogin ?? false);
   const isCajero = usuarioActivo?.rol === 'CAJERO';
 
+  const hasAttemptedAutoLogin = useRef(false);
   useEffect(() => {
-    // Si el login no es requerido y no hay usuario activo, forzar el login del primer Administrador
-    if (!requireLogin && !usuarioActivo) {
+    // Si el login no es requerido y no hay usuario activo, forzar el login del primer Administrador (sólo la primera vez)
+    if (!requireLogin && !usuarioActivo && !hasAttemptedAutoLogin.current) {
+      hasAttemptedAutoLogin.current = true;
       const admins = useAuthStore.getState().usuarios.filter(u => u.rol === 'ADMIN');
       if (admins.length > 0) {
         useAuthStore.setState({ usuarioActivo: admins[0] });
@@ -179,14 +181,13 @@ export default function App() {
 
   const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
 
-  // Si no hay sesion activa, y el login es requerido, mostrar LockScreen
-  if (!usuarioActivo && requireLogin) {
+  // Si no hay sesion activa, mostrar la pantalla de bloqueo (PIN)
+  if (!usuarioActivo) {
+    // Solo mostrar el splash en blanco si está por hacer auto-login inicial
+    if (!requireLogin && !hasAttemptedAutoLogin.current) {
+      return <div className="h-[100dvh] bg-slate-50 dark:bg-black" />; // Prevents crashes
+    }
     return <LockScreen />;
-  }
-
-  // Esperar un frame a que se auto-asigne el usuario si requireLogin es false
-  if (!usuarioActivo && !requireLogin) {
-    return <div className="h-[100dvh] bg-slate-50 dark:bg-black" />; // Prevents crashes down the tree
   }
 
   return (

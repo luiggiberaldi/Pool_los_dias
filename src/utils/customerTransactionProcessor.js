@@ -52,7 +52,15 @@ export async function processCustomerTransaction({
             totalBs: totalEnBs,
             totalUsd: totalEnUsd,
             ...(copEnabled && { totalCop: totalEnCop }),
-            paymentMethod: paymentMethod,
+            paymentMethod: paymentMethod, // Legacy keep just in case
+            payments: [{
+                methodId: paymentMethod,
+                amount: currencyMode === 'USD' ? totalEnUsd : (currencyMode === 'COP' ? totalEnCop : totalEnBs),
+                currency: currencyMode,
+                amountUsd: totalEnUsd,
+                amountBs: totalEnBs,
+                methodLabel: paymentMethod.replace('_', ' ')
+            }],
             items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
         };
         sales.push(cobroRecord);

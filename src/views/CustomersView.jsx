@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState';
 import SwipeableItem from '../components/SwipeableItem';
 import { useProductContext } from '../context/ProductContext';
 import { useAudit } from '../hooks/useAudit';
+import { useAuthStore } from '../hooks/store/useAuthStore';
 
 // Importaciones de Proveedores
 import SuppliersList from '../components/Suppliers/SuppliersList';
@@ -23,6 +24,9 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all'); // 'all' | 'deuda' | 'favor'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+    const usuarioActivo = useAuthStore(state => state.usuarioActivo);
+    const isAdmin = !usuarioActivo || usuarioActivo.rol === 'ADMIN';
 
     // Modal de Abono / Crédito
     const [transactionModal, setTransactionModal] = useState({ isOpen: false, type: null, customer: null }); // type: 'ABONO' | 'CREDITO'
@@ -298,6 +302,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         tasaCop={tasaCop}
                         copEnabled={copEnabled}
                         triggerHaptic={triggerHaptic}
+                        isAdmin={isAdmin}
                         onAddSupplier={() => setIsAddSupplierModalOpen(true)}
                         onSelectSupplier={handleSelectSupplier}
                         onDeleteSupplier={(s) => setDeleteSupplierTarget(s)}
@@ -333,6 +338,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                 <SupplierDetailsSheet 
                     supplier={selectedSupplier}
                     isOpen={!!selectedSupplier}
+                    isAdmin={isAdmin}
                     bcvRate={bcvRate}
                     tasaCop={tasaCop}
                     copEnabled={copEnabled}
@@ -461,7 +467,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                     filteredCustomers.map(customer => (
                         <SwipeableItem
                             key={customer.id}
-                            onDelete={() => handleDeleteCustomerRequest(customer)}
+                            onDelete={isAdmin ? () => handleDeleteCustomerRequest(customer) : undefined}
                             triggerHaptic={triggerHaptic}
                         >
                             <CustomerCard
@@ -473,7 +479,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                                     setSelectedCustomer(customer);
                                     toggleHistory(customer.id);
                                 }}
-                                onDelete={() => handleDeleteCustomerRequest(customer)}
+                                onDelete={isAdmin ? () => handleDeleteCustomerRequest(customer) : undefined}
                             />
                         </SwipeableItem>
                     ))
@@ -517,6 +523,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
             <CustomerDetailSheet
                 customer={selectedCustomer}
                 isOpen={!!selectedCustomer}
+                isAdmin={isAdmin}
                 onClose={() => {
                     setSelectedCustomer(null);
                     setExpandedHistory(null);
@@ -661,7 +668,7 @@ function CustomerCard({ customer, bcvRate, tasaCop, copEnabled, onClick, onDelet
 }
 
 // ─── Sub-componente: Bottom Sheet de Detalle ────────────────
-function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, onEdit, onDelete, bcvRate, tasaCop, copEnabled, sales }) {
+function CustomerDetailSheet({ customer, isOpen, isAdmin, onClose, onAjustar, onReset, onEdit, onDelete, bcvRate, tasaCop, copEnabled, sales }) {
     if (!isOpen || !customer) return null;
 
     const createdDate = customer.createdAt
@@ -745,7 +752,7 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, on
                             <CreditCard size={18} />
                             <span>Ajustar Cuenta</span>
                         </button>
-                        {(customer.deuda !== 0 || customer.favor !== 0) && (
+                        {(customer.deuda !== 0 || customer.favor !== 0) && isAdmin && (
                             <button
                                 onClick={onReset}
                                 className="flex flex-col items-center gap-1.5 py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors active:scale-95"
@@ -821,12 +828,14 @@ function CustomerDetailSheet({ customer, isOpen, onClose, onAjustar, onReset, on
                         >
                             <Pencil size={14} /> Editar
                         </button>
-                        <button
-                            onClick={onDelete}
-                            className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors active:scale-95"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={onDelete}
+                                className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors active:scale-95"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
