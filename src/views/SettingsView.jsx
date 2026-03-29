@@ -106,6 +106,11 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [passwordError, setPasswordError] = useState('');
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
+    // Device limit & data conflict states
+    const [deviceLimitError, setDeviceLimitError] = useState(null); // { devices: [...] }
+    const [blockedDevices, setBlockedDevices] = useState([]);
+    const [dataConflictPending, setDataConflictPending] = useState(null); // { email, cloudBackup, localBackup }
+
     // Business Data
     const [businessName, setBusinessName] = useState(() => localStorage.getItem('business_name') || '');
     const [businessRif, setBusinessRif] = useState(() => localStorage.getItem('business_rif') || '');
@@ -128,44 +133,167 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         triggerHaptic?.();
     };
 
+    const handleSaveCloudAccount_DEPRECATED = async () => {
+        // Esta función fue reemplazada por la versión completa más abajo
+        // Se deja como referencia. Ver handleSaveCloudAccount debajo.
+    };
+
+    // ─── HELPER: Apply a cloud backup to local storage ───────────────────────
+    const applyCloudBackup = async (cloudBackup) => {
+        const lf = localforage.createInstance({ name: 'BodegaApp', storeName: 'bodega_app_data' });
+        if (cloudBackup.version === '2.0' && cloudBackup.data?.idb) {
+            for (const [key, value] of Object.entries(cloudBackup.data.idb)) {
+                await lf.setItem(key, value);
+            }
+            if (cloudBackup.data.ls) {
+                for (const [key, value] of Object.entries(cloudBackup.data.ls)) {
+                    localStorage.setItem(key, value);
+                }
+            }
+        }
+    };
+
+    // ─── HELPER: Collect local backup payload ────────────────────────────────
+    const collectLocalBackup = async () => {
+        const idbKeys = [
+            'bodega_products_v1', 'my_categories_v1',
+            'bodega_sales_v1', 'bodega_customers_v1',
+            'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
+            'bodega_accounts_v2', 'bodega_pending_cart_v1',
+            'payment_methods_v1', 'payment_methods_v2'
+        ];
+        const idbData = {};
+        for (const key of idbKeys) {
+            const data = await storageService.getItem(key, null);
+            if (data !== null) idbData[key] = data;
+        }
+        const lsKeys = [
+            'premium_token', 'street_rate_bs', 'catalog_use_auto_usdt',
+            'catalog_custom_usdt_price', 'catalog_show_cash_price',
+            'monitor_rates_v12', 'business_name', 'business_rif',
+            'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
+            'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
+            'bodega_custom_rate', 'bodega_inventory_view'
+        ];
+        const lsData = {};
+        for (const key of lsKeys) {
+            const val = localStorage.getItem(key);
+            if (val !== null) lsData[key] = val;
+        }
+        return {
+            timestamp: new Date().toISOString(),
+            version: '2.0',
+            appName: 'TasasAlDia_Bodegas_Cloud',
+            data: { idb: idbData, ls: lsData }
+        };
+    };
+
+    // ─── HELPER: Upload local backup to cloud ────────────────────────────────
+    const uploadLocalBackup = async (email, backupData) => {
+        const { error } = await supabaseCloud
+            .from('cloud_backups')
+            .upsert({
+                email: email.toLowerCase(),
+                backup_data: backupData,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'email' });
+        if (error) throw error;
+    };
+
+    // ─── HELPER: Register or update device in account_devices ─────────────────
+    const registerDevice = async (email) => {
+        await supabaseCloud.from('account_devices').upsert({
+            email: email.toLowerCase(),
+            device_id: deviceId || 'UNKNOWN',
+            device_alias: `Dispositivo ${navigator.platform || 'Web'}`,
+            last_seen: new Date().toISOString()
+        }, { onConflict: 'email,device_id' });
+    };
+
+    // ─── HANDLER: Data conflict resolution ──────────────────────────────────
+    const handleDataConflictChoice = async (choice) => {
+        if (!dataConflictPending) return;
+        const { email, cloudBackup, localBackup } = dataConflictPending;
+        setDataConflictPending(null);
+        setImportStatus('loading');
+        setStatusMessage('Aplicando tu elección...');
+        try {
+            if (choice === 'cloud') {
+                // Restore cloud data to this device
+                await applyCloudBackup(cloudBackup);
+                showToast('Datos de la nube restaurados. Reiniciando...', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                // Upload local data to cloud (overwrite)
+                await uploadLocalBackup(email, localBackup);
+                showToast('Datos locales guardados en la nube', 'success');
+            }
+            setAdminCredentials(email, inputPassword);
+            auditLog('NUBE', 'CONFLICTO_RESUELTO', `Conflicto datos resuelto: usuario eligió ${choice}`);
+            setImportStatus(null);
+        } catch (err) {
+            showToast(err.message || 'Error al resolver el conflicto', 'error');
+            setImportStatus('error');
+        }
+    };
+
+    // ─── HANDLER: Desvincular dispositivo más antiguo y reintentar ────────────
+    const handleUnlinkOldestDevice = async () => {
+        if (!blockedDevices.length || !inputEmail) return;
+        setImportStatus('loading');
+        setStatusMessage('Desvinculando dispositivo más antiguo...');
+        try {
+            // Sort by created_at ascending, remove the oldest
+            const oldest = [...blockedDevices].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+            await supabaseCloud.from('account_devices')
+                .delete()
+                .eq('email', inputEmail.toLowerCase())
+                .eq('device_id', oldest.device_id);
+            setDeviceLimitError(null);
+            setBlockedDevices([]);
+            showToast(`"${oldest.device_alias}" desvinculado. Volviendo a conectar...`, 'success');
+            await handleSaveCloudAccount();
+        } catch (err) {
+            showToast(err.message || 'Error al desvincular', 'error');
+            setImportStatus('error');
+        }
+    };
+
     const handleSaveCloudAccount = async () => {
-        // Validación estricta UX
+        // Reset errors
         setEmailError('');
         setPasswordError('');
+        setDeviceLimitError(null);
+        setBlockedDevices([]);
 
         let hasError = false;
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        
-        if (!emailRegex.test(inputEmail.trim())) {
+        if (!inputEmail.includes('@')) {
             setEmailError('Formato de correo no válido');
             hasError = true;
         }
-
-        // Supabase requiere mínimo 6 caracteres para contraseñas de Auth por defecto
         if (inputPassword.length < 6) {
             setPasswordError('Mínimo 6 caracteres para mayor seguridad');
             hasError = true;
         }
-
         if (!isCloudLogin && !inputPhone.trim()) {
             showToast('El teléfono es obligatorio para registrarse', 'error');
             hasError = true;
         }
-
         if (hasError) {
             triggerHaptic?.();
             return;
         }
 
+        const emailToUse = inputEmail.trim().toLowerCase();
+
         try {
             setImportStatus('loading');
             setStatusMessage('Autenticando en la nube...');
 
-            // --- 1. Lógica Auth de abasto 2.0 ---
+            // ── 1. Supabase Auth ────────────────────────────────────────────────
             if (supabaseCloud) {
-                const emailToUse = inputEmail.trim().toLowerCase();
                 if (isCloudLogin) {
-                    const { data, error: err } = await supabaseCloud.auth.signInWithPassword({
+                    const { error: err } = await supabaseCloud.auth.signInWithPassword({
                         email: emailToUse,
                         password: inputPassword,
                     });
@@ -174,113 +302,124 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                     const { data, error: err } = await supabaseCloud.auth.signUp({
                         email: emailToUse,
                         password: inputPassword,
-                        options: {
-                            data: { 
-                                full_name: businessName || 'Bodega',
-                                phone: inputPhone
-                            },
-                        },
+                        options: { data: { full_name: businessName || 'Bodega', phone: inputPhone } },
                     });
                     if (err) {
-                        // Si ya existe, dar mensaje amigable
                         if (err.message.includes('already registered') || err.message.includes('User already registered')) {
                             throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
                         }
                         throw new Error('Error en el registro: ' + err.message);
                     }
-                    if (data?.user && data.user.identities && data.user.identities.length === 0) {
-                         throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
-                    }
+                    if (data?.user?.identities?.length === 0) throw new Error('Este correo ya está registrado. Selecciona "Entrar".');
                     if (data?.user && !data.session) {
-                        // Email confirmation required!
                         showToast('Por favor, revisa tu correo y confirma tu cuenta.', 'success');
                         setImportStatus('awaiting_email_confirmation');
                         setStatusMessage('Por favor confirma tu correo...');
-                        return; // Stop here, do not backup yet!
+                        return;
                     }
                 }
             }
 
-            setStatusMessage('Guardando y sincronizando datos locales...');
-            
-            // --- 2. Recolectar toda la data de la app ---
-            const idbKeys = [
-                'bodega_products_v1', 'my_categories_v1', 
-                'bodega_sales_v1', 'bodega_customers_v1',
-                'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
-                'bodega_accounts_v2', 'bodega_pending_cart_v1',
-                'payment_methods_v1', 'payment_methods_v2'
-            ];
-            const idbData = {};
-            for (const key of idbKeys) {
-                const data = await storageService.getItem(key, null);
-                if (data !== null) idbData[key] = data;
-            }
+            // ── 2. Control de dispositivos (máx. 2) ─────────────────────────────
+            setStatusMessage('Verificando dispositivos autorizados...');
+            const { data: existingDevices, error: devErr } = await supabaseCloud
+                .from('account_devices')
+                .select('*')
+                .eq('email', emailToUse)
+                .order('created_at', { ascending: true });
 
-            const lsKeys = [
-                'premium_token', 'street_rate_bs', 'catalog_use_auto_usdt', 
-                'catalog_custom_usdt_price', 'catalog_show_cash_price', 
-                'monitor_rates_v12', 'business_name', 'business_rif',
-                'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
-                'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
-                'bodega_custom_rate', 'bodega_inventory_view'
-            ];
-            const lsData = {};
-            for (const key of lsKeys) {
-                const val = localStorage.getItem(key);
-                if (val !== null) lsData[key] = val;
-            }
+            if (!devErr && existingDevices) {
+                const myDeviceRegistered = existingDevices.find(d => d.device_id === (deviceId || 'UNKNOWN'));
+                const activeCount = existingDevices.length;
 
-            const backupData = {
-                timestamp: new Date().toISOString(),
-                version: '2.0',
-                appName: 'TasasAlDia_Bodegas_Cloud',
-                data: { idb: idbData, ls: lsData }
-            };
-
-            // 3. Subir a Supabase (usando el correo como clave primaria)
-            if (supabaseCloud) {
-                const { error } = await supabaseCloud
-                    .from('cloud_backups')
-                    .upsert({
-                        email: inputEmail.toLowerCase(),
-                        password_hash: inputPassword, // En produccion idealmente omitimos, pero lo dejamos por compatibilidad
-                        backup_data: backupData,
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'email' });
-
-                if (error) throw error;
-                
-                // --- PREPARATIVO PARA ESTACION MAESTRA (NUEVA BASE DE DATOS) ---
-                // Registramos o actualizamos la licencia inicial y roles
-                try {
-                     await supabaseCloud.from('cloud_licenses').upsert({
-                         email: inputEmail.toLowerCase(),
-                         device_id: deviceId || 'UNKNOWN_DEVICE',
-                         license_type: 'trial', // 'trial', 'permanent', 'days'
-                         days_remaining: 15,
-                         business_name: businessName || 'Bodega',
-                         phone: inputPhone || '',
-                         updated_at: new Date().toISOString()
-                     }, { onConflict: 'email' });
-                } catch(licErr) {
-                     console.warn('Licencia cloud skip: La tabla cloud_licenses no existe todavía, preparado para Estación Maestra.', licErr);
+                if (!myDeviceRegistered && activeCount >= 2) {
+                    // ❌ Límite alcanzado - mostrar error con opción de desvincular
+                    setDeviceLimitError({ devices: existingDevices });
+                    setBlockedDevices(existingDevices);
+                    setImportStatus('error');
+                    setStatusMessage('Límite de dispositivos alcanzado.');
+                    triggerHaptic?.();
+                    return;
                 }
             }
 
-            // 4. Establecer como exitoso localmente
-            setAdminCredentials(inputEmail, inputPassword);
+            // ── 3. Fetch backup en la nube ───────────────────────────────────────
+            setStatusMessage('Consultando backup en la nube...');
+            const { data: cloudRow } = await supabaseCloud
+                .from('cloud_backups')
+                .select('backup_data')
+                .eq('email', emailToUse)
+                .maybeSingle();
+
+            const cloudBackup = cloudRow?.backup_data || null;
+
+            // ── 4. Recolectar datos locales ──────────────────────────────────────
+            const localBackup = await collectLocalBackup();
+            const hasLocalData = Object.keys(localBackup.data.idb).length > 0;
+            const hasCloudData = cloudBackup && cloudBackup.data;
+
+            if (isCloudLogin && hasCloudData && hasLocalData) {
+                // ⚠️ Conflicto: ambos tienen datos → preguntar al usuario
+                setDataConflictPending({ email: emailToUse, cloudBackup, localBackup });
+                await registerDevice(emailToUse);
+                setAdminCredentials(emailToUse, inputPassword);
+                setImportStatus(null);
+                setStatusMessage('');
+                auditLog('NUBE', 'LOGIN_NUBE', `Login exitoso: ${emailToUse}`);
+                return; // Modal de conflicto se muestra, usuario elige
+            }
+
+            if (isCloudLogin && hasCloudData && !hasLocalData) {
+                // 🆕 Dispositivo nuevo/vacío: restaurar automáticamente
+                setStatusMessage('Restaurando backup de la nube...');
+                await applyCloudBackup(cloudBackup);
+                await registerDevice(emailToUse);
+                setAdminCredentials(emailToUse, inputPassword);
+                showToast('Datos restaurados automáticamente desde la nube', 'success');
+                auditLog('NUBE', 'RESTORE_AUTO', `Backup restaurado automaticamente para: ${emailToUse}`);
+                triggerHaptic?.();
+                setImportStatus('success');
+                setStatusMessage('Restauración completa. Reiniciando...');
+                setTimeout(() => window.location.reload(), 1500);
+                return;
+            }
+
+            // ── 5. Subir datos locales a la nube (flujo normal) ─────────────────
+            setStatusMessage('Guardando y sincronizando datos locales...');
+            if (supabaseCloud) {
+                await uploadLocalBackup(emailToUse, localBackup);
+
+                // Registrar licencia inicial (Estación Maestra)
+                try {
+                    await supabaseCloud.from('cloud_licenses').upsert({
+                        email: emailToUse,
+                        device_id: deviceId || 'UNKNOWN_DEVICE',
+                        license_type: 'trial',
+                        days_remaining: 15,
+                        business_name: businessName || 'Bodega',
+                        phone: inputPhone || '',
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'email' });
+                } catch (licErr) {
+                    console.warn('Licencia cloud skip:', licErr);
+                }
+
+                await registerDevice(emailToUse);
+            }
+
+            setAdminCredentials(emailToUse, inputPassword);
             showToast(isCloudLogin ? 'Sesión iniciada y sincronizada' : 'Cuenta confirmada y sincronizada', 'success');
-            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización completa para: ${inputEmail}`);
+            auditLog('NUBE', isCloudLogin ? 'LOGIN_NUBE' : 'REGISTRO_NUBE', `Sincronización completa: ${emailToUse}`);
             triggerHaptic?.();
             setImportStatus(null);
-            
+
         } catch (error) {
             console.error('Error sincronizando con la nube:', error);
             showToast(error.message || 'Hubo un error contactando la nube', 'error');
             setImportStatus('error');
         }
     };
+
 
     const handleResetPasswordRequest = async () => {
         setEmailError('');
@@ -430,6 +569,100 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     // ─── RENDER ───────────────────────────────────────────
     return (
         <div className="fixed inset-0 z-[150] bg-slate-50 dark:bg-slate-950 flex flex-col h-[100dvh] max-h-[100dvh] w-full overflow-hidden animate-in slide-in-from-right duration-300">
+
+            {/* ════ MODAL: Conflicto de Datos ════ */}
+            {dataConflictPending && (
+                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 pb-8 animate-in fade-in">
+                    <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="bg-amber-500 px-5 py-4 text-white">
+                            <div className="flex items-center gap-2 mb-1">
+                                <AlertTriangle size={20} />
+                                <span className="font-black text-base">Conflicto de Datos</span>
+                            </div>
+                            <p className="text-xs text-white/80">Este dispositivo ya tiene datos. ¿Con cuáles quieres quedarte?</p>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => handleDataConflictChoice('cloud')}
+                                    className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:border-indigo-400 active:scale-95 transition-all"
+                                >
+                                    <Database size={24} />
+                                    <span className="text-xs font-black text-center leading-tight">Usar datos<br/>de la nube</span>
+                                    <span className="text-[9px] text-indigo-400 text-center">
+                                        {dataConflictPending?.cloudBackup?.timestamp
+                                            ? `Guardado: ${new Date(dataConflictPending.cloudBackup.timestamp).toLocaleDateString('es-VE')}`
+                                            : 'Backup en la nube'
+                                        }
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => handleDataConflictChoice('local')}
+                                    className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 hover:border-emerald-400 active:scale-95 transition-all"
+                                >
+                                    <Download size={24} />
+                                    <span className="text-xs font-black text-center leading-tight">Mantener datos<br/>de este equipo</span>
+                                    <span className="text-[9px] text-emerald-400 text-center">Sube tus datos locales a la nube</span>
+                                </button>
+                            </div>
+                            <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 px-2">
+                                La opción que no elijas se perderá. Esta acción no se puede deshacer.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ════ MODAL: Límite de Dispositivos ════ */}
+            {deviceLimitError && (
+                <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 pb-8 animate-in fade-in">
+                    <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden">
+                        <div className="bg-red-500 px-5 py-4 text-white">
+                            <div className="flex items-center gap-2 mb-1">
+                                <AlertTriangle size={20} />
+                                <span className="font-black text-base">Límite de Dispositivos</span>
+                            </div>
+                            <p className="text-xs text-white/80">Esta cuenta ya está activa en 2 dispositivos simultáneamente.</p>
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <p className="text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">Dispositivos activos:</p>
+                            {blockedDevices.map((d, i) => (
+                                <div key={d.device_id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                                    <div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center shrink-0">
+                                        <Fingerprint size={16} className="text-slate-500" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{d.device_alias || `Dispositivo ${i + 1}`}</p>
+                                        <p className="text-[9px] text-slate-400">
+                                            Registrado: {new Date(d.created_at).toLocaleDateString('es-VE')}
+                                            {i === 0 && [...blockedDevices].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0]?.device_id === d.device_id
+                                                ? ' · Más antiguo' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                            <button
+                                onClick={handleUnlinkOldestDevice}
+                                disabled={importStatus === 'loading'}
+                                className="w-full mt-2 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white text-sm font-black rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 active:scale-[0.98]"
+                            >
+                                {importStatus === 'loading'
+                                    ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    : <Trash2 size={16} />
+                                }
+                                Desvincular el dispositivo más antiguo
+                            </button>
+                            <button
+                                onClick={() => { setDeviceLimitError(null); setBlockedDevices([]); setImportStatus(null); }}
+                                className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="shrink-0 px-4 pt-[env(safe-area-inset-top)] bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-3 py-4">

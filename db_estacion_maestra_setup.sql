@@ -45,6 +45,22 @@ CREATE POLICY "Permitir todo a cloud_backups" ON public.cloud_backups FOR ALL US
 DROP POLICY IF EXISTS "Permitir todo a cloud_licenses" ON public.cloud_licenses;
 CREATE POLICY "Permitir todo a cloud_licenses" ON public.cloud_licenses FOR ALL USING (true) WITH CHECK (true);
 
+-- 4. Tabla: account_devices -> (Controla qué dispositivos están activos por cuenta, máximo 2)
+CREATE TABLE IF NOT EXISTS public.account_devices (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    device_alias TEXT DEFAULT 'Dispositivo',
+    last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(email, device_id)
+);
+
+ALTER TABLE public.account_devices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Permitir todo a account_devices" ON public.account_devices;
+CREATE POLICY "Permitir todo a account_devices" ON public.account_devices FOR ALL USING (true) WITH CHECK (true);
+
 -- =================================================================================
 -- RECORDATORIOS IMPORTANTES PARA SUPABASE DASHBOARD:
 -- 1. Ve a "Authentication" -> "Providers" -> Activa "Email".
