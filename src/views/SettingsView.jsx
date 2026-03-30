@@ -176,7 +176,8 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             'bodega_sales_v1', 'bodega_customers_v1',
             'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
             'bodega_accounts_v2', 'bodega_pending_cart_v1',
-            'payment_methods_v1', 'payment_methods_v2'
+            'payment_methods_v1', 'payment_methods_v2',
+            'abasto_audit_log_v1'
         ];
         const idbData = {};
         for (const key of idbKeys) {
@@ -189,7 +190,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             'monitor_rates_v12', 'business_name', 'business_rif',
             'printer_paper_width', 'allow_negative_stock', 'cop_enabled',
             'auto_cop_enabled', 'tasa_cop', 'bodega_use_auto_rate',
-            'bodega_custom_rate', 'bodega_inventory_view'
+            'bodega_custom_rate', 'bodega_inventory_view', 'abasto-auth-storage'
         ];
         const lsData = {};
         for (const key of lsKeys) {
@@ -206,6 +207,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
 
     // ─── HELPER: Upload local backup to cloud ────────────────────────────────
     const uploadLocalBackup = async (email, backupData) => {
+        // 1. Respaldo Legacy Blobs
         const { error } = await supabaseCloud
             .from('cloud_backups')
             .upsert({
@@ -214,6 +216,40 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                 updated_at: new Date().toISOString()
             }, { onConflict: 'email' });
         if (error) throw error;
+
+        // 2. Inyección Inicial en Nuevo Sistema Realtime Sync
+        try {
+            const { data: { session } } = await supabaseCloud.auth.getSession();
+            if (session?.user?.id) {
+                const syncPayloads = [];
+                for (const [key, value] of Object.entries(backupData.data.idb || {})) {
+                    syncPayloads.push({
+                        user_id: session.user.id,
+                        collection: 'store',
+                        doc_id: key,
+                        data: { payload: value },
+                        updated_at: new Date().toISOString()
+                    });
+                }
+                // Incluir localStorage en P2P
+                for (const [key, value] of Object.entries(backupData.data.ls || {})) {
+                    let finalVal = value;
+                    try { finalVal = JSON.parse(value); } catch(e) {} // Parsear localStorage (strings) a objetos si es posible
+                    syncPayloads.push({
+                        user_id: session.user.id,
+                        collection: 'local',
+                        doc_id: key,
+                        data: { payload: finalVal },
+                        updated_at: new Date().toISOString()
+                    });
+                }
+                if (syncPayloads.length > 0) {
+                    await supabaseCloud.from('sync_documents').upsert(syncPayloads, { onConflict: 'user_id,collection,doc_id' });
+                }
+            }
+        } catch(syncErr) {
+            console.warn('[Realtime Sync Init] Fallo inicializando sync_documents:', syncErr);
+        }
     };
 
     // ─── HELPER: Register or update device in account_devices ─────────────────
@@ -447,11 +483,12 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         setImportStatus('loading');
         setStatusMessage('Enviando enlace...');
         try {
+            const appUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
             const { error } = await supabaseCloud.auth.resetPasswordForEmail(inputEmail.toLowerCase().trim(), {
-                redirectTo: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
+                redirectTo: appUrl,
             });
             if (error) throw error;
-            showToast('Enlace enviado. Por favor revisa tu correo.', 'success');
+            showToast('Enlace enviado. Revisa tu correo para continuar.', 'success');
             setIsRecoveringPassword(false);
             setImportStatus(null);
             setStatusMessage('');

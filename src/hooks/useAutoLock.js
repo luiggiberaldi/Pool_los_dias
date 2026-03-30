@@ -4,11 +4,16 @@ import { logEvent } from '../services/auditService';
 
 export function useAutoLock() {
     const { usuarioActivo, logout, requireLogin } = useAuthStore();
-    const isLoginRequired = requireLogin ?? false;
+    const adminEmail = useAuthStore(s => s.adminEmail);
+    const adminPassword = useAuthStore(s => s.adminPassword);
+    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+    // El auto-lock solo tiene sentido si hay cuenta cloud Y requireLogin está activo.
+    // Sin cloud no hay LockScreen que mostrar → nunca bloquear.
+    const isLoginRequired = (requireLogin ?? false) && isCloudConfigured;
     const timeoutRef = useRef(null);
 
     const performLock = useCallback((reason = 'manual') => {
-        if (!isLoginRequired) return; // Si el login no es requerido, no cerrar la sesion jamas
+        if (!isLoginRequired) return; // Sin cloud o sin PIN → nunca bloquear
         if (!usuarioActivo || usuarioActivo.rol !== 'ADMIN') return;
         
         logEvent('AUTH', 'SESION_BLOQUEADA', `Bloqueo de seguridad: ${reason}`, usuarioActivo);

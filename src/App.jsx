@@ -5,6 +5,7 @@ import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
 import { ProductsView } from './views/ProductsView';
 import SettingsView from './views/SettingsView';
+import ResetPasswordView from './views/ResetPasswordView';
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -27,11 +28,16 @@ import LockScreen from './components/security/LockScreen';
 import { useAuthStore } from './hooks/store/useAuthStore';
 import { useAutoLock } from './hooks/useAutoLock';
 import { purgeOldEntries } from './services/auditService';
+import { useCloudSync } from './hooks/useCloudSync';
+import { supabaseCloud } from './config/supabaseCloud';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIOSInstall, setShowIOSInstall] = useState(false);
+
+  // Inicializar Sincronización Realtime con Supabase
+  useCloudSync();
 
   // Detectar iOS Safari (no standalone) para mostrar instrucciones manuales
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -159,16 +165,16 @@ export default function App() {
   const requireLogin = useAuthStore(s => s.requireLogin ?? false);
   const adminEmail = useAuthStore(s => s.adminEmail);
   const adminPassword = useAuthStore(s => s.adminPassword);
-  
+
   const isCajero = usuarioActivo?.rol === 'CAJERO';
   const isCloudConfigured = Boolean(adminEmail && adminPassword);
+  // El PIN solo bloquea si requireLogin está activado Y hay cuenta cloud registrada
   const pinLoginEnabled = requireLogin && isCloudConfigured;
 
-  const hasAttemptedAutoLogin = useRef(false);
+  // Auto-login: cuando el PIN no aplica y no hay sesión, restaurar el admin local
+  // automáticamente. useEffect corre antes del primer paint visible → sin flash.
   useEffect(() => {
-    // Si la pantalla de login NO debe aparecer, forzamos el auto-login
-    if (!pinLoginEnabled && !usuarioActivo && !hasAttemptedAutoLogin.current) {
-      hasAttemptedAutoLogin.current = true;
+    if (!pinLoginEnabled && !usuarioActivo) {
       const admins = useAuthStore.getState().usuarios.filter(u => u.rol === 'ADMIN');
       if (admins.length > 0) {
         useAuthStore.setState({ usuarioActivo: admins[0] });
@@ -183,17 +189,12 @@ export default function App() {
     { id: 'clientes', label: 'Contactos', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
   ];
-
   const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
 
-  if (!usuarioActivo) {
-    if (!pinLoginEnabled) {
-      // Sin PIN o sin cloud → splash neutro mientras el auto-login se completa
-      return <div className="h-[100dvh] bg-slate-50 dark:bg-black" />;
-    }
-    // PIN activado + cloud configurado → mostrar pantalla de bloqueo
-    return <LockScreen />;
-  }
+  // Guard: si el PIN aplica y no hay sesión → pantalla de bloqueo
+  if (!usuarioActivo && pinLoginEnabled) return <LockScreen />;
+  // Guard: sin PIN y sin sesión → null mientras el useEffect restaura al admin (imperceptible, <1 frame)
+  if (!usuarioActivo) return null;
 
   return (
     <div className="font-sans antialiased bg-slate-50 dark:bg-black h-[100dvh] flex flex-col overflow-clip transition-colors duration-300">

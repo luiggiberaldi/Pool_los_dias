@@ -10,7 +10,12 @@ const DEFAULT_USERS = [
 export const useAuthStore = create(
     persist(
         (set, get) => ({
-            usuarioActivo: null,
+            usuarioActivo: (() => {
+                try {
+                    const saved = localStorage.getItem('abasto-device-session');
+                    return saved ? JSON.parse(saved) : null;
+                } catch { return null; }
+            })(),
             usuarios: DEFAULT_USERS,
             requireLogin: false, // Login opcional, por defecto desactivado
             adminEmail: '',
@@ -34,6 +39,7 @@ export const useAuthStore = create(
 
                 if (userEncontrado) {
                     set({ usuarioActivo: userEncontrado });
+                    localStorage.setItem('abasto-device-session', JSON.stringify(userEncontrado));
                     logEvent('AUTH', 'LOGIN', `${userEncontrado.nombre} inicio sesion`, userEncontrado);
                     return true;
                 }
@@ -45,6 +51,7 @@ export const useAuthStore = create(
                 const { usuarioActivo } = get();
                 if (usuarioActivo) logEvent('AUTH', 'LOGOUT', `${usuarioActivo.nombre} cerro sesion`, usuarioActivo);
                 set({ usuarioActivo: null });
+                localStorage.removeItem('abasto-device-session');
             },
 
             cambiarPin: (userId, nuevoPin) => {
@@ -54,10 +61,12 @@ export const useAuthStore = create(
                     )
                 }));
                 
-                // Si el usuario que cambió el PIN es el activo, actualizar su sesión
+                // Si el usuario que cambió el PIN es el activo, actualizar su sesión local
                 const { usuarioActivo } = get();
                 if (usuarioActivo && usuarioActivo.id === userId) {
-                    set({ usuarioActivo: { ...usuarioActivo, pin: nuevoPin } });
+                    const nuevoActivo = { ...usuarioActivo, pin: nuevoPin };
+                    set({ usuarioActivo: nuevoActivo });
+                    localStorage.setItem('abasto-device-session', JSON.stringify(nuevoActivo));
                 }
                 const target = get().usuarios.find(u => u.id === userId);
                 logEvent('AUTH', 'PIN_CAMBIADO', `PIN cambiado para ${target?.nombre || 'usuario'}`, get().usuarioActivo);
@@ -95,7 +104,9 @@ export const useAuthStore = create(
                 }));
                 const { usuarioActivo } = get();
                 if (usuarioActivo && usuarioActivo.id === userId) {
-                    set({ usuarioActivo: { ...usuarioActivo, ...datos } });
+                    const nuevoActivo = { ...usuarioActivo, ...datos };
+                    set({ usuarioActivo: nuevoActivo });
+                    localStorage.setItem('abasto-device-session', JSON.stringify(nuevoActivo));
                 }
             },
 
@@ -111,6 +122,27 @@ export const useAuthStore = create(
         }),
         {
             name: 'abasto-auth-storage', // Nombre para localStorage
+            partialize: (state) => ({ 
+                usuarios: state.usuarios, 
+                requireLogin: state.requireLogin,
+                adminEmail: state.adminEmail,
+                adminPassword: state.adminPassword
+            }),
+            storage: {
+                getItem: (name) => {
+                    const str = localStorage.getItem(name);
+                    if (!str) return null;
+                    try { return JSON.parse(str); } catch (e) { return null; }
+                },
+                setItem: (name, value) => {
+                    localStorage.setItem(name, JSON.stringify(value));
+                    // Disparar a la nube para P2P (Lazy import para evitar ciclos)
+                    import('../useCloudSync').then(({ pushCloudSync }) => {
+                        pushCloudSync(name, value);
+                    }).catch(err => console.warn('No se pudo inyectar Auth Cloud', err));
+                },
+                removeItem: (name) => localStorage.removeItem(name)
+            }
         }
     )
 );

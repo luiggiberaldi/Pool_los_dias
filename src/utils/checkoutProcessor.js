@@ -98,6 +98,10 @@ export async function processSaleTransaction({
         return p;
     });
 
+    // Persist updated stock to disk
+    await storageService.setItem('bodega_products_v1', updatedProducts);
+
+
     let updatedCustomer = null;
     let updatedCustomers = customers;
 

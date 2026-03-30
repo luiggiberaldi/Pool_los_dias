@@ -1,6 +1,5 @@
 import localforage from 'localforage';
-
-// Configuración inicial de IndexedDB
+import { pushCloudSync } from '../hooks/useCloudSync';
 localforage.config({
     name: 'BodegaApp',
     storeName: 'bodega_app_data',
@@ -96,6 +95,8 @@ export const storageService = {
             if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
             }
+            // Emitir a la nube silenciosamente de fondo
+            pushCloudSync(key, value);
         } catch (error) {
             console.error(`[Storage Error] Guardando ${key}:`, error);
             // Fallback de emergencia a localStorage si falla algo catastrófico
@@ -104,6 +105,7 @@ export const storageService = {
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
                 }
+                pushCloudSync(key, value);
             } catch (e) {
                 console.error(`[Storage Error CRÍTICO] Ni IndexedDB ni LocalStorage funcionan para ${key}`, e);
             }

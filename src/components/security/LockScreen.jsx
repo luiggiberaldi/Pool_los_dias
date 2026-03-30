@@ -36,7 +36,7 @@ export default function LockScreen() {
         </div>
 
         {/* User Grid */}
-        <div className="grid grid-cols-2 gap-10 sm:gap-14 max-w-md">
+        <div className="w-full grid grid-cols-2 md:flex md:flex-row md:flex-wrap md:justify-center gap-8 sm:gap-14 max-w-[320px] md:max-w-5xl mx-auto">
           {usuarios.map(user => (
             <UserCard
               key={user.id}
