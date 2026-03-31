@@ -133,15 +133,6 @@ export function useCloudSync() {
             try {
                 let session = (await supabaseCloud.auth.getSession()).data.session;
 
-                if (!session?.user?.id && adminEmail && adminPassword) {
-                    const loginRes = await supabaseCloud.auth.signInWithPassword({
-                        email: adminEmail,
-                        password: adminPassword
-                    });
-                    if (loginRes.error) throw loginRes.error;
-                    session = loginRes.data.session;
-                }
-
                 if (!session?.user?.id) return;
 
                 isInitialized.current = true;

@@ -1,8 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-// DB: bodega 2 base de datos (fgzwmwrugerptfqfrsjd)
-const supabaseUrl = 'https://fgzwmwrugerptfqfrsjd.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnendtd3J1Z2VycHRmcWZyc2pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MjA2ODgsImV4cCI6MjA5MDI5NjY4OH0.vi4iEyxWL7vmrb5OLe0mwQ0ozwpyNMYFqSTJzpnT9SM';
+// Instancia única para toda la app (auth, sync, backups, licenses)
+// Las credenciales vienen del entorno (.env / Vercel env vars) — NUNCA hardcodeadas
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Exportando cliente de supabase para los backups vinculados a la cuenta Cloud (email/password)
-export const supabaseCloud = createClient(supabaseUrl, supabaseKey);
+// Singleton — se crea UNA sola vez para evitar múltiples GoTrueClient
+let _instance = null;
+function getSupabase() {
+    if (!_instance) {
+        _instance = createClient(supabaseUrl, supabaseKey);
+    }
+    return _instance;
+}
+
+export const supabaseCloud = getSupabase();

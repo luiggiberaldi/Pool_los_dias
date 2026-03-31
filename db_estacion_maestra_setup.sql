@@ -1,11 +1,9 @@
 -- =================================================================================
--- PREPARATIVOS PARA LA NUEVA BASE DE DATOS Y ESTACIÓN MAESTRA (TASAS AL DIA 2.0)
+-- SETUP COMPLETO: TABLAS PARA LICENCIAS Y CONTROL DE DISPOSITIVOS
+-- Ejecuta esto en el SQL Editor de Supabase (proyecto fgzwmwrugerptfqfrsjd)
 -- =================================================================================
--- Ejecuta este script SQL en tu NUEVA base de datos de Supabase en el panel "SQL Editor".
--- Así quedará todo preparado para el registro de correos, licenciamiento y acceso
--- desde la futura Estación Maestra.
 
--- 1. Tabla: cloud_backups -> (Almacena los respaldos en vivo del usuario)
+-- 1. cloud_backups
 CREATE TABLE IF NOT EXISTS public.cloud_backups (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -14,38 +12,57 @@ CREATE TABLE IF NOT EXISTS public.cloud_backups (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Si la tabla cloud_backups ya existía, añadir índices útiles (Opcional)
--- CREATE INDEX IF NOT EXISTS idx_cloud_backups_email ON public.cloud_backups(email);
-
--- 2. Tabla: cloud_licenses -> (Para manejar Licencia Permanente y Por Días desde la Estación Maestra)
+-- 2. cloud_licenses (con max_devices y active usados por el cliente)
 CREATE TABLE IF NOT EXISTS public.cloud_licenses (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    email TEXT UNIQUE NOT NULL, -- El correo asocia a la persona con su licencia
-    device_id TEXT NOT NULL, 
-    license_type TEXT NOT NULL DEFAULT 'trial', -- Valores: 'trial', 'days', 'permanent'
-    days_remaining INTEGER DEFAULT 15,
+    email TEXT UNIQUE NOT NULL,
+    device_id TEXT,
+    license_type TEXT NOT NULL DEFAULT 'trial',
+    days_remaining INTEGER DEFAULT 7,
+    valid_until TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '7 days',
+    max_devices INTEGER NOT NULL DEFAULT 2,
+    active BOOLEAN NOT NULL DEFAULT true,
     business_name TEXT,
     phone TEXT,
-    is_active BOOLEAN DEFAULT true,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Habilitar Seguridad Básica (Row Level Security - RLS)
--- Opcional según cómo gestiones la seguridad. 
--- Si prefieres leerlo directo, puedes desactivarlo o dejarlo así para empezar.
-ALTER TABLE public.cloud_backups ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cloud_licenses ENABLE ROW LEVEL SECURITY;
+-- Migrar columnas si la tabla ya existía con nombres distintos
+DO $$
+BEGIN
+    -- Renombrar is_active → active si existe
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'cloud_licenses' AND column_name = 'is_active'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'cloud_licenses' AND column_name = 'active'
+    ) THEN
+        ALTER TABLE public.cloud_licenses RENAME COLUMN is_active TO active;
+    END IF;
 
--- Políticas permisivas iniciales (Para la etapa de desarrollo/migración de la app local a la nube)
--- **OJO**: En el futuro podemos limitar esto a "apenas el usuario autenticado (auth.uid())"
-DROP POLICY IF EXISTS "Permitir todo a cloud_backups" ON public.cloud_backups;
-CREATE POLICY "Permitir todo a cloud_backups" ON public.cloud_backups FOR ALL USING (true) WITH CHECK (true);
+    -- Añadir max_devices si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'cloud_licenses' AND column_name = 'max_devices'
+    ) THEN
+        ALTER TABLE public.cloud_licenses ADD COLUMN max_devices INTEGER NOT NULL DEFAULT 2;
+    END IF;
 
-DROP POLICY IF EXISTS "Permitir todo a cloud_licenses" ON public.cloud_licenses;
-CREATE POLICY "Permitir todo a cloud_licenses" ON public.cloud_licenses FOR ALL USING (true) WITH CHECK (true);
+    -- Añadir valid_until si no existe y poblarla matemáticamente
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'cloud_licenses' AND column_name = 'valid_until'
+    ) THEN
+        ALTER TABLE public.cloud_licenses ADD COLUMN valid_until TIMESTAMP WITH TIME ZONE;
+        UPDATE public.cloud_licenses 
+        SET valid_until = updated_at + (days_remaining * INTERVAL '1 day')
+        WHERE valid_until IS NULL;
+    END IF;
+END $$;
 
--- 4. Tabla: account_devices -> (Controla qué dispositivos están activos por cuenta, máximo 2)
+-- 3. account_devices
 CREATE TABLE IF NOT EXISTS public.account_devices (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     email TEXT NOT NULL,
@@ -56,18 +73,98 @@ CREATE TABLE IF NOT EXISTS public.account_devices (
     UNIQUE(email, device_id)
 );
 
+-- 4. RLS — políticas permisivas (anon puede leer/escribir)
+ALTER TABLE public.cloud_backups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cloud_licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_devices ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Permitir todo a account_devices" ON public.account_devices;
-CREATE POLICY "Permitir todo a account_devices" ON public.account_devices FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir todo a cloud_backups" ON public.cloud_backups;
+CREATE POLICY "Permitir todo a cloud_backups"
+    ON public.cloud_backups FOR ALL USING (true) WITH CHECK (true);
 
--- =================================================================================
--- RECORDATORIOS IMPORTANTES PARA SUPABASE DASHBOARD:
--- 1. Ve a "Authentication" -> "Providers" -> Activa "Email".
--- 2. Asegúrate de habilitar "Confirm Email" / "Email Verification".
--- 3. Ajusta los "Redirect URLs" (Settings -> Auth -> URL Configuration) 
---    Agrega todas las direcciones desde las que se usará la app. Por ejemplo:
---      http://localhost:5173/*       (Para pruebas locales)
---      https://tu-app.vercel.app/*   (Para la app final en Vercel)
---    Supabase solo permitirá redireccionar a los dominios listados ahí.
--- =================================================================================
+DROP POLICY IF EXISTS "Permitir todo a cloud_licenses" ON public.cloud_licenses;
+CREATE POLICY "Permitir todo a cloud_licenses"
+    ON public.cloud_licenses FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Permitir todo a account_devices" ON public.account_devices;
+CREATE POLICY "Permitir todo a account_devices"
+    ON public.account_devices FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Función RPC: registrar dispositivo y verificar límite atómicamente
+-- Devuelve: 'ok', 'limit_reached', o 'license_inactive'
+CREATE OR REPLACE FUNCTION public.register_and_check_device(
+    p_email TEXT,
+    p_device_id TEXT,
+    p_device_alias TEXT DEFAULT 'Dispositivo'
+)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_max_devices INTEGER;
+    v_active BOOLEAN;
+    v_license_type TEXT;
+    v_valid_until TIMESTAMP WITH TIME ZONE;
+    v_count INTEGER;
+    v_already_registered BOOLEAN;
+BEGIN
+    -- Obtener licencia
+    SELECT max_devices, active, license_type, valid_until INTO v_max_devices, v_active, v_license_type, v_valid_until
+    FROM public.cloud_licenses
+    WHERE email = p_email;
+
+    -- Sin licencia registrada: permitir sin restricciones
+    IF NOT FOUND THEN
+        RETURN 'ok';
+    END IF;
+
+    -- Licencia desactivada manualmente
+    IF v_active = false THEN
+        RETURN 'license_inactive';
+    END IF;
+
+    -- Licencia expirada por tiempo (Ciclo de Vida cerrado)
+    IF v_license_type != 'permanent' AND v_valid_until < NOW() THEN
+        RETURN 'license_expired';
+    END IF;
+
+    -- Ver cuántos dispositivos hay actualmente almacenados
+    SELECT COUNT(*) INTO v_count
+    FROM public.account_devices
+    WHERE email = p_email;
+
+    -- BLOQUEO ESTRICTO: Si el administrador redujo el límite (ej. de 2 a 1)
+    -- y aún hay más dispositivos registrados que el límite actual, TODOS los dispositivos
+    -- quedarán bloqueados hasta que el Admin expulse manualmente el exceso en la Estación Maestra.
+    IF v_count > v_max_devices THEN
+        RETURN 'limit_reached';
+    END IF;
+
+    -- Ver si este dispositivo PC específico ya está registrado
+    SELECT EXISTS(
+        SELECT 1 FROM public.account_devices
+        WHERE email = p_email AND device_id = p_device_id
+    ) INTO v_already_registered;
+
+    IF v_already_registered THEN
+        -- Actualizar la última vez visto y permitir su paso
+        UPDATE public.account_devices
+        SET last_seen = NOW()
+        WHERE email = p_email AND device_id = p_device_id;
+        RETURN 'ok';
+    END IF;
+
+    -- Si no está registrado y ya llegamos al tope numérico: Bloqueo de entrada
+    IF v_count >= v_max_devices THEN
+        RETURN 'limit_reached';
+    END IF;
+
+    -- Registrar un nuevo equipo físico a la base de datos
+    INSERT INTO public.account_devices (email, device_id, device_alias, last_seen)
+    VALUES (p_email, p_device_id, p_device_alias, NOW())
+    ON CONFLICT (email, device_id) DO UPDATE SET last_seen = NOW();
+
+    RETURN 'ok';
+END;
+$$;

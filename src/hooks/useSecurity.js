@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
-import { supabase } from '../core/supabaseClient';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
 const APP_VERSION = '1.0.0';
 const PRODUCT_ID = 'bodega';
@@ -107,13 +107,7 @@ export function useSecurity() {
             }
             setDeviceId(storedId);
 
-            // Auto-registro: registrar dispositivo si no existe (sin importar licencia)
-            try {
-                if (import.meta.env.VITE_SUPABASE_URL) {
-                    const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
-                    await supabase.rpc('auto_register_device', { p_device_id: storedId, p_product_id: PRODUCT_ID, p_client_name: clientName });
-                }
-            } catch (e) { /* silencioso */ }
+            // Auto-registro: Desactivado. Migrado a CloudAuthModal y useCloudAuthLogic.
 
             checkLicense(storedId);
         };
@@ -126,107 +120,12 @@ export function useSecurity() {
         });
     }, []);
 
-    // Heartbeat + chequeo de revocación en tiempo real
+    // Heartbeat + chequeo de revocación en tiempo real: Desactivado.
+    // Esta lógica dependía de la tabla antigua 'licenses' y los RPC 'heartbeat_device' 
+    // que ya no existen en el nuevo proyecto de Supabase (Cloud Suite).
     useEffect(() => {
-        if (!deviceId || !import.meta.env.VITE_SUPABASE_URL) return;
-
-        // Función de chequeo rápido de estado
-        const verifyStatus = async () => {
-            try {
-                const { data: license, error } = await supabase
-                    .from('licenses')
-                    .select('type, active, expires_at')
-                    .eq('device_id', deviceId)
-                    .eq('product_id', PRODUCT_ID)
-                    .maybeSingle();
-
-                if (license && (license.active === false || license.type === 'revoked') && isPremium) {
-                    // Revocado
-                    localStorage.removeItem('pda_premium_token');
-                    setIsPremium(false);
-                    setIsDemo(false);
-                    setDemoExpiredMsg("Tu licencia ha sido desactivada. Contacta al administrador.");
-                } else if (license && license.active === true) {
-                    // Verificar si demo venció por fecha
-                    if (license.type === 'demo7' && license.expires_at) {
-                        const expiresAt = new Date(license.expires_at).getTime();
-                        if (Date.now() >= expiresAt && isPremium) {
-                            localStorage.removeItem('pda_premium_token');
-                            setIsPremium(false);
-                            setIsDemo(false);
-                            setDemoExpiredMsg("Tu licencia temporal ha finalizado. Esperamos que hayas disfrutado la experiencia completa.");
-                            setLoading(false);
-                            return;
-                        }
-                    }
-
-                    // Si el backend cambio el tipo de licencia, actualizar estado local sin recargar
-                    if (license.type === 'permanent' && (!isPremium || isDemo)) {
-                        // Demo (o Expirado) -> Permanente: actualizar token y estado
-                        const token = { deviceId, type: 'permanent' };
-                        localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                        setIsPremium(true);
-                        setIsDemo(false);
-                        setDemoExpires(null);
-                        setDemoTimeLeft('');
-                    } else if (license.type === 'demo7' && (!isPremium || !isDemo) && license.expires_at) {
-                        // Permanente (o Expirado) -> Demo: actualizar token y estado
-                        const expiresAt = new Date(license.expires_at).getTime();
-                        if (Date.now() < expiresAt) {
-                            const token = { deviceId, type: 'demo7', expires: expiresAt, isDemo: true };
-                            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                            setIsPremium(true);
-                            setIsDemo(true);
-                            setDemoExpires(expiresAt);
-                        }
-                    }
-                }
-            } catch (e) { }
-        };
-
-        const sendHeartbeat = async () => {
-            verifyStatus();
-            try {
-                const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
-                await supabase.rpc('heartbeat_device', { p_device_id: deviceId, p_product_id: PRODUCT_ID, p_client_name: clientName });
-            } catch (e) { }
-        };
-
-        // 1. Ejecutar heartbeat al montar y cada 4 horas
-        sendHeartbeat();
-        const heartbeatInterval = setInterval(sendHeartbeat, 4 * 60 * 60 * 1000);
-
-        // 2. Poll de estado cada 1 minuto para revocaciones rapidas
-        const statusInterval = setInterval(verifyStatus, 60 * 1000);
-
-        // 3. Revisar apenas el usuario regrese a la app
-        const handleVisibility = () => {
-            if (document.visibilityState === 'visible') verifyStatus();
-        };
-        document.addEventListener('visibilitychange', handleVisibility);
-
-        // 4. Supabase Realtime para deteccion instantanea
-        let subscription = null;
-        try {
-            subscription = supabase
-                .channel(`licenses_sync_${deviceId}`)
-                .on('postgres_changes', {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'licenses',
-                    filter: `device_id=eq.${deviceId}`,
-                }, () => {
-                    verifyStatus();
-                })
-                .subscribe();
-        } catch (e) { }
-
-        return () => {
-            clearInterval(heartbeatInterval);
-            clearInterval(statusInterval);
-            document.removeEventListener('visibilitychange', handleVisibility);
-            if (subscription) subscription.unsubscribe();
-        };
+        // Mantenemos este effect vacio por compatibilidad estructural
+        // Para la lógica nueva en la nube, ver useCloudAuthLogic.js
     }, [isPremium, isDemo, deviceId]);
 
     // Countdown timer para demo
@@ -363,20 +262,10 @@ export function useSecurity() {
             if (tokenObj && tokenObj.deviceId === currentDeviceId) {
                 // Token belongs to this device
                 const isTimeLimited = tokenObj.type === 'demo7' || tokenObj.isDemo; // retrocompatibilidad
-                // Verificar estado remoto antes de confiar en el token local
+                // Verificar estado remoto: Desactivado. 
+                // Ahora confiamos exclusivamente en el token local para el modo legado.
+                // La lógica en la nube está gestionada por useCloudAuthLogic.
                 let revokedRemotely = false;
-                try {
-                    const { data: remoteLicense } = await supabase
-                        .from('licenses')
-                        .select('active, expires_at')
-                        .eq('device_id', currentDeviceId)
-                        .eq('product_id', PRODUCT_ID)
-                        .maybeSingle();
-
-                    if (remoteLicense && remoteLicense.active === false) {
-                        revokedRemotely = true;
-                    }
-                } catch (e) { /* Sin red → confiar en token local */ }
 
                 if (revokedRemotely) {
                     localStorage.removeItem('pda_premium_token');

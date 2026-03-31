@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, CheckCircle2 } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, CheckCircle2, LogOut } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -19,6 +19,8 @@ import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
 import { useAuthStore } from '../hooks/store/useAuthStore';
 import { useAudit } from '../hooks/useAudit';
+import { supabaseCloud } from '../config/supabaseCloud';
+import { useConfirm } from '../hooks/useConfirm.jsx';
 
 import Skeleton from '../components/Skeleton';
 
@@ -34,6 +36,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const adminPassword = useAuthStore(s => s.adminPassword);
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
     const { log: auditLog } = useAudit();
+    const confirm = useConfirm();
     const [sales, setSales] = useState([]);
     const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
@@ -450,14 +453,27 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             </button>
                         </div>
                     )}
-                    {/* GEAR ICON FOR SETTINGS */}
-                    <button
-                        onClick={() => { triggerHaptic(); onNavigate('ajustes'); }}
-                        className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-300 rounded-full shadow-sm hover:shadow active:scale-95 transition-all outline-none"
-                        title="Configuracion"
-                    >
-                        <Settings size={22} className="text-slate-700 dark:text-slate-200" />
-                    </button>
+                    {/* CLOUD LOGOUT — solo ADMIN */}
+                    {isAdmin && (
+                        <button
+                            onClick={async () => {
+                                const ok = await confirm({
+                                    title: 'Cerrar sesión',
+                                    message: 'Se cerrará tu acceso a la nube. Tendrás que iniciar sesión nuevamente.',
+                                    confirmText: 'Cerrar sesión',
+                                    cancelText: 'Cancelar',
+                                    variant: 'logout',
+                                });
+                                if (!ok) return;
+                                await supabaseCloud.auth.signOut();
+                                window.location.reload();
+                            }}
+                            className="p-2.5 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/30 text-rose-400 dark:text-rose-400 rounded-full shadow-sm hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-500 active:scale-95 transition-all"
+                            title="Cerrar sesión de la nube (Admin)"
+                        >
+                            <LogOut size={18} strokeWidth={2} />
+                        </button>
+                    )}
                 </div>
             </div>
 

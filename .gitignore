@@ -24,35 +24,64 @@ dist-ssr
 *.sln
 *.sw?
 
-# ✅ SEGURIDAD: Bloquear archivos de entorno
+# SEGURIDAD: Bloquear archivos de entorno con keys
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.local
 
-# API serverless (deploy via Vercel, no subir keys en código, usar vars de entorno)
+# API serverless (deploy via Vercel, usar vars de entorno para keys)
 !api/
 api/*.js
 
-# Archivos innecesarios
+# Backups y datos locales
 backup_*.json
-capturas_manual/
-directivas/
-server/
-scripts/
+*.zip
+
+# Archivos de office / inventarios
+*.xls
+*.xlsx
+
+# Documentos PDF y texto de trabajo
+*.pdf
+*.txt
+
+# Scripts de desarrollo / scraping / utilidades (no son parte del producto)
 *.cjs
+*.py
+
+# Videos y capturas
+*.mp4
+*.mov
+frames/
+
+# Iconos sueltos y logos (van en /public si se necesitan)
 *.ico
+logodark*.png
+"logo .png"
+
+# HTML sueltos (solo se usa index.html en la raíz)
 *.html
 !index.html
-"logo .png"
+
+# Documentación interna / privada
 "Manual Completo de Usuario*"
 Manual_Usuario_*.md
 PERFORMANCE_AUDIT.md
 EXPLICACION_ERRORES.md
 TASASALDIA_MANUAL_TEXTO.md
 "licencia tasas al dia.html"
-.agent/
 CONTEXT.md
+capturas_manual/
+directivas/
+future_plans/
+android/
+server/
+scripts/
+
+# Herramientas de agente y configs de deploy privadas
+.agent/
 .vercel
-.env*.local
+capacitor.config.json

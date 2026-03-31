@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 const BACKUP_KEY = 'bodega_autobackup_v1';
@@ -12,7 +13,6 @@ const CRITICAL_KEYS = [
     'bodega_payment_methods_v1',
     'monitor_rates_v12',
 ];
-import { supabase } from '../core/supabaseClient';
 
 export function useAutoBackup(isPremium, isDemo, deviceId) {
     const intervalRef = useRef(null);

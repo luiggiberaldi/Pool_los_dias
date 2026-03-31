@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X, Settings } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
@@ -16,7 +16,7 @@ import { useRates } from './hooks/useRates';
 import { useSecurity } from './hooks/useSecurity';
 import { ProductProvider } from './context/ProductContext';
 import { CartProvider } from './context/CartContext';
-import PremiumGuard from './components/security/PremiumGuard';
+
 import TermsOverlay from './components/TermsOverlay';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -25,11 +25,13 @@ import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 import SpotlightTour from './components/SpotlightTour';
 import LockScreen from './components/security/LockScreen';
+import CloudAuthModal from './components/security/CloudAuthModal';
 import { useAuthStore } from './hooks/store/useAuthStore';
 import { useAutoLock } from './hooks/useAutoLock';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
 import { supabaseCloud } from './config/supabaseCloud';
+import { useConfirm } from './hooks/useConfirm.jsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -48,14 +50,100 @@ export default function App() {
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showTester, setShowTester] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  
+  // Cloud Auth Session State
+  const [cloudSession, setCloudSession] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // ── Sesión Supabase + límite de dispositivos vía RPC ─────────────────────
+  useEffect(() => {
+    let mounted = true;
+
+    const applySession = async (session) => {
+      if (!mounted) return;
+
+      if (!session?.user?.email) {
+        setCloudSession(null);
+        setCheckingSession(false);
+        return;
+      }
+
+      const email = session.user.email.toLowerCase();
+      const deviceId = localStorage.getItem('pda_device_id') || 'UNKNOWN';
+
+      try {
+        const savedAlias = localStorage.getItem('pda_device_alias');
+        const defaultAlias = `Dispositivo ${navigator.platform || 'Web'}`;
+        const finalAlias = savedAlias && savedAlias.trim() !== '' ? savedAlias.trim() : defaultAlias;
+
+        const isExplicitLogin = localStorage.getItem('pda_explicit_login') === 'true';
+
+        // Si el login NO es explícito (es un auto-login normal),
+        // checamos si este dispositivo ya fue expulsado.
+        if (!isExplicitLogin) {
+            const { data: existingDevice } = await supabaseCloud
+               .from('account_devices')
+               .select('id')
+               .eq('device_id', deviceId)
+               .eq('email', email)
+               .maybeSingle();
+
+            if (!existingDevice) {
+                // Fue expulsado por el Administrador. Tumbamos sesión.
+                await supabaseCloud.auth.signOut();
+                if (mounted) { setCloudSession(null); setCheckingSession(false); }
+                return;
+            }
+        } else {
+            localStorage.removeItem('pda_explicit_login');
+        }
+
+        const { data: result, error } = await supabaseCloud.rpc('register_and_check_device', {
+          p_email: email,
+          p_device_id: deviceId,
+          p_device_alias: finalAlias,
+        });
+
+        if (!error) {
+          if (result === 'license_inactive' || result === 'limit_reached' || result === 'license_expired') {
+            await supabaseCloud.auth.signOut();
+            if (mounted) { setCloudSession(null); setCheckingSession(false); }
+            return;
+          }
+        }
+        // Si la RPC no existe aún (error), deja pasar sin bloquear
+      } catch {
+        // Sin conexión o RPC pendiente — dejar pasar
+      }
+
+      if (mounted) {
+        setCloudSession(session);
+        setCheckingSession(false);
+      }
+    };
+
+    supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+      applySession(session);
+    });
+
+    const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_IN') applySession(session);
+      else if (event === 'SIGNED_OUT') { setCloudSession(null); setCheckingSession(false); }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
   
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const { rates, loading, isOffline, updateData } = useRates();
-  const { isPremium, isDemo, demoTimeLeft, demoExpiredMsg, dismissExpiredMsg, deviceId } = useSecurity();
+  const { deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
-  useAutoBackup(isPremium, isDemo, deviceId);
+  useAutoBackup(false, false, deviceId);
   useAutoLock(); // Auto-lock for ADMINs
 
   // Purge old audit log entries on startup
@@ -77,9 +165,8 @@ export default function App() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  const [tourDone, setTourDone] = useState(
-    () => localStorage.getItem('pda_spotlight_done') === 'true'
-  );
+  const [tourDone, setTourDone] = useState(true); // TODO: re-habilitar cuando el tour esté listo
+  // const [tourDone, setTourDone] = useState(() => localStorage.getItem('pda_spotlight_done') === 'true');
   
   const SPOTLIGHT_STEPS = [
     { target: '[data-tour="tab-ventas"]', title: 'Empieza a vender', text: 'Toca aquí para ir al Punto de Venta. Podrás cobrar en Bolívares o Dólares fácilmente.' },
@@ -171,6 +258,21 @@ export default function App() {
   // El PIN solo bloquea si requireLogin está activado Y hay cuenta cloud registrada
   const pinLoginEnabled = requireLogin && isCloudConfigured;
 
+  const confirm = useConfirm();
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Cerrar sesión',
+      message: 'Se cerrará tu sesión en la nube. Tendrás que iniciar sesión nuevamente para acceder a la aplicación.',
+      confirmText: 'Cerrar sesión',
+      cancelText: 'Cancelar',
+      variant: 'logout',
+    });
+    if (!ok) return;
+    await supabaseCloud.auth.signOut();
+    setCloudSession(null);
+  };
+
   // Auto-login: cuando el PIN no aplica y no hay sesión, restaurar el admin local
   // automáticamente. useEffect corre antes del primer paint visible → sin flash.
   useEffect(() => {
@@ -188,12 +290,26 @@ export default function App() {
     { id: 'catalogo', label: 'Inventario', icon: Store },
     { id: 'clientes', label: 'Contactos', icon: Users },
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
+    { id: 'ajustes', label: 'Config.', icon: Settings, adminOnly: true },
   ];
   const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
 
-  // Guard: si el PIN aplica y no hay sesión → pantalla de bloqueo
+  // Global Hard Gate: Loading State
+  if (checkingSession) {
+    return (
+      <div className="h-[100dvh] w-full bg-slate-50 dark:bg-black flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Global Hard Gate: Must have Cloud Session
+  if (!cloudSession) {
+    return <CloudAuthModal forceLogin={true} />;
+  }
+
+  // Local Guard: si el PIN local aplica y no ha desbloqueado
   if (!usuarioActivo && pinLoginEnabled) return <LockScreen />;
-  // Guard: sin PIN y sin sesión → null mientras el useEffect restaura al admin (imperceptible, <1 frame)
   if (!usuarioActivo) return null;
 
   return (
@@ -203,7 +319,7 @@ export default function App() {
       <TermsOverlay />
 
       {/* Tutorial Onboarding (First Use, after Terms) */}
-      <OnboardingOverlay isPremium={isPremium} />
+      <OnboardingOverlay />
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -229,35 +345,7 @@ export default function App() {
          />
       )}
 
-      {/* Demo Expired Modal */}
-      {demoExpiredMsg && (
-        <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-sm shadow-2xl border border-slate-100 dark:border-slate-800 text-center animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">⏳</span>
-            </div>
-            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">Prueba finalizada</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-              {demoExpiredMsg}
-            </p>
-            <button
-              onClick={() => {
-                const msg = `Hola! Quiero adquirir la licencia Premium de PreciosAlDía. Acabo de terminar mi prueba gratuita.`;
-                window.open(`https://wa.me/584124051793?text=${encodeURIComponent(msg)}`, '_blank');
-              }}
-              className="w-full py-3 bg-brand text-white font-bold rounded-xl shadow-lg shadow-brand/20 active:scale-95 transition-transform text-sm mb-2"
-            >
-              Solicitar Licencia
-            </button>
-            <button
-              onClick={dismissExpiredMsg}
-              className="w-full py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Continuar con versión gratuita
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Golden Tester View Overlay */}
       {showTester && (
@@ -281,9 +369,7 @@ export default function App() {
         {/* Eager views — always mounted, visibility toggled via CSS */}
         <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <PremiumGuard featureName="Punto de Venta" isShop={true}>
-              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
-            </PremiumGuard>
+            <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
           </ErrorBoundary>
         </div>
 
@@ -295,7 +381,7 @@ export default function App() {
 
         <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={(tab) => { if (tab === 'ajustes') { setShowSettings(true); } else { setActiveTab(tab); } }} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} isDemo={isDemo} demoTimeLeft={demoTimeLeft} />
+            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
           </ErrorBoundary>
         </div>
 
@@ -304,33 +390,32 @@ export default function App() {
           {(activeTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
             <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <PremiumGuard featureName="Gestión de Clientes">
-                  <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
-                </PremiumGuard>
+                <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
               </ErrorBoundary>
             </div>
           )}
           {(activeTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <PremiumGuard featureName="Reportes Históricos">
-                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
-                </PremiumGuard>
+                <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
               </ErrorBoundary>
             </div>
           )}
         </Suspense>
-      </main>
 
-      {/* Settings View Overlay — inside providers for context access */}
-      {showSettings && (
-        <SettingsView
-          onClose={() => setShowSettings(false)}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          triggerHaptic={triggerHaptic}
-        />
-      )}
+        {/* Settings — mounted as tab inside providers */}
+        <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'ajustes' ? '' : 'hidden'}`}>
+          <ErrorBoundary>
+            <SettingsView
+              onClose={() => setActiveTab('inicio')}
+              theme={theme}
+              toggleTheme={toggleTheme}
+              triggerHaptic={triggerHaptic}
+            />
+          </ErrorBoundary>
+        </div>
+
+      </main>
 
       </ProductProvider>
       </CartProvider>
@@ -369,6 +454,8 @@ export default function App() {
                 <Download size={20} strokeWidth={3} />
               </button>
             )}
+
+
           </div>
         </div>
       )}

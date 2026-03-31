@@ -1,35 +1,29 @@
 import React, { useState } from 'react';
 import { Lock, Copy, Check, Star, Sparkles, Send, Bot, Store, MessageCircle, Database, Crown, CreditCard, Gift, BarChart3, Bell, Volume2, Search } from 'lucide-react';
 import { useSecurity } from '../../hooks/useSecurity';
+import { useAuthStore } from '../../hooks/store/useAuthStore';
 import { Modal } from '../Modal';
+import CloudAuthModal from './CloudAuthModal';
 
 export default function PremiumGuard({ children, featureName = "Esta función", isShop = false }) {
     const { deviceId, isPremium, loading, unlockApp, activateDemo, demoUsed } = useSecurity();
-    const [inputCode, setInputCode] = useState('');
-    const [error, setError] = useState(false);
-    const [success, setSuccess] = useState(false);
+    
+    // Cloud Auth Check
+    const adminEmail = useAuthStore(state => state.adminEmail);
+    const adminPassword = useAuthStore(state => state.adminPassword);
+    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+
     const [copied, setCopied] = useState(false);
     const [demoLoading, setDemoLoading] = useState(false);
+    const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
 
     // Estado para Modales
     const [messageModal, setMessageModal] = useState({ open: false, title: '', content: '' });
 
     if (loading) return <div className="p-10 text-center text-slate-400">Verificando licencia...</div>;
-    if (isPremium) return children;
+    if (isPremium || isCloudConfigured) return children;
 
     // --- Handlers ---
-    const handleUnlock = async (e) => {
-        e.preventDefault();
-        const result = await unlockApp(inputCode);
-        if (result.success) {
-            setSuccess(true);
-            setError(false);
-        } else {
-            setError(true);
-            if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
-            setTimeout(() => setError(false), 2000);
-        }
-    };
 
     const handleActivateDemo = async () => {
         setDemoLoading(true);
@@ -171,27 +165,22 @@ export default function PremiumGuard({ children, featureName = "Esta función", 
                     </div>
                 </div>
 
-                {/* Activation Form */}
-                <form onSubmit={handleUnlock} className="border-t border-slate-100 dark:border-slate-800 pt-2">
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-1.5 font-bold uppercase tracking-wide leading-tight">Código de Activación</p>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            value={inputCode}
-                            onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                            placeholder="ACTIV-XXXX-XXXX"
-                            className={`flex-1 bg-white dark:bg-slate-950 border ${error ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} rounded-xl px-2 py-2 text-center font-mono text-xs font-bold tracking-widest text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all uppercase placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-sm`}
-                        />
-                        <button
-                            type="submit"
-                            className="bg-slate-900 dark:bg-slate-800 dark:border dark:border-slate-700 text-white font-bold px-4 rounded-xl text-xs hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
-                        >
-                            <Check size={16} strokeWidth={3} />
-                        </button>
-                    </div>
-                    {error && <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">Código inválido.</p>}
-                    {success && <p className="text-[10px] text-green-500 mt-1 font-bold">¡Activado!</p>}
-                </form>
+                {/* Cloud Auth Button replaces Activation Form */}
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-2 font-bold uppercase tracking-wide leading-tight text-center">Desbloquear Nube</p>
+                    <button
+                        onClick={() => setIsCloudModalOpen(true)}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 text-sm"
+                    >
+                        <Database size={16} />
+                        <span>Iniciar Sesión a la Nube</span>
+                    </button>
+                    {isCloudConfigured && (
+                        <p className="text-[9px] text-teal-600 dark:text-teal-400 text-center font-bold mt-2">
+                            Sesión iniciada como: {adminEmail}
+                        </p>
+                    )}
+                </div>
 
                 {/* Modal de Mensajes */}
                 <Modal
@@ -214,6 +203,8 @@ export default function PremiumGuard({ children, featureName = "Esta función", 
                         </button>
                     </div>
                 </Modal>
+
+                <CloudAuthModal isOpen={isCloudModalOpen} onClose={() => setIsCloudModalOpen(false)} />
 
             </div>
         </div>

@@ -45,10 +45,14 @@ function AppRouter() {
   return <App />;
 }
 
+import { ConfirmProvider } from './hooks/useConfirm.jsx'
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ToastProvider>
-      <AppRouter />
+      <ConfirmProvider>
+        <AppRouter />
+      </ConfirmProvider>
     </ToastProvider>
   </React.StrictMode>,
 )

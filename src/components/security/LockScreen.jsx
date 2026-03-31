@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../hooks/store/useAuthStore';
+import { useConfirm } from '../../hooks/useConfirm.jsx';
 import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 
 export default function LockScreen() {
   const { usuarios, login } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState(null);
+  const confirm = useConfirm();
 
   const handlePinSubmit = async (pin, userId) => {
     const success = await login(pin, userId);
@@ -13,6 +15,20 @@ export default function LockScreen() {
       setSelectedUser(null);
     }
     return success;
+  };
+
+  const handleCloudLogout = async () => {
+    const ok = await confirm({
+      title: 'Cerrar sesión',
+      message: 'Se cerrará tu sesión en la nube. Deberás iniciar sesión nuevamente para continuar.',
+      confirmText: 'Cerrar sesión',
+      cancelText: 'Cancelar',
+      variant: 'logout',
+    });
+    if (!ok) return;
+    const { supabaseCloud } = await import('../../config/supabaseCloud');
+    await supabaseCloud.auth.signOut();
+    window.location.reload();
   };
 
   return (
@@ -48,10 +64,17 @@ export default function LockScreen() {
       </div>
 
       {/* Footer sutil */}
-      <div className="relative z-10 pb-6 text-center">
+      <div className="relative z-10 pb-6 text-center flex flex-col items-center gap-3">
         <p className="text-[10px] text-slate-600 font-medium tracking-wider">
           PIN de 4 digitos requerido
         </p>
+        <button
+          onClick={handleCloudLogout}
+          className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
+        </button>
       </div>
 
       {/* PIN Modal */}

@@ -1,15 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-    Database, Users, Lock, AlertTriangle, Mail, Eye, EyeOff,
-    ShieldCheck, Fingerprint, Rocket, Clock
+    Users, Lock, Rocket, Clock
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import UsersManager from '../UsersManager';
-import { supabaseCloud } from '../../../config/supabaseCloud';
+import CloudAuthModal from '../../security/CloudAuthModal';
 
 // ─── CONTROL DE PRÓXIMAMENTE ────────────────────────────────────────────────
-// Cambiar a false cuando la funcionalidad esté completa y lista para clientes
-const SHOW_COMING_SOON = true;
+const SHOW_COMING_SOON = false;
 // ────────────────────────────────────────────────────────────────────────────
 
 function ComingSoonOverlay() {
@@ -34,20 +32,146 @@ function ComingSoonOverlay() {
     );
 }
 
+function CloudLicenseViewer({ adminEmail, showToast }) {
+    const [devices, setDevices] = useState([]);
+    const [license, setLicense] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const confirm = useConfirm();
+
+    const loadData = async () => {
+        setLoading(true);
+        const [devRes, licRes] = await Promise.all([
+            supabaseCloud.from('account_devices').select('*').eq('email', adminEmail).order('created_at', { ascending: true }),
+            supabaseCloud.from('cloud_licenses').select('*').eq('email', adminEmail).maybeSingle()
+        ]);
+        if (!devRes.error && devRes.data) setDevices(devRes.data);
+        if (!licRes.error && licRes.data) setLicense(licRes.data);
+        setLoading(false);
+    }
+
+    useEffect(() => {
+        if (adminEmail) loadData();
+    }, [adminEmail]);
+
+    const handleRemoveDevice = async (deviceId, alias) => {
+        const ok = await confirm({
+            title: 'Desvincular dispositivo',
+            message: `El dispositivo "${alias}" perderá acceso a tu cuenta. Esta acción no se puede deshacer.`,
+            confirmText: 'Desvincular',
+            cancelText: 'Cancelar',
+            variant: 'unlink',
+        });
+        if (!ok) return;
+        const { error } = await supabaseCloud
+            .from('account_devices')
+            .delete()
+            .eq('email', adminEmail)
+            .eq('device_id', deviceId);
+            
+        if (error) {
+            showToast('Error al desvincular', 'error');
+        } else {
+            showToast('Dispositivo desvinculado', 'success');
+            loadData();
+        }
+    }
+
+    if (loading) return <div className="p-4 text-center text-[10px] text-indigo-500 font-bold animate-pulse">Cargando estado de la licencia...</div>;
+    if (!license) return null;
+
+    const isPermanent = license.license_type === 'permanent';
+    let daysDiff = 0;
+    if (license.valid_until) {
+        daysDiff = Math.ceil((new Date(license.valid_until) - new Date()) / 86400000);
+    } else {
+        daysDiff = license.days_remaining || 0;
+    }
+    const daysLeft = daysDiff > 0 ? daysDiff : 0;
+    const isExpired = !isPermanent && daysLeft === 0;
+
+    return (
+        <div className="space-y-4">
+            <div className={`p-4 rounded-xl border ${isExpired ? 'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-900/50' : isPermanent ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-900/50' : 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-900/50'}`}>
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-200">Estado de Licencia</h4>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] uppercase font-black tracking-wider ${isExpired ? 'bg-rose-200 text-rose-800 dark:bg-rose-800/80 dark:text-rose-100' : isPermanent ? 'bg-amber-200 text-amber-800 dark:bg-amber-800/80 dark:text-amber-100' : 'bg-indigo-200 text-indigo-800 dark:bg-indigo-800/80 dark:text-indigo-100'}`}>
+                        {isExpired ? 'VENCIDA' : isPermanent ? 'LIFETIME' : 'ACTIVA'}
+                    </span>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 dark:text-slate-400">Cupo Dispositivos</span>
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                            <span className={devices.length >= license.max_devices ? 'text-rose-500 font-black' : ''}>{devices.length}</span> / {license.max_devices}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500 dark:text-slate-400">Tipo de plan</span>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 capitalize">{license.plan_tier}</span>
+                    </div>
+                    
+                    {!isPermanent && (
+                        <>
+                            <div className="w-full h-px bg-slate-200/60 dark:bg-slate-700/60 my-1 font-mono"></div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><Clock size={14} /> Días restantes</span>
+                                <span className={`font-mono font-bold ${daysLeft <= 3 ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300'}`}>{daysLeft}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 dark:text-slate-400">Fecha de corte</span>
+                                <span className="font-bold text-slate-700 dark:text-slate-300">
+                                    {license.valid_until ? new Date(license.valid_until).toLocaleDateString() : 'Desconocida'}
+                                </span>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <div className="pt-2 border-t border-indigo-200 dark:border-indigo-900/40">
+                <p className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-400 mb-2.5">Equipos Vinculados ({devices.length})</p>
+                {devices.length === 0 ? (
+                    <div className="text-center text-xs text-slate-500">No hay dispositivos registrados.</div>
+                ) : (
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                        {devices.map((d, i) => (
+                            <div key={d.device_id} className="flex items-center justify-between p-2.5 bg-white/60 dark:bg-slate-900/60 border border-indigo-100 dark:border-indigo-900/50 rounded-xl shadow-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 rounded-lg shrink-0">
+                                        <Smartphone size={16} className="text-indigo-500" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate pr-2">
+                                            {d.device_alias || `Dispositivo ${i + 1}`}
+                                        </p>
+                                        <p className="text-[9px] text-slate-500 font-mono mt-0.5" title={d.device_id}>Última vez: {new Date(d.last_seen).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleRemoveDevice(d.device_id, d.device_alias || `Dispositivo ${i + 1}`)}
+                                    className="p-2 text-rose-500 dark:text-rose-400 bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-900/20 border border-rose-100 dark:border-rose-900/50 rounded-lg transition-colors active:scale-95 shadow-sm"
+                                    title="Desvincular"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function SettingsTabUsuarios({
     isCloudConfigured, adminEmail,
     requireLogin, setRequireLogin,
     autoLockMinutes, setAutoLockMinutes,
-    importStatus, statusMessage,
-    isCloudLogin, setIsCloudLogin,
-    inputPhone, setInputPhone,
-    inputEmail, setInputEmail, emailError, setEmailError,
-    inputPassword, setInputPassword, passwordError, setPasswordError,
-    showPassword, setShowPassword,
-    isRecoveringPassword, setIsRecoveringPassword,
-    handleSaveCloudAccount, handleResetPasswordRequest,
     setAdminCredentials, showToast, triggerHaptic,
 }) {
+    const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
+
     return (
         <div className="relative">
             {SHOW_COMING_SOON && <ComingSoonOverlay />}
@@ -57,198 +181,8 @@ export default function SettingsTabUsuarios({
                 </SectionCard>
             )}
 
-            <SectionCard icon={Lock} title="Seguridad (ADMIN)" subtitle="Evitar accesos no autorizados" iconColor="text-rose-500">
-
-                {/* Formulario Correo Nube */}
-                {!isCloudConfigured && (
-                    <div className="mb-5 p-3.5 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30 rounded-2xl animate-in fade-in zoom-in-95">
-                        <div className="flex items-start gap-2.5 mb-3">
-                            <AlertTriangle size={16} className="text-rose-500 mt-0.5 shrink-0" />
-                            <div>
-                                <p className="text-xs font-bold text-rose-700 dark:text-rose-400">Protección Requerida</p>
-                                <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 leading-relaxed mt-0.5">
-                                    Para crear nuevos usuarios, modificar las alertas de seguridad o deshabilitar el PIN de la aplicación, debes registrar primero un correo y contraseña de recuperación.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="bg-white dark:bg-slate-900 border border-rose-200/60 dark:border-rose-900/40 rounded-xl p-4 mt-3 shadow-inner">
-                            {/* Tabs Login/Registro */}
-                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 mb-4">
-                                <button
-                                    onClick={() => setIsCloudLogin(true)}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${isCloudLogin ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Entrar
-                                </button>
-                                <button
-                                    onClick={() => setIsCloudLogin(false)}
-                                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!isCloudLogin ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Registrarse
-                                </button>
-                            </div>
-
-                            {importStatus === 'awaiting_email_confirmation' ? (
-                                <div className="text-center py-6 px-4 animate-in fade-in zoom-in">
-                                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <Mail size={32} className="text-indigo-500" />
-                                    </div>
-                                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-2">¡Revisa tu correo!</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-                                        Hemos enviado un enlace de confirmación a <strong className="text-slate-700 dark:text-slate-300">{inputEmail}</strong>.
-                                        Por favor haz clic en él para verificar tu identidad y luego regresa aquí para Iniciar Sesión.
-                                    </p>
-                                    <button
-                                        onClick={() => { setIsCloudLogin(true); }}
-                                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors active:scale-95"
-                                    >
-                                        Ya lo confirmé, Iniciar Sesión
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {!isCloudLogin && (
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Teléfono Móvil</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="tel"
-                                                    placeholder="Ej: 0414..."
-                                                    value={inputPhone}
-                                                    onChange={e => setInputPhone(e.target.value)}
-                                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none"
-                                                />
-                                                <Fingerprint size={16} className="absolute left-3.5 top-3 text-slate-400" />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Correo Electrónico</label>
-                                        <div className="relative">
-                                            <input
-                                                type="email"
-                                                placeholder="tu@correo.com"
-                                                value={inputEmail}
-                                                onChange={e => { setInputEmail(e.target.value); setEmailError(''); }}
-                                                className={`w-full bg-slate-50 dark:bg-slate-950 border ${emailError ? 'border-red-400' : 'border-slate-200 dark:border-slate-800'} rounded-xl pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all`}
-                                            />
-                                            <Mail size={16} className={`absolute left-3.5 top-3 ${emailError ? 'text-red-400' : 'text-slate-400'}`} />
-                                        </div>
-                                        {emailError && <p className="text-[10px] text-red-500 mt-1 ml-1 font-medium">{emailError}</p>}
-                                    </div>
-
-                                    {!isRecoveringPassword && (
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Contraseña</label>
-                                            <div className="relative">
-                                                <input
-                                                    type={showPassword ? 'text' : 'password'}
-                                                    placeholder="Mínimo 6 caracteres"
-                                                    value={inputPassword}
-                                                    onChange={e => { setInputPassword(e.target.value); setPasswordError(''); }}
-                                                    className={`w-full bg-slate-50 dark:bg-slate-950 border ${passwordError ? 'border-red-400' : 'border-slate-200 dark:border-slate-800'} rounded-xl pl-10 pr-10 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500/30 outline-none transition-all`}
-                                                />
-                                                <Lock size={16} className={`absolute left-3.5 top-3 ${passwordError ? 'text-red-400' : 'text-slate-400'}`} />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
-                                                >
-                                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                </button>
-                                            </div>
-                                            {passwordError && <p className="text-[10px] text-red-500 mt-1 ml-1 font-medium">{passwordError}</p>}
-                                        </div>
-                                    )}
-
-                                    {importStatus === 'error' && (
-                                        <div className="p-2.5 mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg flex items-center gap-2">
-                                            <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                                            <p className="text-[10px] text-red-600 dark:text-red-400 font-medium">{statusMessage}</p>
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={isRecoveringPassword ? handleResetPasswordRequest : handleSaveCloudAccount}
-                                        disabled={importStatus === 'loading'}
-                                        className="w-full mt-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 dark:disabled:bg-indigo-800 text-white text-sm font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
-                                    >
-                                        {importStatus === 'loading'
-                                            ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            : <ShieldCheck size={18} />
-                                        }
-                                        {importStatus === 'loading' ? 'Procesando...' : (
-                                            isRecoveringPassword ? 'Enviar enlace de recuperación' :
-                                            (isCloudLogin ? 'Entrar y Sincronizar' : 'Crear Cuenta Segura')
-                                        )}
-                                    </button>
-
-                                    <div className="flex flex-col items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                                        {isCloudLogin && !isRecoveringPassword && (
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsRecoveringPassword(true); setEmailError(''); setPasswordError(''); }}
-                                                className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline mb-2"
-                                            >
-                                                ¿Olvidaste tu contraseña?
-                                            </button>
-                                        )}
-                                        {isRecoveringPassword && (
-                                            <button
-                                                type="button"
-                                                onClick={() => { setIsRecoveringPassword(false); setEmailError(''); }}
-                                                className="text-[11px] text-slate-500 font-bold hover:underline mb-2"
-                                            >
-                                                Volver a Iniciar Sesión
-                                            </button>
-                                        )}
-                                        {!isCloudLogin && !isRecoveringPassword && (
-                                            <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 leading-relaxed">
-                                                Al registrarte, enviaremos un correo de validación. Tu información será encriptada y quedará lista para la próxima <strong>Estación Maestra</strong>.
-                                            </p>
-                                        )}
-                                        {isRecoveringPassword && (
-                                            <p className="text-[9px] text-center text-slate-400 dark:text-slate-500 leading-relaxed max-w-[200px]">
-                                                Ingresa el correo de tu cuenta. Te enviaremos un mensaje con un enlace para crear una contraseña nueva.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {isCloudConfigured && (
-                    <div className="mb-5 p-3.5 bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-full flex items-center justify-center">
-                                <Database size={20} className="text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Sincronización Activa</p>
-                                <p className="text-[10px] text-slate-500">{adminEmail}</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={async () => {
-                                if (window.confirm('¿Seguro que deseas cerrar la sesión en la nube?')) {
-                                    setAdminCredentials('', '');
-                                    if (supabaseCloud) await supabaseCloud.auth.signOut();
-                                    showToast('Sesión de nube cerrada', 'success');
-                                }
-                            }}
-                            className="px-3 py-1.5 bg-white dark:bg-slate-800 text-red-500 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-95 transition-all"
-                        >
-                            Cerrar Sesión
-                        </button>
-                    </div>
-                )}
-
-                {/* Login Opcional */}
-                <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-4 mt-6">
+            <SectionCard icon={Lock} title="Seguridad Local" subtitle="Protección física del dispositivo" iconColor="text-rose-500">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                     <div>
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Pedir PIN al iniciar</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">Si se desactiva, entrará directo como Administrador.</p>
