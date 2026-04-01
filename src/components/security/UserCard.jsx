@@ -39,24 +39,12 @@ export default function UserCard({ user, onClick }) {
               )}
 
               {isAdmin ? (
-                <div className="relative z-10 p-[4px] rounded-2xl overflow-hidden flex justify-center items-center shadow-[0_0_20px_rgba(0,183,255,0.4)]">
-                  {/* RGB animated border */}
-                  <div style={{
-                    position: 'absolute',
-                    width: '200%',
-                    height: '200%',
-                    backgroundImage: 'linear-gradient(180deg, rgb(0, 183, 255), rgb(255, 48, 255))',
-                    animation: 'rotBGimg 3s linear infinite',
-                  }} />
-                  <div className="relative z-20 bg-slate-900 rounded-2xl">
-                    <LoginAvatar user={user} className="relative z-10 transition-all duration-300 shadow-none ring-0" />
-                  </div>
+                <div className="relative z-10 flex justify-center items-center transition-transform hover:scale-105 duration-300">
+                  <LoginAvatar user={user} className="relative z-10" />
                 </div>
               ) : (
-                <div className="relative z-10 p-[4px] rounded-2xl overflow-hidden flex justify-center items-center bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/30 transition-all duration-300">
-                  <div className="relative z-20 bg-slate-900 rounded-2xl">
-                    <LoginAvatar user={user} className="relative z-10 transition-all duration-300 shadow-none ring-0" />
-                  </div>
+                <div className="relative z-10 flex justify-center items-center transition-transform hover:scale-105 duration-300">
+                  <LoginAvatar user={user} className="relative z-10" />
                 </div>
               )}
             </div>
@@ -64,10 +52,10 @@ export default function UserCard({ user, onClick }) {
 
           {/* Text floating below */}
           <CardItem translateZ="60" className="text-center w-full mt-8 group-hover/card:text-primary transition-colors space-y-1">
-            <h3 className="text-lg font-bold text-white drop-shadow-md">
+            <h3 className="text-lg font-bold text-slate-800 drop-shadow-sm">
               {toTitleCase(user.nombre)}
             </h3>
-            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-purple-400' : 'text-emerald-400'}`}>
+            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-sky-500' : 'text-teal-500'}`}>
               {user.rol === 'ADMIN' ? 'Administrador' : 'Cajero'}
             </span>
           </CardItem>

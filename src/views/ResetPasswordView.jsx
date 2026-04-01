@@ -60,11 +60,11 @@ function ChangePasswordScreen({ onPasswordChanged }) {
 
     return (
         <>
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/30">
+            <div className="w-16 h-16 bg-gradient-to-br from-sky-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-sky-500/20">
                 <ShieldCheck size={30} className="text-white" />
             </div>
-            <h1 className="text-2xl font-black text-white text-center mb-1">Nueva contraseña</h1>
-            <p className="text-slate-400 text-sm text-center mb-8">Elige una contraseña segura para tu cuenta.</p>
+            <h1 className="text-2xl font-black text-slate-800 text-center mb-1">Nueva contraseña</h1>
+            <p className="text-slate-500 text-sm text-center mb-8">Elige una contraseña segura para tu cuenta.</p>
 
             {!sessionReady && (
                 <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2">
@@ -83,7 +83,7 @@ function ChangePasswordScreen({ onPasswordChanged }) {
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             placeholder="Mínimo 6 caracteres"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition-all"
                             autoFocus
                             disabled={!sessionReady || status === 'loading'}
                         />
@@ -115,10 +115,10 @@ function ChangePasswordScreen({ onPasswordChanged }) {
                             value={confirm}
                             onChange={e => setConfirm(e.target.value)}
                             placeholder="Repite la contraseña"
-                            className={`w-full bg-slate-900 border rounded-2xl pl-11 pr-11 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 transition-all ${
+                            className={`w-full bg-slate-50 border rounded-2xl pl-11 pr-11 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all ${
                                 confirm && confirm !== password ? 'border-red-500/50 focus:ring-red-500/30'
                                 : confirm && confirm === password ? 'border-emerald-500/50 focus:ring-emerald-500/30'
-                                : 'border-slate-700 focus:ring-indigo-500/50 focus:border-indigo-500'
+                                : 'border-slate-200 focus:ring-sky-500/50 focus:border-sky-500'
                             }`}
                             disabled={!sessionReady || status === 'loading'}
                         />
@@ -147,7 +147,7 @@ function ChangePasswordScreen({ onPasswordChanged }) {
                 <button
                     type="submit"
                     disabled={!sessionReady || status === 'loading' || !password || password !== confirm}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 mt-2"
+                    className="w-full py-3.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 mt-2"
                 >
                     {status === 'loading' ? (
                         <><Loader2 size={16} className="animate-spin" /> Guardando...</>
@@ -195,11 +195,11 @@ function LoginAfterResetScreen({ onDone }) {
     return (
         <>
             {/* Icon */}
-            <div className="w-16 h-16 bg-emerald-500/20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-500/10">
-                <CheckCircle size={32} className="text-emerald-400" />
+            <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-500/10">
+                <CheckCircle size={32} className="text-emerald-500" />
             </div>
-            <h1 className="text-2xl font-black text-white text-center mb-1">Contraseña actualizada</h1>
-            <p className="text-slate-400 text-sm text-center mb-8 leading-relaxed">
+            <h1 className="text-2xl font-black text-slate-800 text-center mb-1">Contraseña actualizada</h1>
+            <p className="text-slate-500 text-sm text-center mb-8 leading-relaxed">
                 Ingresa tu correo y tu nueva contraseña para iniciar sesión.
             </p>
 
@@ -213,7 +213,7 @@ function LoginAfterResetScreen({ onDone }) {
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             placeholder="tu@correo.com"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition-all"
                             autoFocus
                             disabled={status === 'loading'}
                         />
@@ -230,7 +230,7 @@ function LoginAfterResetScreen({ onDone }) {
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             placeholder="Tu nueva contraseña"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition-all"
                             disabled={status === 'loading'}
                         />
                         <Lock size={16} className="absolute left-4 top-4 text-slate-500" />
@@ -250,7 +250,7 @@ function LoginAfterResetScreen({ onDone }) {
                 <button
                     type="submit"
                     disabled={status === 'loading'}
-                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 mt-2"
+                    className="w-full py-3.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 mt-2"
                 >
                     {status === 'loading' ? (
                         <><Loader2 size={16} className="animate-spin" /> Iniciando sesión...</>
@@ -268,11 +268,11 @@ export default function ResetPasswordView({ onDone }) {
     const [step, setStep] = useState('change'); // 'change' | 'login'
 
     return (
-        <div className="fixed inset-0 z-[300] bg-slate-950 flex items-center justify-center p-6 font-sans">
+        <div className="fixed inset-0 z-[300] bg-white flex items-center justify-center p-6 font-sans">
             {/* Background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-[100px]" />
-                <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-violet-600/10 rounded-full blur-[100px]" />
+                <div className="absolute -top-32 -left-32 w-96 h-96 bg-sky-500/10 rounded-full blur-[100px]" />
+                <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-teal-400/10 rounded-full blur-[100px]" />
             </div>
 
             <div className="relative w-full max-w-sm animate-in slide-in-from-bottom-6 duration-300">

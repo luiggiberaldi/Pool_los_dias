@@ -54,18 +54,18 @@ export default function TermsOverlay() {
                     className="flex-1 overflow-y-auto px-6 py-6 prose prose-sm max-w-none"
                     style={{ scrollbarWidth: 'thin' }}
                 >
-                    <h1 className="text-2xl font-black text-slate-900 mb-4">Términos y Condiciones de Uso - PreciosAlDía</h1>
+                    <h1 className="text-2xl font-black text-slate-900 mb-4">Términos y Condiciones de Uso - Listo POS Lite</h1>
                     <p className="text-xs text-slate-500 font-bold mb-6">Última actualización: Febrero 2026</p>
 
                     <hr className="my-6" />
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">1. Aceptación de los Términos</h2>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        Al acceder y utilizar la aplicación <strong>PreciosAlDía</strong> (en adelante, "la Aplicación"), usted acepta estar sujeto a estos Términos y Condiciones. Si no está de acuerdo con alguna parte de estos términos, no debe utilizar la Aplicación.
+                        Al acceder y utilizar la aplicación <strong>Listo POS Lite</strong> (en adelante, "la Aplicación"), usted acepta estar sujeto a estos Términos y Condiciones. Si no está de acuerdo con alguna parte de estos términos, no debe utilizar la Aplicación.
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">2. Descripción del Servicio</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">PreciosAlDía es una aplicación web progresiva (PWA) diseñada para la gestión de bodegas y pequeños comercios que proporciona:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Listo POS Lite es una aplicación web progresiva (PWA) diseñada para la gestión de bodegas y pequeños comercios que proporciona:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
                         <li><strong>Gestión de inventario</strong> con precios en múltiples monedas (USD, Bolívares)</li>
                         <li><strong>Punto de venta (POS)</strong> con carrito, checkout y recibos</li>
@@ -78,7 +78,7 @@ export default function TermsOverlay() {
 
                     <h3 className="text-base font-bold text-slate-800 mt-4 mb-2">3.1 Información No Vinculante</h3>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        <strong className="text-red-600">TODA LA INFORMACIÓN PROPORCIONADA EN LA APLICACIÓN ES ESTRICTAMENTE INFORMATIVA Y DE REFERENCIA.</strong> PreciosAlDía no garantiza la exactitud, integridad, vigencia o fiabilidad de las tasas de cambio, precios o cualquier otra información mostrada.
+                        <strong className="text-red-600">TODA LA INFORMACIÓN PROPORCIONADA EN LA APLICACIÓN ES ESTRICTAMENTE INFORMATIVA Y DE REFERENCIA.</strong> Listo POS Lite no garantiza la exactitud, integridad, vigencia o fiabilidad de las tasas de cambio, precios o cualquier otra información mostrada.
                     </p>
 
                     <h3 className="text-base font-bold text-slate-800 mt-4 mb-2">3.2 No Constituye Asesoría Financiera</h3>
@@ -87,7 +87,7 @@ export default function TermsOverlay() {
                     </p>
 
                     <h3 className="text-base font-bold text-slate-800 mt-4 mb-2">3.3 Limitación de Responsabilidad</h3>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2"><strong>PreciosAlDía y sus desarrolladores NO se hacen responsables por:</strong></p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2"><strong>Listo POS Lite y sus desarrolladores NO se hacen responsables por:</strong></p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
                         <li>Pérdidas económicas directas o indirectas derivadas del uso de la información</li>
                         <li>Errores en el cálculo de precios o conversiones de moneda</li>
@@ -97,11 +97,11 @@ export default function TermsOverlay() {
 
                     <h3 className="text-base font-bold text-slate-800 mt-4 mb-2">3.4 Uso Bajo Propio Riesgo</h3>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        Al usar PreciosAlDía, usted acepta que lo hace <strong>bajo su propio riesgo y responsabilidad</strong>.
+                        Al usar Listo POS Lite, usted acepta que lo hace <strong>bajo su propio riesgo y responsabilidad</strong>.
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">4. Funcionalidades Premium</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">PreciosAlDía ofrece funciones gratuitas y funciones exclusivas para usuarios con <strong>Licencia Premium</strong>:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Listo POS Lite ofrece funciones gratuitas y funciones exclusivas para usuarios con <strong>Licencia Premium</strong>:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-2">
                         <li><strong>Gratuito:</strong> Dashboard básico, hasta 10 productos en inventario.</li>
                         <li><strong>Premium:</strong> Inventario ilimitado, sistema de ventas POS, gestión de clientes, compartir inventario, reportes completos.</li>
@@ -112,7 +112,7 @@ export default function TermsOverlay() {
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">5. Privacidad y Datos</h2>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        PreciosAlDía opera con principios de <strong>privacidad por diseño</strong>. Los datos se almacenan localmente en su dispositivo y <strong>NO se venden ni comparten con terceros</strong>.
+                        Listo POS Lite opera con principios de <strong>privacidad por diseño</strong>. Los datos se almacenan localmente en su dispositivo y <strong>NO se venden ni comparten con terceros</strong>.
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">6. Legislación Aplicable</h2>
@@ -121,7 +121,7 @@ export default function TermsOverlay() {
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">7. Código de Conducta</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Al utilizar PreciosAlDía, usted se compromete a:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Al utilizar Listo POS Lite, usted se compromete a:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
                         <li><strong>NO</strong> utilizar la Aplicación para actividades ilícitas</li>
                         <li><strong>NO</strong> intentar vulnerar la seguridad del sistema</li>
@@ -139,7 +139,7 @@ export default function TermsOverlay() {
                     </div>
 
                     <p className="text-center text-sm font-bold text-slate-900 mt-8 mb-4">
-                        PreciosAlDía - Tu Bodega Inteligente 🇻🇪
+                        Listo POS Lite - Tu Bodega Inteligente 🇻🇪
                     </p>
                     <p className="text-center text-xs text-slate-500 mb-8">
                         Gestión de inventario y ventas para el comerciante venezolano

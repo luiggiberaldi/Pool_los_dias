@@ -355,7 +355,7 @@ export async function generateDailyClosePDF({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...INK);
-    doc.text('Precios Al Día', CX, y, { align: 'center' });
+    doc.text('Listo POS Lite', CX, y, { align: 'center' });
     y += 4;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);

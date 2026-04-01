@@ -57,13 +57,13 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   const userName = (user.nombre || 'Usuario').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-xl animate-in fade-in duration-200" onClick={onClose}>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
       <div
-        className="relative bg-slate-900/95 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-sm mx-4 shadow-2xl border border-white/10 animate-in zoom-in-95 duration-300"
+        className="relative bg-white rounded-3xl p-8 w-full max-w-sm mx-4 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-300"
         onClick={e => e.stopPropagation()}
       >
         {/* Cerrar */}
-        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors rounded-full hover:bg-white/10">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 transition-colors rounded-full hover:bg-slate-100">
           <X size={20} />
         </button>
 
@@ -72,8 +72,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           <div className="mb-4">
             <LoginAvatar user={user} />
           </div>
-          <h2 className="text-xl font-bold text-white">{userName}</h2>
-          <p className="text-xs text-slate-400 mt-1">Ingresa tu PIN de 4 digitos</p>
+          <h2 className="text-xl font-bold text-slate-800">{userName}</h2>
+          <p className="text-xs text-slate-500 mt-1">Ingresa tu PIN de 4 digitos</p>
         </div>
 
         {/* PIN Dots */}
@@ -85,8 +85,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
                 error
                   ? 'bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
                   : i < pin.length
-                    ? 'bg-brand border-brand shadow-[0_0_10px_rgba(var(--brand-rgb,59,130,246),0.4)] scale-110'
-                    : 'bg-transparent border-slate-600'
+                    ? 'bg-sky-500 border-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.4)] scale-110'
+                    : 'bg-transparent border-slate-300'
               }`}
             />
           ))}
@@ -113,7 +113,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
             <button
               key={n}
               onClick={() => handlePadPress(String(n))}
-              className="h-14 rounded-xl bg-slate-800/80 text-white text-xl font-bold hover:bg-slate-700 active:scale-90 active:bg-brand/30 transition-all duration-150 border border-white/5 shadow-lg"
+              className="h-14 rounded-xl bg-slate-50 text-slate-800 text-xl font-bold hover:bg-slate-100 active:scale-95 active:bg-sky-50 transition-all duration-150 border border-slate-200 shadow-sm"
             >
               {n}
             </button>
@@ -122,13 +122,13 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           <div /> {/* Espacio vacio */}
           <button
             onClick={() => handlePadPress('0')}
-            className="h-14 rounded-xl bg-slate-800/80 text-white text-xl font-bold hover:bg-slate-700 active:scale-90 active:bg-brand/30 transition-all duration-150 border border-white/5 shadow-lg"
+            className="h-14 rounded-xl bg-slate-50 text-slate-800 text-xl font-bold hover:bg-slate-100 active:scale-95 active:bg-sky-50 transition-all duration-150 border border-slate-200 shadow-sm"
           >
             0
           </button>
           <button
             onClick={handleDelete}
-            className="h-14 rounded-xl bg-slate-800/50 text-slate-400 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 active:scale-90 transition-all duration-150 border border-white/5"
+            className="h-14 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all duration-150 border border-slate-200 shadow-sm"
           >
             <Delete size={22} />
           </button>
@@ -136,8 +136,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
 
         {/* Processing */}
         {processing && (
-          <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
-            <Loader2 className="animate-spin text-brand" size={32} />
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
+            <Loader2 className="animate-spin text-sky-500" size={32} />
           </div>
         )}
       </div>

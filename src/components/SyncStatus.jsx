@@ -24,10 +24,10 @@ export default function SyncStatus() {
 
     return (
         <div
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold tracking-wide transition-all duration-300 ${
+            className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-full text-[10px] sm:text-xs font-bold tracking-wider transition-all duration-300 shadow-sm border ${
                 isOnline
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 animate-pulse'
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                    : 'bg-rose-50 border-rose-100 text-rose-500 animate-pulse'
             }`}
             title={isOnline ? 'Conectado a Internet' : 'Sin conexion a Internet'}
         >

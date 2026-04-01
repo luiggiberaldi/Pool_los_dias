@@ -32,22 +32,22 @@ export default function LockScreen() {
   };
 
   return (
-    <div className="fixed inset-0 z-[250] bg-slate-950 text-white font-sans overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[250] bg-slate-50 text-slate-800 font-sans overflow-hidden flex flex-col">
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[30%] -left-[15%] w-[600px] h-[600px] bg-indigo-600/8 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] bg-emerald-600/8 rounded-full blur-[120px]" />
+        <div className="absolute -top-[30%] -left-[15%] w-[600px] h-[600px] bg-sky-500/10 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center flex-1 p-6">
         {/* Header */}
         <div className="text-center mb-14">
           <div className="flex justify-center mb-6">
-            <img src="/logodark.png" alt="Logo" className="h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
+            <img src="/logo.png" alt="Logo" className="h-24 sm:h-32 w-auto object-contain drop-shadow-md" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-300">
+          <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-500">
             Quien esta{' '}
-            <strong className="text-white font-bold">operando</strong>?
+            <strong className="text-slate-800 font-bold">operando</strong>?
           </h1>
         </div>
 

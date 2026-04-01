@@ -304,7 +304,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                     {/* Version footer */}
                     <div className="text-center pt-2 pb-1">
                         <p className="text-[10px] text-slate-300 dark:text-slate-700 font-bold tracking-widest uppercase">
-                            PreciosAlDía Bodegas · v1.0
+                            Listo POS Lite · v1.0
                         </p>
                     </div>
                 </div>

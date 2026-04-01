@@ -71,7 +71,7 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
         headerBlocks.push(sep2);
         headerBlocks.push(`COMPROBANTE DE VENTA`);
     } else {
-        headerBlocks.push(`COMPROBANTE DE VENTA | PRECIOS AL DIA`);
+        headerBlocks.push(`COMPROBANTE DE VENTA | LISTO POS LITE`);
     }
 
     const text = [
@@ -94,7 +94,7 @@ export function buildReceiptWhatsAppUrl(receipt, currentRate) {
         `Gracias por su compra!`,
         ``,
         `_Este documento no constituye factura fiscal. Comprobante de control interno._`,
-        `Precios Al Dia - Sistema POS`,
+        `Listo POS Lite - Sistema POS`,
     ].filter(Boolean).join('\n');
 
     const formatVzlaPhone = (phone) => {

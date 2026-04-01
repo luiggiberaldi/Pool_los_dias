@@ -415,7 +415,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     return (
         <div
             ref={scrollRef}
-            className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto scrollbar-hide"
+            className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto scrollbar-hide"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -423,231 +423,239 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* Pull-to-refresh indicator */}
             {(pullDistance > 0 || isRefreshing) && (
                 <div className="flex justify-center pb-3 transition-all" style={{ height: pullDistance > 0 ? pullDistance : 40 }}>
-                    <div className={`w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-700 border-t-brand ${isRefreshing || pullDistance > 60 ? 'animate-spin-slow' : ''}`}
+                    <div className={`w-6 h-6 rounded-full border-2 border-slate-200 border-t-[#0EA5E9] ${isRefreshing || pullDistance > 60 ? 'animate-spin-slow' : ''}`}
                         style={{ opacity: Math.min(pullDistance / 60, 1), transform: `rotate(${pullDistance * 4}deg)` }}
                     />
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4 pt-2">
-                <div className="flex flex-col items-start gap-0.5">
-                    <img src={theme === 'dark' ? '/logodark.png' : '/logo.png'} alt="PreciosAlDía" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
-                    <div className="flex items-center gap-1.5 pl-3">
-                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
+            {/* ── HEADER ── */}
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[85px] sm:min-h-[120px]">
+                
+                {/* ====== LATERAL IZQUIERDO: Píldoras (PC/Móvil) ====== */}
+                <div className="flex items-center justify-start gap-2 sm:gap-3 z-20">
+                    {/* Píldoras de Estado */}
                     <SyncStatus />
-                    {/* USER BADGE — solo visible si PIN activo + cuenta cloud configurada */}
+                    
+                    {/* User Profile Pill */}
                     {requireLogin && isCloudConfigured && usuarioActivo && (
-                        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full pl-3 pr-2 py-1 shadow-sm">
-                            <div className={`w-2 h-2 rounded-full ${usuarioActivo.rol === 'ADMIN' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 max-w-[80px] truncate">{usuarioActivo.nombre}</span>
-                            <button
-                                onClick={() => { triggerHaptic?.(); authLogout(); }}
-                                className="p-1 text-slate-400 hover:text-red-500 active:scale-90 transition-all rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 ml-1"
-                                title="Cerrar Sesión (Cambiar Usuario)"
-                            >
-                                <LockIcon size={12} strokeWidth={2.5} />
+                        <div className={`flex items-center gap-1.5 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-50 border-sky-100/50' : 'bg-teal-50 border-teal-100/50'} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
+                            <div className="relative flex h-2 w-2 ml-1 sm:ml-0">
+                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-400' : 'bg-teal-400'}`}></span>
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-500' : 'bg-teal-500'}`}></span>
+                            </div>
+                            <span className={`hidden sm:block text-xs font-black sm:max-w-[120px] truncate ${usuarioActivo.rol === 'ADMIN' ? 'text-sky-800' : 'text-teal-800'}`}>
+                                {usuarioActivo.nombre.split(' ')[0]}
+                            </span>
+                            <button onClick={() => { triggerHaptic?.(); authLogout(); }} className={`p-1.5 ml-0.5 transition-all rounded-full active:scale-90 ${usuarioActivo.rol === 'ADMIN' ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700' : 'text-teal-500 hover:bg-teal-100 hover:text-teal-700'}`}>
+                                <LockIcon size={14} strokeWidth={2.5} />
                             </button>
                         </div>
                     )}
-                    {/* CLOUD LOGOUT — solo ADMIN */}
+                </div>
+
+                {/* ====== LOGO FLOTANTE EXACTO (Solo PC) ====== */}
+                <div className="hidden sm:flex absolute z-0 pointer-events-none inset-y-0 items-center" style={{ left: '785px' }}>
+                    <img src="/logo.png" alt="Listo POS Lite" style={{ height: '99px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
+                </div>
+
+                {/* ====== LOGO FLOTANTE EXACTO (Solo Móvil) ====== */}
+                <div className="flex sm:hidden absolute z-0 pointer-events-none inset-y-0 items-center" style={{ left: '115px' }}>
+                    <img src="/logo.png" alt="Listo POS Lite" style={{ height: '65px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
+                </div>
+
+                {/* ====== LATERAL DERECHO: Botones de Salir ====== */}
+                <div className="flex items-center justify-end z-20">
+                    {/* Cloud Logout */}
                     {isAdmin && (
                         <button
                             onClick={async () => {
-                                const ok = await confirm({
-                                    title: 'Cerrar sesión',
-                                    message: 'Se cerrará tu acceso a la nube. Tendrás que iniciar sesión nuevamente.',
-                                    confirmText: 'Cerrar sesión',
-                                    cancelText: 'Cancelar',
-                                    variant: 'logout',
-                                });
+                                const ok = await confirm({ title: 'Cerrar sesión', message: 'Se cerrará tu acceso a la nube.', confirmText: 'Cerrar sesión', cancelText: 'Cancelar', variant: 'logout' });
                                 if (!ok) return;
                                 await supabaseCloud.auth.signOut();
                                 window.location.reload();
                             }}
-                            className="p-2.5 bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/30 text-rose-400 dark:text-rose-400 rounded-full shadow-sm hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-500 active:scale-95 transition-all"
-                            title="Cerrar sesión de la nube (Admin)"
+                            className="p-2 sm:px-4 sm:py-2 flex items-center gap-1.5 bg-rose-50 border border-rose-100 text-rose-500 rounded-full shadow-sm hover:bg-rose-100 hover:text-rose-600 active:scale-95 transition-all"
                         >
-                            <LogOut size={18} strokeWidth={2} />
+                            <LogOut size={16} strokeWidth={2.5} />
+                            <span className="hidden sm:block text-xs font-bold uppercase tracking-wider">Salir</span>
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Acciones Rápidas */}
-            <div className="grid grid-cols-3 gap-3 mb-5">
-                <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }} className="bg-brand hover:bg-brand-dark text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all">
-                    <ShoppingCart size={22} />
-                    <span className="text-xs font-bold">Vender</span>
-                </button>
-                <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('catalogo'); } }} className="bg-indigo-500 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
-                    <Store size={22} />
-                    <span className="text-xs font-bold">Inventario</span>
-                </button>
-                <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('clientes'); } }} className="bg-blue-500 text-white rounded-2xl p-3 flex flex-col items-center justify-center gap-2 shadow-sm hover:scale-[1.02] active:scale-95 transition-all">
-                    <Users size={22} />
-                    <span className="text-xs font-bold">Clientes</span>
-                </button>
+            {/* ── SCROLL CONTENT ── */}
+            <div className="flex flex-col gap-3 px-4 pt-2 pb-28">
+
+            {/* Demo Banner */}
+            {isDemo && demoTimeLeft && (
+                <div className="rounded-2xl p-4 relative overflow-hidden text-white flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #F59E0B, #F97316)' }}>
+                    <div className="absolute right-0 top-0 w-28 h-28 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="flex items-center gap-3 relative z-10">
+                        <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center"><Key size={20} className="text-amber-100" /></div>
+                        <div>
+                            <h3 className="text-[12px] font-bold text-amber-50">Licencia de Prueba</h3>
+                            <p className="text-lg font-black">{demoTimeLeft}</p>
+                        </div>
+                    </div>
+                    <div className="relative z-10">
+                        <button className="text-[10px] font-black bg-white/25 hover:bg-white/35 px-3 py-1.5 rounded-lg active:scale-95 transition-colors"
+                            onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir Listo POS Lite. ID: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
+                            ADQUIRIR
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── HERO REVENUE CARD ── */}
+            <div className="relative rounded-[1.5rem] overflow-hidden" style={{ background: 'linear-gradient(135deg, #0EA5E9 0%, #06B6D4 50%, #5EEAD4 100%)' }}>
+                <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
+                <div className="absolute -left-8 -bottom-8 w-36 h-36 rounded-full bg-white/5" />
+                <div className="relative z-10 p-5">
+                    <div className="flex items-start justify-between mb-4">
+                        <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Ingresos del día</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                            {(() => { const d = new Date(); const days = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB']; const months = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']; return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`; })()}
+                        </span>
+                    </div>
+                    <div className="flex items-end justify-between">
+                        <div>
+                            <div className="flex items-baseline gap-0.5">
+                                <span className="text-white/80 text-xl font-black">$</span>
+                                <span className="text-[2.6rem] font-black text-white tracking-tight leading-none"><AnimatedCounter value={todayTotalUsd} /></span>
+                            </div>
+                            <p className="text-white/60 text-xs font-semibold mt-1.5">{formatBs(todayTotalBs)} Bs</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2.5 mb-1.5">
+                                <p className="text-2xl font-black text-white leading-none"><AnimatedCounter value={todaySales.length} /></p>
+                                <p className="text-white/70 text-[10px] font-bold mt-0.5">{todaySales.length === 1 ? 'VENTA' : 'VENTAS'}</p>
+                            </div>
+                            <p className="text-white/60 text-[10px] font-semibold"><AnimatedCounter value={todayItemsSold} /> artículos</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-                {/* Licencia Demo (solo visible en modo demo) */}
-                {isDemo && demoTimeLeft && (
-                    <div className="col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 shadow-sm relative overflow-hidden text-white flex items-center justify-between">
-                        <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="flex items-center gap-3 relative z-10">
-                            <div className="w-10 h-10 bg-black/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                <Key size={20} className="text-amber-100" />
-                            </div>
-                            <div>
-                                <h3 className="text-[13px] font-bold text-amber-50 leading-tight">Licencia de Prueba</h3>
-                                <p className="text-xl font-black mt-0.5">{demoTimeLeft}</p>
-                            </div>
-                        </div>
-                        <div className="relative z-10 text-right">
-                            <button className="text-[10px] font-bold bg-white/20 hover:bg-white/30 transition-colors px-3 py-1.5 rounded-lg active:scale-95" onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir la licencia Premium de PreciosAlDía Bodega. Mi ID de instalación es: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
-                                ADQUIRIR
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Ventas Hoy */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full blur-2xl"></div>
-                    <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                            <span className="text-emerald-600 dark:text-emerald-400 font-black text-xl">$</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg tracking-wider">HOY</span>
-                    </div>
+            {/* ── KPIs ROW ── */}
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute -right-3 -top-3 w-14 h-14 bg-emerald-50 rounded-full blur-xl" />
                     <div className="relative z-10">
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">$<AnimatedCounter value={todayTotalUsd} /></span>
+                        <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center mb-2.5">
+                            <TrendingUp size={18} className="text-emerald-600" strokeWidth={2.5} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayTotalBs)} Bs</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">Ingresos brutos</p>
+                        <p className={`text-xl font-black leading-none ${todayProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{formatBs(todayProfit)} Bs</p>
+                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Ganancia est.</p>
                     </div>
                 </div>
-
-                {/* Transacciones */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
-                            <ShoppingBag size={18} className="text-indigo-500" />
-                        </div>
-                    </div>
-                    <p className="text-xl font-black text-slate-800 dark:text-white leading-none"><AnimatedCounter value={todaySales.length} /> <span className="text-xs font-bold text-slate-400">{todaySales.length === 1 ? 'venta' : 'ventas'}</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1"><AnimatedCounter value={todayItemsSold} /> {todayItemsSold === 1 ? 'artículo vendido' : 'artículos vendidos'}</p>
-                </div>
-
-                {/* Egresos del Día (solo si hay pagos a proveedores) */}
-                {todayExpensesUsd > 0 && (
-                    <div className="col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-orange-200 dark:border-orange-800/30 shadow-sm relative overflow-hidden">
-                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 dark:bg-orange-900/10 rounded-full blur-2xl"></div>
-                        <div className="flex items-center justify-between relative z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                                    <Package size={20} className="text-orange-500" />
-                                </div>
-                                <div>
-                                    <p className="text-[11px] font-medium text-slate-400">Egresos del dia (Proveedores)</p>
-                                    <p className="text-lg font-black text-orange-600 dark:text-orange-400">-$<AnimatedCounter value={todayExpensesUsd} /></p>
-                                </div>
-                            </div>
-                            <span className="text-xs font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-2.5 py-1 rounded-lg">{todayExpenses.length} {todayExpenses.length === 1 ? 'pago' : 'pagos'}</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Ganancia Estimada */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 dark:bg-green-900/10 rounded-full blur-2xl"></div>
-                    <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                            <TrendingUp size={20} className="text-green-600 dark:text-green-400" strokeWidth={2.5} />
-                        </div>
-                    </div>
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute -right-3 -top-3 w-14 h-14 bg-sky-50 rounded-full blur-xl" />
                     <div className="relative z-10">
-                        <div className="flex items-baseline gap-1">
-                            <span className={`text-2xl font-black tracking-tight ${todayProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                                {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
-                            </span>
+                        <div className="w-9 h-9 bg-sky-100 rounded-xl flex items-center justify-center mb-2.5">
+                            <ArrowUpRight size={18} className="text-sky-600" strokeWidth={2.5} />
                         </div>
-                        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 mt-0.5">{formatBs(todayProfit)} Bs</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">Ganancia estimada</p>
+                        <p className="text-xl font-black text-slate-800 leading-none">{formatBs(bcvRate)}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Bs por dólar</p>
+                        <p className="text-[10px] text-sky-500 mt-1.5 font-bold uppercase tracking-wider">Tasa BCV</p>
                     </div>
                 </div>
+            </div>
 
-                {/* Tasa BCV */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                            <ArrowUpRight size={18} className="text-blue-500" />
+            {/* ── ACCIONES RÁPIDAS ── */}
+            <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Acciones Rápidas</p>
+                <div className="flex gap-2">
+                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }}
+                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                        style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 12px rgba(14,165,233,0.25)' }}>
+                        <ShoppingCart size={22} className="text-white" />
+                        <span className="text-[11px] font-black text-white">Vender</span>
+                    </button>
+                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('catalogo'); } }}
+                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                        style={{ background: 'linear-gradient(135deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(51,65,85,0.15)' }}>
+                        <Store size={22} className="text-white" />
+                        <span className="text-[11px] font-black text-white">Inventario</span>
+                    </button>
+                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('clientes'); } }}
+                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
+                        <Users size={22} className="text-white" />
+                        <span className="text-[11px] font-black text-white">Clientes</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Egresos del día */}
+            {todayExpensesUsd > 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-orange-100 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center"><Package size={18} className="text-orange-500" /></div>
+                        <div>
+                            <p className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Egresos del día</p>
+                            <p className="text-lg font-black text-orange-600">-$<AnimatedCounter value={todayExpensesUsd} /></p>
                         </div>
                     </div>
-                    <p className="text-xl font-black text-slate-800 dark:text-white leading-none">{formatBs(bcvRate)} <span className="text-xs font-bold text-slate-400">Bs/$</span></p>
-                    <p className="text-[11px] text-slate-400 mt-1">Tasa BCV actual</p>
+                    <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-lg">
+                        {todayExpenses.length} {todayExpenses.length === 1 ? 'pago' : 'pagos'}
+                    </span>
                 </div>
+            )}
 
-
-                {/* ═══ BOTON CERRAR CAJA ═══ */}
-                <div className="col-span-2">
-                    {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
-                        <button
-                            onClick={handleDailyClose}
-                            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-2xl p-4 shadow-lg shadow-red-500/20 active:scale-[0.98] transition-all flex items-center justify-between group"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                                    <LockIcon size={22} />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-sm font-black">Cerrar Caja</p>
-                                    <p className="text-[11px] font-medium text-white/70">${todayTotalUsd.toFixed(2)} | {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:translate-x-1 transition-transform">
-                                <LockIcon size={16} />
-                            </div>
-                        </button>
-                    ) : (
-                        <div className="w-full bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
-                                <CheckCircle2 size={20} className="text-emerald-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Sin ventas pendientes</p>
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500">La caja esta limpia</p>
-                            </div>
+            {/* ── CERRAR CAJA ── */}
+            {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
+                <button onClick={handleDailyClose}
+                    className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group"
+                    style={{ background: 'linear-gradient(135deg, #F97316, #EF4444)', boxShadow: '0 6px 20px rgba(239,68,68,0.25)' }}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                            <LockIcon size={22} className="text-white" />
                         </div>
-                    )}
+                        <div className="text-left">
+                            <p className="text-sm font-black text-white">Cerrar Caja</p>
+                            <p className="text-[11px] text-white/70 font-medium">${todayTotalUsd.toFixed(2)} · {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
+                        </div>
+                    </div>
+                    <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                        <ArrowUpRight size={18} className="text-white" />
+                    </div>
+                </button>
+            ) : (
+                <div className="w-full bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                        <CheckCircle2 size={20} className="text-emerald-500" />
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold text-slate-600">Sin ventas pendientes</p>
+                        <p className="text-[11px] text-slate-400">La caja está limpia</p>
+                    </div>
                 </div>
+            )}
 
                 {/* Deudas Pendientes */}
                 {totalDeudas.count > 0 && (
                     <div 
                         onClick={() => { setShowTopDeudas(!showTopDeudas); triggerHaptic && triggerHaptic(); }}
-                        className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-red-100 dark:border-red-800/30 shadow-sm relative overflow-hidden col-span-2 cursor-pointer active:scale-[0.99] transition-all"
+                        className="bg-white rounded-2xl p-4 border border-rose-100 shadow-sm relative overflow-hidden cursor-pointer active:scale-[0.99] transition-all"
                     >
-                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-red-50 dark:bg-red-900/10 rounded-full blur-2xl"></div>
+                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-rose-50 rounded-full blur-2xl" />
                         <div className="flex items-center justify-between relative z-10">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center shadow-inner">
-                                    <Users size={20} className="text-red-500" />
+                                <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center">
+                                    <Users size={20} className="text-rose-500" />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] font-bold text-red-400 uppercase">Deudas por cobrar</p>
-                                    <p className="text-xl font-black text-red-500">${totalDeudas.totalUsd.toFixed(2)}</p>
+                                    <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Deudas</p>
+                                    <p className="text-xl font-black text-rose-600">${totalDeudas.totalUsd.toFixed(2)}</p>
                                 </div>
                             </div>
                             <div className="text-right flex items-center gap-2">
                                 <div>
-                                    <p className="text-sm font-bold text-slate-400">{totalDeudas.count} {totalDeudas.count === 1 ? 'cliente' : 'clientes'}</p>
+                                    <p className="text-sm font-bold text-slate-500">{totalDeudas.count} {totalDeudas.count === 1 ? 'cliente' : 'clientes'}</p>
                                     {bcvRate > 0 && <p className="text-[10px] text-slate-400">{formatBs(totalDeudas.totalUsd * bcvRate)} Bs</p>}
                                 </div>
                                 {showTopDeudas ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
@@ -655,19 +663,19 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </div>
 
                         {showTopDeudas && (
-                            <div className="mt-3 pt-3 border-t border-red-100 dark:border-red-800/20 space-y-2 relative z-10" style={{ animation: 'fadeIn 0.2s ease' }}>
+                            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 relative z-10 animate-fade-in text-slate-700">
                                 {totalDeudas.top5.map((c, i) => (
                                     <div key={c.id} className="flex items-center justify-between py-1.5">
                                         <div className="flex items-center gap-2.5 min-w-0">
-                                            <span className="text-[10px] font-black text-red-300 w-4 text-center shrink-0">{i + 1}</span>
-                                            <div className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
-                                                <span className="text-xs font-black text-red-400">{c.name.charAt(0).toUpperCase()}</span>
+                                            <span className="text-[10px] font-black text-rose-300 w-4 text-center shrink-0">{i + 1}</span>
+                                            <div className="w-7 h-7 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
+                                                <span className="text-xs font-black text-rose-500">{c.name.charAt(0).toUpperCase()}</span>
                                             </div>
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{c.name}</p>
+                                            <p className="text-xs font-bold truncate">{c.name}</p>
                                         </div>
                                         <div className="text-right shrink-0">
-                                            <p className="text-sm font-black text-red-500">${(c.deuda || 0).toFixed(2)}</p>
-                                            {bcvRate > 0 && <p className="text-[9px] text-red-400/60">{formatBs((c.deuda || 0) * bcvRate)} Bs</p>}
+                                            <p className="text-sm font-black text-rose-600">${(c.deuda || 0).toFixed(2)}</p>
+                                            {bcvRate > 0 && <p className="text-[9px] text-rose-400/60">{formatBs((c.deuda || 0) * bcvRate)} Bs</p>}
                                         </div>
                                     </div>
                                 ))}
@@ -675,9 +683,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         )}
                     </div>
                 )}
-            </div>
 
-            {/* Pago por Metodo (agrupado Bs / USD) */}
+            {/* Pago por Metodo */}
             {Object.keys(paymentBreakdown).length > 0 && (() => {
                 const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
                 const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
@@ -697,7 +704,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     let displayAmount = `${formatBs(data.total)} Bs`;
 
                     if (data.currency === 'FIADO') {
-                        // Fiado saves its total in USD, so equivalent is total * bcvRate
                         totalBsEquiv = data.total * bcvRate;
                         pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0;
                         displayAmount = `$ ${data.total.toFixed(2)}`;
@@ -714,26 +720,23 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     }
 
                     return (
-                        <div key={method}>
-                            <div className="flex justify-between text-sm mb-1">
-                                <span className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
-                                    {PayIcon && <PayIcon size={14} className="text-slate-400" />}
+                        <div key={method} className="mb-3">
+                            <div className="flex justify-between items-center mb-1.5">
+                                <span className="text-slate-600 font-bold text-xs flex items-center gap-1.5">
+                                    {PayIcon && <PayIcon size={14} className="text-[#0EA5E9]" />}
                                     {label}
                                 </span>
-                                <div className="text-right">
-                                    <span className="font-bold text-slate-700 dark:text-white">
-                                        {displayAmount}
-                                    </span>
-                                    {data.currency === 'FIADO' && (
-                                        <div className="text-[10px] text-slate-400 font-medium">
-                                            {formatBs(totalBsEquiv)} Bs
-                                        </div>
-                                    )}
+                                <div className="text-right flex items-center gap-2">
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-black text-slate-800 text-sm">{displayAmount}</span>
+                                        {data.currency === 'FIADO' && <span className="text-[9px] text-slate-400">{formatBs(totalBsEquiv)} Bs</span>}
+                                    </div>
+                                    <span className="text-[10px] font-black w-8 text-right text-slate-400">{pct.toFixed(0)}%</span>
                                 </div>
                             </div>
                             {data.currency !== 'FIADO' && (
-                                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-[#0EA5E9] to-[#5EEAD4] rounded-full transition-all" style={{ width: `${pct}%` }} />
                                 </div>
                             )}
                         </div>
@@ -741,59 +744,50 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 };
 
                 return (
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm relative z-10" style={{ animation: 'fadeIn 0.3s ease' }}>
-                        <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
-                            <DollarSign size={12} /> Desglose por Metodo
-                        </h3>
+                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative z-10 animate-fade-in">
+                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Medios de Pago</h3>
                         
                         {fiadoMethods.length > 0 && (
                             <div className="mb-4">
-                                <div className="flex items-center justify-between mb-2">
+                                <div className="flex justify-between items-end mb-2 pb-1 border-b border-rose-50">
                                     <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span>
-                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
+                                    <span className="text-xs font-black text-amber-600">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span>
                                 </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                    <div className="pl-3 space-y-3">{fiadoMethods.map(renderMethod)}</div>
-                                </div>
+                                <div className="pl-2 border-l-2 border-amber-200">{fiadoMethods.map(renderMethod)}</div>
                             </div>
                         )}
 
                         {bsMethods.length > 0 && (
-                            <div className="mb-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Bolivares</span>
-                                    <span className="text-xs font-black text-blue-600 dark:text-blue-400">{formatBs(subtotalBs)} Bs</span>
+                            <div className="mb-4">
+                                <div className="flex justify-between items-end mb-2 pb-1 border-b border-sky-50">
+                                    <span className="text-[10px] font-bold text-sky-500 uppercase tracking-wider">Bolívares</span>
+                                    <span className="text-xs font-black text-sky-600">{formatBs(subtotalBs)} Bs</span>
                                 </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-blue-200 dark:border-blue-800/40">
-                                    <div className="pl-3 space-y-3">{bsMethods.map(renderMethod)}</div>
-                                </div>
+                                <div className="pl-2 border-l-2 border-sky-200">{bsMethods.map(renderMethod)}</div>
                             </div>
                         )}
                         {usdMethods.length > 0 && (
-                            <div className={copMethods.length > 0 ? 'mb-3' : ''}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dolares</span>
-                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">${subtotalUsd.toFixed(2)}</span>
+                            <div className="mb-4">
+                                <div className="flex justify-between items-end mb-2 pb-1 border-b border-emerald-50">
+                                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span>
+                                    <span className="text-xs font-black text-emerald-600">${subtotalUsd.toFixed(2)}</span>
                                 </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-emerald-200 dark:border-emerald-800/40">
-                                    <div className="pl-3 space-y-3">{usdMethods.map(renderMethod)}</div>
-                                </div>
+                                <div className="pl-2 border-l-2 border-emerald-200">{usdMethods.map(renderMethod)}</div>
                             </div>
                         )}
                         {copEnabled && copMethods.length > 0 && (
                             <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos Colombianos</span>
-                                    <span className="text-xs font-black text-amber-600 dark:text-amber-400">{fmtCop(subtotalCop)} COP</span>
+                                <div className="flex justify-between items-end mb-2 pb-1 border-b border-amber-50">
+                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos</span>
+                                    <span className="text-xs font-black text-amber-600">{fmtCop(subtotalCop)} COP</span>
                                 </div>
-                                <div className="space-y-3 pl-1 border-l-2 border-amber-200 dark:border-amber-800/40">
-                                    <div className="pl-3 space-y-3">{copMethods.map(renderMethod)}</div>
-                                </div>
+                                <div className="pl-2 border-l-2 border-amber-200">{copMethods.map(renderMethod)}</div>
                             </div>
                         )}
                     </div>
                 );
             })()}
+
             {/* Gráfica semanal */}
             <SalesChart
                 weekData={weekData} 
@@ -801,32 +795,20 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 onDayClick={(date) => {
                     triggerHaptic();
                     setSelectedChartDate(prev => prev === date ? null : date);
-                    // Scroll down to history a bit smoothly if selecting
-                    setTimeout(() => {
-                        window.scrollBy({ top: 150, behavior: 'smooth' });
-                    }, 50);
+                    setTimeout(() => { window.scrollBy({ top: 150, behavior: 'smooth' }); }, 50);
                 }}
             />
 
             {/* Bajo Stock */}
             {lowStockProducts.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-amber-200 dark:border-amber-800/30 shadow-sm mb-5">
-                    <h3 className="text-xs font-bold text-amber-500 uppercase mb-3 flex items-center gap-1">
-                        <AlertTriangle size={12} /> Bajo Stock ({lowStockProducts.length})
-                    </h3>
-                    <div className="space-y-2">
+                <div className="bg-white rounded-2xl p-4 border border-amber-100 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1.5"><AlertTriangle size={14} /> Bajo Stock</h3>
+                    <div className="flex flex-wrap gap-2">
                         {lowStockProducts.map(p => (
-                            <div key={p.id} className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
-                                    {p.image ? <img src={p.image} className="w-full h-full object-contain" /> : <Package size={14} className="text-slate-400" />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
-                                </div>
-                                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${(p.stock ?? 0) === 0 ? 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
-                                    }`}>
-                                    {p.stock ?? 0} {p.unit === 'kg' ? 'kg' : p.unit === 'litro' ? 'lt' : 'ud'}
-                                </span>
+                            <div key={p.id} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-xl">
+                                <span className={`w-2 h-2 rounded-full ${(p.stock ?? 0) === 0 ? 'bg-red-500' : 'bg-amber-400'}`} />
+                                <span className="text-xs font-bold text-slate-700 truncate max-w-[120px]">{p.name}</span>
+                                <span className="text-[10px] font-black text-slate-400 ml-1">{p.stock ?? 0} {p.unit === 'kg' ? 'kg' : p.unit === 'litro' ? 'lt' : 'u'}</span>
                             </div>
                         ))}
                     </div>
@@ -835,21 +817,17 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             {/* Top Productos */}
             {topProducts.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm mb-5">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
-                        <TrendingUp size={12} /> Más Vendidos
-                    </h3>
-                    <div className="space-y-2">
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5"><TrendingUp size={14} /> Más Vendidos</h3>
+                    <div className="space-y-3">
                         {topProducts.map((p, i) => (
-                            <div key={p.name} className="flex items-center gap-3">
-                                <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${i === 0 ? 'bg-amber-100 text-amber-600' : i === 1 ? 'bg-slate-200 text-slate-500' : 'bg-orange-50 text-orange-400'
-                                    }`}>{i + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
+                            <div key={p.name} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className={`text-[10px] font-black w-4 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>{i + 1}</span>
+                                    <p className="text-xs font-bold text-slate-700 truncate">{p.name}</p>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{p.qty} vendidos</p>
-                                    <p className="text-[10px] text-slate-400">{formatBs(p.revenue)} Bs</p>
+                                <div className="flex flex-col items-end shrink-0 pl-2">
+                                    <span className="text-xs font-black text-[#0EA5E9]">{p.qty} u</span>
                                 </div>
                             </div>
                         ))}
@@ -867,47 +845,41 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 onShareWhatsApp={handleShareWhatsApp}
                 onDownloadPDF={handleDownloadPDF}
                 onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
-                onRequestClientForTicket={(sale) => {
-                    triggerHaptic && triggerHaptic();
-                    setTicketPendingSale(sale);
-                }}
-                onRecycleSale={(sale) => {
-                    triggerHaptic && triggerHaptic();
-                    loadCart(sale.items);
-                    if (onNavigate) onNavigate('ventas');
-                }}
+                onRequestClientForTicket={(sale) => { triggerHaptic && triggerHaptic(); setTicketPendingSale(sale); }}
+                onRecycleSale={(sale) => { triggerHaptic && triggerHaptic(); loadCart(sale.items); if (onNavigate) onNavigate('ventas'); }}
                 onPrintTicket={handlePrintTicket}
             />
 
             {/* Empty state */}
             {sales.length === 0 && (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 py-10 space-y-3">
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 py-10 space-y-3">
                     <BarChart3 size={64} strokeWidth={1} />
-                    <p className="text-sm font-medium">Sin datos aún</p>
-                    <p className="text-xs text-slate-400">Las estadísticas aparecerán cuando hagas tu primera venta</p>
+                    <p className="text-sm font-bold text-slate-500">Sin datos aún</p>
+                    <p className="text-xs font-medium text-slate-400">Las estadísticas aparecerán con tu primera venta</p>
                 </div>
             )}
+            </div>{/* SCROLL CONTENT */}
 
             {/* Modal Registrar Cliente para Ticket */}
             {ticketPendingSale && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
                     onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
+                        className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5">
+                        <div className="p-6">
                             <div className="flex justify-center mb-4">
-                                <div className="w-14 h-14 bg-brand-light/30 dark:bg-brand-dark/30 text-brand rounded-full flex items-center justify-center">
+                                <div className="w-16 h-16 bg-[#0EA5E9]/10 text-[#0EA5E9] rounded-full flex items-center justify-center">
                                     <UserPlus size={28} />
                                 </div>
                             </div>
-                            <h3 className="text-lg font-black text-center text-slate-900 dark:text-white mb-1">
+                            <h3 className="text-lg font-black text-center text-slate-800 mb-1">
                                 Registrar Cliente
                             </h3>
-                            <p className="text-xs text-center text-slate-400 mb-5">
+                            <p className="text-xs text-center text-slate-500 mb-5">
                                 Para enviar el ticket, registra los datos del cliente.
                             </p>
 
@@ -970,31 +942,31 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
             {/* Modal de Confirmación Borrado Historial */}
             {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-4 flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-red-500 rounded-full flex items-center justify-center mb-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+                        <div className="p-6 flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
                                 <Trash2 size={32} />
                             </div>
-                            <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">¿Estás absolutamente seguro?</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 px-2">
+                            <h3 className="text-xl font-black text-slate-800 mb-2">¿Estás absolutamente seguro?</h3>
+                            <p className="text-sm text-slate-500 mb-4 px-2">
                                 Esta acción borrará permanentemente <strong className="text-red-500">TODO el historial de ventas</strong>. (No afectará tu inventario de productos).
                             </p>
-                            <div className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mb-6">
-                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Escribe "BORRAR" para confirmar:</p>
+                            <div className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2 mt-2">
+                                <p className="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Escribe "BORRAR" para confirmar:</p>
                                 <input
                                     type="text"
                                     value={deleteConfirmText}
                                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                                     placeholder="BORRAR"
-                                    className="w-full form-input bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl px-4 py-3 text-center font-black text-red-500 uppercase tracking-widest focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-center font-black text-red-500 uppercase tracking-widest focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all outline-none"
                                 />
                             </div>
                         </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-3">
                             <button
                                 onClick={() => { setIsDeleteModalOpen(false); setDeleteConfirmText(''); }}
-                                className="flex-1 py-3.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
+                                className="flex-1 py-3.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl active:scale-[0.98] transition-all"
                             >
                                 Cancelar
                             </button>
@@ -1008,7 +980,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                     }
                                 }}
                                 disabled={deleteConfirmText.trim().toUpperCase() !== 'BORRAR'}
-                                className="flex-1 py-3.5 bg-red-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2"
+                                className="flex-1 py-3.5 bg-red-500 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2"
                             >
                                 <Trash2 size={18} /> Borrar Historial
                             </button>
@@ -1019,41 +991,44 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* Modal: ¿Reciclar Venta? */}
             {recycleOffer && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
                     onClick={() => setRecycleOffer(null)}
                 >
                     <div
-                        className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200"
+                        className="bg-white w-full max-w-sm rounded-[24px] shadow-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-200"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="p-5 text-center">
+                        <div className="p-6 text-center">
                             <div className="flex justify-center mb-4">
-                                <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 rounded-full flex items-center justify-center">
+                                <div className="w-16 h-16 bg-[#0EA5E9]/10 text-[#0EA5E9] rounded-full flex items-center justify-center">
                                     <Recycle size={28} />
                                 </div>
                             </div>
-                            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-1">
-                                Venta Anulada
+                            <h3 className="text-xl font-black text-slate-800 mb-2">
+                                ¿Reciclar Venta?
                             </h3>
-                            <p className="text-xs text-slate-400 mb-2">
-                                ¿Quieres reciclar los productos de esta venta y enviarlos a la caja?
+                            <p className="text-sm text-slate-500 mb-6">
+                                ¿Quieres copiar los productos de esta venta anulada a tu caja actual?
                             </p>
-                            <div className="text-left bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mt-3 space-y-1">
-                                {recycleOffer.items?.slice(0, 5).map((item, i) => (
-                                    <div key={i} className="flex justify-between text-xs">
-                                        <span className="text-slate-600 dark:text-slate-300 font-medium">{item.qty}{item.isWeight ? 'kg' : 'u'} {item.name.length > 20 ? item.name.substring(0, 20) + '…' : item.name}</span>
-                                        <span className="text-slate-400 font-bold">${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                    </div>
-                                ))}
+                            <div className="text-left bg-slate-50 border border-slate-100 rounded-xl p-3 mb-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Productos a reciclar</p>
+                                <div className="space-y-1.5 max-h-32 overflow-y-auto scrollbar-hide pr-1">
+                                    {recycleOffer.items?.slice(0, 5).map((item, i) => (
+                                        <div key={i} className="flex justify-between text-xs bg-white border border-slate-100 p-2 rounded-lg items-center">
+                                            <span className="font-bold text-slate-700 truncate pr-2 mr-2">{item.qty}{item.isWeight ? 'kg' : 'u'} {item.name}</span>
+                                            <span className="text-slate-500 font-medium shrink-0">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
                                 {recycleOffer.items?.length > 5 && (
-                                    <p className="text-[10px] text-slate-400 text-center">+{recycleOffer.items.length - 5} más...</p>
+                                    <p className="text-[10px] text-slate-400 text-center font-bold mt-2">+{recycleOffer.items.length - 5} productos más...</p>
                                 )}
                             </div>
                         </div>
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex gap-3">
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-3">
                             <button
                                 onClick={() => setRecycleOffer(null)}
-                                className="flex-1 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-bold rounded-xl active:scale-[0.98] transition-all"
+                                className="flex-1 py-3 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl active:scale-[0.98] transition-all"
                             >
                                 No, gracias
                             </button>
@@ -1063,7 +1038,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                     setRecycleOffer(null);
                                     if (onNavigate) onNavigate('ventas');
                                 }}
-                                className="flex-1 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-indigo-500/20"
+                                className="flex-1 py-3 bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold rounded-xl active:scale-[0.98] transition-all flex justify-center items-center gap-2 shadow-md shadow-[#0EA5E9]/20"
                             >
                                 <Recycle size={16} /> Reciclar
                             </button>

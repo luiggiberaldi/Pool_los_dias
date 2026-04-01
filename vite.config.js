@@ -35,13 +35,13 @@ export default defineConfig({
         ]
       },
       manifest: {
-        name: 'Precios Al Día — Bodegas',
-        short_name: 'PreciosAlDía Bodegas',
-        description: 'Punto de venta bimoneda y gestor de inventario para bodegas de Venezuela',
-        theme_color: '#10B981', // Emerald 500
-        background_color: '#10B981', // Verde esmeralda de la marca
-        display: 'standalone', // Modo app nativa (sin barra de navegador)
-        orientation: 'portrait', // Bloquear rotación
+        name: 'Listo POS Lite',
+        short_name: 'Listo Lite',
+        description: 'Punto de venta simple y poderoso para tu negocio',
+        theme_color: '#0EA5E9',      // sky-500 — color del logo
+        background_color: '#F8FAFC', // gris hielo
+        display: 'standalone',
+        orientation: 'portrait',
         scope: '/',
         start_url: '/',
         icons: [
@@ -87,6 +87,9 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           icons: ['lucide-react'],
+          pdf: ['jspdf', 'html2canvas'],
+          cloud: ['@supabase/supabase-js'],
+          ai: ['groq-sdk']
         }
       }
     }
