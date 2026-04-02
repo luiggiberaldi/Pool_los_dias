@@ -1,6 +1,6 @@
-# Listo POS Lite
+# Pool Los Diaz
 
-**Listo POS Lite** es un Sistema Integral de Punto de Venta (POS) y Gestión Administrativa diseñado para operar de manera fluida y multiplataforma. Construido con una arquitectura "Offline-First", garantiza la continuidad del negocio sin importar la conectividad, con sincronización en la nube bidireccional cuando la conexión está disponible.
+**Pool Los Diaz** es un Sistema Integral de Punto de Venta (POS) y Gestión Administrativa diseñado para operar de manera fluida y multiplataforma. Construido con una arquitectura "Offline-First", garantiza la continuidad del negocio sin importar la conectividad, con sincronización en la nube bidireccional cuando la conexión está disponible.
 
 Este módulo forma parte de la suite corporativa integrada y está preparado para funcionar como una **Progressive Web App (PWA)** y como una aplicación nativa para **Android** a través de Capacitor.
 
@@ -35,7 +35,7 @@ El proyecto está construido sobre las tecnologías más modernas y estables par
 ## 📂 Estructura del Proyecto
 
 ```text
-abasto/
+poolbar/
 ├── android/             # Archivos nativos de la aplicación Android de Capacitor
 ├── public/              # Archivos estáticos e iconos PWA
 ├── src/
