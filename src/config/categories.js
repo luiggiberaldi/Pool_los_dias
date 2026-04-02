@@ -7,31 +7,7 @@ import {
 // Categorías predefinidas para el Inventario
 export const BODEGA_CATEGORIES = [
     { id: 'todos', label: 'Todos', icon: '◉', color: 'slate' },
-    // --- Repuestos de Motos ---
-    { id: 'motor', label: 'Motor', icon: '◆', color: 'red' },
-    { id: 'electrico', label: 'Eléctrico', icon: '◆', color: 'yellow' },
-    { id: 'carroceria', label: 'Carrocería', icon: '◆', color: 'blue' },
-    { id: 'transmision', label: 'Transmisión', icon: '◆', color: 'orange' },
-    { id: 'frenos', label: 'Frenos', icon: '◆', color: 'red' },
-    { id: 'cauchos', label: 'Cauchos/Tripas', icon: '◆', color: 'slate' },
-    { id: 'suspension', label: 'Suspensión', icon: '◆', color: 'cyan' },
-    { id: 'escape', label: 'Escape', icon: '◆', color: 'gray' },
-    { id: 'accesorios', label: 'Accesorios', icon: '◆', color: 'green' },
-    { id: 'aceites', label: 'Aceites', icon: '◆', color: 'amber' },
-    { id: 'baterias', label: 'Baterías', icon: '◆', color: 'yellow' },
-    { id: 'guayas', label: 'Guayas', icon: '◆', color: 'slate' },
-    // --- Abastos General ---
-    { id: 'bebidas', label: 'Bebidas', icon: '◆', color: 'blue' },
-    { id: 'limpieza', label: 'Limpieza', icon: '◆', color: 'cyan' },
-    { id: 'charcuteria', label: 'Charcutería', icon: '◆', color: 'amber' },
-    { id: 'snacks', label: 'Snacks', icon: '◆', color: 'orange' },
-    { id: 'granos', label: 'Granos', icon: '◆', color: 'yellow' },
-    { id: 'lacteos', label: 'Lácteos', icon: '◆', color: 'slate' },
-    { id: 'carnes', label: 'Carnes', icon: '◆', color: 'red' },
-    { id: 'verduras', label: 'Verduras', icon: '◆', color: 'green' },
-    { id: 'panaderia', label: 'Panadería', icon: '◆', color: 'amber' },
-    { id: 'viveres', label: 'Víveres', icon: '◆', color: 'green' },
-    { id: 'otros', label: 'Otros', icon: '◆', color: 'gray' },
+    { id: 'general', label: 'General', icon: '◆', color: 'blue' },
 ];
 
 // Lucide icon map for factory categories

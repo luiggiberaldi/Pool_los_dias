@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, Banknote, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus } from 'lucide-react';
 import { Modal } from '../Modal';
+import { useProductContext } from '../../context/ProductContext';
 
 const PACKAGING_TYPES = [
     { id: 'suelto', label: 'Suelto', Icon: Tag, desc: 'Unidad individual', color: 'emerald' },
@@ -45,6 +46,25 @@ export default function ProductFormModal({
     const fileInputRef = useRef(null);
     const [showSummary, setShowSummary] = useState(false);
     const [showMovements, setShowMovements] = useState(false);
+    
+    // Categorías en línea
+    const { setCategories } = useProductContext();
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
+
+    const handleAddCategory = () => {
+        if (!newCategoryName.trim()) return;
+        const catId = newCategoryName.trim().toLowerCase().replace(/\s+/g, '_');
+        
+        setCategories(prev => {
+            if(prev.find(c => c.id === catId)) return prev;
+            return [...prev, { id: catId, label: newCategoryName.trim(), icon: '◆', color: 'emerald' }];
+        });
+        
+        setCategory(catId);
+        setIsAddingCategory(false);
+        setNewCategoryName("");
+    };
 
     if (!isOpen) return null;
 
@@ -120,13 +140,42 @@ export default function ProductFormModal({
 
                     {/* Category (full width) */}
                     <div>
-                        <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Categoría</label>
-                        <select value={category} onChange={e => setCategory(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50">
-                            {categories.filter(c => c.id !== 'todos').map(c => (
-                                <option key={c.id} value={c.id}>{c.label}</option>
-                            ))}
-                        </select>
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-xs font-bold text-slate-400 ml-1 block uppercase">Categoría</label>
+                            <button 
+                                onClick={() => setIsAddingCategory(!isAddingCategory)}
+                                className="text-[10px] font-bold text-emerald-500 hover:text-emerald-600 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md transition-colors"
+                            >
+                                {isAddingCategory ? <X size={12} /> : <Plus size={12} />}
+                                {isAddingCategory ? 'Cancelar' : 'Nueva'}
+                            </button>
+                        </div>
+                        {isAddingCategory ? (
+                            <div className="flex gap-2 animate-in fade-in slide-in-from-top-1">
+                                <input 
+                                    autoFocus
+                                    value={newCategoryName}
+                                    onChange={e => setNewCategoryName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                                    placeholder="Nombre de categoría..."
+                                    className="flex-1 bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                />
+                                <button 
+                                    onClick={handleAddCategory}
+                                    disabled={!newCategoryName.trim()}
+                                    className="bg-emerald-500 text-white px-4 rounded-xl font-bold disabled:opacity-50 hover:bg-emerald-600 transition-colors"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
+                        ) : (
+                            <select value={category} onChange={e => setCategory(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50">
+                                {categories.filter(c => c.id !== 'todos').map(c => (
+                                    <option key={c.id} value={c.id}>{c.label}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* ─── PACKAGING TYPE CARDS ─── */}
