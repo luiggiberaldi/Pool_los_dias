@@ -16,10 +16,10 @@ const SYNC_KEYS = [
     'bodega_use_auto_rate',
     'tasa_cop',
     'cop_enabled',
-    'auto_cop_enabled'
+    'auto_cop_enabled',
+    'poolbar_categories_v1'
 ];
 
-// Llaves que van a colección 'local' (localStorage); el resto va a 'store' (IndexedDB)
 const LOCAL_KEYS = [
     'abasto-auth-storage',
     'bodega_custom_rate',
@@ -31,16 +31,72 @@ const LOCAL_KEYS = [
 
 // ─── Estado Global del Motor ───────────────────────────────────────────────
 let globalSubscription = null;
-let isSyncingFromCloud = false; // true mientras aplicamos cambios de la nube → evita eco
-let pendingPush = {};           // Debounce: { [key]: timeoutId }
+let isSyncingFromCloud = false; 
+let isInitialSyncCompleted = false; // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
+let pendingPush = {};           
 
-// Bandera para proteger un import reciente: si se setea, el pull inicial no sobreescribe datos locales
 const IMPORT_GUARD_KEY = '_poolbar_import_guard';
+const SYNC_QUEUE_KEY = '_poolbar_sync_queue'; // Cola persistente para offline
+
 export const setImportGuard = () => sessionStorage.setItem(IMPORT_GUARD_KEY, '1');
 export const clearImportGuard = () => sessionStorage.removeItem(IMPORT_GUARD_KEY);
 const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
 
-// Interceptor de localStorage — solo para llaves 'local'
+// Gestión de Cola Offline
+const getSyncQueue = () => {
+    try {
+        return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+    } catch(e) { return []; }
+};
+const addToSyncQueue = (key) => {
+    const queue = getSyncQueue();
+    if (!queue.includes(key)) {
+        queue.push(key);
+        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+    }
+};
+const removeFromSyncQueue = (key) => {
+    const queue = getSyncQueue().filter(k => k !== key);
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+};
+
+/**
+ * Procesa todos los cambios pendientes que se hicieron offline o durante el arranque.
+ */
+export const processSyncQueue = async () => {
+    if (!isInitialSyncCompleted) return;
+    const queue = getSyncQueue();
+    if (queue.length === 0) return;
+
+    console.log(`[CloudSync] Procesando cola de pendientes: ${queue.length} items`);
+    for (const key of queue) {
+        try {
+            let value;
+            if (LOCAL_KEYS.includes(key)) {
+                value = localStorage.getItem(key);
+                try { value = JSON.parse(value); } catch(e) {}
+            } else {
+                value = await storageService.getItem(key);
+            }
+            
+            if (value !== null) {
+                // Forzamos la subida saltando el guardia de inicialización
+                await pushCloudSync(key, value, true);
+            }
+            removeFromSyncQueue(key);
+        } catch (e) {
+            console.warn(`[CloudSync] Reintento fallido para ${key}:`, e.message);
+            break; // Detener si falla la red de nuevo
+        }
+    }
+};
+
+// Escuchar retorno de internet
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', processSyncQueue);
+}
+
+// Interceptor de localStorage 
 const originalSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function (key, value) {
     originalSetItem(key, value);
@@ -54,24 +110,34 @@ function _debouncePush(key, value) {
     pendingPush[key] = setTimeout(() => {
         delete pendingPush[key];
         pushCloudSync(key, value).catch(() => {});
-    }, 300);
+    }, 500);
 }
 
 /**
- * Empuja una llave al sincronizador de Supabase.
- * Llamado desde storageService (colección 'store') y el interceptor localStorage (colección 'local').
+ * Empuja cambios a la nube.
  */
-export const pushCloudSync = async (key, value) => {
-    if (isSyncingFromCloud) return;          // Nunca re-emitir lo que llegó de la nube
+export const pushCloudSync = async (key, value, force = false) => {
+    if (isSyncingFromCloud) return;
     if (!SYNC_KEYS.includes(key)) return;
+
+    // Si aún no hemos terminado el pull inicial, encolamos en lugar de subir
+    // para evitar pisar datos nuevos de la nube con datos locales viejos.
+    if (!isInitialSyncCompleted && !force) {
+        console.log(`[CloudSync] Encolado por fase de arranque: ${key}`);
+        addToSyncQueue(key);
+        return;
+    }
 
     try {
         const { data: { session } } = await supabaseCloud.auth.getSession();
-        if (!session?.user?.id) return;
+        if (!session?.user?.id) {
+            addToSyncQueue(key);
+            return;
+        };
 
         const collectionType = LOCAL_KEYS.includes(key) ? 'local' : 'store';
 
-        await supabaseCloud.from('sync_documents').upsert({
+        const { error } = await supabaseCloud.from('sync_documents').upsert({
             user_id: session.user.id,
             collection: collectionType,
             doc_id: key,
@@ -79,21 +145,21 @@ export const pushCloudSync = async (key, value) => {
             updated_at: new Date().toISOString()
         }, { onConflict: 'user_id,collection,doc_id' });
 
+        if (error) throw error;
+        removeFromSyncQueue(key);
+
     } catch (e) {
-        console.warn('[CloudSync] Error al enviar a la nube:', e.message ?? e);
+        console.warn('[CloudSync] Falló envío. Encolado para reintento:', key);
+        addToSyncQueue(key);
     }
 };
 
-/**
- * Aplica un documento recibido de la nube al almacenamiento local.
- * Garantiza que isSyncingFromCloud esté activo durante toda la operación.
- */
 async function _applyFromCloud(docId, collection, payload) {
     isSyncingFromCloud = true;
     try {
         if (collection === 'local') {
             const stringPayload = typeof payload === 'string' ? payload : JSON.stringify(payload);
-            originalSetItem(docId, stringPayload);   // Escribe sin pasar por el interceptor
+            originalSetItem(docId, stringPayload);
             window.dispatchEvent(new StorageEvent('storage', {
                 key: docId,
                 newValue: stringPayload,
@@ -103,12 +169,9 @@ async function _applyFromCloud(docId, collection, payload) {
                 useAuthStore.persist.rehydrate();
             }
         } else {
-            // Colección 'store' → IndexedDB directo, sin pasar por storageService.setItem
             const { default: localforage } = await import('localforage');
             localforage.config({ name: 'BodegaApp', storeName: 'bodega_app_data' });
             await localforage.setItem(docId, payload);
-
-            // Notificar a los componentes React que lean este store
             window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: docId } }));
         }
     } finally {
@@ -116,7 +179,6 @@ async function _applyFromCloud(docId, collection, payload) {
     }
 }
 
-// ─── Hook de React ─────────────────────────────────────────────────────────
 export function useCloudSync() {
     const adminEmail = useAuthStore(s => s.adminEmail);
     const adminPassword = useAuthStore(s => s.adminPassword);
@@ -138,32 +200,43 @@ export function useCloudSync() {
         const initSync = async () => {
             try {
                 let session = (await supabaseCloud.auth.getSession()).data.session;
-
                 if (!session?.user?.id) return;
 
                 isInitialized.current = true;
                 const userId = session.user.id;
 
                 // ── Pull Inicial ───────────────────────────────────────────
-                // Si hay un guard de import, NO sobreescribir datos locales recién importados
                 if (hasImportGuard()) {
-                    console.log('[CloudSync] Guard de import activo — pull inicial omitido para proteger datos importados.');
+                    console.log('[CloudSync] Guard activo — pull inicial omitido.');
                     clearImportGuard();
+                    isInitialSyncCompleted = true; // El import ya es la verdad
                 } else {
                     const { data: docs } = await supabaseCloud
                         .from('sync_documents')
                         .select('collection, doc_id, data')
+                        .eq('user_id', userId)
                         .in('collection', ['store', 'local']);
 
                     if (docs?.length > 0) {
                         for (const doc of docs) {
-                            await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+                            // Solo aplicamos de nube si NO tenemos cambios locales pendientes para esa llave
+                            // Esto protege cambios hechos offline justo antes de abrir la app.
+                            const queue = getSyncQueue();
+                            if (!queue.includes(doc.doc_id)) {
+                                await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+                            } else {
+                                console.log(`[CloudSync] Saltando pull para ${doc.doc_id} por discrepancia local pendiente.`);
+                            }
                         }
-                        console.log(`[CloudSync] Pull inicial: ${docs.length} documentos aplicados.`);
+                        console.log(`[CloudSync] Pull inicial: ${docs.length} documentos procesados.`);
                     }
+                    isInitialSyncCompleted = true;
                 }
 
-                // ── Suscripción WebSocket Realtime ─────────────────────────
+                // Procesar cualquier cambio que se haya intentado subir durante el arranque
+                processSyncQueue();
+
+                // ── Suscripción Realtime ─────────────────────────
                 if (!globalSubscription) {
                     globalSubscription = supabaseCloud
                         .channel(`sync:${userId}`)
@@ -175,26 +248,27 @@ export function useCloudSync() {
                         }, async (payload) => {
                             const doc = payload.new;
                             if (!doc || !['store', 'local'].includes(doc.collection)) return;
-                            console.log(`[CloudSync] Recibido: ${doc.doc_id}`);
+                            
+                            // Ignorar si nosotros mismos estamos intentando subir cambios de esta misma llave
+                            const queue = getSyncQueue();
+                            if (queue.includes(doc.doc_id)) return;
+
+                            console.log(`[CloudSync] Recibido P2P: ${doc.doc_id}`);
                             await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
                         })
                         .subscribe((status) => {
                             if (status === 'SUBSCRIBED') {
-                                console.log('[CloudSync] Conectado y escuchando P2P en Tiempo Real');
+                                console.log('[CloudSync] Conectado en Tiempo Real');
                             }
                         });
                 }
 
             } catch (err) {
-                console.error('[CloudSync] Fallo en inicialización P2P:', err);
-                isInitialized.current = false; // Permitir reintento
+                console.error('[CloudSync] Error inicialización P2P:', err);
+                isInitialized.current = false;
             }
         };
 
         initSync();
-
-        return () => {
-            // No desuscribir en cleanup del efecto — la suscripción debe vivir mientras la app esté abierta
-        };
     }, [isCloudConfigured, adminEmail, adminPassword]);
 }
