@@ -84,13 +84,23 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
     const [sortField, setSortField] = useState(null);
     const [sortDir, setSortDir] = useState('asc');
+    const calculateGridItems = () => {
+        const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+        if (w >= 1536) return 30; // 2xl: 6 cols
+        if (w >= 1280) return 25; // xl: 5 cols
+        if (w >= 1024) return 24; // lg: 4 cols
+        if (w >= 768) return 18;  // md: 3 cols
+        return 14;                // sm: 2 cols
+    };
+
     const [itemsPerPage, setItemsPerPage] = useState(() => {
         const mode = localStorage.getItem('bodega_inventory_view') || 'grid';
-        return mode === 'list' ? 25 : (window.innerWidth >= 1024 ? 12 : 8);
+        return mode === 'list' ? 30 : calculateGridItems();
     });
+
     useEffect(() => {
         const handleResize = () => {
-            if (viewMode === 'grid') setItemsPerPage(window.innerWidth >= 1024 ? 12 : 8);
+            if (viewMode === 'grid') setItemsPerPage(calculateGridItems());
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -620,7 +630,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     )}
                     <div className="flex-1 overflow-y-auto pb-4 scrollbar-hide">
                         {viewMode === 'grid' ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                             {paginatedProducts.map(p => (
                                 <SwipeableItem 
                                     key={p.id}
