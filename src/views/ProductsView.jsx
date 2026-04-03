@@ -24,6 +24,7 @@ import { useProductFiltering } from '../hooks/useProductFiltering';
 import { buildProductPayload } from '../utils/productProcessor';
 import { useAuthStore } from '../hooks/store/useAuthStore';
 import { useAudit } from '../hooks/useAudit';
+import { forcePushToCloud } from '../hooks/useCloudSync';
 
 export const ProductsView = ({ rates, triggerHaptic }) => {
     // ─── STATE DEL HOOK ─────────────────────────────────────
@@ -64,8 +65,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             await storageService.setItem('bodega_sales_v1', sales);
         } catch (e) { /* silencioso */ }
     }
-
-    // Modal UI States
+    // Confirmar cambio de stock: guarda + sube INMEDIATAMENTE (sin debounce)
+    const handleConfirmStock = async (productId, delta) => {
+        await adjustStock(productId, delta);
+        // Small tick to ensure IndexedDB write completes before cloud push
+        await new Promise(r => setTimeout(r, 150));
+        try {
+            await forcePushToCloud();
+        } catch (e) {
+            console.warn('[ProductsView] Force push falló, el dato ya está en cola local:', e);
+        }
+    };
     const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -667,6 +677,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                         copEnabled={copEnabled}
                                         tasaCop={tasaCop}
                                         onAdjustStock={adjustStock}
+                                        onConfirmStock={handleConfirmStock}
                                         onShare={setShareProduct}
                                         onEdit={handleEdit}
                                         onDelete={handleDelete}

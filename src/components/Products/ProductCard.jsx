@@ -1,5 +1,5 @@
-import React from 'react';
-import { Tag, Banknote, AlertTriangle, Box, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Tag, AlertTriangle, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer, Check } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
@@ -9,6 +9,7 @@ export default function ProductCard({
     streetRate,
     categories,
     onAdjustStock,
+    onConfirmStock,   // NEW: called when user confirms staged changes, triggers immediate cloud push
     copEnabled,
     tasaCop,
     daysRemaining,
@@ -16,20 +17,44 @@ export default function ProductCard({
     onToggleSelect,
     onPrint,
     readOnly = false,
-
     onEdit,
     onDelete
 }) {
+    // Staged delta: tracks uncommitted stock changes before the user confirms
+    const [delta, setDelta] = useState(0);
+    const [isConfirming, setIsConfirming] = useState(false);
+
     const valBs = p.priceUsdt * effectiveRate;
     const valCop = p.priceUsdt * tasaCop;
-    const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
+    const stagedStock = (p.stock ?? 0) + delta;
+    const isLowStock = stagedStock <= (p.lowStockAlert ?? 5);
     const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
     const catInfo = categories.find(c => c.id === p.category);
     const unitInfo = UNITS.find(u => u.id === p.unit);
     const efectivoPrecio = streetRate > 0 ? `$${smartCashRounding(valBs / streetRate)}` : null;
 
+    const handleMinus = () => setDelta(prev => prev - 1);
+    const handlePlus  = () => setDelta(prev => prev + 1);
+
+    const handleConfirm = async () => {
+        if (delta === 0) return;
+        setIsConfirming(true);
+        try {
+            if (onConfirmStock) {
+                await onConfirmStock(p.id, delta);
+            } else {
+                onAdjustStock(p.id, delta);
+            }
+            setDelta(0);
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+
+    const handleCancel = () => setDelta(0);
+
     return (
-        <div className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border flex flex-col overflow-hidden group ${isLowStock ? 'border-amber-300 dark:border-amber-700' : 'border-slate-100 dark:border-slate-800'} ${isSelected ? 'ring-2 ring-brand border-brand shadow-brand/20 bg-brand/5 dark:bg-brand/10' : ''}`}>
+        <div className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border flex flex-col overflow-hidden group transition-all ${isLowStock && delta === 0 ? 'border-amber-300 dark:border-amber-700' : delta !== 0 ? 'border-brand ring-2 ring-brand/30 shadow-brand/10' : 'border-slate-100 dark:border-slate-800'} ${isSelected ? 'ring-2 ring-brand border-brand shadow-brand/20 bg-brand/5 dark:bg-brand/10' : ''}`}>
             {/* Image */}
             <div className="w-full h-24 bg-slate-100 dark:bg-slate-800 overflow-hidden relative shrink-0">
                 {/* Select Checkbox */}
@@ -50,9 +75,15 @@ export default function ProductCard({
                     </div>
                 )}
                 {/* Low stock alert */}
-                {isLowStock && (
+                {isLowStock && delta === 0 && (
                     <div className="absolute top-1 right-1 bg-amber-500/90 backdrop-blur-sm text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                         <AlertTriangle size={9} /> Bajo
+                    </div>
+                )}
+                {/* Staging indicator */}
+                {delta !== 0 && (
+                    <div className={`absolute top-1 right-1 backdrop-blur-sm text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${delta > 0 ? 'bg-brand/90' : 'bg-rose-500/90'}`}>
+                        {delta > 0 ? '+' : ''}{delta}
                     </div>
                 )}
             </div>
@@ -61,7 +92,6 @@ export default function ProductCard({
             <div className="p-3 flex flex-col flex-1">
                 <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] leading-tight line-clamp-2 mb-2">{p.name}</h3>
 
-                {/* Units per package info */}
                 {p.unit === 'paquete' && p.unitsPerPackage && (
                     <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">
                         <Package size={11} /> Lote · {p.unitsPerPackage} uds
@@ -91,32 +121,62 @@ export default function ProductCard({
                     )}
                 </div>
 
-                {/* Stock Control Prominente */}
+                {/* Stock Control */}
                 <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-xl p-1">
                         {!readOnly && (
-                        <button onClick={() => onAdjustStock(p.id, -1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-red-500 shadow-sm active:scale-95 transition-all">
-                            <Minus size={18} strokeWidth={2.5} />
-                        </button>
+                            <button
+                                onClick={handleMinus}
+                                className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-red-500 shadow-sm active:scale-95 transition-all"
+                            >
+                                <Minus size={18} strokeWidth={2.5} />
+                            </button>
                         )}
                         <div className="flex flex-col items-center justify-center px-2 text-center min-w-[50px]">
-                            <span className={`text-base font-black leading-none mb-0.5 ${isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
-                                {p.stock ?? 0}
+                            <span className={`text-base font-black leading-none mb-0.5 transition-colors ${delta !== 0 ? 'text-brand dark:text-brand' : isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                                {stagedStock}
                             </span>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UND'}</span>
-                            {p.unit === 'paquete' && p.unitsPerPackage > 0 && Math.floor((p.stock ?? 0) / p.unitsPerPackage) > 0 && (
-                                <span className="text-[8px] text-slate-400 leading-none">= {Math.floor((p.stock ?? 0) / p.unitsPerPackage)} lotes</span>
+                            {p.unit === 'paquete' && p.unitsPerPackage > 0 && Math.floor(stagedStock / p.unitsPerPackage) > 0 && (
+                                <span className="text-[8px] text-slate-400 leading-none">= {Math.floor(stagedStock / p.unitsPerPackage)} lotes</span>
                             )}
                         </div>
                         {!readOnly && (
-                        <button onClick={() => onAdjustStock(p.id, 1)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all">
-                            <Plus size={18} strokeWidth={2.5} />
-                        </button>
+                            <button
+                                onClick={handlePlus}
+                                className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all"
+                            >
+                                <Plus size={18} strokeWidth={2.5} />
+                            </button>
                         )}
                     </div>
 
+                    {/* Confirm / Cancel buttons — only visible when there's a staged change */}
+                    {delta !== 0 && !readOnly && (
+                        <div className="flex gap-1.5 mt-2">
+                            <button
+                                onClick={handleCancel}
+                                className="flex-1 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={isConfirming}
+                                className="flex-[2] py-1.5 rounded-xl text-[11px] font-bold text-white bg-brand hover:bg-brand/90 active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-60"
+                            >
+                                {isConfirming ? (
+                                    <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <Check size={13} strokeWidth={3} />
+                                )}
+                                {isConfirming ? 'Guardando...' : `Confirmar (${delta > 0 ? '+' : ''}${delta})`}
+                            </button>
+                        </div>
+                    )}
+
                     {/* Days Remaining Badge */}
-                    {daysRemaining !== null && daysRemaining !== undefined && (
+                    {daysRemaining !== null && daysRemaining !== undefined && delta === 0 && (
                         <div className={`flex items-center justify-center gap-1 mt-1.5 py-1 rounded-lg text-[10px] font-bold ${
                             daysRemaining <= 3
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-500'
@@ -140,6 +200,6 @@ export default function ProductCard({
                 {!readOnly && <button onClick={() => onEdit(p)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"><Pencil size={12} /></button>}
                 {!readOnly && <button onClick={() => onDelete(p.id)} className="flex-1 py-1.5 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"><Trash2 size={12} /></button>}
             </div>
-        </div >
+        </div>
     );
 }
