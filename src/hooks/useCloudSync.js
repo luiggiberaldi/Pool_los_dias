@@ -91,6 +91,43 @@ export const processSyncQueue = async () => {
     }
 };
 
+/**
+ * FUERZA una descarga completa desde la nube, limpiando cualquier dato local
+ * con discrepancias o pendientes.
+ */
+export const forcePullFromCloud = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.id) throw new Error('No hay sesión activa.');
+
+        console.log('[CloudSync] Iniciando RESTAURACIÓN FORZADA desde la nube...');
+        
+        // 1. Limpiar cola de pendientes para no re-subir basura
+        localStorage.removeItem(SYNC_QUEUE_KEY);
+
+        // 2. Traer todos los documentos de la nube
+        const { data: docs, error } = await supabaseCloud
+            .from('sync_documents')
+            .select('collection, doc_id, data')
+            .eq('user_id', session.user.id);
+
+        if (error) throw error;
+
+        // 3. Aplicar cada uno a la memoria local (Sobrescribir)
+        if (docs && docs.length > 0) {
+            for (const doc of docs) {
+                await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+            }
+        }
+
+        console.log('[CloudSync] Restauración forzada completa.');
+        return true;
+    } catch (e) {
+        console.error('[CloudSync] Error en restauración forzada:', e);
+        throw e;
+    }
+};
+
 // Escuchar retorno de internet
 if (typeof window !== 'undefined') {
     window.addEventListener('online', processSyncQueue);
@@ -120,11 +157,11 @@ export const pushCloudSync = async (key, value, force = false) => {
     if (isSyncingFromCloud) return;
     if (!SYNC_KEYS.includes(key)) return;
 
-    // Si aún no hemos terminado el pull inicial, encolamos en lugar de subir
-    // para evitar pisar datos nuevos de la nube con datos locales viejos.
+    // Si aún no hemos terminado el pull inicial, DESCARTAMOS el push automático
+    // para evitar pisar datos nuevos de la nube con datos locales viejos (stale).
+    // Solo permitimos subir si es forzado o si ya terminó el arranque.
     if (!isInitialSyncCompleted && !force) {
-        console.log(`[CloudSync] Encolado por fase de arranque: ${key}`);
-        addToSyncQueue(key);
+        console.log(`[CloudSync] Push ignorado durante arranque para: ${key}`);
         return;
     }
 
@@ -133,7 +170,7 @@ export const pushCloudSync = async (key, value, force = false) => {
         if (!session?.user?.id) {
             addToSyncQueue(key);
             return;
-        };
+        }
 
         const collectionType = LOCAL_KEYS.includes(key) ? 'local' : 'store';
 
@@ -164,7 +201,7 @@ async function _applyFromCloud(docId, collection, payload) {
                 key: docId,
                 newValue: stringPayload,
                 storageArea: localStorage
-            }));
+              }));
             if (docId === 'abasto-auth-storage') {
                 useAuthStore.persist.rehydrate();
             }
@@ -192,6 +229,9 @@ export function useCloudSync() {
                 globalSubscription = null;
                 isInitialized.current = false;
             }
+            // Si no hay nube instalada, el motor local es el maestro
+            isInitialSyncCompleted = true;
+            window.dispatchEvent(new CustomEvent('sync_initial_completed'));
             return;
         }
 
@@ -228,10 +268,14 @@ export function useCloudSync() {
                                 console.log(`[CloudSync] Saltando pull para ${doc.doc_id} por discrepancia local pendiente.`);
                             }
                         }
-                        console.log(`[CloudSync] Pull inicial: ${docs.length} documentos procesados.`);
+                        isInitialSyncCompleted = true;
                     }
-                    isInitialSyncCompleted = true;
                 }
+
+                // Garantía final de que el motor está listo
+                isInitialSyncCompleted = true;
+                window.dispatchEvent(new CustomEvent('sync_initial_completed'));
+                console.log('[CloudSync] Motor de sincronización listo (Pull Finalizado).');
 
                 // Procesar cualquier cambio que se haya intentado subir durante el arranque
                 processSyncQueue();
@@ -271,4 +315,8 @@ export function useCloudSync() {
 
         initSync();
     }, [isCloudConfigured, adminEmail, adminPassword]);
+
+    return {
+        forcePullFromCloud
+    };
 }

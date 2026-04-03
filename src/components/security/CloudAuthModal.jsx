@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
     Mail, Key, Phone, ArrowRight, ShieldCheck, 
-    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff
+    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw
 } from 'lucide-react';
 import { useCloudAuthLogic } from '../../hooks/useCloudAuthLogic';
-import { useConfirm } from '../../hooks/useConfirm.jsx';
+import { useCloudSync } from '../../hooks/useCloudSync';
+import { useConfirm } from '../../hooks/useConfirm';
 
 // ─── Constantes de color del brand ──────────────────────────────────
 const C = {
@@ -19,29 +20,71 @@ const C = {
 };
 
 export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) {
-    const authLogic = useCloudAuthLogic();
     const {
         inputEmail, setInputEmail,
         inputPassword, setInputPassword,
         inputPhone, setInputPhone,
+        isCloudConfigured,
         isCloudLogin, setIsCloudLogin,
         emailError, setEmailError,
         passwordError, setPasswordError,
         isRecoveringPassword, setIsRecoveringPassword,
         deviceLimitError, setDeviceLimitError,
         blockedDevices, setBlockedDevices,
-        dataConflictPending,
-        importStatus,
-        statusMessage,
+        dataConflictPending, setDataConflictPending,
+        importStatus, setImportStatus,
+        statusMessage, setStatusMessage,
         localDeviceAlias, setLocalDeviceAlias,
         handleDataConflictChoice,
         handleUnlinkSpecificDevice,
         handleSaveCloudAccount,
         handleResetPasswordRequest
-    } = authLogic;
+    } = useCloudAuthLogic();
+
+    const { forcePullFromCloud } = useCloudSync();
 
     const [showPassword, setShowPassword] = useState(false);
+    const [logoClicks, setLogoClicks] = useState(0);
+    const [isRegistrationUnlocked, setIsRegistrationUnlocked] = useState(false);
     const confirm = useConfirm();
+
+    const clickTimeoutRef = useRef(null);
+
+    const handleLogoClick = () => {
+        if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+        
+        const nextClicks = logoClicks + 1;
+        setLogoClicks(nextClicks);
+        
+        if (nextClicks >= 5) {
+            setIsRegistrationUnlocked(true);
+            setLogoClicks(0);
+        } else {
+            clickTimeoutRef.current = setTimeout(() => setLogoClicks(0), 2000);
+        }
+    };
+
+    const handleForceRestore = async () => {
+        const ok = await confirm({
+            title: '¿Restaurar desde la Nube?',
+            message: 'Esto borrará TODO el inventario local de este dispositivo y bajará los datos de la nube. Usa esto solo si ves datos incorrectos.',
+            confirmText: 'Sí, restaurar y limpiar',
+            cancelText: 'Cancelar',
+            variant: 'danger'
+        });
+
+        if (ok) {
+            setImportStatus('loading');
+            setStatusMessage('Limpiando y descargando...');
+            try {
+                await forcePullFromCloud();
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (err) {
+                setImportStatus('error');
+                setStatusMessage('');
+            }
+        }
+    };
 
     if (!isOpen && !forceLogin) return null;
 
@@ -150,6 +193,69 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
     }
 
     // ── Vista Principal: Login / Registro ───────────────────────────
+    if (isCloudConfigured && !forceLogin && !isRegistrationUnlocked) {
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: 'rgba(125,211,252,0.2)' }} />
+                    
+                    <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors z-20">
+                        <X size={18} />
+                    </button>
+
+                    <div className="p-6 text-center">
+                        <div className="flex justify-center mb-4">
+                            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                                <Database size={40} className="text-emerald-500" />
+                            </div>
+                        </div>
+                        
+                        <h2 className="text-xl font-black text-slate-800">Punto de Venta Conectado</h2>
+                        <p className="text-sm text-slate-500 mt-1 font-medium">{inputEmail}</p>
+
+                        <div className="mt-8 space-y-3">
+                            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-left">
+                                <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">Identificador de Estación</p>
+                                <p className="text-sm font-black text-slate-700">{localDeviceAlias || 'Principal'}</p>
+                            </div>
+
+                            <div className="py-4">
+                                <p className="text-xs text-slate-400 mb-4 px-4 font-medium">
+                                    Si ves datos incorrectos o antiguos en este dispositivo, puedes forzar una limpieza.
+                                </p>
+                                <button
+                                    onClick={handleForceRestore}
+                                    disabled={importStatus === 'loading'}
+                                    className="w-full py-3 px-4 flex items-center justify-center gap-2 bg-white border-2 border-red-100 hover:bg-red-50 text-red-500 rounded-xl text-sm font-black transition-all active:scale-[0.98] disabled:opacity-50"
+                                >
+                                    {importStatus === 'loading' ? (
+                                        <div className="w-5 h-5 border-2 border-red-200 border-t-red-500 rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <RefreshCw size={16} />
+                                            Restaurar desde la Nube
+                                        </>
+                                    )}
+                                </button>
+                                {statusMessage && (
+                                    <p className="text-[11px] text-red-500 font-bold mt-2 animate-pulse">{statusMessage}</p>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={onClose}
+                                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl transition-all shadow-md"
+                            >
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Vista Principal: Login / Registro ───────────────────────────
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden relative">
@@ -166,34 +272,42 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                 )}
 
                 <div className="p-6 relative z-10">
-                    {/* Logo */}
-                    <div className="flex flex-col items-center justify-center mt-2 mb-6">
+                    {/* Logo con Gesto Secreto */}
+                    <div className="flex flex-col items-center justify-center mt-2 mb-6 group">
                         <img
                             src="/logo.png"
                             alt="Pool Los Diaz"
-                            className="h-28 sm:h-32 w-auto object-contain select-none"
+                            onClick={handleLogoClick}
+                            className={`h-28 sm:h-32 w-auto object-contain select-none cursor-default transition-transform active:scale-90 ${logoClicks > 0 ? 'animate-pulse' : ''}`}
                             draggable={false}
                         />
-                        <p className="text-slate-400 text-xs mt-3 font-medium text-center">
-                            Tu negocio, siempre listo.
+                        <p className="text-slate-400 text-[10px] mt-3 font-bold uppercase tracking-widest text-center opacity-60">
+                            Pool Los Diaz · Sistema de Control
                         </p>
                     </div>
 
-                    {/* Tabs Login / Registro */}
-                    {!isRecoveringPassword && (
-                        <div className="flex p-1 bg-slate-100 rounded-xl mb-5">
+                    {/* Tabs Login / Registro (Solo si está desbloqueado) */}
+                    {(isRegistrationUnlocked || !isCloudLogin) && !isRecoveringPassword && (
+                        <div className="flex p-1 bg-slate-100 rounded-xl mb-5 animate-in slide-in-from-top-2">
                             <button
                                 onClick={() => { setIsCloudLogin(true); setEmailError(''); setPasswordError(''); }}
                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isCloudLogin ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                Entrar
+                                Acceso Propietario
                             </button>
                             <button
                                 onClick={() => { setIsCloudLogin(false); setEmailError(''); setPasswordError(''); }}
                                 className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isCloudLogin ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                Registro
+                                Registrar Local
                             </button>
+                        </div>
+                    )}
+
+                    {!isRegistrationUnlocked && isCloudLogin && !isRecoveringPassword && (
+                        <div className="mb-4 text-center">
+                            <h2 className="text-lg font-black text-slate-800">Conectar Punto de Venta</h2>
+                            <p className="text-xs text-slate-400 font-medium">Ingresa tus credenciales de administrador</p>
                         </div>
                     )}
 
@@ -263,13 +377,13 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                     {passwordError && <p className="text-[11px] text-red-500 font-bold mt-1 ml-1">{passwordError}</p>}
                                 </div>
 
-                                {/* Alias del equipo */}
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none"><Smartphone size={16} className="text-slate-400" /></div>
+                                {/* Identificador de Estación */}
+                                <div className="group relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none"><Smartphone size={16} className="text-slate-400 group-focus-within:text-sky-500 transition-colors" /></div>
                                     <input
                                         type="text" value={localDeviceAlias} onChange={e => setLocalDeviceAlias(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 outline-none transition-all"
-                                        placeholder="Nombre de esta PC (ej. Mostrador 1)"
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300 placeholder:font-normal"
+                                        placeholder="Identificador de Estación (ej: Barra)"
                                     />
                                 </div>
 
@@ -300,8 +414,8 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
                                         <>
-                                            {isCloudLogin ? 'Conectar Estación' : 'Crear Cuenta Segura'}
-                                            <ArrowRight size={16} strokeWidth={3} />
+                                            {isCloudLogin ? 'Conectar Punto de Venta' : 'Registrar Nuevo Local'}
+                                            <ArrowRight size={16} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
                                         </>
                                     )}
                                 </button>

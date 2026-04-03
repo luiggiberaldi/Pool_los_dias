@@ -8,6 +8,7 @@ export function ProductProvider({ children, rates }) {
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState(BODEGA_CATEGORIES);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+    const [isSyncReady, setIsSyncReady] = useState(false);
 
     // Guard ref: prevents infinite loop when auto-save fires app_storage_update
     const savingRef = useRef(false);
@@ -71,7 +72,9 @@ export function ProductProvider({ children, rates }) {
 
     // Auto-save products and categories with Debounce (Performance Fix)
     useEffect(() => {
-        if (!isLoadingProducts) {
+        // Bloqueamos el auto-guardado hasta que el motor de nube confirme que terminó el pull inicial.
+        // Esto evita que el estado "viejo" de React pise los datos recién bajados de la nube.
+        if (!isLoadingProducts && isSyncReady) {
             savingRef.current = true;
             const timer = setTimeout(() => {
                 const savePromises = [];
@@ -143,11 +146,18 @@ export function ProductProvider({ children, rates }) {
             }
         };
 
+        const handleSyncReady = () => {
+            console.log("[ProductContext] Detectada sincronización inicial completa.");
+            setIsSyncReady(true);
+        };
+
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('app_storage_update', handleAppStorageUpdate);
+        window.addEventListener('sync_initial_completed', handleSyncReady);
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('app_storage_update', handleAppStorageUpdate);
+            window.removeEventListener('sync_initial_completed', handleSyncReady);
         };
     }, []);
 

@@ -101,9 +101,9 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
             const val = e.target.value.replace(/\D/g, '').slice(0, targetPinLength);
             setPin(val);
           }}
-          className="absolute opacity-0 w-0 h-0"
+          className="absolute opacity-0 w-0 h-[1px] -z-10 pointer-events-none"
           autoComplete="off"
-          inputMode="numeric"
+          inputMode="none"
         />
 
         {/* Numpad */}

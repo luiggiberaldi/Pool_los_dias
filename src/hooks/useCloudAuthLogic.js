@@ -23,7 +23,12 @@ export function useCloudAuthLogic() {
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
     const [isCloudLogin, setIsCloudLogin] = useState(true);
     
-    const [localDeviceAlias, setLocalDeviceAlias] = useState(() => localStorage.getItem('pda_device_alias') || '');
+    const [localDeviceAlias, _setLocalDeviceAlias] = useState(() => localStorage.getItem('pda_device_alias') || '');
+    
+    const setLocalDeviceAlias = (val) => {
+        _setLocalDeviceAlias(val);
+        localStorage.setItem('pda_device_alias', val);
+    };
     const [inputPhone, setInputPhone] = useState('');
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
