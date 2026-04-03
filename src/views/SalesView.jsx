@@ -41,7 +41,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const { notifySaleComplete, notifyLowStock } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
-    const { products, setProducts, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProducts, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
 
     // ── State ──────────────────────────────────────
     const [customers, setCustomers] = useState([]);
@@ -301,7 +301,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             storageService.getItem('bodega_customers_v1', []),
             storageService.getItem(SALES_KEY, [])
         ]).then(([savedProducts, methods, savedCustomers, savedSales]) => {
-            setProducts(savedProducts);
+            // setProductsSilent: Only updates the UI, does NOT save to cloud.
+            // This prevents a feedback loop where loading from cloud triggers an upload back.
+            setProductsSilent(savedProducts);
             setPaymentMethods(methods);
             setCustomers(savedCustomers);
             setSalesData(savedSales);
@@ -316,7 +318,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             });
             setTodayAperturaData(apertura || null);
         });
-    }, [isActive, setProducts]);
+    }, [isActive, setProductsSilent]);
 
     useEffect(() => {
         handleReloadContent();
@@ -606,7 +608,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             return;
         }
 
-        setProducts(result.updatedProducts);
+        setProductsSilent(result.updatedProducts);
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
 
@@ -645,8 +647,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             return;
         }
 
-        // Apply state updates using the returned optimized datasets
-        setProducts(result.updatedProducts);
+        // checkoutProcessor already persisted to storage. setProductsSilent updates UI only.
+        setProductsSilent(result.updatedProducts);
         
         if (result.updatedCustomers) {
             setCustomers(result.updatedCustomers);

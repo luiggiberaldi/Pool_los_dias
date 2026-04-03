@@ -5,13 +5,42 @@ import { BODEGA_CATEGORIES } from '../config/categories';
 const ProductContext = createContext();
 
 export function ProductProvider({ children, rates }) {
-    const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState(BODEGA_CATEGORIES);
+    const [products, _setProducts] = useState([]);
+    const [categories, _setCategories] = useState(BODEGA_CATEGORIES);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
     const [isSyncReady, setIsSyncReady] = useState(false);
 
-    // Guard ref: prevents infinite loop when auto-save fires app_storage_update
+    // Guard ref: prevents app_storage_update loop when user edits locally
     const savingRef = useRef(false);
+
+    // Custom setters to forcefully save user-initiated changes but skip cloud pulls
+    const setProducts = (action_or_val) => {
+        savingRef.current = true;
+        if (typeof action_or_val === 'function') {
+            _setProducts(prev => {
+                const next = action_or_val(prev);
+                storageService.setItem('bodega_products_v1', next).finally(() => { setTimeout(() => { savingRef.current = false; }, 50); });
+                return next;
+            });
+        } else {
+            _setProducts(action_or_val);
+            storageService.setItem('bodega_products_v1', action_or_val).finally(() => { setTimeout(() => { savingRef.current = false; }, 50); });
+        }
+    };
+
+    const setCategories = (action_or_val) => {
+        savingRef.current = true;
+        if (typeof action_or_val === 'function') {
+            _setCategories(prev => {
+                const next = action_or_val(prev);
+                storageService.setItem('poolbar_categories_v1', next).finally(() => { setTimeout(() => { savingRef.current = false; }, 50); });
+                return next;
+            });
+        } else {
+            _setCategories(action_or_val);
+            storageService.setItem('poolbar_categories_v1', action_or_val).finally(() => { setTimeout(() => { savingRef.current = false; }, 50); });
+        }
+    };
 
     // MARKET LOGIC - Street Rate
     const [streetRate, setStreetRate] = useState(() => {
@@ -54,8 +83,8 @@ export function ProductProvider({ children, rates }) {
             const savedProducts = await storageService.getItem('bodega_products_v1', []);
             const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
             if (isMounted) {
-                setProducts(savedProducts);
-                setCategories(savedCategories);
+                _setProducts(savedProducts);
+                _setCategories(savedCategories);
                 setIsLoadingProducts(false);
             }
         };
@@ -70,30 +99,8 @@ export function ProductProvider({ children, rates }) {
         }
     }, [rates.bcv?.price, streetRate]);
 
-    // Auto-save products and categories with Debounce (Performance Fix)
-    useEffect(() => {
-        // Bloqueamos el auto-guardado hasta que el motor de nube confirme que terminó el pull inicial.
-        // Esto evita que el estado "viejo" de React pise los datos recién bajados de la nube.
-        if (!isLoadingProducts && isSyncReady) {
-            savingRef.current = true;
-            const timer = setTimeout(() => {
-                const savePromises = [];
-                // IMPORTANTE: Solo guardamos productos si HAY datos.
-                // No guardar array vacío evita sobrescribir un import reciente
-                // con el estado inicial vacío de React antes de que loadData() cargue.
-                if (products.length > 0) {
-                    savePromises.push(storageService.setItem('bodega_products_v1', products));
-                }
-                savePromises.push(storageService.setItem('poolbar_categories_v1', categories));
-                Promise.all(savePromises).finally(() => {
-                    // Reset guard after microtask queue flushes
-                    setTimeout(() => { savingRef.current = false; }, 50);
-                });
-            }, 1000); // 1 segundo de debounce
-
-            return () => clearTimeout(timer);
-        }
-    }, [products, categories, isLoadingProducts]);
+    // Auto-save useEffect is REMOVED: Saving is now strictly handled by setProducts explicitly.
+    // This entirely removes the Race Condition where boots/reloads overwrite cloud databases.
 
     useEffect(() => {
         if (streetRate > 0) localStorage.setItem('street_rate_bs', streetRate.toString());
@@ -123,11 +130,11 @@ export function ProductProvider({ children, rates }) {
                 setTasaCopManual(e.newValue);
             }
             if (e.key === 'bodega_products_v1') {
-                // If modified in another tab, fetch it
-                storageService.getItem('bodega_products_v1', []).then(updatedProducts => setProducts(updatedProducts));
+                // If modified in another tab, fetch it silently using internal setter
+                storageService.getItem('bodega_products_v1', []).then(updatedProducts => _setProducts(updatedProducts));
             }
             if (e.key === 'poolbar_categories_v1') {
-                storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES).then(updatedCategories => setCategories(updatedCategories));
+                storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES).then(updatedCategories => _setCategories(updatedCategories));
             }
         };
 
@@ -138,11 +145,11 @@ export function ProductProvider({ children, rates }) {
 
             if (e.detail?.key === 'bodega_products_v1') {
                 const updatedProducts = await storageService.getItem('bodega_products_v1', []);
-                setProducts(updatedProducts);
+                _setProducts(updatedProducts);
             }
             if (e.detail?.key === 'poolbar_categories_v1') {
                 const updatedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
-                setCategories(updatedCategories);
+                _setCategories(updatedCategories);
             }
         };
 
@@ -176,6 +183,9 @@ export function ProductProvider({ children, rates }) {
         <ProductContext.Provider value={{
             products,
             setProducts,
+            // setProductsSilent: updates UI ONLY, no save to storage/cloud.
+            // Use this after receiving data from cloud to avoid re-upload loops.
+            setProductsSilent: _setProducts,
             categories,
             setCategories,
             isLoadingProducts,
