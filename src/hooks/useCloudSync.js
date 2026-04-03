@@ -101,11 +101,13 @@ export const forcePullFromCloud = async () => {
         if (!session?.user?.id) throw new Error('No hay sesión activa.');
 
         console.log('[CloudSync] Iniciando RESTAURACIÓN FORZADA desde la nube...');
-        
-        // 1. Limpiar cola de pendientes para no re-subir basura
         localStorage.removeItem(SYNC_QUEUE_KEY);
 
-        // 2. Traer todos los documentos de la nube
+        // ¡MUY IMPORTANTE! Limpiamos la base local primero para evitar que residuos (ej. motos) queden vivos
+        // si no existen ya en la nube.
+        await storageService.removeItem('bodega_products_v1');
+        await storageService.removeItem('poolbar_categories_v1');
+
         const { data: docs, error } = await supabaseCloud
             .from('sync_documents')
             .select('collection, doc_id, data')
@@ -113,7 +115,6 @@ export const forcePullFromCloud = async () => {
 
         if (error) throw error;
 
-        // 3. Aplicar cada uno a la memoria local (Sobrescribir)
         if (docs && docs.length > 0) {
             for (const doc of docs) {
                 await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
@@ -127,6 +128,46 @@ export const forcePullFromCloud = async () => {
         throw e;
     }
 };
+
+// ----- NUEVA FUNCIÓN: FORZAR SUBIDA -----
+export const forcePushToCloud = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.id) throw new Error('No hay sesión activa.');
+
+        console.log('[CloudSync] Iniciando SUBIDA FORZADA a la nube...');
+        
+        const localProducts = await storageService.getItem('bodega_products_v1') || [];
+        const localCategories = await storageService.getItem('poolbar_categories_v1') || [];
+        
+        await pushCloudSync('bodega_products_v1', localProducts, true);
+        await pushCloudSync('poolbar_categories_v1', localCategories, true);
+        
+        const backupData = {
+            data: {
+                idb: {
+                    'bodega_products_v1': localProducts,
+                    'poolbar_categories_v1': localCategories
+                }
+            }
+        };
+        
+        const { error: backupError } = await supabaseCloud.from('cloud_backups').upsert({
+            email: session.user.email,
+            backup_data: backupData,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'email' });
+
+        if (backupError) throw backupError;
+
+        console.log('[CloudSync] Subida forzada completa.');
+        return true;
+    } catch (e) {
+        console.error('[CloudSync] Error en subida forzada:', e);
+        throw e;
+    }
+};
+// ----------------------------------------
 
 // Escuchar retorno de internet
 if (typeof window !== 'undefined') {
@@ -317,6 +358,7 @@ export function useCloudSync() {
     }, [isCloudConfigured, adminEmail, adminPassword]);
 
     return {
-        forcePullFromCloud
+        forcePullFromCloud,
+        forcePushToCloud
     };
 }

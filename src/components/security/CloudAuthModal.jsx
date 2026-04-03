@@ -41,7 +41,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
         handleResetPasswordRequest
     } = useCloudAuthLogic();
 
-    const { forcePullFromCloud } = useCloudSync();
+    const { forcePullFromCloud, forcePushToCloud } = useCloudSync();
 
     const [showPassword, setShowPassword] = useState(false);
     const [logoClicks, setLogoClicks] = useState(0);
@@ -66,22 +66,46 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
 
     const handleForceRestore = async () => {
         const ok = await confirm({
-            title: '¿Restaurar desde la Nube?',
-            message: 'Esto borrará TODO el inventario local de este dispositivo y bajará los datos de la nube. Usa esto solo si ves datos incorrectos.',
-            confirmText: 'Sí, restaurar y limpiar',
-            cancelText: 'Cancelar',
-            variant: 'danger'
+            title: "⚠ CUIDADO: Bajar datos",
+            message: "Esto borrará TODOS los productos de ESTE DISPOSITIVO y descargará los que estén en la nube. ¿Estás seguro?",
+            confirmText: "Sí, borrar local y bajar",
+            cancelText: "Cancelar"
         });
-
+        
         if (ok) {
+            setStatusMessage('Limpiando dispositivo y descargando...');
             setImportStatus('loading');
-            setStatusMessage('Limpiando y descargando...');
             try {
                 await forcePullFromCloud();
-                setTimeout(() => window.location.reload(), 1500);
-            } catch (err) {
+                setImportStatus('success');
+                setStatusMessage('Datos restaurados de la nube.');
+                setTimeout(() => window.location.reload(), 2000);
+            } catch (e) {
                 setImportStatus('error');
-                setStatusMessage('');
+                setStatusMessage('Error al restaurar: ' + e.message);
+            }
+        }
+    };
+
+    const handleForceUpload = async () => {
+        const ok = await confirm({
+            title: "⚠ CUIDADO: Subir datos",
+            message: "Esto APLASTARÁ la nube con los productos de este dispositivo. Úsalo solo si este equipo es tu CAJA PRINCIPAL.",
+            confirmText: "Sí, aplastar nube (Subir)",
+            cancelText: "Cancelar"
+        });
+        
+        if (ok) {
+            setStatusMessage('Subiendo datos locales a la nube...');
+            setImportStatus('loading');
+            try {
+                await forcePushToCloud();
+                setImportStatus('success');
+                setStatusMessage('La Nube ha sido sobrescrita exitosamente.');
+                setTimeout(() => setImportStatus(null), 2000);
+            } catch (e) {
+                setImportStatus('error');
+                setStatusMessage('Error al subir: ' + e.message);
             }
         }
     };
@@ -219,25 +243,42 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                 <p className="text-sm font-black text-slate-700">{localDeviceAlias || 'Principal'}</p>
                             </div>
 
-                            <div className="py-4">
-                                <p className="text-xs text-slate-400 mb-4 px-4 font-medium">
-                                    Si ves datos incorrectos o antiguos en este dispositivo, puedes forzar una limpieza.
+                            <div className="py-4 space-y-3">
+                                <p className="text-xs text-slate-400 mb-2 px-4 font-medium">
+                                    Gestión de sincronización:
                                 </p>
                                 <button
                                     onClick={handleForceRestore}
                                     disabled={importStatus === 'loading'}
-                                    className="w-full py-3 px-4 flex items-center justify-center gap-2 bg-white border-2 border-red-100 hover:bg-red-50 text-red-500 rounded-xl text-sm font-black transition-all active:scale-[0.98] disabled:opacity-50"
+                                    className="w-full py-3 px-4 flex items-center justify-center gap-2 bg-white border-2 border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-black transition-all active:scale-[0.98] disabled:opacity-50"
                                 >
                                     {importStatus === 'loading' ? (
-                                        <div className="w-5 h-5 border-2 border-red-200 border-t-red-500 rounded-full animate-spin" />
+                                        <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
                                     ) : (
                                         <>
-                                            <RefreshCw size={16} />
-                                            Restaurar desde la Nube
+                                            <Download size={16} />
+                                            Restaurar Nube (Bajar)
                                         </>
                                     )}
                                 </button>
-                                {statusMessage && (
+                                
+                                <button
+                                    onClick={handleForceUpload}
+                                    disabled={importStatus === 'loading'}
+                                    className="w-full py-3 px-4 flex items-center justify-center gap-2 bg-red-50 border border-red-200 hover:bg-red-100 text-red-600 rounded-xl text-sm font-black transition-all active:scale-[0.98] disabled:opacity-50 mt-2"
+                                >
+                                    {importStatus === 'loading' ? (
+                                        <div className="w-5 h-5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Database size={16} />
+                                            Sobreescribir Nube (Subir)
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            {statusMessage && (
                                     <p className="text-[11px] text-red-500 font-bold mt-2 animate-pulse">{statusMessage}</p>
                                 )}
                             </div>
