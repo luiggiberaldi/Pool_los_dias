@@ -279,9 +279,8 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                             </div>
 
                             {statusMessage && (
-                                    <p className="text-[11px] text-red-500 font-bold mt-2 animate-pulse">{statusMessage}</p>
-                                )}
-                            </div>
+                                <p className="text-[11px] text-red-500 font-bold mt-2 animate-pulse">{statusMessage}</p>
+                            )}
 
                             <button
                                 onClick={onClose}
