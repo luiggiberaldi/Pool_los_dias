@@ -435,6 +435,13 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setDeleteCategoryConfirmId(null);
     };
 
+    const handleEditCategory = (categoryId, newName) => {
+        if (!newName.trim() || categoryId === 'todos' || categoryId === 'otros') return;
+        setCategories(categories.map(c => c.id === categoryId ? { ...c, label: newName.trim() } : c));
+        showToast('Categoría renombrada', 'success');
+        triggerHaptic && triggerHaptic();
+    };
+
     // ─── RENDER ─────────────────────────────────────────────
 
     return (
@@ -907,6 +914,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 categories={categories}
                 onAddCategory={handleAddCategory}
                 onDeleteCategory={handleDeleteCategory}
+                onEditCategory={handleEditCategory}
                 newCategoryIcon={newCategoryIcon}
                 setNewCategoryIcon={setNewCategoryIcon}
                 newCategoryName={newCategoryName}

@@ -31,6 +31,7 @@ import Confetti from '../components/Confetti';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
 import { TableQueuePanel } from '../components/tables/TableQueuePanel';
+import TableBillModal from '../components/tables/TableBillModal';
 import { useTablesStore } from '../hooks/store/useTablesStore';
 
 const SALES_KEY = 'bodega_sales_v1';
@@ -80,6 +81,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // ── Mesa Queue (Checkout pedido por mesero) ──────────
     const [tableCheckoutData, setTableCheckoutData] = useState(null);
+    const [showTablePayment, setShowTablePayment] = useState(false);
 
     // Cart Navigation State
     const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
@@ -612,7 +614,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
         } catch (error) {
             console.error("Error al cerrar la mesa:", error);
-            showToast("Venta completa, pero falló al apagar mesa libre.", "warning");
+            showToast("Venta completa, pero falló al liberar la mesa.", "warning");
         }
 
         setShowReceipt(result.sale); 
@@ -623,6 +625,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         setTableCheckoutData(null); 
         setSelectedCustomerId(''); 
     };
+
 
     const handleCheckout = async (payments, changeBreakdown) => {
         triggerHaptic && triggerHaptic();
@@ -766,30 +769,15 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             />
 
             {/* ── Mesa Queue: cuentas pendientes de mesas ── */}
-            <TableQueuePanel onCheckoutTable={setTableCheckoutData} />
+            <TableQueuePanel onCheckoutTable={setTableCheckoutData} effectiveRate={effectiveRate} />
 
             {!todayAperturaData ? (
                 <CajaCerradaOverlay 
                     cartCount={cartRef.current.length}
-                    onOpenApertura={() => setIsAperturaOpen(true)} 
+                    onOpenApertura={() => onNavigate && onNavigate('inicio')} 
                 />
             ) : (
                 <>
-                    {/* ── APERTURA DE CAJA BANNER ── */}
-                    <div className="shrink-0 mb-3">
-                        <div className="w-full bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-2xl sm:rounded-3xl p-3 sm:p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl flex items-center justify-center">
-                                    <CheckCircle2 size={18} className="text-emerald-500" />
-                                </div>
-                                <div>
-                                    <p className="text-xs sm:text-sm font-bold text-emerald-700 dark:text-emerald-400">Apertura Registrada</p>
-                                    <p className="text-[10px] sm:text-xs text-emerald-500/70">${todayAperturaData.openingUsd?.toFixed(2)} · Bs {formatBs(todayAperturaData.openingBs || 0)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* ── Split Layout: Products (left) + Cart Sidebar (right) on desktop ── */}
                     <div className="flex-1 min-h-0 flex flex-col lg:flex-row lg:gap-4">
 
@@ -982,22 +970,25 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 onClose={() => setShowKeyboardHelp(false)} 
             />
 
-            {/* Apertura Caja Modal */}
-            <AperturaCajaModal
-                isOpen={isAperturaOpen}
-                onClose={() => setIsAperturaOpen(false)}
-                onConfirm={handleSaveApertura}
-            />
 
-            {/* ── Modal de cobro de mesa (desde la cola del cajero usando CheckoutModal) ── */}
-            {tableCheckoutData && (
+            {/* ── PASO 1: Desglose de cuenta de mesa ── */}
+            {tableCheckoutData && !showTablePayment && (
+                <TableBillModal
+                    data={tableCheckoutData}
+                    onClose={() => setTableCheckoutData(null)}
+                    onProceedToPayment={() => setShowTablePayment(true)}
+                />
+            )}
+
+            {/* ── PASO 2: Cobro de mesa ── */}
+            {tableCheckoutData && showTablePayment && (
                 <CheckoutModal
-                    onClose={() => { setTableCheckoutData(null); setSelectedCustomerId(''); }}
+                    onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={tableCheckoutData.grandTotal}
                     cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
-                    cartTotalUsd={tableCheckoutData.grandTotal} 
-                    cartTotalBs={tableCheckoutData.grandTotal * effectiveRate} 
-                    discountData={{active: false, amountUsd: 0, amountBs: 0}}
+                    cartTotalUsd={tableCheckoutData.grandTotal}
+                    cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
+                    discountData={{ active: false, amountUsd: 0, amountBs: 0 }}
                     effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
@@ -1007,6 +998,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                     tasaCop={tasaCop}
                     currentFloatUsd={currentFloat.usd}
                     currentFloatBs={currentFloat.bs}
+                    tableContext={tableCheckoutData}
                 />
             )}
         </div>

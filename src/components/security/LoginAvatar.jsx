@@ -9,6 +9,10 @@ const AVATAR_COLORS = {
     bg: 'bg-gradient-to-b from-teal-400 to-teal-500 border-t-2 border-teal-300 shadow-[0_6px_0_#0f766e,_0_12px_25px_rgba(20,184,166,0.4)]', 
     text: 'text-white font-black' 
   },
+  MESERO: { 
+    bg: 'bg-gradient-to-b from-orange-400 to-orange-500 border-t-2 border-orange-300 shadow-[0_6px_0_#c2410c,_0_12px_25px_rgba(249,115,22,0.4)]', 
+    text: 'text-white font-black' 
+  },
 };
 
 export default function LoginAvatar({ user, size = 'lg', className = '' }) {

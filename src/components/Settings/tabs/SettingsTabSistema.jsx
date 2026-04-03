@@ -64,23 +64,6 @@ export default function SettingsTabSistema({
                 )}
             </SectionCard>
 
-            {/* Apariencia */}
-            <SectionCard icon={Palette} title="Apariencia" subtitle="Estilo visual de la app" iconColor="text-pink-500">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        {theme === 'dark' ? <Moon size={18} className="text-indigo-400" /> : <Sun size={18} className="text-amber-500" />}
-                        <div>
-                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{theme === 'dark' ? 'Modo Oscuro' : 'Modo Claro'}</p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Toca para cambiar</p>
-                        </div>
-                    </div>
-                    <Toggle
-                        enabled={theme === 'dark'}
-                        color="indigo"
-                        onChange={() => { toggleTheme(); triggerHaptic?.(); }}
-                    />
-                </div>
-            </SectionCard>
 
             {/* Dispositivo */}
             <SectionCard icon={Fingerprint} title="Dispositivo" subtitle="Informacion tecnica" iconColor="text-slate-500">

@@ -1,6 +1,6 @@
 import { RefreshCw, ShoppingCart, Keyboard, Lock } from 'lucide-react';
 import Tooltip from '../Tooltip';
-import { useAuthStore } from '../../hooks/store/useAuthStore';
+import { useAuthStore } from '../../hooks/store/authStore';
 
 const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
@@ -15,8 +15,9 @@ export default function SalesHeader({
     setShowKeyboardHelp,
     triggerHaptic
 }) {
-    const usuarioActivo = useAuthStore(s => s.usuarioActivo);
-    const isLocked = usuarioActivo?.rol === 'CAJERO';
+    const role = useAuthStore(s => s.role);
+    const userRole = (role || '').toUpperCase();
+    const isLocked = userRole === 'CAJERO' || userRole === 'MESERO';
 
     const handleRateToggle = () => {
         if (isLocked) return;
@@ -74,7 +75,7 @@ export default function SalesHeader({
             </div>
 
             {/* Rate Config Panel */}
-            {showRateConfig && (
+            {showRateConfig && !isLocked && (
                 <div className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500">Tasa de Cambio</span>

@@ -4,22 +4,15 @@ import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { formatElapsedTime, calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 
-function useBcvRate() {
-    try {
-        const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-        return saved?.bcv?.price || 1;
-    } catch { return 1; }
-}
-
 /**
  * Panel shown in SalesView (cashier) listing all tables that have requested checkout.
  * Cashier taps a row to open the TableCheckoutModal for that table.
  */
-export function TableQueuePanel({ onCheckoutTable }) {
+export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const { tables, activeSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
     const config = useTablesStore(s => s.config);
-    const tasaUSD = useBcvRate();
+    const tasaUSD = effectiveRate;
 
     // Ensure realtime is active while this panel is mounted
     useEffect(() => {
@@ -32,18 +25,21 @@ export function TableQueuePanel({ onCheckoutTable }) {
     if (pendingSessions.length === 0) return null;
 
     return (
-        <div className="mb-4 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/40 rounded-2xl sm:rounded-3xl overflow-hidden">
+        <div className="mb-4 bg-orange-50 dark:bg-orange-950/20 border-2 border-orange-400 dark:border-orange-600/60 rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg shadow-orange-500/10">
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-orange-200 dark:border-orange-800/40">
-                <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900/40 rounded-xl flex items-center justify-center">
-                    <CreditCard size={16} className="text-orange-500" />
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-orange-200 dark:border-orange-800/40 bg-orange-100/60 dark:bg-orange-900/20">
+                <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center shadow-md shadow-orange-500/30">
+                    <CreditCard size={17} className="text-white" />
                 </div>
                 <div className="flex-1">
                     <p className="text-sm font-black text-orange-700 dark:text-orange-400">Cuentas Pendientes de Cobro</p>
-                    <p className="text-[11px] text-orange-500/70">{pendingSessions.length} mesa{pendingSessions.length !== 1 ? 's' : ''} esperando</p>
+                    <p className="text-[11px] text-orange-500/80">Toca una fila para procesar el cobro</p>
                 </div>
-                <div className="w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center text-[10px] font-black animate-pulse">
-                    {pendingSessions.length}
+                <div className="relative">
+                    <div className="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-black">
+                        {pendingSessions.length}
+                    </div>
+                    <span className="absolute inset-0 rounded-full bg-orange-400 animate-ping opacity-40" />
                 </div>
             </div>
 
@@ -64,10 +60,10 @@ export function TableQueuePanel({ onCheckoutTable }) {
                         <button
                             key={session.id}
                             onClick={() => onCheckoutTable({ table, session, elapsed, timeCost, totalConsumption, currentItems: items, grandTotal })}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-orange-100/60 dark:hover:bg-orange-900/20 transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-orange-100/70 dark:hover:bg-orange-900/20 active:scale-[0.99] transition-all text-left"
                         >
                             {/* Table name badge */}
-                            <div className="w-10 h-10 bg-orange-500 text-white rounded-xl flex items-center justify-center font-black text-xs shrink-0 shadow-md shadow-orange-500/20">
+                            <div className="w-11 h-11 bg-orange-500 text-white rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-md shadow-orange-500/20">
                                 {table.name.replace(/[^0-9]/g, '') || table.name.charAt(0)}
                             </div>
 
@@ -88,11 +84,11 @@ export function TableQueuePanel({ onCheckoutTable }) {
 
                             {/* Total */}
                             <div className="text-right shrink-0">
-                                <p className="font-black text-slate-800 dark:text-white text-sm">${grandTotal.toFixed(2)}</p>
+                                <p className="font-black text-orange-600 dark:text-orange-400 text-base">${grandTotal.toFixed(2)}</p>
                                 <p className="text-[10px] text-slate-400">Bs {(grandTotal * tasaUSD).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
                             </div>
 
-                            <ChevronRight size={16} className="text-orange-400 shrink-0" />
+                            <ChevronRight size={18} className="text-orange-400 shrink-0" />
                         </button>
                     );
                 })}

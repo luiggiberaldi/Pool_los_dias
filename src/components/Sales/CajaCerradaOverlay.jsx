@@ -16,7 +16,7 @@ export default function CajaCerradaOverlay({ cartCount, onOpenApertura }) {
                 className="bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white px-8 md:px-12 py-4 md:py-5 rounded-2xl md:rounded-3xl font-bold shadow-lg shadow-emerald-500/30 transition-all flex items-center gap-3 text-base md:text-lg"
             >
                 <DollarSign size={24} />
-                <span>Aperturar Caja Ahora</span>
+                <span>Ir a Inicio para Aperturar Caja</span>
             </button>
             {cartCount > 0 && (
                 <p className="mt-8 text-xs font-semibold text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-500/10 px-4 py-2 rounded-xl">

@@ -171,11 +171,19 @@ export default function TableCard({ table, session }) {
             </div>
 
             {/* Timer & Cost display */}
-            <div className="flex-1 flex flex-col justify-center items-center py-2 sm:py-4 min-h-[100px]">
+            <div className="flex-1 flex flex-col justify-center items-center py-1 sm:py-3 min-h-[90px]">
                 {isAvailable ? (
-                    <div className="flex flex-col items-center opacity-40 grayscale">
-                        <Activity size={28} className="text-slate-300 sm:w-10 sm:h-10" strokeWidth={1.5} />
-                        <span className="text-[10px] sm:text-xs font-bold mt-2 text-slate-400 uppercase tracking-widest">
+                    <div className="flex flex-col items-center gap-2">
+                        <Activity
+                            size={28}
+                            className={`sm:w-9 sm:h-9 opacity-25 ${table.type === 'NORMAL' ? 'text-slate-400' : 'text-sky-400'}`}
+                            strokeWidth={1.5}
+                        />
+                        <span className={`text-xs sm:text-sm font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                            table.type === 'NORMAL'
+                                ? 'text-slate-500 bg-slate-100 border-slate-200'
+                                : 'text-sky-600 bg-sky-50 border-sky-200'
+                        }`}>
                             {table.type === 'NORMAL' ? 'Mesa Normal' : 'Mesa de Pool'}
                         </span>
                     </div>
@@ -194,28 +202,31 @@ export default function TableCard({ table, session }) {
                         ) : (
                             <>
                                 {session.game_mode === 'PINA' ? (
-                                    <div className="flex flex-col items-center justify-center gap-1.5 mt-1">
-                                        <div className="w-12 h-12 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center shadow-inner mb-1">
-                                            <TargetIcon size={24} />
+                                    <div className="flex flex-col items-center gap-1 mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center shrink-0">
+                                                <TargetIcon size={16} />
+                                            </div>
+                                            <div className="text-lg font-black tracking-tight text-amber-400 uppercase leading-none">
+                                                Modo Piña
+                                            </div>
                                         </div>
-                                        <div className="text-xl sm:text-2xl font-black tracking-tighter text-amber-500 uppercase leading-none">
-                                            Modo Piña
-                                        </div>
-                                        <div className="text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 bg-white/10 px-2 py-0.5 rounded-full">
-                                            Tiempo en mesa: {formatElapsedTime(elapsed)}
+                                        <div className="text-[10px] font-bold text-white/60 bg-white/10 px-2 py-0.5 rounded-full">
+                                            {formatElapsedTime(elapsed)} en mesa
                                         </div>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="flex items-center justify-center gap-2 relative group">
+                                        <div className="flex items-center justify-center gap-2">
                                             <div className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
                                                 {hasLimit ? formatElapsedTime(Math.abs(remainingMins)) : formatElapsedTime(elapsed)}
                                             </div>
                                             <button 
                                                 onClick={handleAdjustTime} 
-                                                className="absolute -right-7 opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-sky-400 bg-white/10 rounded-full transition-all active:scale-95"
+                                                className="p-1.5 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"
+                                                title="Ampliar tiempo"
                                             >
-                                                <Edit2 size={14} />
+                                                <span className="text-lg font-black leading-none">+</span>
                                             </button>
                                         </div>
                                         {hasLimit && (
@@ -242,8 +253,8 @@ export default function TableCard({ table, session }) {
                             </button>
                         </div>
                         {session.game_mode === 'PINA' && (
-                            <div className="text-[10px] sm:text-xs font-bold opacity-70 mt-2 uppercase tracking-wider text-center flex flex-col items-center text-amber-500">
-                                <span>Partidas: {1 + (Number(session.extended_times) || 0)}</span>
+                            <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mt-1 text-center">
+                                {1 + (Number(session.extended_times) || 0)} partida{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
                             </div>
                         )}
                     </>
@@ -280,26 +291,26 @@ export default function TableCard({ table, session }) {
                         <div className="flex flex-col gap-1.5">
                         {/* Botón exclusivo Piña: nueva partida */}
                         {session?.game_mode === 'PINA' && !isCheckoutPending && (
-                            <div className="flex gap-1.5">
+                            <div className="flex flex-col gap-1">
                                 <button
                                     onClick={async () => {
                                         await useTablesStore.getState().addRoundToSession(session.id);
                                     }}
-                                    className="flex-1 bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
+                                    className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs py-3 rounded-xl shadow-md transition-all whitespace-nowrap"
                                 >
-                                    <TargetIcon size={13} /> + Nueva Partida
+                                    + Nueva Partida
                                 </button>
                                 {(currentUser?.role === 'ADMIN' || currentUser?.rol === 'ADMIN') && (Number(session?.extended_times) || 0) > 0 && (
                                     <button
                                         onClick={() => useTablesStore.getState().removeRoundFromSession(session.id)}
-                                        title="Quitar partida (solo Admin)"
-                                        className="shrink-0 w-9 bg-rose-500/80 hover:bg-rose-500 active:scale-95 text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center"
+                                        className="w-full text-[10px] font-bold text-white/80 bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/30 transition-colors py-1 rounded-lg flex items-center justify-center gap-1 whitespace-nowrap"
                                     >
-                                        <X size={14} strokeWidth={3} />
+                                        <X size={10} strokeWidth={2.5} /> Quitar última partida
                                     </button>
                                 )}
                             </div>
                         )}
+
 
                         {isCheckoutPending ? (
                             /* ── Estado: enviado a caja ── */

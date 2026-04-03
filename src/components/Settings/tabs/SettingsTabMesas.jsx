@@ -4,8 +4,29 @@ import { SectionCard } from '../../SettingsShared';
 import { useTablesStore } from '../../../hooks/store/useTablesStore';
 import ConfirmModal from '../../ConfirmModal';
 
+function useBcvRate() {
+    const [rate, setRate] = useState(1);
+    useEffect(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
+            if (saved?.bcv?.price) setRate(saved.bcv.price);
+        } catch {}
+        
+        const handleStorage = () => {
+             try {
+                const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
+                if (saved?.bcv?.price) setRate(saved.bcv.price);
+            } catch {}
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, []);
+    return rate;
+}
+
 export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const { config, updateConfig, tables, addTable, updateTable, deleteTable } = useTablesStore();
+    const bcvRate = useBcvRate();
     
     // Config State
     const [pricePerHour, setPricePerHour] = useState(config?.pricePerHour || 0);
@@ -18,12 +39,32 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const [isSaving, setIsSaving] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
 
+    const getNextTableName = () => {
+        let maxNum = 0;
+        const currentTables = useTablesStore.getState().tables;
+        currentTables.forEach(t => {
+            const match = t.name.match(/\d+/);
+            if (match) {
+                const num = parseInt(match[0], 10);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+        return `Mesa ${maxNum + 1}`;
+    };
+
     useEffect(() => {
         if (config) {
             setPricePerHour(config.pricePerHour);
             setPricePina(config.pricePina);
         }
     }, [config]);
+
+    // Auto-fill next table name when not editing and not typed yet
+    useEffect(() => {
+        if (!isEditing && tableName === '') {
+            setTableName(getNextTableName());
+        }
+    }, [tables, isEditing]);
 
     const handleSaveConfig = async () => {
         await updateConfig({
@@ -47,7 +88,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             }
             // Reset
             setIsEditing(null);
-            setTableName('');
+            setTableName(getNextTableName()); // Now safely uses fresh state!
             setTableType('POOL');
         } catch (e) {
             showToast('Error al guardar tabla', 'error');
@@ -83,7 +124,10 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Aplica globalmente para Mesas de Pool" iconColor="text-emerald-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Hora Libre (USD)</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex justify-between items-center">
+                            <span>Hora Libre (USD)</span>
+                            <span className="text-emerald-500/80 lowercase">~ bs {(pricePerHour * bcvRate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</span>
+                        </label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
                             <input
@@ -95,7 +139,10 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                         </div>
                     </div>
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">La Piña (USD)</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex justify-between items-center">
+                            <span>La Piña (USD)</span>
+                            <span className="text-emerald-500/80 lowercase">~ bs {(pricePina * bcvRate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</span>
+                        </label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
                             <input

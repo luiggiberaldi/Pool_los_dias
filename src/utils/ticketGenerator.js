@@ -305,7 +305,7 @@ export function printThermalTicket(sale, bcvRate) {
 
     // ── OBTENER CONFIGURACIÓN DEL NEGOCIO ──
     const settings = { 
-        name: localStorage.getItem('business_name') || 'Bodega Sin Nombre', 
+        name: localStorage.getItem('business_name') || 'Pool Los Diaz', 
         rif: localStorage.getItem('business_rif') || '', 
         address: localStorage.getItem('business_address') || '', 
         phone: localStorage.getItem('business_phone') || '', 

@@ -7,6 +7,13 @@ const tablesCache = localforage.createInstance({
     storeName: "tables_cache"
 });
 
+const sortTables = (tables) => {
+    if (!tables) return [];
+    return [...tables].sort((a, b) => {
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    });
+};
+
 export const useTablesStore = create((set, get) => ({
     tables: [],
     activeSessions: [],
@@ -32,7 +39,7 @@ export const useTablesStore = create((set, get) => ({
             const cachedSessions = await tablesCache.getItem('active_sessions') || [];
             
             set({ 
-                tables: cachedTables, 
+                tables: sortTables(cachedTables), 
                 activeSessions: cachedSessions,
                 loading: false 
             });
@@ -70,11 +77,13 @@ export const useTablesStore = create((set, get) => ({
 
             if (sessionsError) throw sessionsError;
 
-            await tablesCache.setItem('tables', tablesData);
+            const finalTables = sortTables(tablesData);
+
+            await tablesCache.setItem('tables', finalTables);
             await tablesCache.setItem('active_sessions', sessionsData);
 
             set({
-                tables: tablesData,
+                tables: finalTables,
                 activeSessions: sessionsData
             });
 
@@ -162,20 +171,23 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    closeSession: async (sessionId, staffId, totalCost) => {
+    closeSession: async (sessionId, staffId, totalCost, paymentMethod = null) => {
         // Optimistic UI update
         const { activeSessions } = get();
         const updatedList = activeSessions.filter(s => s.id !== sessionId);
         set({ activeSessions: updatedList });
 
         try {
+            const updatePayload = { 
+                status: 'CLOSED',
+                closed_at: new Date().toISOString(),
+                total_cost_usd: totalCost
+            };
+            if (paymentMethod) updatePayload.payment_method = paymentMethod;
+
             const { error } = await supabaseCloud
                 .from('table_sessions')
-                .update({ 
-                    status: 'CLOSED',
-                    closed_at: new Date().toISOString(),
-                    total_cost_usd: totalCost
-                })
+                .update(updatePayload)
                 .eq('id', sessionId);
 
             if (error) throw error;
@@ -323,7 +335,7 @@ export const useTablesStore = create((set, get) => ({
 
             if (error) throw error;
             // Optimistic update locally
-            set(state => ({ tables: [...state.tables, data] }));
+            set(state => ({ tables: sortTables([...state.tables, data]) }));
             await tablesCache.setItem('tables', get().tables);
             return data;
         } catch (e) {
@@ -342,7 +354,7 @@ export const useTablesStore = create((set, get) => ({
             if (error) throw error;
             // Optimistic update
             set(state => ({
-                tables: state.tables.map(t => t.id === id ? { ...t, ...updates } : t)
+                tables: sortTables(state.tables.map(t => t.id === id ? { ...t, ...updates } : t))
             }));
             await tablesCache.setItem('tables', get().tables);
         } catch (e) {

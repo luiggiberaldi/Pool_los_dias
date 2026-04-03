@@ -308,9 +308,9 @@ export function useCloudAuthLogic() {
                             device_id: deviceId || 'UNKNOWN',
                             license_type: 'trial',
                             days_remaining: 7,
-                            max_devices: 1,
+                            max_devices: 10,
                             valid_until: trialExpiry.toISOString(),
-                            business_name: businessName || 'Bodega',
+                            business_name: businessName || 'Pool Los Diaz',
                             phone: inputPhone || '',
                             active: true,
                             updated_at: new Date().toISOString()

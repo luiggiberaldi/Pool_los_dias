@@ -7,6 +7,7 @@ import { ProductsView } from './views/ProductsView';
 import SettingsView from './views/SettingsView';
 import ResetPasswordView from './views/ResetPasswordView';
 import TablesView from './views/TablesView';
+import CashierCheckoutView from './views/CashierCheckoutView';
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -271,14 +272,24 @@ export default function App() {
 
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
-    { id: 'mesas', label: 'Mesas', icon: Layers },
-    { id: 'ventas', label: 'Vender', icon: ShoppingCart },
-    { id: 'catalogo', label: 'Inventario', icon: Store },
-    { id: 'clientes', label: 'Contactos', icon: Users },
+    { id: 'mesas', label: 'Mesas', icon: Layers, hiddenForCajero: true },
+    { id: 'ventas', label: 'Vender', icon: ShoppingCart, hiddenForMesero: true },
+    { id: 'catalogo', label: 'Inventario', icon: Store, adminOnly: true },
+    { id: 'clientes', label: 'Contactos', icon: Users, adminOrCashier: true },
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
     { id: 'ajustes', label: 'Config.', icon: Settings, adminOnly: true },
   ];
-  const TABS = isCajero ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS;
+  
+  const TABS = role === 'ADMIN' ? ALL_TABS : 
+               role === 'CAJERO' ? ALL_TABS.filter(t => !t.adminOnly && !t.hiddenForCajero) : 
+               ALL_TABS.filter(t => !t.adminOnly && !t.adminOrCashier && !t.hiddenForMesero);
+
+  // Auto-redirect CAJERO away from mesas (they use SalesView with TableQueuePanel)
+  useEffect(() => {
+    if (role === 'CAJERO' && activeTab === 'mesas') {
+        setActiveTab('ventas');
+    }
+  }, [role, activeTab]);
 
   // Global Hard Gate: Loading State
   if (checkingSession) {
@@ -375,7 +386,7 @@ export default function App() {
           </ErrorBoundary>
         </div>
 
-        {/* Mesas de Pool */}
+        {/* Mesas de Pool / Cola de Cobros */}
         <div className={`flex-1 flex flex-col ${activeTab === 'mesas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AnyStaffRoute>

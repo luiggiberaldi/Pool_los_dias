@@ -34,6 +34,12 @@ let globalSubscription = null;
 let isSyncingFromCloud = false; // true mientras aplicamos cambios de la nube → evita eco
 let pendingPush = {};           // Debounce: { [key]: timeoutId }
 
+// Bandera para proteger un import reciente: si se setea, el pull inicial no sobreescribe datos locales
+const IMPORT_GUARD_KEY = '_poolbar_import_guard';
+export const setImportGuard = () => sessionStorage.setItem(IMPORT_GUARD_KEY, '1');
+export const clearImportGuard = () => sessionStorage.removeItem(IMPORT_GUARD_KEY);
+const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
+
 // Interceptor de localStorage — solo para llaves 'local'
 const originalSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function (key, value) {
@@ -139,16 +145,22 @@ export function useCloudSync() {
                 const userId = session.user.id;
 
                 // ── Pull Inicial ───────────────────────────────────────────
-                const { data: docs } = await supabaseCloud
-                    .from('sync_documents')
-                    .select('collection, doc_id, data')
-                    .in('collection', ['store', 'local']);
+                // Si hay un guard de import, NO sobreescribir datos locales recién importados
+                if (hasImportGuard()) {
+                    console.log('[CloudSync] Guard de import activo — pull inicial omitido para proteger datos importados.');
+                    clearImportGuard();
+                } else {
+                    const { data: docs } = await supabaseCloud
+                        .from('sync_documents')
+                        .select('collection, doc_id, data')
+                        .in('collection', ['store', 'local']);
 
-                if (docs?.length > 0) {
-                    for (const doc of docs) {
-                        await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+                    if (docs?.length > 0) {
+                        for (const doc of docs) {
+                            await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+                        }
+                        console.log(`[CloudSync] Pull inicial: ${docs.length} documentos aplicados.`);
                     }
-                    console.log(`[CloudSync] Pull inicial: ${docs.length} documentos aplicados.`);
                 }
 
                 // ── Suscripción WebSocket Realtime ─────────────────────────

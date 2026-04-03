@@ -5,15 +5,16 @@ import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 import { LogOut, DownloadCloud } from 'lucide-react';
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { useConfirm } from '../../hooks/useConfirm.jsx';
 
 export default function LoginScreen() {
     const { cachedUsers, login, syncUsers, logout } = useAuthStore();
     const { activeCashSession } = useCashStore();
+    const confirm = useConfirm();
     
     const [selectedUser, setSelectedUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    // Initial sync of users if empty
     useEffect(() => {
         if (cachedUsers.length === 0) {
             handleForceSync();
@@ -28,14 +29,17 @@ export default function LoginScreen() {
 
     const handlePinSubmit = async (pin, userId) => {
         const success = await login(userId, pin);
-        if (success) {
-            setSelectedUser(null);
-        }
+        if (success) setSelectedUser(null);
         return success;
     };
 
     const handleCloudLogout = async () => {
-        const ok = window.confirm('¿Cerrar sesión remota? Se borrará todo caché.');
+        const ok = await confirm({
+            title: '¿Cerrar sesión remota?',
+            message: 'Se borrará todo caché.',
+            confirmText: 'Sí, cerrar sesión',
+            variant: 'logout'
+        });
         if (!ok) return;
         await logout();
         await supabaseCloud.auth.signOut();
@@ -43,73 +47,89 @@ export default function LoginScreen() {
     };
 
     return (
-        <div className="fixed inset-0 z-[300] bg-slate-50 text-slate-800 font-sans flex flex-col justify-center items-center overflow-auto min-h-screen">
-            {/* Background glow */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="fixed inset-0 z-[300] bg-slate-50 text-slate-800 font-sans" style={{ overflowY: 'auto' }}>
+            {/* Background glow — decorativo, no interfiere con layout */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute -top-[30%] -left-[15%] w-[600px] h-[600px] bg-sky-500/10 rounded-full blur-[120px]" />
                 <div className="absolute -bottom-[30%] -right-[15%] w-[600px] h-[600px] bg-teal-400/10 rounded-full blur-[120px]" />
             </div>
 
-            <div className="relative z-10 w-full p-6 flex flex-col items-center flex-1 justify-center min-h-[500px]">
-                {/* Header */}
-                <div className="text-center mb-14">
-                    <div className="flex justify-center mb-6">
-                        <img src="/logo.png" alt="Logo" className="h-48 sm:h-64 w-auto object-contain drop-shadow-md" />
-                    </div>
+            {/* Contenedor principal — siempre ocupa al menos la pantalla completa */}
+            <div className="relative z-10 min-h-screen flex flex-col items-center justify-between px-6 py-8 gap-6">
+
+                {/* ── LOGO + TÍTULO ── */}
+                <div className="text-center flex flex-col items-center gap-3 w-full">
+                    <img
+                        src="/logo.png"
+                        alt="Logo"
+                        className="w-auto object-contain drop-shadow-md"
+                        style={{ height: 'clamp(80px, 20vw, 180px)' }}
+                    />
                     <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-500">
                         Quien esta <strong className="text-slate-800 font-bold">operando</strong>?
                     </h1>
                 </div>
 
-                <div className="w-full flex justify-center">
+                {/* ── GRID DE USUARIOS ── */}
+                <div className="w-full flex-1 flex items-center justify-center py-4">
                     {cachedUsers.length === 0 ? (
-                        <div className="text-center text-slate-500 mb-8 max-w-sm">
-                            <p className="mb-4">No hay usuarios en caché.</p>
-                            <button 
+                        <div className="text-center text-slate-500 max-w-xs w-full">
+                            <p className="mb-4 text-sm">No hay usuarios en caché.</p>
+                            <button
                                 onClick={handleForceSync}
                                 disabled={isSyncing}
                                 className="px-6 py-2 bg-sky-500 text-white rounded-full font-medium shadow-md shadow-sky-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 w-full"
                             >
                                 <DownloadCloud className={`w-5 h-5 ${isSyncing ? 'animate-bounce' : ''}`} />
-                                {isSyncing ? "Sincronizando..." : "Sincronizar ahora"}
+                                {isSyncing ? 'Sincronizando...' : 'Sincronizar ahora'}
                             </button>
                         </div>
                     ) : (
-                        <div className="w-full grid grid-cols-2 md:flex md:flex-row md:flex-wrap md:justify-center gap-8 sm:gap-14 max-w-[320px] md:max-w-5xl mx-auto">
+                        /* Flex wrap: se ajusta automáticamente al número de cards (1,2,3,N).
+                           En móvil max 2 por fila; en pantallas más grandes toda en fila. */
+                        <div
+                            className="flex flex-wrap justify-center gap-8 sm:gap-12"
+                            style={{ maxWidth: cachedUsers.length <= 2 ? '320px' : '520px' }}
+                        >
                             {cachedUsers.map(user => (
-                                <UserCard
+                                <div
                                     key={user.id}
-                                    user={user}
-                                    onClick={() => setSelectedUser(user)}
-                                />
+                                    style={{ flexBasis: 'calc(50% - 16px)', maxWidth: '130px', minWidth: '100px' }}
+                                >
+                                    <UserCard
+                                        user={user}
+                                        onClick={() => setSelectedUser(user)}
+                                    />
+                                </div>
                             ))}
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* Footer */}
-            <div className="relative z-10 w-full pb-8 text-center flex flex-col items-center gap-4 mt-auto">
-                <p className="text-[10px] text-slate-600 font-medium tracking-wider">
-                    PIN de 4 digitos requerido
-                </p>
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={handleForceSync}
-                        disabled={isSyncing}
-                        className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50"
-                    >
-                        <DownloadCloud className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
-                        Refrescar
-                    </button>
-                    <button
-                        onClick={handleCloudLogout}
-                        className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
-                    >
-                        <LogOut className="w-3 h-3" strokeWidth={2.5} />
-                        Cerrar sesión
-                    </button>
+                {/* ── FOOTER ── */}
+                <div className="w-full text-center flex flex-col items-center gap-3">
+                    <p className="text-[10px] text-slate-600 font-medium tracking-wider">
+                        Ingresa tu PIN asignado
+                    </p>
+                    <div className="flex items-center gap-6">
+                        <button
+                            onClick={handleForceSync}
+                            disabled={isSyncing}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50"
+                        >
+                            <DownloadCloud className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
+                            Refrescar
+                        </button>
+                        <button
+                            onClick={handleCloudLogout}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
+                        >
+                            <LogOut className="w-3 h-3" strokeWidth={2.5} />
+                            Cerrar sesión
+                        </button>
+                    </div>
                 </div>
+
             </div>
 
             {/* PIN Modal */}

@@ -1,4 +1,4 @@
-# 🎱 Pool Los Diaz — Hoja de Ruta del Sistema
+![alt text](image.png)# 🎱 Pool Los Diaz — Hoja de Ruta del Sistema
 
 > **Versión:** 1.0  
 > **Proyecto:** Pool Los Diaz POS  
@@ -35,7 +35,7 @@ Sistema de punto de venta especializado para un salón de billar, con gestión d
 
 ---
 
-## FASE 2 — Plano Interactivo de Mesas de Pool 🔲 (COMPLETADA)
+## FASE 2 — Plano Interactivo de Mesas de Pool ✅ (COMPLETADA)
 
 **Objetivo:** Vista principal de operación. El operador ve el estado de cada mesa en tiempo real y puede asignar sesiones, ver timers y cobrar.
 
@@ -58,56 +58,57 @@ Sistema de punto de venta especializado para un salón de billar, con gestión d
 
 ---
 
-## FASE 2.5 — Refinamiento Administrativo y UI Móvil 🔲
+## FASE 2.5 — Refinamiento Administrativo y UI Móvil ✅ (COMPLETADA)
 
 **Objetivo:** Permitir al administrador autogestionar el plano estructural del bar (añadir/editar mesas) y optimizar la experiencia para los meseros en teléfonos.
 
 ### Entregables
-- [ ] Módulo Administrativo: CRUD de Mesas (Añadir mesas nuevas, cambiar nombres).
-- [ ] Tipos de Mesas: Soporte para 'Mesa de Pool' (con temporizador) vs 'Mesa Normal' (sólo para cargar consumo, sin costo por tiempo).
-- [ ] UI/UX Móvil: Optimización de la vista `TablesView.jsx` (Reducción de márgenes, grilla colapsable o modo lista para manejar +10 mesas).
+- [x] Módulo Administrativo: CRUD de Mesas (Añadir mesas nuevas, cambiar nombres).
+- [x] Tipos de Mesas: Soporte para 'Mesa de Pool' (con temporizador) vs 'Mesa Normal' (sólo para cargar consumo, sin costo por tiempo).
+- [x] Filtros Dinámicos: Barra de filtros combinados por **Tipo** (Todas/Pool/Bar) y **Estado** (Libres/Ocupadas).
+- [x] UI/UX Móvil: Optimización de la vista `TablesView.jsx` con diseño adhesivo (sticky) para filtros y contadores.
 
 ---
 
-## FASE 3 — Sistema de Órdenes, Comandas y Cobro 🔲
+## FASE 3 — Sistema de Órdenes, Consumo y Cobro ✅ (COMPLETADA)
 
 **Objetivo:** Vincular órdenes de consumo de barra a cada mesa, gestionar la expansión de tiempo y proveer un checkout robusto unificado (consumo + mesas).
 
 ### Entregables
-- [ ] Tabla `orders`, `order_items` y `payments`.
-- [ ] Componente `OrderPanel.jsx` — Panel para agregar ítems a la mesa activa.
-- [ ] Soporte para "Ampliar Uso": Añadir horas de forma manual o modificar el tiempo actual a cuenta cliente.
-- [ ] Modal interactivo de "Cobrar y Cerrar": Resumen de TODO lo gastado (Horas jugadas + Productos consumidos) antes de cerrar la mesa.
-- [ ] Motor de Impresión por Mesa: Capacidad de emitir un Ticket Parcial (cuenta temporal o saldo actual para el cliente).
-- [ ] Flujo de cobro integrado con el motor existente (`checkoutProcessor.js`).
+- [x] Tabla `orders`, `order_items` y `payments`.
+- [x] Componente `OrderPanel.jsx` — Re-diseñado en **Light Mode** y renombrado a "**Consumo**".
+- [x] Modal de "Detalle de Cuenta": Desglose premium de tiempo (solo pool) e ítems consumidos con conversión dual ($/Bs).
+- [x] Diferenciación visual: Esquemas de color únicos para mesas de Pool (Cielo) vs Mesas de Bar (Bulto/Violeta).
+- [x] Motor de Impresión por Mesa: Capacidad de emitir un Ticket Parcial (cuenta temporal o saldo actual para el cliente).
+- [x] Flujo de cobro integrado con el motor existente (`checkoutProcessor.js`).
 
 ---
 
-## FASE 4 — Apertura y Cierre de Caja 🔲
+## FASE 4 — Apertura y Cierre de Caja ✅ (COMPLETADA)
 
 **Objetivo:** Control formal del dinero físico. El administrador abre la caja con un fondo inicial, el cajero opera, y al final del turno se realiza el arqueo y cierre.
 
 ### Entregables
-- [ ] Tabla `cash_sessions` (fondo inicial USD/Bs, tasas del momento, estado, arqueo, cajero)
-- [ ] Pantalla de **Apertura de Caja** — Ingreso de fondo inicial y verificación de tasas
-- [ ] Bloqueo de acceso para cajeros/meseros si no hay caja abierta
-- [ ] Vista de **Cierre de Caja** — Arqueo físico vs sistema, diferencias en USD y Bs
-- [ ] Generación de PDF de cierre del día (ya parcialmente implementado en `dailyCloseGenerator.js`)
-- [ ] Historial de sesiones de caja en `DashboardView`
+- [x] Tabla `cash_sessions` (fondo inicial USD/Bs, tasas del momento, estado, arqueo, cajero)
+- [x] Pantalla de **Apertura de Caja** — Ingreso de fondo inicial y verificación de tasas
+- [x] Bloqueo de acceso para cajeros/meseros si no hay caja abierta
+- [x] Vista de **Cierre de Caja** — Arqueo físico vs sistema, diferencias en USD y Bs (Cierre Ciego implementado)
+- [x] Generación de Ticket Térmico/PDF de cierre de caja (`dailyCloseGenerator.js`)
+- [x] Historial de sesiones de caja visualizado en `ReportsView.jsx`
 
 ---
 
-## FASE 5 — Inventario de Barra y Cocina 🔲
+## FASE 5 — Inventario de Barra y Cocina ✅ (COMPLETADA)
 
-**Objetivo:** Control de stock de los productos vendidos en el salón (bebidas, snacks, insumos). Descuento automático de inventario al procesar una orden.
+**Objetivo:** Control de stock de los productos vendidos en el salón (bebidas, snacks, insumos). Descuento automático de inventario al procesar una orden. *(Esta fase se autocompletó gracias a la migración total de componentes desde Abasto)*.
 
 ### Entregables
-- [ ] Integración del catálogo de productos existente con la nueva tabla `products` en Supabase
-- [ ] Descuento automático de stock al confirmar una orden (`process_checkout` RPC)
-- [ ] Alertas de stock bajo configurables por producto
-- [ ] Vista de inventario con filtros por categoría (Bebidas, Snacks, Insumos de mesa)
-- [ ] Módulo de ajuste de inventario (entradas, salidas manuales, mermas)
-- [ ] Reporte de rotación de productos integrado en el cierre del día
+- [x] Integración del catálogo de productos existente con la nueva tabla `products` en Supabase
+- [x] Descuento automático de stock al confirmar una orden (`process_checkout` RPC)
+- [x] Alertas de stock bajo configurables por producto
+- [x] Vista de inventario con filtros por categoría (Bebidas, Snacks, Insumos de mesa)
+- [x] Módulo de ajuste de inventario (entradas, salidas manuales, mermas)
+- [x] Reporte de rotación de productos integrado en el cierre del día
 
 ---
 
@@ -115,10 +116,10 @@ Sistema de punto de venta especializado para un salón de billar, con gestión d
 
 ```
 ABR 2026   ████████░░░░░░░░░░░░  FASE 1 — Login y Roles
-MAY 2026   ████████████░░░░░░░░  FASE 2 — Plano de Mesas
-JUN 2026   ████████████░░░░░░░░  FASE 3 — Órdenes y Comandas
-JUL 2026   ████████░░░░░░░░░░░░  FASE 4 — Apertura y Cierre de Caja
-AGO 2026   ████████░░░░░░░░░░░░  FASE 5 — Inventario de Barra
+MAY 2026   ██████████████████░░  FASE 2 — Plano y Refinamiento (Filtrado)
+JUN 2026   ███████████████░░░░░  FASE 3 — Órdenes y Consumo
+JUL 2026   ████████████████████  FASE 4 — Apertura y Cierre de Caja
+AGO 2026   ████████████████████  FASE 5 — Inventario de Barra
 ```
 
 ---
@@ -171,6 +172,6 @@ AGO 2026   ████████░░░░░░░░░░░░  FASE 5 
 | Tickets térmicos 58mm | ✅ Calibrado |
 | Sistema de Login por PIN | ✅ Completo (Fase 1) |
 | Plano de Mesas con Timers | ✅ Completo (Fase 2) |
-| Órdenes y Comandas | ⏳ Pendiente (Fase 3) |
-| Apertura / Cierre de Caja | ⏳ Pendiente (Fase 4) |
-| Inventario de Barra | ⏳ Pendiente (Fase 5) |
+| Apertura / Cierre de Caja | ✅ Completo (Fase 4) |
+| Órdenes y Comandas | ✅ Completo (Fase 3) |
+| Inventario de Barra | ✅ Completo (Fase 5) |

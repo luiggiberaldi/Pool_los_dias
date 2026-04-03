@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle } from 'lucide-react';
+import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle, Clock, Coffee, Layers } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 import { round2, mulR, divR, subR, sumR } from '../../utils/dinero';
@@ -27,7 +27,8 @@ export default function CheckoutModal({
     copEnabled,
     tasaCop,
     currentFloatUsd = 0,
-    currentFloatBs = 0
+    currentFloatBs = 0,
+    tableContext = null,  // { table, elapsed, timeCost, totalConsumption, currentItems, grandTotal }
 }) {
     // -- State: un valor por barra --
     const [barValues, setBarValues] = useState({});
@@ -257,6 +258,35 @@ export default function CheckoutModal({
 
             {/* --- SCROLLABLE BODY --- */}
             <div className="flex-1 overflow-y-auto overscroll-contain pb-28">
+
+            {/* -- MESA BREAKDOWN (solo cuando es cobro de mesa) -- */}
+                {tableContext && (
+                    <div className="mx-3 mb-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/40 rounded-2xl overflow-hidden">
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-orange-100 dark:border-orange-800/30 bg-orange-100/50 dark:bg-orange-900/20">
+                            <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center shrink-0">
+                                <Layers size={13} className="text-white" />
+                            </div>
+                            <p className="text-xs font-black text-orange-700 dark:text-orange-400">{tableContext.table.name}</p>
+                        </div>
+                        <div className="divide-y divide-orange-100 dark:divide-orange-800/20">
+                            {tableContext.timeCost > 0 && (
+                                <div className="flex items-center justify-between px-3 py-2">
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-500"><Clock size={11} className="text-blue-400" /> Tiempo de juego</span>
+                                    <span className="text-xs font-black text-slate-700 dark:text-white">${tableContext.timeCost.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {tableContext.currentItems?.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between px-3 py-1.5">
+                                    <span className="flex items-center gap-1.5 text-xs text-slate-500 truncate pr-2">
+                                        <Coffee size={11} className="text-amber-400 shrink-0" />
+                                        <span className="font-bold text-slate-600">{item.qty}x</span> {item.product_name || item.name}
+                                    </span>
+                                    <span className="text-xs font-black text-slate-700 dark:text-white shrink-0">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* -- TOTAL BIMONEDA -- */}
                 <div className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">

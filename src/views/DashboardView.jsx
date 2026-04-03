@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, CheckCircle2, LogOut } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, ListChecks, LineChart, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
 import CierreCajaWizard from '../components/Dashboard/CierreCajaWizard';
+import AperturaCajaModal from '../components/Dashboard/AperturaCajaModal';
+import OperatorDashboardPanel from '../components/Dashboard/OperatorDashboardPanel';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { processVoidSale } from '../utils/voidSaleProcessor';
@@ -20,6 +22,7 @@ import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
 import { useAuthStore as useLegacyAuthStore } from '../hooks/store/useAuthStore';
 import { useAuthStore } from '../hooks/store/authStore';
+import { useCashStore } from '../hooks/store/cashStore';
 import { useAudit } from '../hooks/useAudit';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -33,6 +36,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // Auth from new authStore
     const { currentUser: usuarioActivo, role, logout: authLogout } = useAuthStore();
     const isAdmin = role === 'ADMIN';
+
+    // Caja
+    const { activeCashSession, openCashSession, closeCashSession } = useCashStore();
 
     // Legacy Config checking
     const requireLogin = useLegacyAuthStore(s => s.requireLogin ?? false);
@@ -63,6 +69,39 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [showTopDeudas, setShowTopDeudas] = useState(false);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
+
+    const [isAperturaOpen, setIsAperturaOpen] = useState(false);
+
+    const handleSaveApertura = async (data) => {
+        try {
+            const todayStr = new Date().toISOString();
+            const aperturaRecord = {
+                id: `apertura_${Date.now()}`,
+                tipo: 'APERTURA_CAJA',
+                openingUsd: data.openingUsd,
+                openingBs: data.openingBs,
+                timestamp: todayStr,
+                cajaCerrada: false
+            };
+
+            const existingSales = await storageService.getItem(SALES_KEY, []);
+            const updatedSales = [...existingSales, aperturaRecord];
+            
+            await storageService.setItem(SALES_KEY, updatedSales);
+            setSales(updatedSales);
+            
+            // New native cash session handling for guards!
+            await openCashSession(data.openingUsd, data.openingBs, data.cashierName || usuarioActivo?.name);
+
+            setIsAperturaOpen(false);
+            showToast('Turno de Caja Abierto', 'success');
+            if (triggerHaptic) triggerHaptic();
+
+        } catch (error) {
+            console.error('Error al guardar apertura:', error);
+            showToast('Error al abrir la caja', 'error');
+        }
+    };
 
     useEffect(() => {
         if (!isActive) return;
@@ -316,10 +355,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // Handler: Cierre de Caja (abre modal de confirmación y cuadre)
     const handleDailyClose = () => {
         triggerHaptic && triggerHaptic();
-        if (todayCashFlow.length === 0 && todaySales.length === 0) {
-            showToast('No hay movimientos hoy para cerrar caja', 'error');
-            return;
-        }
         setIsCashReconOpen(true);
     };
 
@@ -365,6 +400,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
         await storageService.setItem(SALES_KEY, updatedSales);
         setSales(updatedSales);
+        
+        // Finalize global cash session
+        await closeCashSession(reconData, usuarioActivo?.email || 'admin');
+        
         setIsCashReconOpen(false);
         showToast('Cierre de caja completado (Historial conservado)', 'success');
         auditLog('VENTA', 'CIERRE_CAJA', 'Cierre de caja completado');
@@ -511,86 +550,96 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
-            {/* ── HERO REVENUE CARD ── */}
-            <div className="relative rounded-[1.5rem] overflow-hidden" style={{ background: 'linear-gradient(135deg, #0EA5E9 0%, #06B6D4 50%, #5EEAD4 100%)' }}>
-                <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
-                <div className="absolute -left-8 -bottom-8 w-36 h-36 rounded-full bg-white/5" />
-                <div className="relative z-10 p-5">
-                    <div className="flex items-start justify-between mb-4">
-                        <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Ingresos del día</span>
-                        <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
-                            {(() => { const d = new Date(); const days = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB']; const months = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']; return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`; })()}
-                        </span>
-                    </div>
-                    <div className="flex items-end justify-between">
-                        <div>
-                            <div className="flex items-baseline gap-0.5">
-                                <span className="text-white/80 text-xl font-black">$</span>
-                                <span className="text-[2.6rem] font-black text-white tracking-tight leading-none"><AnimatedCounter value={todayTotalUsd} /></span>
-                            </div>
-                            <p className="text-white/60 text-xs font-semibold mt-1.5">{formatBs(todayTotalBs)} Bs</p>
+            {isAdmin ? (
+                <>
+                {/* ── HERO REVENUE CARD ── */}
+                <div className="relative rounded-[1.5rem] overflow-hidden" style={{ background: 'linear-gradient(135deg, #0EA5E9 0%, #06B6D4 50%, #5EEAD4 100%)' }}>
+                    <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-white/10" />
+                    <div className="absolute -left-8 -bottom-8 w-36 h-36 rounded-full bg-white/5" />
+                    <div className="relative z-10 p-5">
+                        <div className="flex items-start justify-between mb-4">
+                            <span className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Ingresos del día</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 text-white px-2.5 py-1 rounded-full backdrop-blur-sm">
+                                {(() => { const d = new Date(); const days = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB']; const months = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']; return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]}`; })()}
+                            </span>
                         </div>
-                        <div className="text-right">
-                            <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2.5 mb-1.5">
-                                <p className="text-2xl font-black text-white leading-none"><AnimatedCounter value={todaySales.length} /></p>
-                                <p className="text-white/70 text-[10px] font-bold mt-0.5">{todaySales.length === 1 ? 'VENTA' : 'VENTAS'}</p>
+                        <div className="flex items-end justify-between">
+                            <div>
+                                <div className="flex items-baseline gap-0.5">
+                                    <span className="text-white/80 text-xl font-black">$</span>
+                                    <span className="text-[2.6rem] font-black text-white tracking-tight leading-none"><AnimatedCounter value={todayTotalUsd} /></span>
+                                </div>
+                                <p className="text-white/60 text-xs font-semibold mt-1.5">{formatBs(todayTotalBs)} Bs</p>
                             </div>
-                            <p className="text-white/60 text-[10px] font-semibold"><AnimatedCounter value={todayItemsSold} /> artículos</p>
+                            <div className="text-right">
+                                <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2.5 mb-1.5">
+                                    <p className="text-2xl font-black text-white leading-none"><AnimatedCounter value={todaySales.length} /></p>
+                                    <p className="text-white/70 text-[10px] font-bold mt-0.5">{todaySales.length === 1 ? 'VENTA' : 'VENTAS'}</p>
+                                </div>
+                                <p className="text-white/60 text-[10px] font-semibold"><AnimatedCounter value={todayItemsSold} /> artículos</p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* ── KPIs ROW ── */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-3 -top-3 w-14 h-14 bg-emerald-50 rounded-full blur-xl" />
-                    <div className="relative z-10">
-                        <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center mb-2.5">
-                            <TrendingUp size={18} className="text-emerald-600" strokeWidth={2.5} />
+                {/* ── KPIs ROW ── */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-3 -top-3 w-14 h-14 bg-emerald-50 rounded-full blur-xl" />
+                        <div className="relative z-10">
+                            <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center mb-2.5">
+                                <TrendingUp size={18} className="text-emerald-600" strokeWidth={2.5} />
+                            </div>
+                            <p className={`text-xl font-black leading-none ${todayProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{formatBs(todayProfit)} Bs</p>
+                            <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Ganancia est.</p>
                         </div>
-                        <p className={`text-xl font-black leading-none ${todayProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                            {todayProfit >= 0 ? '+' : ''}${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{formatBs(todayProfit)} Bs</p>
-                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Ganancia est.</p>
+                    </div>
+                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div className="absolute -right-3 -top-3 w-14 h-14 bg-sky-50 rounded-full blur-xl" />
+                        <div className="relative z-10">
+                            <div className="w-9 h-9 bg-sky-100 rounded-xl flex items-center justify-center mb-2.5">
+                                <ArrowUpRight size={18} className="text-sky-600" strokeWidth={2.5} />
+                            </div>
+                            <p className="text-xl font-black text-slate-800 leading-none">{formatBs(bcvRate)}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Bs por dólar</p>
+                            <p className="text-[10px] text-sky-500 mt-1.5 font-bold uppercase tracking-wider">Tasa BCV</p>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
-                    <div className="absolute -right-3 -top-3 w-14 h-14 bg-sky-50 rounded-full blur-xl" />
-                    <div className="relative z-10">
-                        <div className="w-9 h-9 bg-sky-100 rounded-xl flex items-center justify-center mb-2.5">
-                            <ArrowUpRight size={18} className="text-sky-600" strokeWidth={2.5} />
-                        </div>
-                        <p className="text-xl font-black text-slate-800 leading-none">{formatBs(bcvRate)}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Bs por dólar</p>
-                        <p className="text-[10px] text-sky-500 mt-1.5 font-bold uppercase tracking-wider">Tasa BCV</p>
-                    </div>
-                </div>
-            </div>
+                </>
+            ) : (
+                <OperatorDashboardPanel onNavigate={onNavigate} />
+            )}
 
             {/* ── ACCIONES RÁPIDAS ── */}
-            <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
+            <div className={`bg-white rounded-2xl p-3 border border-slate-100 shadow-sm ${!isAdmin ? 'mt-3' : ''}`}>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Acciones Rápidas</p>
                 <div className="flex gap-2">
-                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('ventas'); } }}
+                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('mesas'); } }}
                         className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
                         style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 12px rgba(14,165,233,0.25)' }}>
-                        <ShoppingCart size={22} className="text-white" />
-                        <span className="text-[11px] font-black text-white">Vender</span>
+                        <ListChecks size={22} className="text-white" />
+                        <span className="text-[11px] font-black text-white">{usuarioActivo?.role === 'CAJERO' ? 'Cobros' : 'Mesas'}</span>
                     </button>
-                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('catalogo'); } }}
-                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
-                        style={{ background: 'linear-gradient(135deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(51,65,85,0.15)' }}>
-                        <Store size={22} className="text-white" />
-                        <span className="text-[11px] font-black text-white">Inventario</span>
-                    </button>
-                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('clientes'); } }}
-                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
-                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
-                        <Users size={22} className="text-white" />
-                        <span className="text-[11px] font-black text-white">Clientes</span>
-                    </button>
+                    {isAdmin && (
+                        <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('reportes'); } }}
+                            className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                            style={{ background: 'linear-gradient(135deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(51,65,85,0.15)' }}>
+                            <LineChart size={22} className="text-white" />
+                            <span className="text-[11px] font-black text-white">Reportes</span>
+                        </button>
+                    )}
+                    {role !== 'MESERO' && (
+                        <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('clientes'); } }}
+                            className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                            style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
+                            <Users size={22} className="text-white" />
+                            <span className="text-[11px] font-black text-white">Clientes</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -610,32 +659,52 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
-            {/* ── CERRAR CAJA ── */}
-            {(todayCashFlow.length > 0 || todaySales.length > 0) ? (
-                <button onClick={handleDailyClose}
-                    className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group"
-                    style={{ background: 'linear-gradient(135deg, #F97316, #EF4444)', boxShadow: '0 6px 20px rgba(239,68,68,0.25)' }}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                            <LockIcon size={22} className="text-white" />
+            {/* ── CERRAR / ABRIR CAJA — solo Admin ── */}
+            {isAdmin ? (
+                !activeCashSession ? (
+                    <button onClick={() => setIsAperturaOpen(true)}
+                        className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
+                        style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 6px 20px rgba(5,150,105,0.25)' }}>
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <Unlock size={22} className="text-white" />
+                            </div>
+                            <div className="text-left">
+                                <p className="text-sm font-black text-white">Abrir Caja / Turno</p>
+                                <p className="text-[11px] text-white/80 font-medium">Click para iniciar el día de ventas</p>
+                            </div>
                         </div>
-                        <div className="text-left">
-                            <p className="text-sm font-black text-white">Cerrar Caja</p>
-                            <p className="text-[11px] text-white/70 font-medium">${todayTotalUsd.toFixed(2)} · {todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'}</p>
+                    </button>
+                ) : (
+                    <button onClick={handleDailyClose}
+                        className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
+                        style={{ background: 'linear-gradient(135deg, #F97316, #EF4444)', boxShadow: '0 6px 20px rgba(239,68,68,0.25)' }}>
+                        <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                                <LockIcon size={22} className="text-white" />
+                            </div>
+                            <div className="text-left">
+                                <p className="text-sm font-black text-white">Cerrar Caja</p>
+                                <p className="text-[11px] text-white/70 font-medium">
+                                    {todaySales.length === 0 && todayCashFlow.length === 0 
+                                        ? 'Caja sin movimientos' 
+                                        : `$${todayTotalUsd.toFixed(2)} · ${todaySales.length} ${todaySales.length === 1 ? 'venta' : 'ventas'}`}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
-                        <ArrowUpRight size={18} className="text-white" />
-                    </div>
-                </button>
-            ) : (
-                <div className="w-full bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                        <CheckCircle2 size={20} className="text-emerald-500" />
+                        <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                            <ArrowUpRight size={18} className="text-white" />
+                        </div>
+                    </button>
+                )
+            ) : (!activeCashSession) && (
+                <div className="w-full bg-amber-50 rounded-2xl p-4 border border-amber-200 shadow-sm flex items-center gap-3 mt-4">
+                    <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center border-2 border-white shadow-sm">
+                        <LockIcon size={22} className="text-amber-500" />
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-slate-600">Sin ventas pendientes</p>
-                        <p className="text-[11px] text-slate-400">La caja está limpia</p>
+                        <p className="text-sm font-black text-slate-800">Caja Cerrada</p>
+                        <p className="text-[11px] font-semibold text-slate-500">Espera que un Administrador abra el turno para operar</p>
                     </div>
                 </div>
             )}
@@ -689,7 +758,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 )}
 
             {/* Pago por Metodo */}
-            {Object.keys(paymentBreakdown).length > 0 && (() => {
+            {isAdmin && Object.keys(paymentBreakdown).length > 0 && (() => {
                 const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
                 const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
                 const bsMethods = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
@@ -793,18 +862,20 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             })()}
 
             {/* Gráfica semanal */}
-            <SalesChart
-                weekData={weekData} 
-                selectedDate={selectedChartDate}
-                onDayClick={(date) => {
-                    triggerHaptic();
-                    setSelectedChartDate(prev => prev === date ? null : date);
-                    setTimeout(() => { window.scrollBy({ top: 150, behavior: 'smooth' }); }, 50);
-                }}
-            />
+            {isAdmin && (
+                <SalesChart
+                    weekData={weekData} 
+                    selectedDate={selectedChartDate}
+                    onDayClick={(date) => {
+                        triggerHaptic();
+                        setSelectedChartDate(prev => prev === date ? null : date);
+                        setTimeout(() => { window.scrollBy({ top: 150, behavior: 'smooth' }); }, 50);
+                    }}
+                />
+            )}
 
             {/* Bajo Stock */}
-            {lowStockProducts.length > 0 && (
+            {isAdmin && lowStockProducts.length > 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-amber-100 shadow-sm">
                     <h3 className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-1.5"><AlertTriangle size={14} /> Bajo Stock</h3>
                     <div className="flex flex-wrap gap-2">
@@ -820,7 +891,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* Top Productos */}
-            {topProducts.length > 0 && (
+            {isAdmin && topProducts.length > 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-1.5"><TrendingUp size={14} /> Más Vendidos</h3>
                     <div className="space-y-3">
@@ -839,23 +910,25 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
-            <SalesHistory
-                sales={sales}
-                recentSales={recentSales}
-                bcvRate={bcvRate}
-                totalSalesCount={sales.length}
-                isAdmin={isAdmin}
-                onVoidSale={handleVoidSale}
-                onShareWhatsApp={handleShareWhatsApp}
-                onDownloadPDF={handleDownloadPDF}
-                onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
-                onRequestClientForTicket={(sale) => { triggerHaptic && triggerHaptic(); setTicketPendingSale(sale); }}
-                onRecycleSale={(sale) => { triggerHaptic && triggerHaptic(); loadCart(sale.items); if (onNavigate) onNavigate('ventas'); }}
-                onPrintTicket={handlePrintTicket}
-            />
+            {isAdmin && (
+                <SalesHistory
+                    sales={sales}
+                    recentSales={recentSales}
+                    bcvRate={bcvRate}
+                    totalSalesCount={sales.length}
+                    isAdmin={isAdmin}
+                    onVoidSale={handleVoidSale}
+                    onShareWhatsApp={handleShareWhatsApp}
+                    onDownloadPDF={handleDownloadPDF}
+                    onOpenDeleteModal={() => setIsDeleteModalOpen(true)}
+                    onRequestClientForTicket={(sale) => { triggerHaptic && triggerHaptic(); setTicketPendingSale(sale); }}
+                    onRecycleSale={(sale) => { triggerHaptic && triggerHaptic(); loadCart(sale.items); if (onNavigate) onNavigate('ventas'); }}
+                    onPrintTicket={handlePrintTicket}
+                />
+            )}
 
             {/* Empty state */}
-            {sales.length === 0 && (
+            {isAdmin && sales.length === 0 && (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-300 py-10 space-y-3">
                     <BarChart3 size={64} strokeWidth={1} />
                     <p className="text-sm font-bold text-slate-500">Sin datos aún</p>
@@ -1089,6 +1162,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 bcvRate={bcvRate}
                 copEnabled={copEnabled}
                 tasaCop={tasaCop}
+                isAdmin={isAdmin}
+            />
+
+            <AperturaCajaModal
+                isOpen={isAperturaOpen}
+                onClose={() => setIsAperturaOpen(false)}
+                onConfirm={handleSaveApertura}
             />
 
 

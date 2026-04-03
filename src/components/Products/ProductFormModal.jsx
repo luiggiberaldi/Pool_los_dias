@@ -47,25 +47,35 @@ export default function ProductFormModal({
     const [showSummary, setShowSummary] = useState(false);
     const [showMovements, setShowMovements] = useState(false);
     
-    // Gavera Assistant States
-    const [showGaveraCalc, setShowGaveraCalc] = useState(false);
-    const [gaveraCost, setGaveraCost] = useState('');
-    const [gaveraUnits, setGaveraUnits] = useState('36');
-    const [gaveraQty, setGaveraQty] = useState('1');
+    // Calculadora de Lote States
+    const [showLoteCalc, setShowLoteCalc] = useState(false);
+    const [loteCost, setLoteCost] = useState('');
+    const [loteUnits, setLoteUnits] = useState('');
+    const [loteQty, setLoteQty] = useState('1');
 
-    const handleApplyGavera = () => {
-        const cost = parseFloat(gaveraCost) || 0;
-        const units = parseInt(gaveraUnits) || 1;
-        const qty = parseInt(gaveraQty) || 1;
+    // Live preview
+    const loteUnitCost = (parseFloat(loteCost) > 0 && parseInt(loteUnits) > 0)
+        ? (parseFloat(loteCost) / parseInt(loteUnits)).toFixed(3)
+        : null;
+    const loteTotalUnits = (parseInt(loteQty) > 0 && parseInt(loteUnits) > 0)
+        ? parseInt(loteQty) * parseInt(loteUnits)
+        : null;
+
+    const handleApplyLote = () => {
+        const cost = parseFloat(loteCost) || 0;
+        const units = parseInt(loteUnits) || 1;
+        const qty = parseInt(loteQty) || 1;
         
         if(cost > 0 && units > 0) {
-            handleCostUsdChange((cost / units).toString());
+            handleCostUsdChange((cost / units).toFixed(4));
         }
         if(qty > 0 && units > 0) {
             setStock(((parseInt(stock) || 0) + (qty * units)).toString());
         }
-        setShowGaveraCalc(false);
-        setGaveraCost('');
+        setShowLoteCalc(false);
+        setLoteCost('');
+        setLoteUnits('');
+        setLoteQty('1');
     };
     
     // Categorías en línea
@@ -216,8 +226,15 @@ export default function ProductFormModal({
                                     Costo (Bs){priceSuffix}
                                 </label>
                                 {!isCombo && (
-                                <button onClick={() => setShowGaveraCalc(!showGaveraCalc)} className="text-[9px] font-bold text-brand hover:text-brand-light flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded transition-colors active:scale-95">
-                                    🧮 Asistente de Gavera
+                                <button
+                                    onClick={() => setShowLoteCalc(!showLoteCalc)}
+                                    className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-all active:scale-95 ${
+                                        showLoteCalc
+                                        ? 'bg-brand text-white'
+                                        : 'bg-brand/10 dark:bg-brand/20 text-brand hover:bg-brand/20'
+                                    }`}
+                                >
+                                    <Package size={10}/> Lote/Bulto
                                 </button>
                                 )}
                             </div>
@@ -226,25 +243,74 @@ export default function ProductFormModal({
                         </div>
                     </div>
 
-                    {/* ─── GAVERA CALCULATOR BANDA ─── */}
-                    {showGaveraCalc && !isCombo && (
-                        <div className="bg-slate-100 dark:bg-slate-800/80 p-3 rounded-xl border border-brand/30 animate-in slide-in-from-top-2">
-                            <h4 className="text-[11px] font-black uppercase text-brand mb-2 flex items-center gap-1.5"><Package size={12}/> Calculadora de Gaveras/Cajas</h4>
-                            <div className="grid grid-cols-3 gap-2 mb-2">
+                    {/* ─── CALCULADORA DE LOTE ─── */}
+                    {showLoteCalc && !isCombo && (
+                        <div className="bg-brand/5 dark:bg-brand/10 border border-brand/25 p-3.5 rounded-2xl space-y-3 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-[11px] font-black uppercase text-brand flex items-center gap-1.5">
+                                    <Package size={12}/> Calculadora de Lote / Bulto
+                                </h4>
+                                {loteUnitCost && (
+                                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                                        ${loteUnitCost} / und
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-500">Costo total ($)</label>
-                                    <input type="number" value={gaveraCost} onChange={e => setGaveraCost(e.target.value)} placeholder="Ej: 20" className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Costo lote ($)</label>
+                                    <input
+                                        autoFocus
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={loteCost}
+                                        onChange={e => setLoteCost(e.target.value)}
+                                        placeholder="20.00"
+                                        className="w-full bg-white dark:bg-slate-900 px-2.5 py-2 rounded-xl text-sm font-bold outline-none border border-slate-200 dark:border-slate-700 focus:border-brand"
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-500">Uds/Caja</label>
-                                    <input type="number" value={gaveraUnits} onChange={e => setGaveraUnits(e.target.value)} className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Uds por lote</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={loteUnits}
+                                        onChange={e => setLoteUnits(e.target.value)}
+                                        placeholder="24"
+                                        className="w-full bg-white dark:bg-slate-900 px-2.5 py-2 rounded-xl text-sm font-bold outline-none border border-slate-200 dark:border-slate-700 focus:border-brand"
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-500">Cant. Cajas</label>
-                                    <input type="number" value={gaveraQty} onChange={e => setGaveraQty(e.target.value)} className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Cant. lotes</label>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={loteQty}
+                                        onChange={e => setLoteQty(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-900 px-2.5 py-2 rounded-xl text-sm font-bold outline-none border border-slate-200 dark:border-slate-700 focus:border-brand"
+                                    />
                                 </div>
                             </div>
-                            <button onClick={handleApplyGavera} disabled={!gaveraCost || !gaveraUnits} className="w-full py-2 bg-brand hover:bg-brand-dark text-white text-[11px] font-bold rounded-lg transition-colors">
+                            {/* Live result preview */}
+                            {(loteUnitCost || loteTotalUnits) && (
+                                <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-xl px-3 py-2 border border-slate-100 dark:border-slate-800">
+                                    {loteUnitCost && (
+                                        <span className="text-xs text-slate-500">
+                                            Costo unitario: <strong className="text-slate-700 dark:text-white">${loteUnitCost}</strong>
+                                        </span>
+                                    )}
+                                    {loteTotalUnits && (
+                                        <span className="text-xs text-slate-500">
+                                            Stock a sumar: <strong className="text-emerald-600">+{loteTotalUnits} uds</strong>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            <button
+                                onClick={handleApplyLote}
+                                disabled={!loteCost || !loteUnits}
+                                className="w-full py-2.5 bg-brand hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-all active:scale-[0.98]"
+                            >
                                 Aplicar Costo y Sumar al Stock
                             </button>
                         </div>
@@ -350,8 +416,8 @@ export default function ProductFormModal({
                                 <div className="relative">
                                     <input type="checkbox" className="sr-only" checked={isCombo} onChange={(e) => {
                                         setIsCombo(e.target.checked);
-                                        // Auto-disable gavera assistant if turning combo on
-                                        if (e.target.checked) setShowGaveraCalc(false);
+                                        // Auto-close lote calc if turning combo on
+                                        if (e.target.checked) setShowLoteCalc(false);
                                     }} />
                                     <div className={`block w-10 h-6 rounded-full transition-colors ${isCombo ? 'bg-brand' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
                                     <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isCombo ? 'translate-x-4' : ''}`}></div>

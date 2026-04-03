@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Delete, Loader2 } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 
-const PIN_LENGTH = 4;
-
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
+  const targetPinLength = user?.role === 'ADMIN' ? 6 : 4;
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -19,15 +18,15 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
     }
   }, [isOpen]);
 
-  // Auto-submit cuando se completan los 4 dígitos
+  // Auto-submit cuando se completan los N dígitos
   useEffect(() => {
-    if (pin.length === PIN_LENGTH && !processing) {
+    if (pin.length === targetPinLength && !processing) {
       handleSubmit();
     }
-  }, [pin]);
+  }, [pin, processing, targetPinLength]);
 
   const handleSubmit = async () => {
-    if (pin.length !== PIN_LENGTH || processing) return;
+    if (pin.length !== targetPinLength || processing) return;
     setProcessing(true);
 
     const success = await onSubmit(pin, user?.id);
@@ -43,7 +42,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   };
 
   const handlePadPress = (digit) => {
-    if (pin.length >= PIN_LENGTH || processing) return;
+    if (pin.length >= targetPinLength || processing) return;
     setPin(prev => prev + digit);
   };
 
@@ -73,12 +72,12 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
             <LoginAvatar user={user} />
           </div>
           <h2 className="text-xl font-bold text-slate-800">{userName}</h2>
-          <p className="text-xs text-slate-500 mt-1">Ingresa tu PIN de 4 digitos</p>
+          <p className="text-xs text-slate-500 mt-1">Ingresa tu PIN de {targetPinLength} digitos</p>
         </div>
 
         {/* PIN Dots */}
         <div className={`flex justify-center gap-3 mb-8 ${error ? 'animate-shake' : ''}`}>
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+          {Array.from({ length: targetPinLength }).map((_, i) => (
             <div
               key={i}
               className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
@@ -96,10 +95,10 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
         <input
           ref={inputRef}
           type="tel"
-          maxLength={PIN_LENGTH}
+          maxLength={targetPinLength}
           value={pin}
           onChange={e => {
-            const val = e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH);
+            const val = e.target.value.replace(/\D/g, '').slice(0, targetPinLength);
             setPin(val);
           }}
           className="absolute opacity-0 w-0 h-0"

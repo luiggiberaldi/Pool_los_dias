@@ -3,7 +3,7 @@ import { useAuthStore } from '../../hooks/store/authStore';
 import { showToast } from '../Toast';
 import {
     UserPlus, Trash2, KeyRound, Shield, ShoppingCart,
-    Crown, X, Check, Eye, EyeOff, AlertTriangle, Edit2
+    Crown, X, Check, Eye, EyeOff, AlertTriangle, Edit2, Coffee
 } from 'lucide-react';
 
 const ROLE_CONFIG = {
@@ -22,12 +22,20 @@ const ROLE_CONFIG = {
         text: 'text-emerald-600 dark:text-emerald-400',
         border: 'border-emerald-200 dark:border-emerald-800/40',
         icon: ShoppingCart,
+    },
+    MESERO: {
+        label: 'Mesero',
+        gradient: 'from-orange-400 to-amber-500',
+        bg: 'bg-orange-50 dark:bg-orange-900/20',
+        text: 'text-orange-600 dark:text-orange-400',
+        border: 'border-orange-200 dark:border-orange-800/40',
+        icon: Coffee,
     }
 };
 
-// ─── PIN Input (4 digits) ─────────────────────────
-function PinInput({ value, onChange, label }) {
-    const digits = (value || '').padEnd(4, '').slice(0, 4).split('');
+// ─── PIN Input (N digits, dinámico por rol) ──────────────
+function PinInput({ value, onChange, label, length = 4 }) {
+    const digits = (value || '').padEnd(length, '').slice(0, length).split('');
 
     const handleChange = (index, digit) => {
         if (!/^\d?$/.test(digit)) return;
@@ -36,7 +44,7 @@ function PinInput({ value, onChange, label }) {
         onChange(newDigits.join('').replace(/ /g, ''));
 
         // Auto-focus next
-        if (digit && index < 3) {
+        if (digit && index < length - 1) {
             const next = document.getElementById(`pin-${label}-${index + 1}`);
             next?.focus();
         }
@@ -50,23 +58,24 @@ function PinInput({ value, onChange, label }) {
     };
 
     return (
-        <div className="flex gap-2 justify-center">
-            {[0, 1, 2, 3].map(i => (
+        <div className={`flex justify-center ${length > 4 ? 'gap-1.5' : 'gap-3'}`}>
+            {Array.from({ length }).map((_, i) => (
                 <input
                     key={i}
                     id={`pin-${label}-${i}`}
-                    type="text"
+                    type="password"
                     inputMode="numeric"
                     maxLength={1}
                     value={digits[i]?.trim() || ''}
                     onChange={e => handleChange(i, e.target.value)}
                     onKeyDown={e => handleKeyDown(i, e)}
-                    className="w-12 h-14 text-center text-xl font-black bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-800 dark:text-white transition-all"
+                    className={`${length > 4 ? 'w-[38px] h-12 text-lg' : 'w-11 h-14 text-xl'} text-center font-black bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-800 dark:text-white transition-all`}
                 />
             ))}
         </div>
     );
 }
+
 
 // ─── User Row ──────────────────────────────────────
 function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, triggerHaptic }) {
@@ -153,9 +162,12 @@ export default function UsersManager({ triggerHaptic }) {
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState('CAJERO');
     const [newPin, setNewPin] = useState('');
+    const [authorizatorPin, setAuthorizatorPin] = useState('');
 
     const [changePinUser, setChangePinUser] = useState(null);
-    const [pinValue, setPinValue] = useState('');
+    const [currentPinValue, setCurrentPinValue] = useState('');  // PIN anterior
+    const [pinValue, setPinValue] = useState('');                 // PIN nuevo
+    const [confirmPinValue, setConfirmPinValue] = useState('');   // Confirmación
     const [showPin, setShowPin] = useState(false);
 
     const [deleteUser, setDeleteUser] = useState(null);
@@ -165,10 +177,19 @@ export default function UsersManager({ triggerHaptic }) {
 
     // ─── Handlers ────────────────────────────────────
     const handleAdd = async () => {
+        const requiredLen = newRole === 'ADMIN' ? 6 : 4;
         if (!newName.trim()) return showToast('Ingresa un nombre', 'error');
-        if (newPin.length !== 4) return showToast('El PIN debe tener 4 digitos', 'error');
+        if (newPin.length !== requiredLen) return showToast(`El PIN debe tener ${requiredLen} digitos`, 'error');
 
         try {
+            const { hashPin } = await import('../../utils/crypto');
+            
+            if (newRole === 'ADMIN') {
+                if (authorizatorPin.length !== 6) return showToast('PIN de autorización inválido', 'error');
+                const adminHash = await hashPin(authorizatorPin);
+                if (adminHash !== usuarioActivo?.pin_hash) return showToast('Autorización de Administrador fallida', 'error');
+            }
+
             const hashedPin = await hashPin(newPin);
             const { error } = await supabaseCloud
                 .from('staff_users')
@@ -186,6 +207,7 @@ export default function UsersManager({ triggerHaptic }) {
             setNewName('');
             setNewRole('CAJERO');
             setNewPin('');
+            setAuthorizatorPin('');
             setShowAddForm(false);
             
             await syncUsers(); // Actualiza LocalForage y Zustand
@@ -196,26 +218,46 @@ export default function UsersManager({ triggerHaptic }) {
     };
 
     const handleChangePin = async () => {
-        if (pinValue.length !== 4) return showToast('El PIN debe tener 4 digitos', 'error');
+        const targetRole = changePinUser?.role || changePinUser?.rol || 'CAJERO';
+        const requiredLen = targetRole === 'ADMIN' ? 6 : 4;
+        const requireCurrentPin = targetRole === 'ADMIN';
+
+        if (requireCurrentPin && currentPinValue.length !== requiredLen)
+            return showToast(`El PIN actual debe tener ${requiredLen} digitos`, 'error');
+        if (pinValue.length !== requiredLen)
+            return showToast(`El nuevo PIN debe tener ${requiredLen} digitos`, 'error');
+        if (pinValue !== confirmPinValue)
+            return showToast('Los PINs no coinciden', 'error');
 
         try {
-            const hashedPin = await hashPin(pinValue);
+            const { hashPin: hp } = await import('../../utils/crypto');
+            
+            // Verificar PIN anterior solo si es Admin
+            if (requireCurrentPin) {
+                const currentHash = await hp(currentPinValue);
+                if (currentHash !== changePinUser.pin_hash)
+                    return showToast('El PIN anterior es incorrecto', 'error');
+            }
+
+            const hashedPin = await hp(pinValue);
             const { error } = await supabaseCloud
                 .from('staff_users')
                 .update({ pin_hash: hashedPin })
                 .eq('id', changePinUser.id);
-                
+
             if (error) throw error;
 
             showToast(`PIN de ${changePinUser.nombre || changePinUser.name} actualizado`, 'success');
             triggerHaptic?.();
             setChangePinUser(null);
+            setCurrentPinValue('');
             setPinValue('');
-            
+            setConfirmPinValue('');
+
             await syncUsers();
         } catch (err) {
             console.error('Error al cambiar PIN:', err);
-            showToast('Ocurrió un error al actualizar el PIN', 'error');
+            showToast('Ocurrio un error al actualizar el PIN', 'error');
         }
     };
 
@@ -272,7 +314,7 @@ export default function UsersManager({ triggerHaptic }) {
                         key={user.id}
                         user={user}
                         currentUserId={usuarioActivo?.id}
-                        onChangePin={u => { setChangePinUser(u); setPinValue(''); setShowPin(false); }}
+                        onChangePin={u => { setChangePinUser(u); setCurrentPinValue(''); setPinValue(''); setConfirmPinValue(''); setShowPin(false); }}
                         onEditName={u => { setEditNameUser(u); setEditNameValue(u.name || u.nombre || ''); }}
                         onDelete={u => setDeleteUser(u)}
                         triggerHaptic={triggerHaptic}
@@ -315,7 +357,7 @@ export default function UsersManager({ triggerHaptic }) {
                     {/* Role Selector */}
                     <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Rol</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             {Object.entries(ROLE_CONFIG).map(([key, conf]) => {
                                 const Icon = conf.icon;
                                 return (
@@ -334,17 +376,25 @@ export default function UsersManager({ triggerHaptic }) {
                         </div>
                     </div>
 
+                    {/* PIN Autorización (Solo si crea Admin) */}
+                    {newRole === 'ADMIN' && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl mb-4">
+                            <label className="text-[10px] uppercase font-bold text-red-600 dark:text-red-400 block mb-2 text-center tracking-wider">Tu PIN de Administrador (Autorización)</label>
+                            <PinInput value={authorizatorPin} onChange={setAuthorizatorPin} label="auth" length={6} />
+                        </div>
+                    )}
+
                     {/* PIN */}
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-2">PIN de 4 digitos</label>
-                        <PinInput value={newPin} onChange={setNewPin} label="new" />
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-2 text-center">PIN del Nuevo Usuario ({newRole === 'ADMIN' ? '6' : '4'} digitos)</label>
+                        <PinInput value={newPin} onChange={setNewPin} label="new" length={newRole === 'ADMIN' ? 6 : 4} />
                     </div>
 
                     {/* Submit */}
                     <button
                         onClick={handleAdd}
-                        disabled={!newName.trim() || newPin.length !== 4}
-                        className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-[0.98] shadow-md shadow-indigo-500/20 disabled:shadow-none"
+                        disabled={!newName.trim() || newPin.length !== (newRole === 'ADMIN' ? 6 : 4) || (newRole === 'ADMIN' && authorizatorPin.length !== 6)}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-[0.98] shadow-md shadow-indigo-500/20 disabled:shadow-none mt-2"
                     >
                         <Check size={16} /> Crear Usuario
                     </button>
@@ -352,49 +402,68 @@ export default function UsersManager({ triggerHaptic }) {
             )}
 
             {/* ─── Change PIN Modal ────────────────────── */}
-            {changePinUser && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setChangePinUser(null)}>
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                        <div className="text-center mb-6">
-                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[changePinUser.role || changePinUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
-                                <span className="text-white font-black text-2xl">{(changePinUser.name || changePinUser.nombre || 'U')[0].toUpperCase()}</span>
+            {changePinUser && (() => {
+                const targetRole = changePinUser?.role || changePinUser?.rol || 'CAJERO';
+                const pinLen = targetRole === 'ADMIN' ? 6 : 4;
+                const requireCurrentPin = targetRole === 'ADMIN';
+                
+                const isReady = (!requireCurrentPin || currentPinValue.length === pinLen) && pinValue.length === pinLen && confirmPinValue.length === pinLen;
+                const mismatch = confirmPinValue.length === pinLen && pinValue !== confirmPinValue;
+
+                return (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setChangePinUser(null)}>
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                            <div className="text-center mb-6">
+                                <div className={`w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br ${ROLE_CONFIG[targetRole]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3 shadow-lg shadow-indigo-500/10`}>
+                                    <span className="text-white font-black text-2xl">{(changePinUser.name || changePinUser.nombre || 'U')[0].toUpperCase()}</span>
+                                </div>
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white mb-1">Cambiar PIN</h3>
+                                <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400">{changePinUser.name || changePinUser.nombre} &middot; Seguridad Nivel {targetRole}</p>
                             </div>
-                            <h3 className="text-lg font-black text-slate-800 dark:text-white">Cambiar PIN</h3>
-                            <p className="text-xs text-slate-400 mt-1">{changePinUser.name || changePinUser.nombre}</p>
-                        </div>
 
-                        <div className="mb-4">
-                            <PinInput value={pinValue} onChange={setPinValue} label="change" />
-                        </div>
+                            <div className="space-y-5 mb-7">
+                                {/* PIN Anterior (Solo Admins) */}
+                                {requireCurrentPin && (
+                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-2 text-center tracking-wider">PIN Anterior</label>
+                                        <PinInput value={currentPinValue} onChange={setCurrentPinValue} label="current" length={pinLen} />
+                                    </div>
+                                )}
 
-                        <div className="flex items-center justify-center gap-2 mb-5">
-                            <button
-                                onClick={() => setShowPin(!showPin)}
-                                className="text-[10px] text-slate-400 flex items-center gap-1 hover:text-slate-600 transition-colors"
-                            >
-                                {showPin ? <EyeOff size={12} /> : <Eye size={12} />}
-                                {showPin ? `PIN: ${pinValue || '----'}` : 'Mostrar PIN'}
-                            </button>
-                        </div>
+                                {/* PIN Nuevo */}
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-indigo-500 dark:text-indigo-400 block mb-2 text-center tracking-wider">Nuevo PIN</label>
+                                    <PinInput value={pinValue} onChange={setPinValue} label="change" length={pinLen} />
+                                </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setChangePinUser(null)}
-                                className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleChangePin}
-                                disabled={pinValue.length !== 4}
-                                className="flex-1 py-3 text-sm font-bold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Guardar
-                            </button>
+                                {/* Confirmar PIN */}
+                                <div>
+                                    <label className={`text-[10px] uppercase font-bold block mb-2 text-center tracking-wider transition-colors ${mismatch ? 'text-red-500' : 'text-slate-400'}`}>
+                                        {mismatch ? 'Los PINs no coinciden' : 'Confirmar Nuevo PIN'}
+                                    </label>
+                                    <PinInput value={confirmPinValue} onChange={setConfirmPinValue} label="confirm" length={pinLen} />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setChangePinUser(null)}
+                                    className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleChangePin}
+                                    disabled={!isReady || mismatch}
+                                    className="flex-1 py-3 text-sm font-bold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* ─── Delete Confirmation ─────────────────── */}
             {deleteUser && (

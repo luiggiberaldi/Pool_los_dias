@@ -11,7 +11,6 @@ import { Lock, DollarSign, X, Check } from 'lucide-react';
 export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
     const [usd, setUsd] = useState('');
     const [bs, setBs] = useState('');
-    const [cashierName, setCashierName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
@@ -29,11 +28,9 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
             await onConfirm({
                 openingUsd,
                 openingBs,
-                cashierName: cashierName.trim() || 'Cajero',
             });
             setUsd('');
             setBs('');
-            setCashierName('');
         } finally {
             setIsSubmitting(false);
         }
@@ -68,18 +65,6 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
                 </div>
 
                 <div className="space-y-4">
-                    {/* Cashier Name */}
-                    <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Cajero (opcional)</label>
-                        <input
-                            type="text"
-                            placeholder="Nombre del cajero"
-                            value={cashierName}
-                            onChange={e => setCashierName(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
-                        />
-                    </div>
-
                     {/* USD Opening */}
                     <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Efectivo en Dólares ($)</label>

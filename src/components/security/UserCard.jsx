@@ -29,7 +29,7 @@ export default function UserCard({ user, onClick }) {
 
               {/* Fake thickness layers (3D depth) */}
               <div className="absolute inset-0 bg-black/40 rounded-3xl translate-y-4 translate-x-4 blur-xl" />
-              <div className={`absolute inset-0 rounded-3xl translate-y-2 translate-x-1 ${isAdmin ? 'bg-indigo-500/20' : 'bg-emerald-500/20'}`} />
+              <div className={`absolute inset-0 rounded-3xl translate-y-2 translate-x-1 ${role === 'ADMIN' ? 'bg-indigo-500/20' : role === 'MESERO' ? 'bg-orange-500/20' : 'bg-emerald-500/20'}`} />
 
               {/* Admin Crown */}
               {isAdmin && (
@@ -57,8 +57,8 @@ export default function UserCard({ user, onClick }) {
             <h3 className="text-lg font-bold text-slate-800 drop-shadow-sm">
               {toTitleCase(name)}
             </h3>
-            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-sky-500' : 'text-teal-500'}`}>
-              {role === 'ADMIN' ? 'Administrador' : 'Cajero'}
+            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${role === 'ADMIN' ? 'text-sky-500' : role === 'MESERO' ? 'text-orange-500' : 'text-teal-500'}`}>
+              {role === 'ADMIN' ? 'Administrador' : role === 'MESERO' ? 'Mesero' : 'Cajero'}
             </span>
           </CardItem>
 

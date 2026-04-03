@@ -18,7 +18,8 @@ export default function CierreCajaWizard({
     todayTopProducts = [],
     bcvRate = 1,
     copEnabled = false,
-    tasaCop = 0
+    tasaCop = 0,
+    isAdmin = true
 }) {
     const [step, setStep] = useState(1);
     const [actualUsd, setActualUsd] = useState('');
@@ -245,7 +246,7 @@ export default function CierreCajaWizard({
                                     />
                                 </div>
                                 <p className="text-[11px] text-slate-400 mt-1.5 pl-1">
-                                    Sistema espera: <span className="font-bold text-indigo-500">${expectedUsd.toFixed(2)}</span>
+                                    {isAdmin ? <>Sistema espera: <span className="font-bold text-indigo-500">${expectedUsd.toFixed(2)}</span></> : 'Asegúrate de contar bien todo el efectivo'}
                                 </p>
                             </div>
 
@@ -268,7 +269,7 @@ export default function CierreCajaWizard({
                                     {
                                         expectedBs < 0
                                             ? <span className="font-bold text-amber-500">⚠ La gaveta usó Bs {formatBs(Math.abs(expectedBs))} extra para dar cambio</span>
-                                            : <span className="text-slate-400">Sistema espera: <span className="font-bold text-indigo-500">{formatBs(expectedBs)} Bs</span></span>
+                                            : isAdmin ? <span className="text-slate-400">Sistema espera: <span className="font-bold text-indigo-500">{formatBs(expectedBs)} Bs</span></span> : <span className="text-slate-400">Verifica bien la cantidad de billetes</span>
                                     }
                                 </p>
                             </div>
@@ -290,7 +291,7 @@ export default function CierreCajaWizard({
                                         />
                                     </div>
                                     <p className="text-[11px] text-slate-400 mt-1.5 pl-1">
-                                        Sistema espera: <span className="font-bold text-amber-500">{fmtCop(expectedCop)} COP</span>
+                                        {isAdmin ? <>Sistema espera: <span className="font-bold text-amber-500">{fmtCop(expectedCop)} COP</span></> : 'Ingresa el total acumulado de pesos'}
                                     </p>
                                 </div>
                             )}
@@ -316,73 +317,84 @@ export default function CierreCajaWizard({
                         const SemIcon = sem.icon;
                         return (
                             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
-                                {/* Semaforo */}
-                                <div className={`${sem.bg} rounded-2xl p-5 text-white text-center relative overflow-hidden`}>
-                                    <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
-                                    <SemIcon size={40} className="mx-auto mb-2" />
-                                    <h3 className="text-xl font-black">{sem.label}</h3>
-                                    <p className="text-sm font-medium text-white/80 mt-1">
-                                        Diferencia: {diffUsd >= 0 ? '+' : ''}{diffUsd.toFixed(2)} USD
-                                    </p>
-                                </div>
+                                {/* Semaforo e Información (Solo Admin) */}
+                                {isAdmin ? (
+                                    <>
+                                        <div className={`${sem.bg} rounded-2xl p-5 text-white text-center relative overflow-hidden`}>
+                                            <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
+                                            <SemIcon size={40} className="mx-auto mb-2" />
+                                            <h3 className="text-xl font-black">{sem.label}</h3>
+                                            <p className="text-sm font-medium text-white/80 mt-1">
+                                                Diferencia: {diffUsd >= 0 ? '+' : ''}{diffUsd.toFixed(2)} USD
+                                            </p>
+                                        </div>
 
-                                {/* Tabla comparativa */}
-                                <div>
-                                    <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 pl-1">Comparativa</h4>
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 overflow-hidden">
-                                        {/* Header */}
-                                        <div className="grid grid-cols-3 gap-0 px-4 py-2.5 bg-slate-100 dark:bg-slate-700/50">
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase"></span>
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase text-center">Esperado</span>
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase text-center">Declarado</span>
-                                        </div>
-                                        {/* USD Row */}
-                                        <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
-                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">USD</span>
-                                            <span className="text-sm font-mono font-bold text-slate-500 text-center">${expectedUsd.toFixed(2)}</span>
-                                            <span className={`text-sm font-mono font-black text-center ${diffUsd >= -0.50 && diffUsd <= 0.50 ? 'text-emerald-600' : diffUsd < -5 || diffUsd > 5 ? 'text-red-500' : 'text-amber-600'}`}>
-                                                ${declaredUsd.toFixed(2)}
-                                            </span>
-                                        </div>
-                                        {/* Bs Row */}
-                                        <div className={`grid grid-cols-3 gap-0 px-4 py-3 ${hasCopTransactions ? 'border-b border-slate-100 dark:border-slate-700/50' : 'border-b border-slate-100 dark:border-slate-700/50'}`}>
-                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Bs</span>
-                                            <span className="text-sm font-mono font-bold text-slate-500 text-center">{formatBs(expectedBs)}</span>
-                                            <span className={`text-sm font-mono font-black text-center ${Math.abs(diffBs) <= expectedBs * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                {formatBs(declaredBs)}
-                                            </span>
-                                        </div>
-                                        {/* COP Row */}
-                                        {hasCopTransactions && (
-                                            <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
-                                                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">COP</span>
-                                                <span className="text-sm font-mono font-bold text-slate-500 text-center">{fmtCop(expectedCop)}</span>
-                                                <span className={`text-sm font-mono font-black text-center ${Math.abs(diffCop) <= expectedCop * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                                    {fmtCop(declaredCop)}
-                                                </span>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 pl-1">Comparativa</h4>
+                                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 overflow-hidden">
+                                                {/* Header */}
+                                                <div className="grid grid-cols-3 gap-0 px-4 py-2.5 bg-slate-100 dark:bg-slate-700/50">
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase"></span>
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase text-center">Esperado</span>
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase text-center">Declarado</span>
+                                                </div>
+                                                {/* USD Row */}
+                                                <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">USD</span>
+                                                    <span className="text-sm font-mono font-bold text-slate-500 text-center">${expectedUsd.toFixed(2)}</span>
+                                                    <span className={`text-sm font-mono font-black text-center ${diffUsd >= -0.50 && diffUsd <= 0.50 ? 'text-emerald-600' : diffUsd < -5 || diffUsd > 5 ? 'text-red-500' : 'text-amber-600'}`}>
+                                                        ${declaredUsd.toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                {/* Bs Row */}
+                                                <div className={`grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50`}>
+                                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Bs</span>
+                                                    <span className="text-sm font-mono font-bold text-slate-500 text-center">{formatBs(expectedBs)}</span>
+                                                    <span className={`text-sm font-mono font-black text-center ${Math.abs(diffBs) <= expectedBs * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                        {formatBs(declaredBs)}
+                                                    </span>
+                                                </div>
+                                                {/* COP Row */}
+                                                {hasCopTransactions && (
+                                                    <div className="grid grid-cols-3 gap-0 px-4 py-3 border-b border-slate-100 dark:border-slate-700/50">
+                                                        <span className="text-sm font-bold text-amber-600 dark:text-amber-400">COP</span>
+                                                        <span className="text-sm font-mono font-bold text-slate-500 text-center">{fmtCop(expectedCop)}</span>
+                                                        <span className={`text-sm font-mono font-black text-center ${Math.abs(diffCop) <= expectedCop * 0.02 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                            {fmtCop(declaredCop)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {/* Diff Row */}
+                                                <div className="grid grid-cols-3 gap-0 px-4 py-3 bg-slate-100/50 dark:bg-slate-700/30">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase">Diferencia</span>
+                                                    <span className={`text-sm font-mono font-black text-center ${diffUsd >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                        {diffUsd >= 0 ? '+' : ''}{diffUsd.toFixed(2)}
+                                                    </span>
+                                                    <span className={`text-sm font-mono font-black text-center ${diffBs >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                        {diffBs >= 0 ? '+' : ''}{formatBs(diffBs)}
+                                                    </span>
+                                                </div>
+                                                {hasCopTransactions && (
+                                                    <div className="grid grid-cols-3 gap-0 px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10">
+                                                        <span className="text-xs font-bold text-amber-500 uppercase">Dif. COP</span>
+                                                        <span></span>
+                                                        <span className={`text-sm font-mono font-black text-center ${diffCop >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                            {diffCop >= 0 ? '+' : ''}{fmtCop(diffCop)}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                        {/* Diff Row */}
-                                        <div className="grid grid-cols-3 gap-0 px-4 py-3 bg-slate-100/50 dark:bg-slate-700/30">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">Diferencia</span>
-                                            <span className={`text-sm font-mono font-black text-center ${diffUsd >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                {diffUsd >= 0 ? '+' : ''}{diffUsd.toFixed(2)}
-                                            </span>
-                                            <span className={`text-sm font-mono font-black text-center ${diffBs >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                {diffBs >= 0 ? '+' : ''}{formatBs(diffBs)}
-                                            </span>
                                         </div>
-                                        {hasCopTransactions && (
-                                            <div className="grid grid-cols-3 gap-0 px-4 py-2 bg-amber-50/50 dark:bg-amber-900/10">
-                                                <span className="text-xs font-bold text-amber-500 uppercase">Dif. COP</span>
-                                                <span></span>
-                                                <span className={`text-sm font-mono font-black text-center ${diffCop >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                    {diffCop >= 0 ? '+' : ''}{fmtCop(diffCop)}
-                                                </span>
-                                            </div>
-                                        )}
+                                    </>
+                                ) : (
+                                    <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 text-center relative overflow-hidden border border-slate-200 dark:border-slate-700">
+                                        <CheckCircle2 size={40} className="mx-auto mb-2 text-indigo-500" />
+                                        <h3 className="text-xl font-black text-slate-800 dark:text-white">Conteo Registrado</h3>
+                                        <p className="text-sm font-medium text-slate-500 mt-2">
+                                            Los totales ingresados han sido capturados para la auditoría de caja (Cierre Ciego). Puedes confirmar el cierre.
+                                        </p>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Actions */}
                                 <div className="flex gap-3 pt-2">

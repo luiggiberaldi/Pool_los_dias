@@ -23,6 +23,7 @@ import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
 import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios';
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
 import SettingsTabMesas from '../components/Settings/tabs/SettingsTabMesas';
+import { setImportGuard } from '../hooks/useCloudSync';
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 const TABS = [
@@ -141,24 +142,47 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const handleFileChange = (event) => {
         const file = event.target.files[0];
         if (!file) return;
+        // Reset input so same file can be re-selected if needed
+        event.target.value = '';
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 setImportStatus('loading'); setStatusMessage('Restaurando...');
                 const json = JSON.parse(e.target.result);
                 if (!json.data) throw new Error('Formato invalido.');
+
                 if (json.version === '2.0' && json.data.idb) {
-                    for (const [key, value] of Object.entries(json.data.idb)) await storageService.setItem(key, value);
-                    if (json.data.ls) for (const [key, value] of Object.entries(json.data.ls)) localStorage.setItem(key, value);
+                    // Import IDB keys one by one, tolerating individual sync errors
+                    for (const [key, value] of Object.entries(json.data.idb)) {
+                        try {
+                            await storageService.setItem(key, value);
+                        } catch (innerErr) {
+                            console.warn(`[Import] Error guardando ${key}, continuando...`, innerErr);
+                        }
+                    }
+                    if (json.data.ls) {
+                        for (const [key, value] of Object.entries(json.data.ls)) {
+                            localStorage.setItem(key, value);
+                        }
+                    }
                 } else {
-                    if (json.data.bodega_products_v1) await storageService.setItem('bodega_products_v1', typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1);
+                    if (json.data.bodega_products_v1) {
+                        await storageService.setItem('bodega_products_v1', typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1);
+                    }
                 }
+
                 setImportStatus('success'); setStatusMessage('Restauracion finalizada. Reiniciando...');
                 auditLog('SISTEMA', 'BACKUP_IMPORTADO', 'Backup restaurado'); triggerHaptic?.();
+                // Activar guard para que el pull inicial de la nube no sobreescriba los datos importados
+                setImportGuard();
                 setTimeout(() => window.location.reload(), 1500);
-            } catch {
-                setImportStatus('error'); setStatusMessage('Error: archivo corrupto o invalido.');
+            } catch (err) {
+                console.error('[Import] Error critico al restaurar backup:', err);
+                setImportStatus('error'); setStatusMessage(`Error: ${err.message || 'archivo invalido'}.`);
             }
+        };
+        reader.onerror = () => {
+            setImportStatus('error'); setStatusMessage('Error: no se pudo leer el archivo.');
         };
         reader.readAsText(file);
     };

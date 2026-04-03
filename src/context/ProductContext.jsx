@@ -75,12 +75,11 @@ export function ProductProvider({ children, rates }) {
             savingRef.current = true;
             const timer = setTimeout(() => {
                 const savePromises = [];
+                // IMPORTANTE: Solo guardamos productos si HAY datos.
+                // No guardar array vacío evita sobrescribir un import reciente
+                // con el estado inicial vacío de React antes de que loadData() cargue.
                 if (products.length > 0) {
                     savePromises.push(storageService.setItem('bodega_products_v1', products));
-                } else {
-                    // Guardar array vacío explícitamente (en vez de removeItem) 
-                    // para que la nube sincronice el borrado correctamente
-                    savePromises.push(storageService.setItem('bodega_products_v1', []));
                 }
                 savePromises.push(storageService.setItem('poolbar_categories_v1', categories));
                 Promise.all(savePromises).finally(() => {
