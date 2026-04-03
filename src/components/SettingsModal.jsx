@@ -56,7 +56,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
 
             const allProducts = await storageService.getItem('bodega_products_v1', []);
             const accounts = await storageService.getItem('bodega_accounts_v2', []);
-            const categories = await storageService.getItem('my_categories_v1', []);
+            const categories = await storageService.getItem('poolbar_categories_v1', []);
 
             const backupData = {
                 timestamp: new Date().toISOString(),
@@ -64,7 +64,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                 data: {
                     bodega_products_v1: JSON.stringify(allProducts),
                     bodega_accounts_v2: JSON.stringify(accounts),
-                    my_categories_v1: JSON.stringify(categories),
+                    poolbar_categories_v1: JSON.stringify(categories),
                     premium_token: localStorage.getItem('premium_token'),
                     street_rate_bs: localStorage.getItem('street_rate_bs'),
                     catalog_use_auto_usdt: localStorage.getItem('catalog_use_auto_usdt'),
@@ -133,9 +133,9 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                 if (json.data.business_name) localStorage.setItem('business_name', json.data.business_name);
                 if (json.data.business_rif) localStorage.setItem('business_rif', json.data.business_rif);
 
-                if (json.data.my_categories_v1) {
-                    const cats = typeof json.data.my_categories_v1 === 'string' ? JSON.parse(json.data.my_categories_v1) : json.data.my_categories_v1;
-                    await lf.setItem('my_categories_v1', cats);
+                if (json.data.poolbar_categories_v1) {
+                    const cats = typeof json.data.poolbar_categories_v1 === 'string' ? JSON.parse(json.data.poolbar_categories_v1) : json.data.poolbar_categories_v1;
+                    await lf.setItem('poolbar_categories_v1', cats);
                 }
 
                 setImportStatus('success');
@@ -199,20 +199,9 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                         </div>
 
                         <div>
-                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Ancho de Impresora Térmica</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => setPaperWidth('58')}
-                                    className={`py-2 px-3 text-xs font-bold rounded-lg transition-colors border ${paperWidth === '58' ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                >
-                                    58 mm (Pequeña)
-                                </button>
-                                <button
-                                    onClick={() => setPaperWidth('80')}
-                                    className={`py-2 px-3 text-xs font-bold rounded-lg transition-colors border ${paperWidth === '80' ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                >
-                                    80 mm (Estándar)
-                                </button>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Impresora Térmica</label>
+                            <div className="py-2 px-3 text-xs font-bold rounded-lg border bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300 text-center">
+                                58 mm — Configuración fija
                             </div>
                         </div>
 

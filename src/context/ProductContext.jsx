@@ -51,7 +51,7 @@ export function ProductProvider({ children, rates }) {
         let isMounted = true;
         const loadData = async () => {
             const savedProducts = await storageService.getItem('bodega_products_v1', []);
-            const savedCategories = await storageService.getItem('my_categories_v1', BODEGA_CATEGORIES);
+            const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
             if (isMounted) {
                 setProducts(savedProducts);
                 setCategories(savedCategories);
@@ -82,7 +82,7 @@ export function ProductProvider({ children, rates }) {
                     // para que la nube sincronice el borrado correctamente
                     savePromises.push(storageService.setItem('bodega_products_v1', []));
                 }
-                savePromises.push(storageService.setItem('my_categories_v1', categories));
+                savePromises.push(storageService.setItem('poolbar_categories_v1', categories));
                 Promise.all(savePromises).finally(() => {
                     // Reset guard after microtask queue flushes
                     setTimeout(() => { savingRef.current = false; }, 50);
@@ -124,8 +124,8 @@ export function ProductProvider({ children, rates }) {
                 // If modified in another tab, fetch it
                 storageService.getItem('bodega_products_v1', []).then(updatedProducts => setProducts(updatedProducts));
             }
-            if (e.key === 'my_categories_v1') {
-                storageService.getItem('my_categories_v1', BODEGA_CATEGORIES).then(updatedCategories => setCategories(updatedCategories));
+            if (e.key === 'poolbar_categories_v1') {
+                storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES).then(updatedCategories => setCategories(updatedCategories));
             }
         };
 
@@ -138,8 +138,8 @@ export function ProductProvider({ children, rates }) {
                 const updatedProducts = await storageService.getItem('bodega_products_v1', []);
                 setProducts(updatedProducts);
             }
-            if (e.detail?.key === 'my_categories_v1') {
-                const updatedCategories = await storageService.getItem('my_categories_v1', BODEGA_CATEGORIES);
+            if (e.detail?.key === 'poolbar_categories_v1') {
+                const updatedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
                 setCategories(updatedCategories);
             }
         };

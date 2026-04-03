@@ -29,8 +29,8 @@ const STEPS = [
         bg: 'bg-indigo-100',
         title: 'Inventario',
         headline: 'Tu inventario de productos',
-        descriptionFree: 'Listo POS Lite Free incluye uso ilimitado y gratis para siempre. Guarda hasta 50 productos, convierte precios y consulta la tasa del día al instante.',
-        descriptionPremium: 'Con Listo POS Lite Premium puedes gestionar un inventario ilimitado, cobrar con POS y compartir tu inventario.',
+        descriptionFree: 'Pool Los Diaz Free incluye uso ilimitado y gratis para siempre. Guarda hasta 50 productos, convierte precios y consulta la tasa del día al instante.',
+        descriptionPremium: 'Con Pool Los Diaz Premium puedes gestionar un inventario ilimitado, cobrar con POS y compartir tu inventario.',
         tipPremium: '💡 Comparte tu inventario con otros usando un código de 6 dígitos.',
         tipFree: '👑 Activa tu licencia para desbloquear todas las funciones.',
     },
@@ -41,7 +41,7 @@ const STEPS = [
         title: 'Clientes',
         headline: 'Gestiona tus clientes',
         descriptionPremium: 'Registra a tus clientes frecuentes, lleva control de fiados y pagos parciales. Todo offline y seguro.',
-        descriptionFree: 'Con Listo POS Lite Premium puedes gestionar tu cartera de clientes y control de deudas.',
+        descriptionFree: 'Con Pool Los Diaz Premium puedes gestionar tu cartera de clientes y control de deudas.',
         tipPremium: '💡 Toca un cliente para ver su historial completo de fiados.',
         tipFree: '👑 Activa tu licencia para gestionar clientes.',
     },
@@ -114,7 +114,7 @@ export default function OnboardingOverlay({ isPremium = false }) {
                             <div className="relative mx-auto mb-5">
                                 <img
                                     src="/logo.png"
-                                    alt="Listo POS Lite Bodega"
+                                    alt="Pool Los Diaz Bodega"
                                     className="w-44 h-auto mx-auto drop-shadow-lg"
                                 />
                                 <div className="absolute inset-0 bg-emerald-500/15 rounded-full blur-2xl -z-10 scale-150" />

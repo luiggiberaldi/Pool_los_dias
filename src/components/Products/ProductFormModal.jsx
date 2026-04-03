@@ -3,11 +3,7 @@ import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, C
 import { Modal } from '../Modal';
 import { useProductContext } from '../../context/ProductContext';
 
-const PACKAGING_TYPES = [
-    { id: 'suelto', label: 'Suelto', Icon: Tag, desc: 'Unidad individual', color: 'emerald' },
-    { id: 'lote', label: 'Lote', Icon: Package, desc: 'Caja, bulto o paquete', color: 'indigo' },
-    { id: 'granel', label: 'Granel', Icon: Scale, desc: 'Por Kg o Litro', color: 'amber' },
-];
+// PACKAGING_TYPES removed for Pool Bar mode
 
 export default function ProductFormModal({
     isOpen,
@@ -41,11 +37,36 @@ export default function ProductFormModal({
     handleImageUpload,
     handleSave,
     categories,
-    productMovements
+    productMovements,
+    products,
+    isCombo, setIsCombo,
+    linkedProductId, setLinkedProductId,
+    linkedQty, setLinkedQty
 }) {
     const fileInputRef = useRef(null);
     const [showSummary, setShowSummary] = useState(false);
     const [showMovements, setShowMovements] = useState(false);
+    
+    // Gavera Assistant States
+    const [showGaveraCalc, setShowGaveraCalc] = useState(false);
+    const [gaveraCost, setGaveraCost] = useState('');
+    const [gaveraUnits, setGaveraUnits] = useState('36');
+    const [gaveraQty, setGaveraQty] = useState('1');
+
+    const handleApplyGavera = () => {
+        const cost = parseFloat(gaveraCost) || 0;
+        const units = parseInt(gaveraUnits) || 1;
+        const qty = parseInt(gaveraQty) || 1;
+        
+        if(cost > 0 && units > 0) {
+            handleCostUsdChange((cost / units).toString());
+        }
+        if(qty > 0 && units > 0) {
+            setStock(((parseInt(stock) || 0) + (qty * units)).toString());
+        }
+        setShowGaveraCalc(false);
+        setGaveraCost('');
+    };
     
     // Categorías en línea
     const { setCategories } = useProductContext();
@@ -178,77 +199,7 @@ export default function ProductFormModal({
                         )}
                     </div>
 
-                    {/* ─── PACKAGING TYPE CARDS ─── */}
-                    <div>
-                        <label className="text-xs font-bold text-slate-400 ml-1 mb-1.5 block uppercase">Tipo de Empaque</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {PACKAGING_TYPES.map(pt => {
-                                const selected = packagingType === pt.id;
-                                const colorMap = {
-                                    emerald: selected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' : '',
-                                    indigo: selected ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : '',
-                                    amber: selected ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' : '',
-                                };
-                                const textColor = {
-                                    emerald: 'text-emerald-700 dark:text-emerald-400',
-                                    indigo: 'text-indigo-700 dark:text-indigo-400',
-                                    amber: 'text-amber-700 dark:text-amber-400',
-                                };
-                                return (
-                                    <button key={pt.id}
-                                        onClick={() => setPackagingType(pt.id)}
-                                        className={`flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all active:scale-95 ${selected
-                                            ? colorMap[pt.color]
-                                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
-                                            }`}>
-                                        <pt.Icon size={22} strokeWidth={2} className={selected ? textColor[pt.color] : 'text-slate-400'} />
-                                        <span className={`text-xs font-black uppercase ${selected ? textColor[pt.color] : 'text-slate-500'}`}>{pt.label}</span>
-                                        <span className="text-[9px] text-slate-400 leading-tight text-center">{pt.desc}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* ─── GRANEL: Unit selector ─── */}
-                    {isGranel && (
-                        <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            {['kg', 'litro'].map(u => (
-                                <button key={u} onClick={() => setGranelUnit(u)}
-                                    className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${granelUnit === u
-                                        ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                        }`}>
-                                    {u === 'kg' ? <><Scale size={14} className="inline -mt-0.5" /> Kilogramo</> : <><Droplets size={14} className="inline -mt-0.5" /> Litro</>}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* ─── LOTE: Units per package ─── */}
-                    {isLote && (
-                        <div className="bg-indigo-50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800/30 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <div>
-                                <label className="text-xs font-bold text-indigo-700 dark:text-indigo-400 ml-1 mb-1 block uppercase">¿Cuántas unidades trae el lote?</label>
-                                <input type="number" inputMode="numeric" value={unitsPerPackage} onChange={e => setUnitsPerPackage(e.target.value)} placeholder="Ej: 24"
-                                    className="w-full bg-white dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                            </div>
-
-                            {/* Toggle: sell by unit */}
-                            {parsedUnits > 1 && (
-                                <label className="flex items-center gap-3 cursor-pointer select-none p-2 rounded-lg hover:bg-indigo-100/50 dark:hover:bg-indigo-900/20 transition-colors">
-                                    <div className={`w-11 h-6 rounded-full relative transition-colors duration-200 shrink-0 ${sellByUnit ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                        onClick={() => setSellByUnit(!sellByUnit)}>
-                                        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${sellByUnit ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-                                    </div>
-                                    <div onClick={() => setSellByUnit(!sellByUnit)}>
-                                        <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300">¿También vender por unidad suelta?</span>
-                                        <p className="text-[10px] text-indigo-500/70 dark:text-indigo-400/50 mt-0.5">Permite vender unidades individuales del lote</p>
-                                    </div>
-                                </label>
-                            )}
-                        </div>
-                    )}
+                    {/* Removed Packaging Type, Granel, and Lote UI blocks */}
 
                     {/* ─── COST SECTION (first) ─── */}
                     <div className="grid grid-cols-2 gap-3">
@@ -260,25 +211,46 @@ export default function ProductFormModal({
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
                         </div>
                         <div>
-                            <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
-                                Costo (Bs){priceSuffix}
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 block uppercase tracking-wider">
+                                    Costo (Bs){priceSuffix}
+                                </label>
+                                {!isCombo && (
+                                <button onClick={() => setShowGaveraCalc(!showGaveraCalc)} className="text-[9px] font-bold text-brand hover:text-brand-light flex items-center gap-1 bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded transition-colors active:scale-95">
+                                    🧮 Asistente de Gavera
+                                </button>
+                                )}
+                            </div>
                             <input type="number" inputMode="decimal" value={costBs} onChange={e => handleCostBsChange(e.target.value)} placeholder="0.00"
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
                         </div>
                     </div>
 
-                    {/* ─── LOTE: Auto unit cost ─── */}
-                    {isLote && parsedUnits > 1 && parsedCost > 0 && (
-                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl text-[11px]">
-                            <span className="text-slate-500 font-medium">Costo por unidad:</span>
-                            <span className="font-bold text-slate-700 dark:text-white flex items-center gap-1.5">
-                                ${(parsedCost / parsedUnits).toFixed(2)}
-                                <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded font-black">AUTO</span>
-                            </span>
+                    {/* ─── GAVERA CALCULATOR BANDA ─── */}
+                    {showGaveraCalc && !isCombo && (
+                        <div className="bg-slate-100 dark:bg-slate-800/80 p-3 rounded-xl border border-brand/30 animate-in slide-in-from-top-2">
+                            <h4 className="text-[11px] font-black uppercase text-brand mb-2 flex items-center gap-1.5"><Package size={12}/> Calculadora de Gaveras/Cajas</h4>
+                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500">Costo total ($)</label>
+                                    <input type="number" value={gaveraCost} onChange={e => setGaveraCost(e.target.value)} placeholder="Ej: 20" className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500">Uds/Caja</label>
+                                    <input type="number" value={gaveraUnits} onChange={e => setGaveraUnits(e.target.value)} className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500">Cant. Cajas</label>
+                                    <input type="number" value={gaveraQty} onChange={e => setGaveraQty(e.target.value)} className="w-full bg-white dark:bg-slate-900 px-2 py-1.5 rounded-lg text-sm outline-none border border-slate-200 dark:border-slate-700"/>
+                                </div>
+                            </div>
+                            <button onClick={handleApplyGavera} disabled={!gaveraCost || !gaveraUnits} className="w-full py-2 bg-brand hover:bg-brand-dark text-white text-[11px] font-bold rounded-lg transition-colors">
+                                Aplicar Costo y Sumar al Stock
+                            </button>
                         </div>
                     )}
 
+                    {/* LOTE: Auto unit cost removed */}
                     {/* ─── PRICE SECTION ─── */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="relative">
@@ -318,50 +290,7 @@ export default function ProductFormModal({
                         </div>
                     )}
 
-                    {/* ─── LOTE: Unit Price (Bimoneda) ─── */}
-                    {isLote && sellByUnit && parsedUnits > 1 && (
-                        <div className="bg-white dark:bg-slate-800/80 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800/40 space-y-2 animate-in fade-in slide-in-from-top-1">
-                            <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Precio por Unidad Suelta</label>
-                                {parsedPrice > 0 && parsedUnits > 0 && (
-                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
-                                        Auto: ${(parsedPrice / parsedUnits).toFixed(2)}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[9px] font-bold text-emerald-500 ml-0.5 mb-0.5 block">USD ($)</label>
-                                    <input type="number" inputMode="decimal" value={unitPriceUsd}
-                                        onChange={e => setUnitPriceUsd(e.target.value)}
-                                        placeholder={parsedPrice > 0 && parsedUnits > 0 ? (parsedPrice / parsedUnits).toFixed(2) : '0.00'}
-                                        className="w-full bg-indigo-50/50 dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 p-3 rounded-xl font-black text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-bold text-blue-500 ml-0.5 mb-0.5 block">Bolívares (Bs)</label>
-                                    <div className="w-full bg-blue-50/50 dark:bg-slate-900 border border-blue-100 dark:border-blue-900/30 p-3 rounded-xl font-black text-blue-700 dark:text-blue-400 text-sm flex items-center justify-between">
-                                        {effectiveRate > 0
-                                            ? (effectiveUnitPrice * effectiveRate).toFixed(2)
-                                            : '—'
-                                        }
-                                        <span className="text-[8px] bg-blue-100 dark:bg-blue-900/30 text-blue-500 px-1.5 py-0.5 rounded font-black">Bs</span>
-                                    </div>
-                                </div>
-                                {copEnabled && (
-                                    <div className="col-span-2 mt-0.5">
-                                        <div className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 p-2.5 rounded-xl text-xs flex items-center justify-between">
-                                            <span className="text-amber-700/70 dark:text-amber-500/70 font-bold">Unidad Suelta COP:</span>
-                                            <span className="font-black text-amber-600 dark:text-amber-400">
-                                                 {(effectiveUnitPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <p className="text-[9px] text-slate-400 italic">Déjalo vacío para usar el precio auto-calculado (lote ÷ unidades)</p>
-                        </div>
-                    )}
-
+                    {/* LOTE: Unit Price removed */}
                     {/* ─── MARGIN PANEL ─── */}
                     <div className={`p-3 rounded-xl border space-y-1.5 min-h-[60px] ${mainMarginPct !== null && mainMarginPct < 0
                         ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30'
@@ -409,36 +338,62 @@ export default function ProductFormModal({
                         )}
                     </div>
 
-                    {/* ─── STOCK SECTION ─── */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            {isLote ? (
-                                <>
-                                    <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">¿Cuántos lotes?</label>
-                                    <input type="number" inputMode="numeric" value={stockInLotes} onChange={e => setStockInLotes(e.target.value)} placeholder="0"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
-                                    {parsedStockLotes > 0 && parsedUnits > 0 && (
-                                        <p className="text-[10px] text-indigo-500 font-bold mt-1 ml-1">= {stockUnitsCalc} unidades</p>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Stock</label>
-                                    <input type="number" inputMode="numeric" value={stock} onChange={e => setStock(e.target.value)} placeholder="0"
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50" />
-                                </>
-                            )}
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-amber-500 ml-1 mb-1 block uppercase flex items-center gap-1">
-                                <AlertTriangle size={10} /> Alerta mín.
+                    {/* ─── STOCK / COMBO SECTION ─── */}
+                    <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                                <Droplets size={14} className="text-brand" />
+                                {isCombo ? 'Configuración de Combo/Tobo' : 'Control de Stock'}
+                            </span>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Es Combo</span>
+                                <div className="relative">
+                                    <input type="checkbox" className="sr-only" checked={isCombo} onChange={(e) => {
+                                        setIsCombo(e.target.checked);
+                                        // Auto-disable gavera assistant if turning combo on
+                                        if (e.target.checked) setShowGaveraCalc(false);
+                                    }} />
+                                    <div className={`block w-10 h-6 rounded-full transition-colors ${isCombo ? 'bg-brand' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                    <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isCombo ? 'translate-x-4' : ''}`}></div>
+                                </div>
                             </label>
-                            <input type="number" inputMode="numeric" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} placeholder="5"
-                                className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 p-3.5 rounded-xl font-bold text-amber-700 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50" />
-                            {isLote && parsedAlert > 0 && parsedUnits > 0 && (
-                                <p className="text-[10px] text-amber-500 font-bold mt-1 ml-1">= {alertLotesCalc.toFixed(1)} lotes</p>
-                            )}
                         </div>
+
+                        {isCombo ? (
+                            <div className="grid grid-cols-3 gap-3 animate-in fade-in zoom-in-95">
+                                <div className="col-span-2">
+                                    <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase">¿Qué producto descuenta?</label>
+                                    <select value={linkedProductId} onChange={e => setLinkedProductId(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 text-sm">
+                                        <option value="">Selecciona base...</option>
+                                        // Props needed: `products` is already passed in ProductsView
+                                        {products?.filter(p => !p.isCombo).map(p => (
+                                            <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-span-1">
+                                    <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase">Cant.</label>
+                                    <input type="number" value={linkedQty} onChange={e => setLinkedQty(e.target.value)} placeholder="12"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 text-center" />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase">Stock Físico</label>
+                                    <input type="number" inputMode="numeric" value={stock} onChange={e => setStock(e.target.value)} placeholder="0"
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3.5 rounded-xl font-black text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-brand/50 text-lg" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-amber-500 ml-1 mb-1 block uppercase flex items-center gap-1">
+                                        <AlertTriangle size={10} /> Alerta Mínima
+                                    </label>
+                                    <input type="number" inputMode="numeric" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} placeholder="5"
+                                        className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/30 p-3.5 rounded-xl font-bold text-amber-700 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50" />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* ─── PRE-SAVE SUMMARY ─── */}
@@ -453,14 +408,11 @@ export default function ProductFormModal({
                                 <div className="px-3 py-2.5 space-y-1.5 text-xs bg-white dark:bg-slate-900 animate-in fade-in slide-in-from-top-1 duration-150">
                                     <div className="flex justify-between"><span className="text-slate-400">Nombre:</span><span className="font-bold text-slate-700 dark:text-white">{name}</span></div>
                                     <div className="flex justify-between"><span className="text-slate-400">Categoría:</span><span className="font-bold text-slate-700 dark:text-white">{categories.find(c => c.id === category)?.label || category}</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-400">Tipo:</span><span className="font-bold text-slate-700 dark:text-white">{PACKAGING_TYPES.find(p => p.id === packagingType)?.label}</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-400">Precio USD/BS:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)}{priceSuffix} / {(parsedPrice * effectiveRate).toFixed(2)} Bs</span></div>
-                                    {copEnabled && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP{priceSuffix}</span></div>}
-                                    {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}{priceSuffix}</span></div>}
+                                    <div className="flex justify-between"><span className="text-slate-400">Precio USD/BS:</span><span className="font-bold text-emerald-600">${parsedPrice.toFixed(2)} / {(parsedPrice * effectiveRate).toFixed(2)} Bs</span></div>
+                                    {copEnabled && <div className="flex justify-between"><span className="text-amber-500/80">Precio COP:</span><span className="font-bold text-amber-600">{(parsedPrice * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</span></div>}
+                                    {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}</span></div>}
                                     {mainMarginPct !== null && <div className="flex justify-between"><span className="text-slate-400">Margen:</span><span className={`font-black ${mainMarginPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{mainMarginPct.toFixed(1)}%</span></div>}
-                                    {isLote && <div className="flex justify-between"><span className="text-slate-400">Uds/Lote:</span><span className="font-bold text-indigo-500">{parsedUnits}</span></div>}
-                                    {isLote && sellByUnit && <div className="flex justify-between"><span className="text-slate-400">Venta suelta:</span><span className="font-bold text-indigo-500">Sí — ${effectiveUnitPrice.toFixed(2)}/ud</span></div>}
-                                    <div className="flex justify-between"><span className="text-slate-400">Stock:</span><span className="font-bold text-slate-700 dark:text-white">{isLote ? `${parsedStockLotes} lotes (${stockUnitsCalc} uds)` : `${stock || 0}`}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-400">Stock:</span><span className="font-bold text-slate-700 dark:text-white">{stock || 0}</span></div>
                                     {barcode && <div className="flex justify-between"><span className="text-slate-400">Código:</span><span className="font-bold text-slate-700 dark:text-white">{barcode}</span></div>}
                                 </div>
                             )}

@@ -5,7 +5,7 @@
 // Los productos tienen UUIDs válidos en la tabla products de SB.
 // ============================================================
 
-import { supabase } from '../core/supabaseClient';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { round2, sumR, subR } from '../utils/dinero';
 

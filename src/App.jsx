@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X, Settings } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X, Settings, Layers } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
 import { ProductsView } from './views/ProductsView';
 import SettingsView from './views/SettingsView';
 import ResetPasswordView from './views/ResetPasswordView';
+import TablesView from './views/TablesView';
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -24,9 +25,10 @@ import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 import SpotlightTour from './components/SpotlightTour';
-import LockScreen from './components/security/LockScreen';
+import LoginScreen from './components/security/LoginScreen';
 import CloudAuthModal from './components/security/CloudAuthModal';
-import { useAuthStore } from './hooks/store/useAuthStore';
+import { useAuthStore } from './hooks/store/authStore';
+import { AnyStaffRoute, CashierRoute, AdminRoute } from './components/security/Guards';
 import { useAutoLock } from './hooks/useAutoLock';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
@@ -248,16 +250,9 @@ export default function App() {
     };
   }, []);
 
-  // === Auth — condiciones para mostrar pantalla de PIN ===
-  const usuarioActivo = useAuthStore(s => s.usuarioActivo);
-  const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-  const adminEmail = useAuthStore(s => s.adminEmail);
-  const adminPassword = useAuthStore(s => s.adminPassword);
-
-  const isCajero = usuarioActivo?.rol === 'CAJERO';
-  const isCloudConfigured = Boolean(adminEmail && adminPassword);
-  // El PIN solo bloquea si requireLogin está activado Y hay cuenta cloud registrada
-  const pinLoginEnabled = requireLogin && isCloudConfigured;
+  // === Auth Local via PIN ===
+  const { isAuthenticated, role, currentUser } = useAuthStore();
+  const isCajero = role === 'CAJERO';
 
   const confirm = useConfirm();
 
@@ -274,19 +269,9 @@ export default function App() {
     setCloudSession(null);
   };
 
-  // Auto-login: cuando el PIN no aplica y no hay sesión, restaurar el admin local
-  // automáticamente. useEffect corre antes del primer paint visible → sin flash.
-  useEffect(() => {
-    if (!pinLoginEnabled && !usuarioActivo) {
-      const admins = useAuthStore.getState().usuarios.filter(u => u.rol === 'ADMIN');
-      if (admins.length > 0) {
-        useAuthStore.setState({ usuarioActivo: admins[0] });
-      }
-    }
-  }, [pinLoginEnabled, usuarioActivo]);
-
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
+    { id: 'mesas', label: 'Mesas', icon: Layers },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart },
     { id: 'catalogo', label: 'Inventario', icon: Store },
     { id: 'clientes', label: 'Contactos', icon: Users },
@@ -309,9 +294,8 @@ export default function App() {
     return <CloudAuthModal forceLogin={true} />;
   }
 
-  // Local Guard: si el PIN local aplica y no ha desbloqueado
-  if (!usuarioActivo && pinLoginEnabled) return <LockScreen />;
-  if (!usuarioActivo) return null;
+  // Local Guard: Require PIN login for operators
+  if (!isAuthenticated) return <LoginScreen />;
 
   return (
     <div className="font-sans antialiased bg-[#F8FAFC] h-[100dvh] flex flex-col overflow-clip">
@@ -319,8 +303,7 @@ export default function App() {
       {/* Terms and Conditions Overlay (First Use) */}
       <TermsOverlay />
 
-      {/* Tutorial Onboarding (First Use, after Terms) */}
-      <OnboardingOverlay />
+
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -370,19 +353,34 @@ export default function App() {
         {/* Eager views — always mounted, visibility toggled via CSS */}
         <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
+            <AnyStaffRoute>
+              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
+            </AnyStaffRoute>
           </ErrorBoundary>
         </div>
 
         <div className={`flex-1 flex flex-col ${activeTab === 'catalogo' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
+            <AdminRoute>
+              <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
+            </AdminRoute>
           </ErrorBoundary>
         </div>
 
         <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
+            <AnyStaffRoute>
+              <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
+            </AnyStaffRoute>
+          </ErrorBoundary>
+        </div>
+
+        {/* Mesas de Pool */}
+        <div className={`flex-1 flex flex-col ${activeTab === 'mesas' ? '' : 'hidden'}`}>
+          <ErrorBoundary>
+            <AnyStaffRoute>
+              <TablesView triggerHaptic={triggerHaptic} isActive={activeTab === 'mesas'} />
+            </AnyStaffRoute>
           </ErrorBoundary>
         </div>
 
@@ -391,14 +389,18 @@ export default function App() {
           {(activeTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
             <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
+                <CashierRoute>
+                  <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
+                </CashierRoute>
               </ErrorBoundary>
             </div>
           )}
           {(activeTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
             <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
-                <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
+                <AdminRoute>
+                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
+                </AdminRoute>
               </ErrorBoundary>
             </div>
           )}
@@ -407,12 +409,14 @@ export default function App() {
         {/* Settings — mounted as tab inside providers */}
         <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'ajustes' ? '' : 'hidden'}`}>
           <ErrorBoundary>
-            <SettingsView
-              onClose={() => setActiveTab('inicio')}
-              theme={theme}
-              toggleTheme={toggleTheme}
-              triggerHaptic={triggerHaptic}
-            />
+            <AdminRoute>
+              <SettingsView
+                onClose={() => setActiveTab('inicio')}
+                theme={theme}
+                toggleTheme={toggleTheme}
+                triggerHaptic={triggerHaptic}
+              />
+            </AdminRoute>
           </ErrorBoundary>
         </div>
 
@@ -485,7 +489,7 @@ export default function App() {
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center shrink-0 text-emerald-600 font-bold text-sm">✓</div>
-                <p className="text-sm text-slate-600 dark:text-slate-300">¡Listo! La app aparecerá como un ícono en tu teléfono</p>
+                <p className="text-sm text-slate-600 dark:text-slate-300">¡Pool Los Diaz! La app aparecerá como un ícono en tu teléfono</p>
               </div>
             </div>
             <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="w-full mt-6 py-3 bg-brand text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">

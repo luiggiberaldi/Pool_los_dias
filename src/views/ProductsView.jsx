@@ -165,10 +165,14 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [stockInLotes, setStockInLotes] = useState('');
     const [granelUnit, setGranelUnit] = useState('kg');
     
-    // UI states
     const [isFormShaking, setIsFormShaking] = useState(false);
     const fileInputRef = useRef(null);
     const categoryScrollRef = useRef(null);
+
+    // Form State (Combos)
+    const [isCombo, setIsCombo] = useState(false);
+    const [linkedProductId, setLinkedProductId] = useState('');
+    const [linkedQty, setLinkedQty] = useState('12');
 
     // Form State (Category create)
     const [newCategoryName, setNewCategoryName] = useState('');
@@ -270,7 +274,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         const productData = buildProductPayload({
             name, barcode, priceUsd, priceBs, costUsd, costBs, stock, stockInLotes,
             packagingType, unitsPerPackage, granelUnit, sellByUnit, unitPriceUsd,
-            category, lowStockAlert
+            category, lowStockAlert, isCombo, linkedProductId, linkedQty
         }, effectiveRate);
 
         if (editingId) {
@@ -314,6 +318,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         setCategory(product.category || 'otros');
         setLowStockAlert(product.lowStockAlert ?? 5);
         setImage(product.image);
+
+        setIsCombo(product.isCombo || false);
+        setLinkedProductId(product.linkedProductId || '');
+        setLinkedQty(product.linkedQty ? product.linkedQty.toString() : '12');
 
         // Derive packagingType from legacy unit
         const u = product.unit || 'unidad';
@@ -376,6 +384,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const handleClose = () => {
         setName(''); setBarcode(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
         setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
+        setIsCombo(false); setLinkedProductId(''); setLinkedQty('12');
         setProductMovements([]);
     };
 
@@ -778,6 +787,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 packagingType={packagingType} setPackagingType={setPackagingType}
                 stockInLotes={stockInLotes} setStockInLotes={setStockInLotes}
                 granelUnit={granelUnit} setGranelUnit={setGranelUnit}
+                isCombo={isCombo} setIsCombo={setIsCombo}
+                linkedProductId={linkedProductId} setLinkedProductId={setLinkedProductId}
+                linkedQty={linkedQty} setLinkedQty={setLinkedQty}
                 effectiveRate={effectiveRate}
                 copEnabled={copEnabled}
                 tasaCop={tasaCop}
@@ -785,6 +797,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 handleImageUpload={handleImageUpload}
                 handleSave={handleSave}
                 categories={categories}
+                products={products}
                 productMovements={editingId ? productMovements : null}
             />
 

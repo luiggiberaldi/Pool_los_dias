@@ -30,6 +30,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
+import { TableQueuePanel } from '../components/tables/TableQueuePanel';
+import { useTablesStore } from '../hooks/store/useTablesStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -75,6 +77,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [showRateConfig, setShowRateConfig] = useState(false);
 
     const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
+
+    // ── Mesa Queue (Checkout pedido por mesero) ──────────
+    const [tableCheckoutData, setTableCheckoutData] = useState(null);
 
     // Cart Navigation State
     const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
@@ -452,7 +457,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         handleSetSearchTerm('');
         setHierarchyPending(null);
         
-        // --- LISTO POS Flow: blur search to enter cart mode and auto-select ---
+        // --- Pool Los Diaz Flow: blur search to enter cart mode and auto-select ---
         setTimeout(() => {
             searchInputRef.current?.blur();
             setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / - 
@@ -535,6 +540,90 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
 
 
+    const handleTableCheckout = async (payments, changeBreakdown) => {
+        if (!tableCheckoutData) return;
+        triggerHaptic && triggerHaptic();
+
+        const syntheticCart = [];
+        
+        if (tableCheckoutData.timeCost > 0) {
+            syntheticCart.push({
+                id: crypto.randomUUID(),
+                name: `Tiempo Jugado (${tableCheckoutData.table.name})`,
+                priceUsdt: tableCheckoutData.timeCost,
+                priceUsd: tableCheckoutData.timeCost,
+                qty: 1,
+                costUsd: 0,
+                costBs: 0,
+                category: 'servicios',
+                unit: 'servicio',
+                stock: 9999
+            });
+        }
+        
+        if (tableCheckoutData.currentItems && tableCheckoutData.currentItems.length > 0) {
+             tableCheckoutData.currentItems.forEach(item => {
+                 const p = products.find(p => p.id === item.product_id);
+                 if (p) {
+                     syntheticCart.push({
+                         ...p,
+                         id: p.id,
+                         priceUsdt: Number(item.unit_price_usd),
+                         priceUsd: Number(item.unit_price_usd),
+                         qty: Number(item.qty),
+                         costBs: p.costBs || 0,
+                         costUsd: p.costUsd || 0,
+                     });
+                 }
+             });
+        }
+
+        const opts = {
+            cart: syntheticCart, 
+            cartTotalUsd: tableCheckoutData.grandTotal, 
+            cartTotalBs: tableCheckoutData.grandTotal * effectiveRate, 
+            cartSubtotalUsd: tableCheckoutData.grandTotal, 
+            payments, 
+            changeBreakdown,
+            selectedCustomerId, 
+            customers, 
+            products, 
+            effectiveRate, 
+            tasaCop, 
+            copEnabled,
+            discountData: { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 }, 
+            useAutoRate
+        };
+
+        const result = await processSaleTransaction(opts);
+        
+        if (!result.success) {
+            console.error('Abortando venta de mesa:', result.error);
+            showToast(result.error, result.error.includes('No se pueden') ? 'warning' : 'error');
+            playError();
+            return;
+        }
+
+        setProducts(result.updatedProducts);
+        if (result.updatedCustomers) setCustomers(result.updatedCustomers);
+        setSalesData(prev => [result.sale, ...prev]);
+
+        try {
+            await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
+        } catch (error) {
+            console.error("Error al cerrar la mesa:", error);
+            showToast("Venta completa, pero falló al apagar mesa libre.", "warning");
+        }
+
+        setShowReceipt(result.sale); 
+        playCheckout(); 
+        setShowConfetti(true);
+        notifyLowStock(result.updatedProducts);
+        
+        setTableCheckoutData(null); 
+        setSelectedCustomerId(''); 
+    };
+
     const handleCheckout = async (payments, changeBreakdown) => {
         triggerHaptic && triggerHaptic();
 
@@ -601,7 +690,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         if (amountUsd <= 0) return;
         
         const customProduct = {
-            id: `custom_${Date.now()}`,
+            id: crypto.randomUUID(),
             name: 'Venta Libre',
             priceUsdt: amountUsd, // Usamos priceUsdt para que la validación temprana lo acepte
             exactBs: exactBsToStore, // Monto exacto original en Bs, o null si debe flotar
@@ -617,7 +706,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     };
 
     // ==========================================
-    // KEYBOARD SHORTCUTS (LISTO POS Port)
+    // KEYBOARD SHORTCUTS (Pool Los Diaz Port)
     // ==========================================
     useSalesKeyboard({
         todayAperturaData, showCheckout, showReceipt, hierarchyPending, weightPending, 
@@ -675,6 +764,9 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 setShowKeyboardHelp={setShowKeyboardHelp}
                 triggerHaptic={triggerHaptic}
             />
+
+            {/* ── Mesa Queue: cuentas pendientes de mesas ── */}
+            <TableQueuePanel onCheckoutTable={setTableCheckoutData} />
 
             {!todayAperturaData ? (
                 <CajaCerradaOverlay 
@@ -896,6 +988,27 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
                 onClose={() => setIsAperturaOpen(false)}
                 onConfirm={handleSaveApertura}
             />
+
+            {/* ── Modal de cobro de mesa (desde la cola del cajero usando CheckoutModal) ── */}
+            {tableCheckoutData && (
+                <CheckoutModal
+                    onClose={() => { setTableCheckoutData(null); setSelectedCustomerId(''); }}
+                    cartSubtotalUsd={tableCheckoutData.grandTotal}
+                    cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
+                    cartTotalUsd={tableCheckoutData.grandTotal} 
+                    cartTotalBs={tableCheckoutData.grandTotal * effectiveRate} 
+                    discountData={{active: false, amountUsd: 0, amountBs: 0}}
+                    effectiveRate={effectiveRate}
+                    customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
+                    paymentMethods={paymentMethods}
+                    onConfirmSale={handleTableCheckout} onCreateCustomer={handleCreateCustomer}
+                    triggerHaptic={triggerHaptic}
+                    copEnabled={copEnabled}
+                    tasaCop={tasaCop}
+                    currentFloatUsd={currentFloat.usd}
+                    currentFloatBs={currentFloat.bs}
+                />
+            )}
         </div>
     );
 }

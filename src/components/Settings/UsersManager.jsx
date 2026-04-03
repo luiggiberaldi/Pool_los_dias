@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useAuthStore } from '../../hooks/store/useAuthStore';
+import React, { useState, useEffect } from 'react';
+import { useAuthStore } from '../../hooks/store/authStore';
 import { showToast } from '../Toast';
 import {
     UserPlus, Trash2, KeyRound, Shield, ShoppingCart,
@@ -70,16 +70,19 @@ function PinInput({ value, onChange, label }) {
 
 // ─── User Row ──────────────────────────────────────
 function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, triggerHaptic }) {
-    const roleConf = ROLE_CONFIG[user.rol] || ROLE_CONFIG.CAJERO;
+    const roleString = user.role || user.rol || 'CAJERO';
+    const nameString = user.name || user.nombre || 'Desconocido';
+    
+    const roleConf = ROLE_CONFIG[roleString] || ROLE_CONFIG.CAJERO;
     const RoleIcon = roleConf.icon;
     const isCurrentUser = user.id === currentUserId;
-    const isAdmin = user.rol === 'ADMIN';
+    const isAdmin = roleString === 'ADMIN';
 
     return (
         <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isCurrentUser ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-800/30' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
             {/* Avatar */}
             <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${roleConf.gradient} flex items-center justify-center shrink-0 shadow-sm relative`}>
-                <span className="text-white font-black text-lg">{(user.nombre || 'U')[0].toUpperCase()}</span>
+                <span className="text-white font-black text-lg">{(nameString)[0].toUpperCase()}</span>
                 {isAdmin && (
                     <div className="absolute -top-2 left-1/2 -translate-x-1/2">
                         <Crown size={12} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" />
@@ -90,7 +93,7 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, trigg
             {/* Info */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{user.nombre}</p>
+                    <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{nameString}</p>
                     {isCurrentUser && (
                         <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded-full">Tu</span>
                     )}
@@ -133,9 +136,17 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, trigg
     );
 }
 
+import { supabaseCloud } from '../../config/supabaseCloud';
+import { hashPin } from '../../utils/crypto';
+
 // ═══════════════════════════════════════════════════ MAIN
 export default function UsersManager({ triggerHaptic }) {
-    const { usuarios, usuarioActivo, agregarUsuario, eliminarUsuario, cambiarPin, editarUsuario } = useAuthStore();
+    const { cachedUsers: usuarios, currentUser: usuarioActivo, syncUsers } = useAuthStore();
+
+    // Siempre sincronizar al montar para tener UUIDs frescos de Supabase
+    useEffect(() => {
+        syncUsers();
+    }, []);
 
     // States
     const [showAddForm, setShowAddForm] = useState(false);
@@ -153,50 +164,103 @@ export default function UsersManager({ triggerHaptic }) {
     const [editNameValue, setEditNameValue] = useState('');
 
     // ─── Handlers ────────────────────────────────────
-    const handleAdd = () => {
+    const handleAdd = async () => {
         if (!newName.trim()) return showToast('Ingresa un nombre', 'error');
         if (newPin.length !== 4) return showToast('El PIN debe tener 4 digitos', 'error');
-        // Check duplicate PIN
-        if (usuarios.some(u => u.pin === newPin)) return showToast('Ese PIN ya esta en uso', 'error');
 
-        agregarUsuario(newName.trim(), newRole, newPin);
-        showToast(`Usuario "${newName.trim()}" creado`, 'success');
-        triggerHaptic?.();
-        setNewName('');
-        setNewRole('CAJERO');
-        setNewPin('');
-        setShowAddForm(false);
-    };
+        try {
+            const hashedPin = await hashPin(newPin);
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .insert({
+                    name: newName.trim(),
+                    role: newRole,
+                    pin_hash: hashedPin,
+                    active: true
+                });
 
-    const handleChangePin = () => {
-        if (pinValue.length !== 4) return showToast('El PIN debe tener 4 digitos', 'error');
-        if (usuarios.some(u => u.id !== changePinUser.id && u.pin === pinValue)) return showToast('Ese PIN ya esta en uso', 'error');
+            if (error) throw error;
 
-        cambiarPin(changePinUser.id, pinValue);
-        showToast(`PIN de ${changePinUser.nombre} actualizado`, 'success');
-        triggerHaptic?.();
-        setChangePinUser(null);
-        setPinValue('');
-    };
-
-    const handleDelete = () => {
-        const result = eliminarUsuario(deleteUser.id);
-        if (result === false) {
-            showToast('No se puede eliminar este usuario', 'error');
-        } else {
-            showToast(`"${deleteUser.nombre}" eliminado`, 'success');
+            showToast(`Usuario "${newName.trim()}" creado`, 'success');
             triggerHaptic?.();
+            setNewName('');
+            setNewRole('CAJERO');
+            setNewPin('');
+            setShowAddForm(false);
+            
+            await syncUsers(); // Actualiza LocalForage y Zustand
+        } catch (err) {
+            console.error('Error al agregar usuario:', err);
+            showToast('Ocurrió un error al crear el usuario', 'error');
         }
-        setDeleteUser(null);
     };
 
-    const handleEditName = () => {
+    const handleChangePin = async () => {
+        if (pinValue.length !== 4) return showToast('El PIN debe tener 4 digitos', 'error');
+
+        try {
+            const hashedPin = await hashPin(pinValue);
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .update({ pin_hash: hashedPin })
+                .eq('id', changePinUser.id);
+                
+            if (error) throw error;
+
+            showToast(`PIN de ${changePinUser.nombre || changePinUser.name} actualizado`, 'success');
+            triggerHaptic?.();
+            setChangePinUser(null);
+            setPinValue('');
+            
+            await syncUsers();
+        } catch (err) {
+            console.error('Error al cambiar PIN:', err);
+            showToast('Ocurrió un error al actualizar el PIN', 'error');
+        }
+    };
+
+    const handleDelete = async () => {
+        try {
+            // Soft delete
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .update({ active: false })
+                .eq('id', deleteUser.id);
+
+            if (error) throw error;
+
+            showToast(`"${deleteUser.nombre || deleteUser.name}" eliminado`, 'success');
+            triggerHaptic?.();
+            setDeleteUser(null);
+            
+            await syncUsers();
+        } catch (err) {
+            console.error('Error al eliminar usuario:', err);
+            showToast('No se puede eliminar este usuario', 'error');
+        }
+    };
+
+    const handleEditName = async () => {
         if (!editNameValue.trim()) return showToast('Ingresa un nombre válido', 'error');
-        editarUsuario(editNameUser.id, { nombre: editNameValue.trim() });
-        showToast(`Nombre actualizado a ${editNameValue.trim()}`, 'success');
-        triggerHaptic?.();
-        setEditNameUser(null);
-        setEditNameValue('');
+
+        try {
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .update({ name: editNameValue.trim() })
+                .eq('id', editNameUser.id);
+                
+            if (error) throw error;
+            
+            showToast(`Nombre actualizado a ${editNameValue.trim()}`, 'success');
+            triggerHaptic?.();
+            setEditNameUser(null);
+            setEditNameValue('');
+            
+            await syncUsers();
+        } catch (err) {
+            console.error('Error al editar usuario:', err);
+            showToast('Error al modificar el nombre', 'error');
+        }
     };
 
     return (
@@ -209,7 +273,7 @@ export default function UsersManager({ triggerHaptic }) {
                         user={user}
                         currentUserId={usuarioActivo?.id}
                         onChangePin={u => { setChangePinUser(u); setPinValue(''); setShowPin(false); }}
-                        onEditName={u => { setEditNameUser(u); setEditNameValue(u.nombre); }}
+                        onEditName={u => { setEditNameUser(u); setEditNameValue(u.name || u.nombre || ''); }}
                         onDelete={u => setDeleteUser(u)}
                         triggerHaptic={triggerHaptic}
                     />
@@ -292,11 +356,11 @@ export default function UsersManager({ triggerHaptic }) {
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setChangePinUser(null)}>
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="text-center mb-6">
-                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[changePinUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
-                                <span className="text-white font-black text-2xl">{(changePinUser.nombre || 'U')[0].toUpperCase()}</span>
+                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[changePinUser.role || changePinUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
+                                <span className="text-white font-black text-2xl">{(changePinUser.name || changePinUser.nombre || 'U')[0].toUpperCase()}</span>
                             </div>
                             <h3 className="text-lg font-black text-slate-800 dark:text-white">Cambiar PIN</h3>
-                            <p className="text-xs text-slate-400 mt-1">{changePinUser.nombre}</p>
+                            <p className="text-xs text-slate-400 mt-1">{changePinUser.name || changePinUser.nombre}</p>
                         </div>
 
                         <div className="mb-4">
@@ -341,7 +405,7 @@ export default function UsersManager({ triggerHaptic }) {
                         </div>
                         <h3 className="text-lg font-black text-slate-800 dark:text-white mb-2">Eliminar Usuario</h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                            ¿Seguro que deseas eliminar a <strong>"{deleteUser.nombre}"</strong>? Esta accion no se puede deshacer.
+                            ¿Seguro que deseas eliminar a <strong>"{deleteUser.name || deleteUser.nombre}"</strong>? Esta accion no se puede deshacer.
                         </p>
                         <div className="flex gap-3">
                             <button
@@ -366,11 +430,11 @@ export default function UsersManager({ triggerHaptic }) {
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEditNameUser(null)}>
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="text-center mb-6">
-                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[editNameUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
-                                <span className="text-white font-black text-2xl">{(editNameUser.nombre || 'U')[0].toUpperCase()}</span>
+                            <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${ROLE_CONFIG[editNameUser.role || editNameUser.rol]?.gradient || 'from-slate-500 to-slate-600'} flex items-center justify-center mb-3`}>
+                                <span className="text-white font-black text-2xl">{(editNameUser.name || editNameUser.nombre || 'U')[0].toUpperCase()}</span>
                             </div>
                             <h3 className="text-lg font-black text-slate-800 dark:text-white">Cambiar Nombre</h3>
-                            <p className="text-xs text-slate-400 mt-1">{editNameUser.rol}</p>
+                            <p className="text-xs text-slate-400 mt-1">{editNameUser.role || editNameUser.rol}</p>
                         </div>
 
                         <div className="mb-6">

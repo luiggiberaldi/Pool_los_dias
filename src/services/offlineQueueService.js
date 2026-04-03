@@ -1,5 +1,5 @@
 import localforage from 'localforage';
-import { supabase } from '../core/supabaseClient';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
 const QUEUE_KEY = 'offline_sales_queue';
 
@@ -40,7 +40,13 @@ export const offlineQueueService = {
         updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'synced' } : q);
       } catch (err) {
         console.error('[Offline Sync] Fallo al sincronizar venta offline:', err);
-        updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, attempts: q.attempts + 1 } : q);
+        // Descartar si es un error tipográfico incorregible o superó los 3 intentos
+        if (item.attempts >= 3 || err?.code === '22P02') {
+            console.warn('[Offline Sync] Venta descartada permanentemente (error irreparable o máximo de intentos).');
+            updatedQueue = updatedQueue.filter(q => q.id !== item.id);
+        } else {
+            updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, attempts: q.attempts + 1 } : q);
+        }
       }
     }
     

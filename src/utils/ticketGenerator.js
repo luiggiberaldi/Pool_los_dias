@@ -6,8 +6,8 @@ import { formatBs, formatUsd } from './calculatorUtils';
  * Cada dato ocupa su propia línea — nada se solapa.
  */
 export async function generateTicketPDF(sale, bcvRate) {
-    const WIDTH = 80;
-    const M = 6;
+    const WIDTH = 58;
+    const M = 3;
     const CX = WIDTH / 2;
     const RIGHT = WIDTH - M;
 
@@ -45,11 +45,12 @@ export async function generateTicketPDF(sale, bcvRate) {
     // ════════════════════════════════════
     try {
         const img = new Image();
-        img.src = '/logo.png';
+        img.src = '/logo-ticket.png';
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-        const logoW = 50;
-        const logoH = 12; // ~4:1 aspect ratio matching original
-        doc.addImage(img, 'PNG', CX - logoW / 2, y, logoW, logoH);
+        const targetW = 50;
+        const ratio = img.width / img.height;
+        const logoH = targetW / ratio;
+        doc.addImage(img, 'PNG', CX - targetW / 2, y, targetW, logoH);
         y += logoH + 4;
     } catch (_) { y += 2; }
 
@@ -287,24 +288,20 @@ export async function generateTicketPDF(sale, bcvRate) {
 
 /**
  * Imprime un ticket de venta en impresora termica via window.print().
- * Genera un HTML optimizado para papel termico 58mm/80mm.
  * Compatible con impresoras USB (PC) y Bluetooth emparejadas (movil Android/iOS).
  */
 export function printThermalTicket(sale, bcvRate) {
-    const paperWidth = localStorage.getItem('printer_paper_width') || '58';
-    const is80 = paperWidth === '80';
-
-    // ── CONFIGURACIÓN DE TAMAÑOS (58mm vs 80mm) ──
-    const cssPageSize = is80 ? '80mm auto' : '58mm auto';
-    const cssBodyWidth = is80 ? '76mm' : '48mm';
-    const cssLogoW = is80 ? '60mm' : '44mm';
-    const fDisclaimer = is80 ? '9px' : '7.5px';
-    const fTiny = is80 ? '11px' : '9px';     // Secundaria (detalles, RIF, c/u)
-    const fSmall = is80 ? '12px' : '10px';   // Info general (fechas, nro)
-    const fBase = is80 ? '14px' : '11px';    // Primaria (Items, label totales)
-    const fTitle = is80 ? '18px' : '14px';   // Nombre negocio
-    const fTotalU = is80 ? '32px' : '24px';  // Total $
-    const fTotalB = is80 ? '18px' : '14px';  // Total Bs
+    // ── CONFIGURACIÓN DE TAMAÑOS (Fija en 58mm) ──
+    const cssPageSize = '58mm auto';
+    const cssBodyWidth = '48mm';
+    const cssLogoW = '44mm';
+    const fDisclaimer = '7.5px';
+    const fTiny = '9px';     // Secundaria (detalles, RIF, c/u)
+    const fSmall = '10px';   // Info general (fechas, nro)
+    const fBase = '11px';    // Primaria (Items, label totales)
+    const fTitle = '14px';   // Nombre negocio
+    const fTotalU = '24px';  // Total $
+    const fTotalB = '14px';  // Total Bs
 
     // ── OBTENER CONFIGURACIÓN DEL NEGOCIO ──
     const settings = { 
@@ -328,8 +325,7 @@ export function printThermalTicket(sale, bcvRate) {
         const unit = item.isWeight ? 'Kg' : 'u';
         const sub = item.priceUsd * item.qty;
         const subBs = sub * rate;
-        const maxLen = is80 ? 32 : 22;
-        const name = item.name.length > maxLen ? item.name.substring(0, maxLen) + '...' : item.name;
+        const name = item.name.length > 22 ? item.name.substring(0, 22) + '...' : item.name;
         return `
             <tr>
                 <td style="text-align:left;font-size:${fBase};padding:2px 0;">${qty}${unit}</td>
@@ -397,7 +393,7 @@ export function printThermalTicket(sale, bcvRate) {
     .dash {
         border: none;
         border-top: 1px dashed #555;
-        margin: ${is80 ? '8px 0' : '6px 0'};
+        margin: 6px 0;
     }
     .total-usd {
         font-size: ${fTotalU};
@@ -428,7 +424,7 @@ export function printThermalTicket(sale, bcvRate) {
 <body>
     <!-- Logo -->
     <div class="center" style="margin-bottom:6px;">
-        <img src="/logo.png" alt="Logo" style="max-width:${cssLogoW};max-height:16mm;" onerror="this.style.display='none'">
+        <img src="/logo-ticket.png" alt="Logo" style="max-width:${cssLogoW};max-height:16mm;" onerror="this.style.display='none'">
     </div>
 
     <!-- Info del Negocio -->
@@ -493,7 +489,7 @@ export function printThermalTicket(sale, bcvRate) {
         <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
         <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
-        ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:${is80 ? '16px' : '13px'};">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
+        ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:13px;">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
     </div>
 
     <hr class="dash">
@@ -514,12 +510,11 @@ export function printThermalTicket(sale, bcvRate) {
 </body>
 </html>`;
 
-    // Abrir ventana de impresion
     const printWindow = window.open('', '_blank', 'width=350,height=600');
     if (!printWindow) {
         // Fallback: iframe oculto
         const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:80mm;height:auto;';
+        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:58mm;height:auto;';
         document.body.appendChild(iframe);
         iframe.contentDocument.open();
         iframe.contentDocument.write(html);
@@ -609,7 +604,7 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
         doc.setFontSize(12);
         
         const priceBsRaw = priceUsdRaw * effectiveRate;
-        // Redondeo inteligente de Bs hacia arriba como en Listo POS si se quiere, o exacto.
+        // Redondeo inteligente de Bs hacia arriba como en Pool Los Diaz si se quiere, o exacto.
         const textBs = `Bs ${Math.ceil(priceBsRaw).toLocaleString('es-VE')}`;
         
         doc.text(textBs, centerX, safeY, { align: "center", baseline: "top" });
@@ -647,6 +642,109 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
             iframe.contentWindow.print();
         } catch (e) {
             console.error("Error printing from iframe:", e);
+            window.open(blobUrl, '_blank');
+        }
+    };
+};
+
+export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD }) {
+    const WIDTH = 58;
+    const M = 3;
+    const CX = WIDTH / 2;
+    const RIGHT = WIDTH - M;
+
+    const itemCount = currentItems?.length || 0;
+    const H = 90 + (itemCount * 14);
+
+    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
+    const INK = [33, 37, 41];
+    const RULE = [206, 212, 218];
+
+    let y = 8;
+    const dash = (yy) => {
+        doc.setDrawColor(...RULE);
+        doc.setLineWidth(0.3);
+        doc.setLineDashPattern([1, 1], 0);
+        doc.line(M, yy, RIGHT, yy);
+        doc.setLineDashPattern([], 0);
+    };
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.setFontSize(14);
+    doc.text("PRE-CUENTA MESA", CX, y, { align: 'center' });
+    y += 6;
+    doc.setFontSize(10);
+    doc.text(table.name.toUpperCase(), CX, y, { align: 'center' });
+    y += 6;
+
+    dash(y);
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    const d = new Date();
+    doc.text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`, M, y);
+    y += 5;
+
+    dash(y);
+    y += 6;
+
+    // TIEMPO
+    if (timeCost > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.text("Tiempo de Mesa", M, y);
+        y += 4;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${Math.ceil(elapsed / 60)}h (${session.game_mode})`, M, y);
+        doc.text(`$${timeCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+        y += 6;
+    }
+
+    // CONSUMO
+    if (currentItems.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.text("Consumo Bar", M, y);
+        y += 5;
+        
+        doc.setFont('helvetica', 'normal');
+        currentItems.forEach(i => {
+           doc.text(`${i.qty}x ${i.product_name.substring(0, 16)}`, M, y);
+           const t = i.qty * i.unit_price_usd;
+           doc.text(`$${t.toFixed(2)}`, RIGHT, y, { align: 'right' });
+           y += 5;
+        });
+        y += 2;
+    }
+
+    dash(y);
+    y += 6;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text("TOTAL ESTIMADO:", M, y);
+    doc.text(`$${grandTotal.toFixed(2)}`, RIGHT, y, { align: 'right' });
+    y += 6;
+    
+    doc.setFontSize(8);
+    doc.text(`Ref: BS. ${(grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
+
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.text("*** NO ES RECIBO DE PAGO ***", CX, y, { align: 'center' });
+
+    // Print
+    doc.autoPrint();
+    const blobUrl = doc.output('bloburl');
+    const iframe = document.createElement('iframe');
+    Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (e) {
             window.open(blobUrl, '_blank');
         }
     };

@@ -1,12 +1,12 @@
 import React from 'react';
 
 /**
- * LogoIcon — Isotipo de Listo POS Lite
+ * LogoIcon — Isotipo de Pool Los Diaz
  * Ícono de encendido con gradiente sky → teal (extraído del logo oficial).
  * Úsalo en sidebar colapsado, favicons, y cabeceras compactas.
  */
 /**
- * LogoIcon — Isotipo oficial de Listo POS Lite
+ * LogoIcon — Isotipo oficial de Pool Los Diaz
  * Usa la imagen favicon.png (ícono de encendido sky→teal).
  * Úsalo en sidebar colapsado y cabeceras compactas.
  */
@@ -14,7 +14,7 @@ export const LogoIcon = ({ className = 'w-10 h-10' }) => {
   return (
     <img
       src="/favicon.png"
-      alt="Listo POS Lite"
+      alt="Pool Los Diaz"
       className={`object-contain select-none ${className}`}
       draggable={false}
     />
@@ -22,7 +22,7 @@ export const LogoIcon = ({ className = 'w-10 h-10' }) => {
 };
 
 /**
- * LogoFull — Logo completo de Listo POS Lite con imagen oficial.
+ * LogoFull — Logo completo de Pool Los Diaz con imagen oficial.
  * Usar en sidebar expandido, pantallas de login y splash screens.
  */
 export const LogoFull = ({ className = '', height = 56 }) => {
@@ -30,7 +30,7 @@ export const LogoFull = ({ className = '', height = 56 }) => {
     <div className={`flex items-center justify-center ${className}`}>
       <img
         src="/logo.png"
-        alt="Listo POS Lite"
+        alt="Pool Los Diaz"
         style={{ height: `${height}px`, width: 'auto' }}
         className="object-contain select-none"
         draggable={false}
@@ -40,7 +40,7 @@ export const LogoFull = ({ className = '', height = 56 }) => {
 };
 
 /**
- * LogoWordmark — Texto "LISTO POS LITE" en tipografía de la marca.
+ * LogoWordmark — Texto "Pool Los Diaz" en tipografía de la marca.
  * Para cabeceras y pantallas donde no cabe la imagen completa.
  */
 export const LogoWordmark = ({ className = '' }) => {

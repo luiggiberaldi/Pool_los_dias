@@ -81,7 +81,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
             const dateStr = new Date().toLocaleDateString('es-VE').replace(/\//g, '-');
             const timeStr = new Date().toLocaleTimeString('es-VE', { hour12: false }).replace(/:/g, '');
 
-            link.download = `ListoPOSLite_${dateStr}_${timeStr}.jpg`;
+            link.download = `PoolLosDiaz_${dateStr}_${timeStr}.jpg`;
             link.href = image;
             document.body.appendChild(link);
             link.click();
@@ -116,7 +116,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
 
                 {/* Encabezado Kiosco */}
                 <div className="flex flex-col items-center mt-12 gap-4">
-                    <img src="/logodark.png" alt="Listo POS Lite" className="h-20 w-auto object-contain drop-shadow-lg" />
+                    <img src="/logodark.png" alt="Pool Los Diaz" className="h-20 w-auto object-contain drop-shadow-lg" />
                     <div className="bg-slate-800/60 px-4 py-1.5 rounded-full border border-slate-700/50 backdrop-blur-md">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">MONITOR EN TIEMPO REAL</p>
                     </div>
@@ -197,7 +197,7 @@ export default function MonitorView({ rates, loading, isOffline, onRefresh, togg
             <header className="flex items-center justify-between pt-[env(safe-area-inset-top)] pb-2 px-3 sm:px-4 shrink-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}>
                 <div className="flex flex-col items-start gap-0.5">
                     <button onClick={handleSecretDebug} className="active:scale-95 transition-transform outline-none">
-                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="Listo POS Lite" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
+                        <img src={theme === 'dark' ? '/logodark.png' : '/logoprincipal.png'} alt="Pool Los Diaz" className="h-14 sm:h-16 w-auto object-contain drop-shadow-sm" />
                     </button>
                     <div className="flex items-center gap-1.5 pl-3">
                         <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.18em] leading-none">Bodegas</span>

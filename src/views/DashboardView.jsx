@@ -18,7 +18,8 @@ import SyncStatus from '../components/SyncStatus';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useSecurity } from '../hooks/useSecurity';
-import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore as useLegacyAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore } from '../hooks/store/authStore';
 import { useAudit } from '../hooks/useAudit';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -29,12 +30,14 @@ const SALES_KEY = 'bodega_sales_v1';
 export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
-    const usuarioActivo = useAuthStore(s => s.usuarioActivo);
-    const isAdmin = !usuarioActivo || usuarioActivo.rol === 'ADMIN';
-    const authLogout = useAuthStore(s => s.logout);
-    const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
+    // Auth from new authStore
+    const { currentUser: usuarioActivo, role, logout: authLogout } = useAuthStore();
+    const isAdmin = role === 'ADMIN';
+
+    // Legacy Config checking
+    const requireLogin = useLegacyAuthStore(s => s.requireLogin ?? false);
+    const adminEmail = useLegacyAuthStore(s => s.adminEmail);
+    const adminPassword = useLegacyAuthStore(s => s.adminPassword);
     const isCloudConfigured = Boolean(adminEmail && adminPassword);
     const { log: auditLog } = useAudit();
     const confirm = useConfirm();
@@ -431,7 +434,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── HEADER ── */}
-            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[85px] sm:min-h-[120px]">
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[120px] sm:min-h-[160px]">
                 
                 {/* ====== LATERAL IZQUIERDO: Píldoras (PC/Móvil) ====== */}
                 <div className="flex items-center justify-start gap-2 sm:gap-3 z-20">
@@ -439,16 +442,16 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <SyncStatus />
                     
                     {/* User Profile Pill */}
-                    {requireLogin && isCloudConfigured && usuarioActivo && (
-                        <div className={`flex items-center gap-1.5 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-50 border-sky-100/50' : 'bg-teal-50 border-teal-100/50'} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
+                    {usuarioActivo && (
+                        <div className={`flex items-center gap-1.5 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-50 border-sky-100/50' : 'bg-teal-50 border-teal-100/50'} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
                             <div className="relative flex h-2 w-2 ml-1 sm:ml-0">
-                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-400' : 'bg-teal-400'}`}></span>
-                              <span className={`relative inline-flex rounded-full h-2 w-2 ${usuarioActivo.rol === 'ADMIN' ? 'bg-sky-500' : 'bg-teal-500'}`}></span>
+                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-400' : 'bg-teal-400'}`}></span>
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-500' : 'bg-teal-500'}`}></span>
                             </div>
-                            <span className={`hidden sm:block text-xs font-black sm:max-w-[120px] truncate ${usuarioActivo.rol === 'ADMIN' ? 'text-sky-800' : 'text-teal-800'}`}>
-                                {usuarioActivo.nombre.split(' ')[0]}
+                            <span className={`hidden sm:block text-xs font-black sm:max-w-[120px] truncate ${usuarioActivo.role === 'ADMIN' ? 'text-sky-800' : 'text-teal-800'}`}>
+                                {usuarioActivo.name.split(' ')[0]}
                             </span>
-                            <button onClick={() => { triggerHaptic?.(); authLogout(); }} className={`p-1.5 ml-0.5 transition-all rounded-full active:scale-90 ${usuarioActivo.rol === 'ADMIN' ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700' : 'text-teal-500 hover:bg-teal-100 hover:text-teal-700'}`}>
+                            <button onClick={() => { triggerHaptic?.(); authLogout(); }} className={`p-1.5 ml-0.5 transition-all rounded-full active:scale-90 ${usuarioActivo.role === 'ADMIN' ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700' : 'text-teal-500 hover:bg-teal-100 hover:text-teal-700'}`}>
                                 <LockIcon size={14} strokeWidth={2.5} />
                             </button>
                         </div>
@@ -456,13 +459,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
 
                 {/* ====== LOGO FLOTANTE EXACTO (Solo PC) ====== */}
-                <div className="hidden sm:flex absolute z-0 pointer-events-none inset-y-0 items-center" style={{ left: '785px' }}>
-                    <img src="/logo.png" alt="Listo POS Lite" style={{ height: '99px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
+                <div className="hidden sm:flex absolute z-0 pointer-events-none inset-x-0 top-2 justify-center">
+                    <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '139px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
                 </div>
 
                 {/* ====== LOGO FLOTANTE EXACTO (Solo Móvil) ====== */}
-                <div className="flex sm:hidden absolute z-0 pointer-events-none inset-y-0 items-center" style={{ left: '115px' }}>
-                    <img src="/logo.png" alt="Listo POS Lite" style={{ height: '65px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
+                <div className="flex sm:hidden absolute z-0 pointer-events-none inset-x-0 top-1 justify-center">
+                    <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '105px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
                 </div>
 
                 {/* ====== LATERAL DERECHO: Botones de Salir ====== */}
@@ -501,7 +504,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     </div>
                     <div className="relative z-10">
                         <button className="text-[10px] font-black bg-white/25 hover:bg-white/35 px-3 py-1.5 rounded-lg active:scale-95 transition-colors"
-                            onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir Listo POS Lite. ID: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
+                            onClick={() => window.open(`https://wa.me/584124051793?text=Hola! Quiero adquirir Pool Los Diaz. ID: ${deviceId || 'N/A'}`.replace(/\s+/g, '%20'), '_blank')}>
                             ADQUIRIR
                         </button>
                     </div>

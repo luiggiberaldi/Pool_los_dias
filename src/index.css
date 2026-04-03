@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* ── LISTO POS LITE — DESIGN TOKENS ── */
+    /* ── Pool Los Diaz — DESIGN TOKENS ── */
     /* Paleta extraída del gradiente del logo (sky-blue → teal) */
 
     /* Primary (sky-500 → sky-600) */
@@ -172,4 +172,37 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ── NO SCROLLBAR ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── CUSTOM SCROLLBAR (dark panels) ── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ── DARK PANEL BG UTILITIES ── */
+.bg-white\/8 {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.bg-white\/12 {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+.border-white\/8 {
+  border-color: rgba(255, 255, 255, 0.08);
 }

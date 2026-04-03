@@ -3,7 +3,7 @@ import { procesarImpactoCliente } from './financialLogic';
 import { logEvent } from '../services/auditService';
 import { useAuthStore } from '../hooks/store/useAuthStore';
 import { round2, subR, sumR } from './dinero';
-import { supabase } from '../core/supabaseClient';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
 
 const SALES_KEY = 'bodega_sales_v1';
@@ -50,12 +50,19 @@ export async function processSaleTransaction({
     // correctamente sin depender del methodId hardcodeado.
     const rpcPayload = {
       total: cartTotalUsd,
-      cart: cart.map(i => ({ id: i._originalId || i.id, qty: i.qty, priceUsd: i.priceUsd })),
+      cart: cart.map(i => ({
+          id: i._originalId || i.id,
+          qty: i.qty,
+          priceUsd: i.priceUsd,
+          isCombo: i.isCombo || false,
+          linkedProductId: i.linkedProductId || null,
+          linkedQty: i.linkedQty || 1
+      })),
       payments: payments.map(p => ({
         methodId: p.methodId,
         amountUsd: p.amountUsd,
-        currency: p.currency || 'USD',          // 'USD' | 'BS' | 'COP'
-        methodLabel: p.methodLabel || p.methodId // Nombre legible: "Pago Móvil", "Binance", etc.
+        currency: p.currency || 'USD',
+        methodLabel: p.methodLabel || p.methodId
       })),
       fiadoUsd: fiadoAmountUsd
     };
@@ -126,17 +133,28 @@ export async function processSaleTransaction({
     logEvent('VENTA', tipo, `Venta #${saleNumber} [${saleMode.toUpperCase()}] - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, user, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
 
     // Deduct stock in local cache immediately
-    const updatedProducts = products.map(p => {
-        const cartItemsForThisProduct = cart.filter(i => (i._originalId || i.id) === p.id);
-        if (cartItemsForThisProduct.length > 0) {
-            const totalDeducted = cartItemsForThisProduct.reduce((sum, item) => {
-                if (item.isWeight) return sum + item.qty;
-                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                return sum + item.qty;
-            }, 0);
+    // Calculate total deductions per product ID
+    const deductions = {};
+    cart.forEach(item => {
+        let deduction = 0;
+        if (item.isWeight) deduction = item.qty;
+        else if (item._mode === 'unit') deduction = (item.qty / (item._unitsPerPackage || 1));
+        else deduction = item.qty;
 
+        if (item.isCombo && item.linkedProductId) {
+            const linkedDeduction = deduction * (item.linkedQty || 1);
+            deductions[item.linkedProductId] = (deductions[item.linkedProductId] || 0) + linkedDeduction;
+            // Combos don't deduct their own stock, only the linked product
+        } else {
+            const id = item._originalId || item.id;
+            deductions[id] = (deductions[id] || 0) + deduction;
+        }
+    });
+
+    const updatedProducts = products.map(p => {
+        if (deductions[p.id]) {
             const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
-            const newStock = (p.stock ?? 0) - totalDeducted;
+            const newStock = (p.stock ?? 0) - deductions[p.id];
             return { ...p, stock: allowNeg ? newStock : Math.max(0, newStock) };
         }
         return p;

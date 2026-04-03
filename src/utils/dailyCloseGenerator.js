@@ -19,8 +19,8 @@ export async function generateDailyClosePDF({
     reconData, // Datos del cuadre físico
     apertura,  // Registro de apertura de caja: { openingUsd, openingBs, sellerName }
 }) {
-    const WIDTH = 80;
-    const M = 5;
+    const WIDTH = 58;
+    const M = 4;
     const CX = WIDTH / 2;
     const RIGHT = WIDTH - M;
 
@@ -70,11 +70,12 @@ export async function generateDailyClosePDF({
     // ════════════════════════════════════
     try {
         const img = new Image();
-        img.src = '/logo.png';
+        img.src = '/logo-ticket.png';
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-        const logoW = 46;
-        const logoH = 11;
-        doc.addImage(img, 'PNG', CX - logoW / 2, y, logoW, logoH);
+        const targetW = 40;
+        const ratio = img.width / img.height;
+        const logoH = targetW / ratio;
+        doc.addImage(img, 'PNG', CX - targetW / 2, y, targetW, logoH);
         y += logoH + 3;
     } catch (_) { y += 2; }
 
@@ -355,7 +356,7 @@ export async function generateDailyClosePDF({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...INK);
-    doc.text('Listo POS Lite', CX, y, { align: 'center' });
+    doc.text('Pool Los Diaz', CX, y, { align: 'center' });
     y += 4;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);

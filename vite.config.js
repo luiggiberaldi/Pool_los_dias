@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       // Archivos estáticos que deben estar disponibles offline
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'logo.png', 'logodark.png'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'logo.png', 'logo-ticket.png', 'logodark.png'],
       workbox: {
         cleanupOutdatedCaches: true,
         skipWaiting: true,
@@ -35,8 +35,8 @@ export default defineConfig({
         ]
       },
       manifest: {
-        name: 'Listo POS Lite',
-        short_name: 'Listo Lite',
+        name: 'Pool Los Diaz',
+        short_name: 'Pool Los Diaz',
         description: 'Punto de venta simple y poderoso para tu negocio',
         theme_color: '#0EA5E9',      // sky-500 — color del logo
         background_color: '#F8FAFC', // gris hielo

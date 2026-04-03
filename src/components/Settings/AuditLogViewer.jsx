@@ -70,7 +70,7 @@ async function generateAuditPDF(entries, dateFrom, dateTo) {
     // ── Logo ──
     try {
         const img = new Image();
-        img.src = '/logo.png';
+        img.src = '/logo-ticket.png';
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
         doc.addImage(img, 'PNG', CX - 23, y, 46, 11);
         y += 14;

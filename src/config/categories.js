@@ -7,7 +7,12 @@ import {
 // Categorías predefinidas para el Inventario
 export const BODEGA_CATEGORIES = [
     { id: 'todos', label: 'Todos', icon: '◉', color: 'slate' },
-    { id: 'general', label: 'General', icon: '◆', color: 'blue' },
+    { id: 'snack', label: 'Snack', icon: '🍿', color: 'orange' },
+    { id: 'cigarros', label: 'Cigarros', icon: '🚬', color: 'gray' },
+    { id: 'cervezas', label: 'Cervezas', icon: '🍺', color: 'amber' },
+    { id: 'malta', label: 'Malta', icon: '🧋', color: 'amber' },
+    { id: 'bebidas', label: 'Bebidas', icon: '🥤', color: 'cyan' },
+    { id: 'licores', label: 'Licores', icon: '🥃', color: 'red' },
 ];
 
 // Lucide icon map for factory categories

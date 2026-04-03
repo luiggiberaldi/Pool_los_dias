@@ -1,27 +1,20 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { useAuthStore } from './store/useAuthStore';
+import { useAuthStore } from './store/authStore';
 import { logEvent } from '../services/auditService';
 
 export function useAutoLock() {
-    const { usuarioActivo, logout, requireLogin } = useAuthStore();
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
-    // El auto-lock solo tiene sentido si hay cuenta cloud Y requireLogin está activo.
-    // Sin cloud no hay LockScreen que mostrar → nunca bloquear.
-    const isLoginRequired = (requireLogin ?? false) && isCloudConfigured;
+    const { currentUser, role, logout } = useAuthStore();
     const timeoutRef = useRef(null);
 
     const performLock = useCallback((reason = 'manual') => {
-        if (!isLoginRequired) return; // Sin cloud o sin PIN → nunca bloquear
-        if (!usuarioActivo || usuarioActivo.rol !== 'ADMIN') return;
+        if (!currentUser || role !== 'ADMIN') return;
         
-        logEvent('AUTH', 'SESION_BLOQUEADA', `Bloqueo de seguridad: ${reason}`, usuarioActivo);
+        logEvent('AUTH', 'SESION_BLOQUEADA', `Bloqueo de seguridad: ${reason}`, currentUser);
         logout();
-    }, [usuarioActivo, logout, isLoginRequired]);
+    }, [currentUser, role, logout]);
 
     const resetTimer = useCallback(() => {
-        if (!isLoginRequired || !usuarioActivo || usuarioActivo.rol !== 'ADMIN') {
+        if (!currentUser || role !== 'ADMIN') {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             return;
         }
@@ -36,11 +29,11 @@ export function useAutoLock() {
         timeoutRef.current = setTimeout(() => {
             performLock('inactividad');
         }, ms);
-    }, [usuarioActivo, performLock]);
+    }, [currentUser, role, performLock]);
 
     useEffect(() => {
-        // Solo importa si es ADMIN y el login es requerido
-        if (!isLoginRequired || !usuarioActivo || usuarioActivo.rol !== 'ADMIN') {
+        // Solo importa si es ADMIN
+        if (!currentUser || role !== 'ADMIN') {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
             return;
         }
@@ -78,7 +71,7 @@ export function useAutoLock() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [usuarioActivo, resetTimer, performLock]);
+    }, [currentUser, role, resetTimer, performLock]);
 
     return { manualLock: () => performLock('manual') };
 }

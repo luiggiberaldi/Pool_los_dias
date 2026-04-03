@@ -170,7 +170,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                     <div className="flex flex-col items-center justify-center mt-2 mb-6">
                         <img
                             src="/logo.png"
-                            alt="Listo POS Lite"
+                            alt="Pool Los Diaz"
                             className="h-28 sm:h-32 w-auto object-contain select-none"
                             draggable={false}
                         />

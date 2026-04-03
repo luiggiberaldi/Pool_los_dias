@@ -1,34 +1,70 @@
-# Pool Los Diaz
+# 🎱 Pool Los Diaz — Sistema POS para Salón de Billar
 
-**Pool Los Diaz** es un Sistema Integral de Punto de Venta (POS) y Gestión Administrativa diseñado para operar de manera fluida y multiplataforma. Construido con una arquitectura "Offline-First", garantiza la continuidad del negocio sin importar la conectividad, con sincronización en la nube bidireccional cuando la conexión está disponible.
+**Pool Los Diaz** es un Sistema Integral de Punto de Venta (POS) diseñado específicamente para la gestión de un salón de billar. Construido con arquitectura **Offline-First**, garantiza continuidad del negocio sin importar la conectividad, con sincronización en la nube mediante Supabase cuando la conexión está disponible.
 
-Este módulo forma parte de la suite corporativa integrada y está preparado para funcionar como una **Progressive Web App (PWA)** y como una aplicación nativa para **Android** a través de Capacitor.
+Funciona como **Progressive Web App (PWA)** instalable en cualquier dispositivo (PC, Android, iOS) sin necesidad de una tienda de aplicaciones.
 
-## 🚀 Características Principales
+> 📋 Ver [ROADMAP.md](./ROADMAP.md) para las fases de desarrollo planificadas.  
+> 📓 Ver [BITACORA.md](./BITACORA.md) para el historial de avances y decisiones técnicas.
 
-- **📦 Gestión de Punto de Venta (POS)**: Interfaz rápida y responsiva para procesar transacciones de clientes eficientemente, compatible con métodos de pago customizados e importes personalizados.
-- **☁️ Sincronización en la Nube y Offline-First**: Utiliza `localforage` para almacenamiento local robusto, permitiendo operar sin internet, y sincroniza automáticamente con **Supabase** al recuperar conectividad.
-- **🔐 Autenticación y Seguridad en la Nube**: Integración nativa con Supabase Auth. Datos completamente encriptados y segmentados por rol (Administrador, Empleado).
-- **🖨️ Impresión de Tickets Térmicos**: Generación y exportación de recibos térmicos diseñados con soporte para hardware POS físico y exportación a PDF vía `html2canvas` y `jsPDF`.
-- **📱 PWA & Android App**: Preparado para escritorio, navegador, e instalable localmente con iconos adaptativos. Empaquetado nativo usando `@capacitor/android`.
-- **🤖 Integración de Inteligencia Artificial**: Incluye capacidades inteligentes (con `groq-sdk`) integradas directamente en el flujo de trabajo para automatización y reportes.
-- **⚙️ Respaldos Integrales y Configuración**: Permite realizar backups de todo el estado de la aplicación, configuraciones y reportes históricos.
+---
+
+## 🚀 Características Actuales
+
+### Motor de Ventas
+- Procesamiento de ventas con múltiples métodos de pago simultáneos (USD, Bs, COP, Pago Móvil, Fiado)
+- Motor transaccional atómico vía RPC en Supabase (`process_checkout`)
+- Cola de emergencia offline — las ventas nunca se pierden sin internet
+- Contabilidad de doble partida para integridad financiera
+
+### Sincronización
+- Sincronización P2P en tiempo real (`useCloudSync`) cuando hay internet
+- Caché offline con `localforage` (IndexedDB) como fuente principal
+- Reconciliación automática al recuperar conexión
+
+### Tickets e Impresión
+- Generación de tickets PDF con `jsPDF` — formato 58mm térmico
+- Impresión directa en impresoras térmicas USB/Bluetooth
+- Logo con **aspect ratio dinámico** (sin distorsión)
+- Reporte de Cierre del Día exportable como PDF
+
+### Tarifas y Monedas
+- Tasa BCV en tiempo real como referencia base
+- Soporte para Peso Colombiano (COP) con TRM automática
+- Conversiones USD ↔ Bs ↔ COP en tiempo real
+
+### Seguridad y Licencias
+- Sistema de licencias por dispositivo con validación en Supabase
+- Control de sesiones de dispositivos (máx. N dispositivos por licencia)
+- Pantalla de bloqueo automática por inactividad
+
+---
+
+## 🗺️ Fases de Desarrollo (Roadmap)
+
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| **0** | Infraestructura base, branding, motor de ventas | ✅ Completa |
+| **1** | Login con PIN y roles (Admin/Cajero/Mesero) | 🔄 En progreso |
+| **2** | Plano interactivo de mesas con timers | ⏳ Pendiente |
+| **3** | Órdenes y comandas por mesa | ⏳ Pendiente |
+| **4** | Apertura y cierre de caja formal | ⏳ Pendiente |
+| **5** | Inventario de barra y cocina | ⏳ Pendiente |
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-El proyecto está construido sobre las tecnologías más modernas y estables para maximizar rendimiento y mantenibilidad:
-
-- **Core Frontend**: React 19 + Vite
-- **Estilos**: Tailwind CSS + PostCSS + Autoprefixer
-- **Manejo de Estado**: Zustand
-- **Backend as a Service (BaaS)**: Supabase (Auth & Realtime Database)
-- **Persistencia de Datos Local**: LocalForage
-- **Plataforma Nativa PWA/Móvil**: Vite PWA Plugin + Capacitor 8
-- **Íconos y UI**: Lucide React
-- **Exportación de Documentos**: jsPDF + html2canvas
-- **Inteligencia Artificial**: Groq SDK
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | React 19 + Vite |
+| Estilos | Tailwind CSS |
+| Estado global | Zustand + React Context |
+| Backend / DB | Supabase (PostgreSQL + Realtime) |
+| Persistencia offline | LocalForage (IndexedDB) |
+| PWA | Vite PWA Plugin |
+| Documentos | jsPDF |
+| Iconos UI | Lucide React |
 
 ---
 
@@ -36,26 +72,26 @@ El proyecto está construido sobre las tecnologías más modernas y estables par
 
 ```text
 poolbar/
-├── android/             # Archivos nativos de la aplicación Android de Capacitor
-├── public/              # Archivos estáticos e iconos PWA
+├── public/              # Estáticos, logo-ticket.png, íconos PWA
 ├── src/
-│   ├── assets/          # Imágenes, gráficos y fuentes
-│   ├── components/      # Componentes reutilizables de React (Sales, Customers, etc.)
-│   ├── config/          # Configuraciones globales (ej. supabaseCloud.js)
-│   ├── context/         # Contextos de React
-│   ├── core/            # Funciones esenciales y lógica de negocio principal
-│   ├── data/            # Almacenamiento de datos locales y mocks temporales
-│   ├── hooks/           # Custom React Hooks
-│   ├── modules/         # Lógica agrupada por áreas de la aplicación
-│   ├── services/        # Integración con APIs externas, Supabase, Groq
-│   ├── testing/         # Scripts y archivos de pruebas unitarias/E2E
-│   ├── utils/           # Utilidades (ej. ticketGenerator)
-│   ├── views/           # Páginas o vistas principales de la aplicación (Views)
-│   ├── App.jsx          # Componente principal / Root Router
-│   └── main.jsx         # Punto de entrada de React
-├── package.json         # Dependencias y scripts
-├── tailwind.config.js   # Configuración de los temas visuales
-└── vite.config.js       # Configuración del bundler y plugins
+│   ├── components/      # Componentes reutilizables
+│   │   ├── security/    # LoginScreen, PinPad, Guards de rol
+│   │   ├── Settings/    # Tabs de configuración, UsersManager
+│   │   └── ...
+│   ├── config/          # supabaseCloud.js, paymentMethods.js
+│   ├── context/         # ProductContext, AuthContext
+│   ├── hooks/
+│   │   └── store/       # authStore.js, useCloudSync.js
+│   ├── utils/           # ticketGenerator.js, checkoutProcessor.js
+│   │                    # dailyCloseGenerator.js, offlineQueueService.js
+│   ├── views/           # SalesView, DashboardView, SettingsView...
+│   ├── App.jsx          # Componente raíz y navegación por estado
+│   └── main.jsx         # Punto de entrada
+├── ROADMAP.md           # Hoja de ruta del proyecto
+├── BITACORA.md          # Bitácora de avances y decisiones
+├── package.json
+├── tailwind.config.js
+└── vite.config.js
 ```
 
 ---
@@ -63,48 +99,45 @@ poolbar/
 ## 💻 Desarrollo e Instalación
 
 ### Requisitos Previos
-- [Node.js](https://nodejs.org/) (versión 20+ recomendada)
-- Un proyecto en [Supabase](https://supabase.com/) (para el entorno en la nube)
-- [Android Studio](https://developer.android.com/studio) (si se planea compilar para Android nativo)
+- [Node.js](https://nodejs.org/) v20+
+- Proyecto activo en [Supabase](https://supabase.com/) — Ref: `raxcxddreghynthyvllh`
 
 ### Instrucciones
 
-1. **Instalar dependencias:**
-   ```bash
-   npm install
-   ```
+```bash
+# 1. Instalar dependencias
+npm install
 
-2. **Iniciar servidor de desarrollo (con Hot Module Replacement):**
-   ```bash
-   npm run dev
-   ```
+# 2. Iniciar en modo desarrollo
+npm run dev
 
-3. **Construir para Producción:**
-   ```bash
-   npm run build
-   ```
-
-4. **Sincronización PWA y Android (Capacitor):**
-   - Una vez realizado el `build`, para sincronizar con Android Studio:
-     ```bash
-     npx cap sync android
-     npx cap open android
-     ```
+# 3. Construir para producción
+npm run build
+```
 
 ### Scripts Disponibles
 
-- `npm run dev`: Inicia el servidor de desarrollo local a través de Vite.
-- `npm run build`: Compila y empaqueta la aplicación de forma optimizada para producción.
-- `npm run preview`: Sirve los archivos de producción de manera local para pruebas.
-- `npm run lint`: Ejecuta ESLint en todo el proyecto asegurando el estándar de código.
-- `npm run prettier`: Ejecuta auto-formateo en la base de código.
+| Script | Descripción |
+|--------|-------------|
+| `npm run dev` | Servidor de desarrollo con HMR |
+| `npm run build` | Build optimizado para producción |
+| `npm run preview` | Previsualizar el build de producción |
+| `npm run lint` | Ejecutar ESLint |
 
 ---
 
-## 🤝 Buenas Prácticas y Metodología (`.agent/skills/`)
-Este proyecto implementa protocolos estables que garantizan alta disponibilidad, interfaz profesional y código limpio:
-- **Clean Architecture** y principios **SOLID**.
-- Validaciones estandarizadas estilo Producción.
-- Optimización de Rendimiento Frontend (Performance UX).
+## 📐 Reglas del Sistema
 
-El proyecto fue desarrollado y estructurado siguiendo principios avanzados de optimización y responsividad UI/UX con enfoque corporativo.
+1. **Offline-First** — Toda acción funciona sin internet.
+2. **PIN Hasheado** — SHA-256 vía Web Crypto API. Nunca texto plano.
+3. **Doble Partida** — Integridad contable garantizada.
+4. **Papel 58mm** — Todos los documentos optimizados para impresora térmica 58mm.
+5. **Moneda base USD** — Bs y COP son conversiones dinámicas.
+
+---
+
+## 🤝 Metodología
+
+- Principios **SOLID** y **Clean Architecture**
+- Componentes atómicos y reutilizables
+- Manejo de errores con fallback offline en cada capa

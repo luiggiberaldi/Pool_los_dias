@@ -56,7 +56,7 @@ export function useCloudAuthLogic() {
 
     const collectLocalBackup = async () => {
         const idbKeys = [
-            'bodega_products_v1', 'my_categories_v1',
+            'bodega_products_v1', 'poolbar_categories_v1',
             'bodega_sales_v1', 'bodega_customers_v1',
             'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
             'bodega_accounts_v2', 'bodega_pending_cart_v1',

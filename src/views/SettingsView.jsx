@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     Store, CreditCard, Database, Users,
     AlertTriangle, Download, Upload, Share2,
     Sun, Moon, LogOut, Trash2, Copy, Check,
-    ChevronRight, ShieldCheck, Package, Printer, BadgeCheck
+    ChevronRight, ShieldCheck, Package, Printer, Layers
 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
@@ -14,7 +14,7 @@ import { useSecurity } from '../hooks/useSecurity';
 import { useNotifications } from '../hooks/useNotifications';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useProductContext } from '../context/ProductContext';
-import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore } from '../hooks/store/authStore';
 import ShareInventoryModal from '../components/ShareInventoryModal';
 import { useAudit } from '../hooks/useAudit';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -22,14 +22,14 @@ import SettingsTabNegocio from '../components/Settings/tabs/SettingsTabNegocio';
 import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
 import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios';
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
-import SettingsTabLicencia from '../components/Settings/tabs/SettingsTabLicencia';
+import SettingsTabMesas from '../components/Settings/tabs/SettingsTabMesas';
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 const TABS = [
     { id: 'negocio',   label: 'Negocio',   icon: Store,        color: 'indigo' },
+    { id: 'mesas',     label: 'Mesas',     icon: Layers,       color: 'sky', adminOnly: true },
     { id: 'ventas',    label: 'Ventas',     icon: CreditCard,   color: 'emerald' },
     { id: 'usuarios',  label: 'Usuarios',   icon: Users,        color: 'violet', adminOnly: true },
-    { id: 'licencia',  label: 'Licencia',   icon: BadgeCheck,   color: 'sky',    adminOnly: true },
     { id: 'sistema',   label: 'Sistema',    icon: Database,     color: 'amber' },
 ];
 
@@ -51,17 +51,21 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
         tasaCop: calculatedTasaCop
     } = useProductContext();
 
-    const isAdmin = useAuthStore(s => s.usuarioActivo)?.rol === 'ADMIN';
-    const requireLogin = useAuthStore(s => s.requireLogin ?? false);
-    const setRequireLogin = useAuthStore(s => s.setRequireLogin);
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const setAdminCredentials = useAuthStore(s => s.setAdminCredentials);
-
+    const role = useAuthStore(s => s.role);
+    const isAdmin = role === 'ADMIN';
+    
     const { deviceId, forceHeartbeat } = useSecurity();
     const { log: auditLog } = useAudit();
     const confirm = useConfirm();
     const fileInputRef = useRef(null);
+
+    // Cloud session email for header badge
+    const [cloudEmail, setCloudEmail] = useState(null);
+    useEffect(() => {
+        supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+            setCloudEmail(session?.user?.email || null);
+        });
+    }, []);
 
     const [activeTab, setActiveTab] = useState('negocio');
     const [idCopied, setIdCopied] = useState(false);
@@ -79,7 +83,6 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') !== 'false');
     const [autoLockMinutes, setAutoLockMinutes] = useState(localStorage.getItem('admin_auto_lock_minutes') || '5');
 
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
 
     const handleSaveBusinessData = () => {
         localStorage.setItem('business_name', businessName);
@@ -95,7 +98,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             setImportStatus('loading');
             setStatusMessage('Generando backup completo...');
             const idbKeys = [
-                'bodega_products_v1', 'my_categories_v1',
+                'bodega_products_v1', 'poolbar_categories_v1',
                 'bodega_sales_v1', 'bodega_customers_v1',
                 'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
                 'bodega_accounts_v2', 'bodega_pending_cart_v1',
@@ -180,7 +183,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                             </p>
                         </div>
                         {/* Cloud session badge + logout */}
-                        {isAdmin && adminEmail && (
+                        {isAdmin && cloudEmail && (
                             <button
                                 onClick={async () => {
                                     const ok = await confirm({
@@ -197,9 +200,9 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                 className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full pl-2.5 pr-3 py-1.5 group hover:border-rose-300 dark:hover:border-rose-700 transition-colors"
                             >
                                 <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center">
-                                    <span className="text-[8px] font-black text-white uppercase">{adminEmail[0]}</span>
+                                    <span className="text-[8px] font-black text-white uppercase">{cloudEmail[0]}</span>
                                 </div>
-                                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 max-w-[80px] truncate group-hover:text-rose-500 transition-colors">{adminEmail}</span>
+                                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 max-w-[80px] truncate group-hover:text-rose-500 transition-colors">{cloudEmail}</span>
                                 <LogOut size={11} className="text-slate-400 group-hover:text-rose-500 transition-colors" />
                             </button>
                         )}
@@ -259,6 +262,14 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                         />
                     )}
 
+                    {/* ═══ TAB MESAS ═══ */}
+                    {activeTab === 'mesas' && isAdmin && (
+                        <SettingsTabMesas
+                            showToast={showToast}
+                            triggerHaptic={triggerHaptic}
+                        />
+                    )}
+
                     {/* ═══ TAB VENTAS ═══ */}
                     {activeTab === 'ventas' && (
                         <SettingsTabVentas
@@ -272,19 +283,9 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                     {/* ═══ TAB USUARIOS ═══ */}
                     {activeTab === 'usuarios' && isAdmin && (
                         <SettingsTabUsuarios
-                            isCloudConfigured={isCloudConfigured} adminEmail={adminEmail}
-                            requireLogin={requireLogin} setRequireLogin={setRequireLogin}
                             autoLockMinutes={autoLockMinutes} setAutoLockMinutes={setAutoLockMinutes}
-                            setAdminCredentials={setAdminCredentials} showToast={showToast}
+                            showToast={showToast}
                             triggerHaptic={triggerHaptic}
-                        />
-                    )}
-
-                    {/* ═══ TAB LICENCIA ═══ */}
-                    {activeTab === 'licencia' && isAdmin && (
-                        <SettingsTabLicencia
-                            isCloudConfigured={isCloudConfigured}
-                            adminEmail={adminEmail}
                         />
                     )}
 
@@ -315,7 +316,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                     {/* Version footer */}
                     <div className="text-center pt-2 pb-1">
                         <p className="text-[10px] text-slate-300 dark:text-slate-700 font-bold tracking-widest uppercase">
-                            Listo POS Lite · v1.0
+                            Pool Los Diaz · v1.0
                         </p>
                     </div>
                 </div>

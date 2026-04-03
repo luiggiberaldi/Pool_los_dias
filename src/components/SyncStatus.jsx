@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, CloudOff, Wifi, WifiOff, RefreshCw } from 'lucide-react';
-import { supabase } from '../core/supabaseClient';
+import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import localforage from 'localforage';
 
 /**

@@ -10,7 +10,7 @@ export default {
       colors: {
 
         // ─────────────────────────────────────────────────────
-        // 🎨 LISTO POS LITE — PALETA SEMÁNTICA OFICIAL
+        // 🎨 Pool Los Diaz — PALETA SEMÁNTICA OFICIAL
         // Extraída del gradiente del logo (sky-blue → teal)
         // ─────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 import { round2, mulR, divR, subR, sumR } from '../../utils/dinero';
 
 /**
- * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Listo POS)
+ * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Pool Los Diaz)
  * Cada método de pago tiene su propia barra con input + botón TOTAL.
  */
 export default function CheckoutModal({
