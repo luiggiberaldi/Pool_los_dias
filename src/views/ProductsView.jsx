@@ -175,6 +175,8 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [stockInLotes, setStockInLotes] = useState('');
     const [granelUnit, setGranelUnit] = useState('kg');
     
+    const [isDeleteSelectedModalOpen, setIsDeleteSelectedModalOpen] = useState(false);
+    
     const [isFormShaking, setIsFormShaking] = useState(false);
     const fileInputRef = useRef(null);
     const categoryScrollRef = useRef(null);
@@ -391,6 +393,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         }
     };
 
+    const confirmDeleteSelected = () => {
+        if (selectedIds.size === 0) return;
+        const count = selectedIds.size;
+        setProducts(products.filter(p => !selectedIds.has(p.id)));
+        auditLog('INVENTARIO', 'ELIMINACION_MASIVA', `Eliminados ${count} productos seleccionados`);
+        setSelectedIds(new Set());
+        setIsDeleteSelectedModalOpen(false);
+        triggerHaptic && triggerHaptic();
+        showToast(`${count} productos eliminados correctamente`, 'success');
+    };
+
     const handleClose = () => {
         setName(''); setBarcode(''); setPriceUsd(''); setPriceBs(''); setCostUsd(''); setCostBs(''); setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd(''); setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null); setIsModalOpen(false);
         setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
@@ -568,6 +581,14 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                         <button onClick={() => setSelectedIds(new Set())} className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">
                             Cancelar
                         </button>
+                        {!isCajero && (
+                            <button 
+                                onClick={() => { triggerHaptic && triggerHaptic(); setIsDeleteSelectedModalOpen(true); }}
+                                className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-bold rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-all flex items-center gap-1"
+                            >
+                                <Trash2 size={14} /> <span className="hidden sm:inline">Eliminar seleccionados</span><span className="sm:hidden">Borrar</span>
+                            </button>
+                        )}
                         <button onClick={handlePrintSelected} className="px-3 py-1.5 bg-brand text-white text-xs font-bold rounded-lg shadow-sm hover:bg-brand-dark transition-all flex items-center gap-1">
                             <Printer size={14} /> <span className="hidden sm:inline">Imprimir Etiquetas</span><span className="sm:hidden">Imprimir</span>
                         </button>
@@ -940,6 +961,17 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 message="¿Seguro que deseas borrar esta categoría? Los productos no se eliminarán, pero quedarán sin categoría asignada."
                 confirmText="Sí, eliminar"
                 variant="warning"
+            />
+
+            {/* Modal Confirmación: Borrar Seleccionados */}
+            <ConfirmModal
+                isOpen={isDeleteSelectedModalOpen}
+                onClose={() => setIsDeleteSelectedModalOpen(false)}
+                onConfirm={confirmDeleteSelected}
+                title="Eliminar productos seleccionados"
+                message={`¿Estás seguro que deseas eliminar los ${selectedIds.size} productos seleccionados? Esta acción no se puede deshacer.`}
+                confirmText="Sí, eliminar seleccionados"
+                variant="danger"
             />
         </div>
     );
