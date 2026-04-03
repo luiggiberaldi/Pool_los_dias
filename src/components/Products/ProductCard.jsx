@@ -151,29 +151,30 @@ export default function ProductCard({
                         )}
                     </div>
 
-                    {/* Confirm / Cancel — mobile-optimized: big full-width button, tiny cancel link */}
+                    {/* Confirm / Cancel — premium mobile-optimized */}
                     {delta !== 0 && !readOnly && (
-                        <div className="mt-2 flex flex-col gap-1 animate-[fadeIn_0.15s_ease]">
+                        <div className="mt-2 flex flex-col gap-1.5 animate-[fadeIn_0.15s_ease]">
                             <button
                                 onClick={handleConfirm}
                                 disabled={isConfirming}
-                                className="w-full h-12 rounded-2xl text-[13px] font-black text-white bg-brand hover:bg-brand/90 active:scale-[0.97] transition-all flex items-center justify-center gap-2 shadow-md shadow-brand/30 disabled:opacity-60"
+                                className="w-full h-12 rounded-2xl text-[14px] font-bold text-white bg-brand active:scale-[0.97] transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/30 disabled:opacity-60 overflow-hidden"
                             >
                                 {isConfirming ? (
-                                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                    <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    <Check size={16} strokeWidth={3} />
+                                    <>
+                                        <div className="bg-white/20 p-1 rounded-lg">
+                                            <Check size={14} strokeWidth={4} />
+                                        </div>
+                                        <span className="whitespace-nowrap">
+                                            Confirmar ({delta > 0 ? '+' : ''}{delta})
+                                        </span>
+                                    </>
                                 )}
-                                <span>
-                                    {isConfirming
-                                        ? 'Guardando...'
-                                        : `Confirmar ${delta > 0 ? '+' : ''}${delta} unid.`
-                                    }
-                                </span>
                             </button>
                             <button
                                 onClick={handleCancel}
-                                className="w-full py-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center"
+                                className="w-full py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center uppercase tracking-widest"
                             >
                                 Cancelar
                             </button>
