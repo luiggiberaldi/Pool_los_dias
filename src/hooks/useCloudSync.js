@@ -43,19 +43,19 @@ export const clearImportGuard = () => sessionStorage.removeItem(IMPORT_GUARD_KEY
 const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
 
 // Gestión de Cola Offline
-const getSyncQueue = () => {
+export const getSyncQueue = () => {
     try {
         return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
     } catch(e) { return []; }
 };
-const addToSyncQueue = (key) => {
+export const addToSyncQueue = (key) => {
     const queue = getSyncQueue();
     if (!queue.includes(key)) {
         queue.push(key);
         localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
     }
 };
-const removeFromSyncQueue = (key) => {
+export const removeFromSyncQueue = (key) => {
     const queue = getSyncQueue().filter(k => k !== key);
     localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
 };
@@ -80,13 +80,12 @@ export const processSyncQueue = async () => {
             }
             
             if (value !== null) {
-                // Forzamos la subida saltando el guardia de inicialización
                 await pushCloudSync(key, value, true);
             }
-            removeFromSyncQueue(key);
+            // NOTA: removeFromSyncQueue ahora se llama dentro de pushCloudSync si tiene éxito
         } catch (e) {
             console.warn(`[CloudSync] Reintento fallido para ${key}:`, e.message);
-            break; // Detener si falla la red de nuevo
+            break; 
         }
     }
 };
@@ -103,8 +102,6 @@ export const forcePullFromCloud = async () => {
         console.log('[CloudSync] Iniciando RESTAURACIÓN FORZADA desde la nube...');
         localStorage.removeItem(SYNC_QUEUE_KEY);
 
-        // ¡MUY IMPORTANTE! Limpiamos la base local primero para evitar que residuos (ej. motos) queden vivos
-        // si no existen ya en la nube.
         await storageService.removeItem('bodega_products_v1');
         await storageService.removeItem('poolbar_categories_v1');
 
@@ -129,7 +126,6 @@ export const forcePullFromCloud = async () => {
     }
 };
 
-// ----- NUEVA FUNCIÓN: FORZAR SUBIDA -----
 export const forcePushToCloud = async () => {
     try {
         const { data: { session } } = await supabaseCloud.auth.getSession();
@@ -167,7 +163,6 @@ export const forcePushToCloud = async () => {
         throw e;
     }
 };
-// ----------------------------------------
 
 // Escuchar retorno de internet
 if (typeof window !== 'undefined') {
@@ -179,16 +174,20 @@ const originalSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function (key, value) {
     originalSetItem(key, value);
     if (!isSyncingFromCloud && LOCAL_KEYS.includes(key)) {
-        _debouncePush(key, value);
+        scheduleCloudPush(key, value);
     }
 };
 
-function _debouncePush(key, value) {
+export function scheduleCloudPush(key, value) {
+    // Al añadirlo a la cola de sincronización inmediatamente, evitamos que un reinicio
+    // accidental sobrescriba el dato local (Punto ACID)
+    addToSyncQueue(key);
+    
     if (pendingPush[key]) clearTimeout(pendingPush[key]);
     pendingPush[key] = setTimeout(() => {
         delete pendingPush[key];
         pushCloudSync(key, value).catch(() => {});
-    }, 500);
+    }, 1000);
 }
 
 /**
@@ -247,14 +246,50 @@ async function _applyFromCloud(docId, collection, payload) {
                 useAuthStore.persist.rehydrate();
             }
         } else {
-            const { default: localforage } = await import('localforage');
-            localforage.config({ name: 'BodegaApp', storeName: 'bodega_app_data' });
-            await localforage.setItem(docId, payload);
+            // Use storageService directly (consistent localforage instance, avoids config issues)
+            await storageService.setItemSilent(docId, payload);
             window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: docId } }));
         }
     } finally {
         isSyncingFromCloud = false;
     }
+}
+
+/**
+ * Lightweight cloud pull: fetches latest from sync_documents without clearing local state.
+ * Safe to call on visibility change / app foreground restore.
+ */
+export const pullLatestFromCloud = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.id) return;
+        const queue = getSyncQueue();
+        const { data: docs } = await supabaseCloud
+            .from('sync_documents')
+            .select('collection, doc_id, data')
+            .eq('user_id', session.user.id)
+            .in('doc_id', ['bodega_products_v1', 'poolbar_categories_v1']);
+
+        if (docs?.length > 0) {
+            for (const doc of docs) {
+                // Skip if we have local pending changes for this key
+                if (queue.includes(doc.doc_id)) continue;
+                await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+            }
+        }
+    } catch (e) {
+        console.warn('[CloudSync] pullLatest falló silenciosamente:', e.message);
+    }
+};
+
+// Auto-pull when app returns to foreground (recovers from WebSocket drops during sleep)
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && isInitialSyncCompleted) {
+            console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
+            pullLatestFromCloud();
+        }
+    });
 }
 
 export function useCloudSync() {

@@ -96,8 +96,8 @@ export const storageService = {
             if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
             }
-            // Emitir a la nube silenciosamente de fondo
-            pushCloudSync(key, value);
+            // Emitir a la nube silenciosamente de fondo con debounce + cola de seguridad ACID
+            import('../hooks/useCloudSync').then(m => m.scheduleCloudPush(key, value));
         } catch (error) {
             console.error(`[Storage Error] Guardando ${key}:`, error);
             // Fallback de emergencia a localStorage si falla algo catastrófico
@@ -106,10 +106,24 @@ export const storageService = {
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
                 }
-                pushCloudSync(key, value);
+                import('../hooks/useCloudSync').then(m => m.scheduleCloudPush(key, value));
             } catch (e) {
                 console.error(`[Storage Error CRÍTICO] Ni IndexedDB ni LocalStorage funcionan para ${key}`, e);
             }
+        }
+    },
+
+    /**
+     * Guarda un item en IndexedDB SIN disparar subida a la nube.
+     * Usar EXCLUSIVAMENTE cuando el dato viene de la nube (para evitar re-subida en bucle).
+     */
+    async setItemSilent(key, value) {
+        try {
+            await localforage.setItem(key, value);
+            try { localStorage.removeItem(key); } catch(e) {}
+            // No cloud push, no scheduleCloudPush
+        } catch (error) {
+            console.error(`[Storage Error Silent] Guardando ${key}:`, error);
         }
     },
 
