@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { BODEGA_CATEGORIES } from '../config/categories';
+import { supabaseCloud } from '../config/supabaseCloud';
+import { fetchCloudProducts } from '../hooks/useCloudSync';
 
 const ProductContext = createContext();
 
@@ -76,16 +78,61 @@ export function ProductProvider({ children, rates }) {
         ? rates.autoCopRate.price 
         : (parseFloat(tasaCopManual) > 0 ? parseFloat(tasaCopManual) : 4150);
 
-    // Initial Load
+    // Initial Load — Cloud-First: Supabase es la fuente de verdad
     useEffect(() => {
         let isMounted = true;
         const loadData = async () => {
-            const savedProducts = await storageService.getItem('bodega_products_v1', []);
-            const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
-            if (isMounted) {
-                _setProducts(savedProducts);
-                _setCategories(savedCategories);
-                setIsLoadingProducts(false);
+            try {
+                // 1. Verificar si hay sesión activa de Supabase
+                const { data: { session } } = await supabaseCloud.auth.getSession();
+
+                if (session?.user?.id) {
+                    // 2. Intentar cargar de la nube con timeout de 4 segundos
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Cloud timeout')), 4000)
+                    );
+                    try {
+                        const cloudData = await Promise.race([
+                            fetchCloudProducts(session.user.id),
+                            timeoutPromise
+                        ]);
+
+                        if (cloudData && isMounted) {
+                            // 3. Nube respondió: usar datos de la nube como fuente de verdad
+                            const cloudProducts = cloudData.products || [];
+                            const cloudCategories = cloudData.categories || BODEGA_CATEGORIES;
+                            _setProducts(cloudProducts);
+                            _setCategories(cloudCategories);
+                            // Cachear en local para offline (sin triggear push de vuelta)
+                            await storageService.setItemSilent('bodega_products_v1', cloudProducts);
+                            await storageService.setItemSilent('poolbar_categories_v1', cloudCategories);
+                            console.log(`[ProductContext] Cloud-first: ${cloudProducts.length} productos cargados de Supabase`);
+                            if (isMounted) setIsLoadingProducts(false);
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn('[ProductContext] Cloud no disponible, usando caché local:', err.message);
+                    }
+                }
+
+                // 4. Fallback: cargar de caché local (sin sesión o sin internet)
+                const savedProducts = await storageService.getItem('bodega_products_v1', []);
+                const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
+                if (isMounted) {
+                    _setProducts(savedProducts);
+                    _setCategories(savedCategories);
+                    setIsLoadingProducts(false);
+                }
+            } catch (err) {
+                console.error('[ProductContext] Error en carga inicial:', err);
+                // Último recurso: local
+                const savedProducts = await storageService.getItem('bodega_products_v1', []);
+                const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
+                if (isMounted) {
+                    _setProducts(savedProducts);
+                    _setCategories(savedCategories);
+                    setIsLoadingProducts(false);
+                }
             }
         };
         loadData();

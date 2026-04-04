@@ -255,6 +255,34 @@ async function _applyFromCloud(docId, collection, payload) {
 }
 
 /**
+ * Cloud-first fetch: obtiene productos y categorías directamente de Supabase.
+ * Usado por ProductContext al arrancar para tener la nube como fuente de verdad.
+ * @param {string} userId - ID del usuario de Supabase
+ * @returns {Promise<{products: Array, categories: Array}|null>} null si no hay datos
+ */
+export async function fetchCloudProducts(userId) {
+    const { data } = await supabaseCloud
+        .from('sync_documents')
+        .select('doc_id, data')
+        .eq('user_id', userId)
+        .in('doc_id', ['bodega_products_v1', 'poolbar_categories_v1'])
+        .eq('collection', 'store');
+
+    if (!data || data.length === 0) return null;
+
+    const result = { products: null, categories: null };
+    for (const doc of data) {
+        if (doc.doc_id === 'bodega_products_v1' && doc.data?.payload) {
+            result.products = doc.data.payload;
+        }
+        if (doc.doc_id === 'poolbar_categories_v1' && doc.data?.payload) {
+            result.categories = doc.data.payload;
+        }
+    }
+    return result;
+}
+
+/**
  * Lightweight cloud pull: fetches latest from sync_documents without clearing local state.
  * Safe to call on visibility change / app foreground restore.
  */
