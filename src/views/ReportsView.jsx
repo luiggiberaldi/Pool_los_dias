@@ -378,7 +378,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                     <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-1">
                         <TrendingUp size={12} /> Top Productos
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                         {topProducts.map((p, i) => (
                             <div key={p.name} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-xl p-2.5">
                                 <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${i < 3 ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
@@ -542,7 +542,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
             {recycleOffer && (
                 <div className="fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200"
                     onClick={() => setRecycleOffer(null)}>
-                    <div className="bg-white dark:bg-slate-900 w-full sm:max-w-xs sm:rounded-2xl rounded-t-[2rem] p-5 shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
+                    <div className="bg-white dark:bg-slate-900 w-full sm:max-w-xs md:max-w-sm sm:rounded-2xl rounded-t-[2rem] p-5 shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
                         onClick={e => e.stopPropagation()}>
                         <div className="flex flex-col items-center gap-2 mb-4">
                             <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600">

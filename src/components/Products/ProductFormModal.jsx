@@ -129,10 +129,11 @@ export default function ProductFormModal({
     const priceSuffix = isLote ? ' / Lote' : isGranel ? ` / ${granelLabel}` : '';
 
     return (
-        <Modal 
-            isOpen={isOpen} 
-            onClose={onClose} 
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
             title={isEditing ? "Editar Producto" : "Nuevo Producto"}
+            maxWidthClass="max-w-lg md:max-w-xl"
             className={isFormShaking ? 'animate-shake border-red-500 shadow-xl shadow-red-500/20' : ''}
         >
             <div className="space-y-4">

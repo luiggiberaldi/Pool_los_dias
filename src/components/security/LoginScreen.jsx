@@ -89,8 +89,7 @@ export default function LoginScreen() {
                         /* Flex wrap: se ajusta automáticamente al número de cards (1,2,3,N).
                            En móvil max 2 por fila; en pantallas más grandes toda en fila. */
                         <div
-                            className="flex flex-wrap justify-center gap-8 sm:gap-12"
-                            style={{ maxWidth: cachedUsers.length <= 2 ? '320px' : '520px' }}
+                            className={`flex flex-wrap justify-center gap-8 sm:gap-12 ${cachedUsers.length <= 2 ? 'max-w-xs sm:max-w-sm' : 'max-w-[320px] sm:max-w-md md:max-w-lg'}`}
                         >
                             {cachedUsers.map(user => (
                                 <div
@@ -109,21 +108,21 @@ export default function LoginScreen() {
 
                 {/* ── FOOTER ── */}
                 <div className="w-full text-center flex flex-col items-center gap-3">
-                    <p className="text-[10px] text-slate-600 font-medium tracking-wider">
+                    <p className="text-[10px] sm:text-xs text-slate-600 font-medium tracking-wider">
                         Ingresa tu PIN asignado
                     </p>
                     <div className="flex items-center gap-6">
                         <button
                             onClick={handleForceSync}
                             disabled={isSyncing}
-                            className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50"
                         >
                             <DownloadCloud className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
                             Refrescar
                         </button>
                         <button
                             onClick={handleCloudLogout}
-                            className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
+                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
                         >
                             <LogOut className="w-3 h-3" strokeWidth={2.5} />
                             Cerrar sesión

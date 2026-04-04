@@ -42,7 +42,7 @@ export default function AperturaCajaModal({ isOpen, onClose, onConfirm }) {
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-slate-900 w-full sm:max-w-sm rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-6 duration-250"
+                className="bg-white dark:bg-slate-900 w-full sm:max-w-sm md:max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-6 duration-250"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}

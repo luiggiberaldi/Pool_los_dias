@@ -8,7 +8,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
 
     return (
         <div className="fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white w-full sm:max-w-sm sm:rounded-[2rem] rounded-t-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden relative flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+            <div className="bg-white w-full sm:max-w-sm md:max-w-md sm:rounded-[2rem] rounded-t-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden relative flex flex-col max-h-[95vh] sm:max-h-[90vh]">
 
                 {/* Botón X cerrar — siempre visible */}
                 <button

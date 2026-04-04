@@ -73,7 +73,7 @@ export default function ProductCard({
     return (
         <div className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border flex flex-col overflow-hidden group transition-all ${isLowStock && delta === 0 ? 'border-amber-300 dark:border-amber-700' : delta !== 0 ? 'border-brand ring-2 ring-brand/30 shadow-brand/10' : 'border-slate-100 dark:border-slate-800'} ${isSelected ? 'ring-2 ring-brand border-brand shadow-brand/20 bg-brand/5 dark:bg-brand/10' : ''}`}>
             {/* Image */}
-            <div className="w-full h-24 bg-slate-100 dark:bg-slate-800 overflow-hidden relative shrink-0">
+            <div className="w-full h-20 sm:h-24 md:h-28 bg-slate-100 dark:bg-slate-800 overflow-hidden relative shrink-0">
                 {/* Select Checkbox */}
                 <div className="absolute top-1 left-1 z-10 w-6 h-6 flex items-center justify-center bg-white/80 dark:bg-slate-900/80 rounded backdrop-blur-sm">
                     <input type="checkbox" checked={isSelected} onChange={onToggleSelect} className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer shadow-sm" />
@@ -87,19 +87,19 @@ export default function ProductCard({
                 )}
                 {/* Category badge */}
                 {catInfo && catInfo.id !== 'otros' && (
-                    <div className={`absolute top-1 left-8 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${CATEGORY_COLORS[catInfo.color] || ''}`}>
+                    <div className={`absolute top-1 left-8 text-[9px] sm:text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${CATEGORY_COLORS[catInfo.color] || ''}`}>
                         {(() => { const CatIcon = CATEGORY_ICONS[catInfo.id]; return CatIcon ? <CatIcon size={9} /> : catInfo.icon; })()} {catInfo.label}
                     </div>
                 )}
                 {/* Low stock alert */}
                 {isLowStock && delta === 0 && (
-                    <div className="absolute top-1 right-1 bg-amber-500/90 backdrop-blur-sm text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                    <div className="absolute top-1 right-1 bg-amber-500/90 backdrop-blur-sm text-white text-[9px] sm:text-xs font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
                         <AlertTriangle size={9} /> Bajo
                     </div>
                 )}
                 {/* Staging indicator */}
                 {delta !== 0 && (
-                    <div className={`absolute top-1 right-1 backdrop-blur-sm text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${delta > 0 ? 'bg-brand/90' : 'bg-rose-500/90'}`}>
+                    <div className={`absolute top-1 right-1 backdrop-blur-sm text-white text-[9px] sm:text-xs font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 ${delta > 0 ? 'bg-brand/90' : 'bg-rose-500/90'}`}>
                         {delta > 0 ? '+' : ''}{delta}
                     </div>
                 )}
@@ -107,10 +107,10 @@ export default function ProductCard({
 
             {/* Info */}
             <div className="p-3 flex flex-col flex-1">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] leading-tight line-clamp-2 mb-2">{p.name}</h3>
+                <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] sm:text-sm leading-tight line-clamp-2 mb-2">{p.name}</h3>
 
                 {p.unit === 'paquete' && p.unitsPerPackage && (
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">
+                    <div className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">
                         <Package size={11} /> Lote · {p.unitsPerPackage} uds
                     </div>
                 )}
@@ -118,21 +118,21 @@ export default function ProductCard({
                 <div className="flex justify-between items-end mb-3">
                     <div>
                         <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none">
-                            {formatUsd(p.priceUsdt)} <span className="text-[10px] font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
+                            {formatUsd(p.priceUsdt)} <span className="text-[10px] sm:text-xs font-bold text-emerald-600/50 dark:text-emerald-400/50">USD {(p.unit === 'kg' || p.unit === 'litro') ? `/ ${unitInfo?.short || 'ud'}` : ''}</span>
                         </p>
-                        <p className="text-[11px] font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
+                        <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1">{formatBs(valBs)} Bs</p>
                         {copEnabled && (
-                            <p className="text-[11px] font-bold text-amber-500/80 mt-0.5">{valCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
+                            <p className="text-[11px] sm:text-xs font-bold text-amber-500/80 mt-0.5">{valCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</p>
                         )}
                         {p.unit === 'paquete' && p.sellByUnit && (
-                            <p className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
+                            <p className="text-[10px] sm:text-xs font-bold text-indigo-500 dark:text-indigo-400 mt-0.5 flex items-center gap-0.5">
                                 <Layers size={10} />
                                 ${(p.unitPriceUsd ?? p.priceUsdt / (p.unitsPerPackage || 1)).toFixed(2)} / ud
                             </p>
                         )}
                     </div>
                     {!readOnly && margin !== null && (
-                        <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+                        <span className={`text-[10px] sm:text-xs font-black px-2 py-1 rounded-lg ${margin >= 0 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
                             {margin >= 0 ? '+' : ''}{margin.toFixed(0)}%
                         </span>
                     )}
@@ -144,7 +144,7 @@ export default function ProductCard({
                         {!readOnly && (
                             <button
                                 onClick={handleMinus}
-                                className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-red-500 shadow-sm active:scale-95 transition-all"
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-red-500 shadow-sm active:scale-95 transition-all"
                             >
                                 <Minus size={18} strokeWidth={2.5} />
                             </button>
@@ -153,15 +153,15 @@ export default function ProductCard({
                             <span className={`text-base font-black leading-none mb-0.5 transition-colors ${delta !== 0 ? 'text-brand dark:text-brand' : isLowStock ? 'text-amber-500' : 'text-slate-700 dark:text-slate-200'}`}>
                                 {stagedStock}
                             </span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UND'}</span>
+                            <span className="text-[9px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider leading-none">{(p.unit === 'kg' || p.unit === 'litro') ? unitInfo?.short : 'UND'}</span>
                             {p.unit === 'paquete' && p.unitsPerPackage > 0 && Math.floor(stagedStock / p.unitsPerPackage) > 0 && (
-                                <span className="text-[8px] text-slate-400 leading-none">= {Math.floor(stagedStock / p.unitsPerPackage)} lotes</span>
+                                <span className="text-[8px] sm:text-[10px] text-slate-400 leading-none">= {Math.floor(stagedStock / p.unitsPerPackage)} lotes</span>
                             )}
                         </div>
                         {!readOnly && (
                             <button
                                 onClick={handlePlus}
-                                className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all"
+                                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-emerald-500 shadow-sm active:scale-95 transition-all"
                             >
                                 <Plus size={18} strokeWidth={2.5} />
                             </button>
@@ -174,7 +174,7 @@ export default function ProductCard({
                             <button
                                 onClick={handleConfirm}
                                 disabled={isConfirming}
-                                className="w-full h-12 rounded-2xl text-[14px] font-bold text-white bg-brand active:scale-[0.97] transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/30 disabled:opacity-60 overflow-hidden"
+                                className="w-full h-12 rounded-2xl text-sm sm:text-base font-bold text-white bg-brand active:scale-[0.97] transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand/30 disabled:opacity-60 overflow-hidden"
                             >
                                 {isConfirming ? (
                                     <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -191,7 +191,7 @@ export default function ProductCard({
                             </button>
                             <button
                                 onClick={handleCancel}
-                                className="w-full py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center uppercase tracking-widest"
+                                className="w-full py-2 text-[11px] sm:text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-center uppercase tracking-widest"
                             >
                                 Cancelar
                             </button>
@@ -200,7 +200,7 @@ export default function ProductCard({
 
                     {/* Days Remaining Badge */}
                     {daysRemaining !== null && daysRemaining !== undefined && delta === 0 && (
-                        <div className={`flex items-center justify-center gap-1 mt-1.5 py-1 rounded-lg text-[10px] font-bold ${
+                        <div className={`flex items-center justify-center gap-1 mt-1.5 py-1 rounded-lg text-[10px] sm:text-xs font-bold ${
                             daysRemaining <= 3
                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-500'
                                 : daysRemaining <= 7

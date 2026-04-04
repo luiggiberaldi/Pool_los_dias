@@ -428,14 +428,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     if (isLoading) {
         return (
-            <div className="flex-1 p-3 sm:p-6 space-y-4">
+            <div className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 space-y-4">
                 <Skeleton className="h-14 w-40 rounded-2xl" />
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <Skeleton className="h-24 rounded-2xl" />
                     <Skeleton className="h-24 rounded-2xl" />
                     <Skeleton className="h-24 rounded-2xl" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Skeleton className="h-32 rounded-3xl" />
                     <Skeleton className="h-32 rounded-3xl" />
                 </div>
@@ -545,7 +545,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             </div>
 
             {/* ── SCROLL CONTENT ── */}
-            <div className="flex flex-col gap-3 px-4 pt-2 pb-28">
+            <div className="flex flex-col gap-3 px-3 sm:px-4 md:px-6 lg:px-8 pt-2 pb-28">
 
             {/* Demo Banner */}
             {isDemo && demoTimeLeft && (
@@ -600,7 +600,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
 
                 {/* ── KPIs ROW ── */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm relative overflow-hidden">
                         <div className="absolute -right-3 -top-3 w-14 h-14 bg-emerald-50 rounded-full blur-xl" />
                         <div className="relative z-10">
@@ -961,7 +961,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     onClick={() => { setTicketPendingSale(null); setTicketClientName(''); setTicketClientPhone(''); setTicketClientDocument(''); }}
                 >
                     <div
-                        className="bg-white w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
+                        className="bg-white w-full max-w-sm md:max-w-md rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-6">

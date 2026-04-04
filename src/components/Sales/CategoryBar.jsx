@@ -34,7 +34,7 @@ export default function CategoryBar({
                     {/* Monto Libre Button */}
                 <button
                     onClick={() => { triggerHaptic && triggerHaptic(); onOpenCustomAmount && onOpenCustomAmount(); }}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black transition-all active:scale-95 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 shadow-sm"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-black transition-all active:scale-95 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 shadow-sm"
                 >
                     <Calculator size={14} />
                     Monto Libre
@@ -51,7 +51,7 @@ export default function CategoryBar({
                         <button
                             key={cat.id}
                             onClick={() => { triggerHaptic && triggerHaptic(); setSelectedCategory(isActive && cat.id !== 'todos' ? 'todos' : cat.id); }}
-                            className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95 ${isActive
+                            className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all active:scale-95 ${isActive
                                 ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
                                 : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-emerald-300'
                                 }`}
@@ -67,7 +67,7 @@ export default function CategoryBar({
             {/* Product Grid */}
             {searchTerm.length === 0 && (
                 <div className="flex-1 overflow-y-auto min-h-0 pb-2">
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2">
                         {visibleProducts.map(p => {
                             const isOut = (p.stock ?? 0) <= 0;
                             const isDisabled = isOut && !allowNegativeStock;
@@ -86,8 +86,8 @@ export default function CategoryBar({
                                             : <CatIcon size={18} className="text-slate-400" />
                                         }
                                     </div>
-                                    <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
-                                    <p className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">${p.priceUsdt?.toFixed(2)}</p>
+                                    <p className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
+                                    <p className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400">${p.priceUsdt?.toFixed(2)}</p>
                                     <p className="text-[9px] text-slate-400 font-medium">{isOut ? 'Agotado' : `${p.stock ?? 0} disp.`}</p>
                                 </button>
                             );

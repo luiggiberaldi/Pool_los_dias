@@ -71,7 +71,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
           <div className="mb-4">
             <LoginAvatar user={user} />
           </div>
-          <h2 className="text-xl font-bold text-slate-800">{userName}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-800">{userName}</h2>
           <p className="text-xs text-slate-500 mt-1">Ingresa tu PIN de {targetPinLength} digitos</p>
         </div>
 
@@ -107,12 +107,12 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
         />
 
         {/* Numpad */}
-        <div className="grid grid-cols-3 gap-3 max-w-[280px] mx-auto">
+        <div className="grid grid-cols-3 gap-3 max-w-[280px] sm:max-w-xs md:max-w-sm mx-auto">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
             <button
               key={n}
               onClick={() => handlePadPress(String(n))}
-              className="h-14 rounded-xl bg-slate-50 text-slate-800 text-xl font-bold hover:bg-slate-100 active:scale-95 active:bg-sky-50 transition-all duration-150 border border-slate-200 shadow-sm"
+              className="h-14 rounded-xl bg-slate-50 text-slate-800 text-lg sm:text-xl font-bold hover:bg-slate-100 active:scale-95 active:bg-sky-50 transition-all duration-150 border border-slate-200 shadow-sm"
             >
               {n}
             </button>

@@ -79,7 +79,7 @@ export default function CartPanel({
                             const isSelected = cartSelectedIndex === idx;
 
                             return (
-                                <div key={item.id} className={`group bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2 pr-6 sm:p-3 sm:pr-10 border flex items-center justify-between gap-2 transition-colors relative ${
+                                <div key={item.id} className={`group bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl p-2 pr-6 sm:p-3 sm:pr-10 md:p-4 md:pr-12 border flex items-center justify-between gap-2 sm:gap-3 transition-colors relative ${
                                     isSelected 
                                         ? 'border-emerald-500 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:ring-emerald-400/20' 
                                         : 'border-slate-100 dark:border-slate-800/80 hover:border-emerald-200 dark:hover:border-emerald-800'
@@ -97,8 +97,8 @@ export default function CartPanel({
                                         <div className="flex-1 min-w-0 pr-1">
                                             <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight mb-0.5 sm:mb-1 truncate">{item.name}</p>
                                             <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                                                <p className="text-[10px] sm:text-[11px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
-                                                <p className="text-[10px] sm:text-[11px] font-medium text-slate-400">
+                                                <p className="text-[10px] sm:text-[11px] md:text-xs font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 sm:px-1.5 rounded">${item.priceUsd.toFixed(2)}</p>
+                                                <p className="text-[10px] sm:text-[11px] md:text-xs font-medium text-slate-400">
                                                     {item.exactBs != null ? formatBs(item.exactBs) : formatBs(item.priceUsd * effectiveRate)} Bs
                                                 </p>
                                             </div>
@@ -149,9 +149,9 @@ export default function CartPanel({
                 <button
                     onClick={() => { triggerHaptic && triggerHaptic(); onOpenDiscount(); }}
                     disabled={cart.length === 0}
-                    className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl flex items-center justify-between transition-all outline-none focus:ring-2 focus:ring-emerald-500/50 ${discountData?.active ? 'bg-amber-100/80 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+                    className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl flex items-center justify-between transition-all outline-none focus:ring-2 focus:ring-emerald-500/50 ${discountData?.active ? 'bg-amber-100/80 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
                 >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3">
                         <Percent size={16} className={discountData?.active ? 'text-amber-600 dark:text-amber-500' : ''} />
                         <span className="text-[13px] sm:text-sm font-bold">
                             {discountData?.active ? 'Descuento Aplicado' : 'Añadir Descuento'}
@@ -180,8 +180,8 @@ export default function CartPanel({
                     </div>
                     <div className="text-right flex items-center gap-3 sm:block w-full sm:w-auto justify-between">
                         <div className="flex flex-col items-start sm:items-end">
-                            <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase sm:hidden">Total (Ref)</span>
-                            <span className="text-[11px] font-bold text-slate-500 sm:hidden">{formatBs(cartTotalBs)} Bs</span>
+                            <span className="text-[10px] sm:text-xs font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase sm:hidden">Total (Ref)</span>
+                            <span className="text-[11px] sm:text-xs font-bold text-slate-500 sm:hidden">{formatBs(cartTotalBs)} Bs</span>
                         </div>
                         <p className={`text-2xl sm:text-3xl font-black leading-none tracking-tight transition-colors ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
                             ${cartTotalUsd.toFixed(2)}
@@ -189,14 +189,14 @@ export default function CartPanel({
                     </div>
                 </div>
 
-                <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl">
-                    <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Bolívares</span>
+                <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl sm:rounded-2xl">
+                    <span className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Bolívares</span>
                     <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatBs(cartTotalBs)} Bs</span>
                 </div>
 
                 {copEnabled && (
-                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl">
-                        <span className="text-[11px] font-black text-amber-600 dark:text-amber-500 tracking-widest uppercase">Pesos (COP)</span>
+                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl sm:rounded-2xl">
+                        <span className="text-[11px] sm:text-xs font-black text-amber-600 dark:text-amber-500 tracking-widest uppercase">Pesos (COP)</span>
                         <span className="text-xl font-black text-amber-600 dark:text-amber-400">{(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 )}

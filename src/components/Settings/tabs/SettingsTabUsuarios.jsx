@@ -201,7 +201,7 @@ export default function SettingsTabUsuarios({
                 <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Bloqueo Automático</label>
                     <p className="text-[10px] text-slate-400 mb-3">Tu sesión se bloqueará exigiendo el PIN tras estos minutos de inactividad.</p>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {[
                             { val: '1', label: '1m' },
                             { val: '3', label: '3m' },
