@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CreditCard, Banknote, Smartphone, DollarSign, Store, ShoppingCart, Package, Coins, Key, Fingerprint } from 'lucide-react';
 import { getAllPaymentMethods, savePaymentMethods, togglePaymentMethodEnabled, FACTORY_PAYMENT_METHODS, PAYMENT_ICONS, ICON_COMPONENTS, toTitleCase } from '../../config/paymentMethods';
 import { showToast } from '../Toast';
+import { useAudit } from '../../hooks/useAudit';
 
 const ICON_OPTIONS = [
     { key: 'Banknote', Icon: Banknote },
@@ -17,6 +18,7 @@ const ICON_OPTIONS = [
 ];
 
 export default function PaymentMethodsManager({ triggerHaptic }) {
+    const { log } = useAudit();
     const [methods, setMethods] = useState([]);
     const [showAdd, setShowAdd] = useState(false);
     const [newLabel, setNewLabel] = useState('');
@@ -49,15 +51,18 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
         setNewLabel('');
         setShowAdd(false);
         showToast('Método de pago agregado', 'success');
+        log('CONFIG', 'METODO_PAGO_CREADO', `Método de pago creado: ${toTitleCase(newLabel.trim())} (${newCurrency})`, { label: toTitleCase(newLabel.trim()), currency: newCurrency, icon: newIcon });
     };
 
     const handleRemove = async (id) => {
         triggerHaptic && triggerHaptic();
+        const removed = methods.find(m => m.id === id);
         const updated = methods.filter(m => m.id !== id);
         await savePaymentMethods(updated);
         const hydrated = await getAllPaymentMethods();
         setMethods(hydrated);
         showToast('Método eliminado', 'success');
+        log('CONFIG', 'METODO_PAGO_ELIMINADO', `Método de pago eliminado: ${removed?.label || id}`, { id, label: removed?.label, currency: removed?.currency });
     };
 
     const handleToggleState = async (id) => {

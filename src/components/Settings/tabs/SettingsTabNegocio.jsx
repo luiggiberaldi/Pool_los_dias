@@ -2,6 +2,7 @@ import React from 'react';
 import { Store, Printer, Coins, Check } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import WebSerialPanel from '../WebSerialPanel';
+import { useAudit } from '../../../hooks/useAudit';
 
 export default function SettingsTabNegocio({
     businessName, setBusinessName,
@@ -16,6 +17,13 @@ export default function SettingsTabNegocio({
     showToast,
     triggerHaptic,
 }) {
+    const { log } = useAudit();
+
+    const handleSaveWithAudit = () => {
+        handleSaveBusinessData();
+        log('CONFIG', 'CONFIG_NEGOCIO_CAMBIADA', 'Configuración del negocio actualizada', { businessName, businessRif });
+    };
+
     return (
         <>
             {/* Mi Negocio */}
@@ -41,7 +49,7 @@ export default function SettingsTabNegocio({
                     />
                 </div>
                 <button
-                    onClick={handleSaveBusinessData}
+                    onClick={handleSaveWithAudit}
                     className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors active:scale-[0.98]"
                 >
                     <Check size={16} /> Guardar

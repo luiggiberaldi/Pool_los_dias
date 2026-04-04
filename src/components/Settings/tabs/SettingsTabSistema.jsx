@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import AuditLogViewer from '../AuditLogViewer';
+import { useAudit } from '../../../hooks/useAudit';
 
 export default function SettingsTabSistema({
     theme, toggleTheme,
@@ -16,6 +17,34 @@ export default function SettingsTabSistema({
     setShowDeleteConfirm,
     triggerHaptic,
 }) {
+    const { log } = useAudit();
+
+    const handleThemeToggleWithAudit = () => {
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        toggleTheme();
+        log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', `Tema cambiado a ${newTheme}`, { setting: 'theme', value: newTheme });
+    };
+
+    const handleExportWithAudit = () => {
+        handleExport();
+        log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', 'Backup exportado', { setting: 'export', value: 'backup' });
+    };
+
+    const handleImportWithAudit = () => {
+        handleImportClick();
+        log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', 'Importación de backup iniciada', { setting: 'import', value: 'backup' });
+    };
+
+    const handleShareWithAudit = () => {
+        setIsShareOpen(true);
+        log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', 'Compartir base de datos iniciado', { setting: 'share_db', value: true });
+    };
+
+    const handleDeleteConfirmWithAudit = () => {
+        setShowDeleteConfirm(true);
+        log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', 'Solicitud de borrado de historial de ventas', { setting: 'delete_sales_history', value: true });
+    };
+
     return (
         <>
             {/* Datos y Respaldo */}
@@ -28,7 +57,7 @@ export default function SettingsTabSistema({
                 </div>
 
                 <div className="space-y-2">
-                    <button onClick={handleExport} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
+                    <button onClick={handleExportWithAudit} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
                         <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg"><Download size={18} className="text-blue-500" /></div>
                         <div className="text-left flex-1">
                             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Exportar Backup</p>
@@ -37,7 +66,7 @@ export default function SettingsTabSistema({
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
 
-                    <button onClick={handleImportClick} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
+                    <button onClick={handleImportWithAudit} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
                         <div className="p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg"><Upload size={18} className="text-emerald-500" /></div>
                         <div className="text-left flex-1">
                             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Importar Backup</p>
@@ -46,7 +75,7 @@ export default function SettingsTabSistema({
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
 
-                    <button onClick={() => setIsShareOpen(true)} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
+                    <button onClick={handleShareWithAudit} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
                         <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"><Share2 size={18} className="text-indigo-500" /></div>
                         <div className="text-left flex-1">
                             <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Compartir Base de Datos</p>
@@ -102,7 +131,7 @@ export default function SettingsTabSistema({
                     </p>
                 </div>
                 <button
-                    onClick={() => setShowDeleteConfirm(true)}
+                    onClick={handleDeleteConfirmWithAudit}
                     className="w-full flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors group active:scale-[0.98]"
                 >
                     <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg"><Trash2 size={18} className="text-red-600 dark:text-red-400" /></div>

@@ -359,6 +359,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         const updated = suppliers.filter(s => s.id !== deleteSupplierTarget.id);
                         await saveSuppliers(updated);
                         showToast(`Proveedor ${deleteSupplierTarget.name} eliminado`, 'success');
+                        auditLog('PROVEEDOR', 'PROVEEDOR_ELIMINADO', `Proveedor ${deleteSupplierTarget.name} eliminado`, { proveedorId: deleteSupplierTarget.id });
                         setSelectedSupplier(null);
                         setDeleteSupplierTarget(null);
                     }}
@@ -600,6 +601,7 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         await saveCustomers(newCustomers);
                         setEditingCustomer(null);
                         showToast('Cliente actualizado', 'success');
+                        auditLog('CLIENTE', 'CLIENTE_EDITADO', `Cliente ${updated.nombre || updated.name} actualizado`, { clienteId: updated.id });
                     }}
                 />
             )}

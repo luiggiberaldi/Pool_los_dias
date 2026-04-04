@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../hooks/store/authStore';
+import { useAudit } from '../../hooks/useAudit';
 import { showToast } from '../Toast';
 import {
     UserPlus, Trash2, KeyRound, Shield, ShoppingCart,
@@ -151,6 +152,7 @@ import { hashPin } from '../../utils/crypto';
 // ═══════════════════════════════════════════════════ MAIN
 export default function UsersManager({ triggerHaptic }) {
     const { cachedUsers: usuarios, currentUser: usuarioActivo, syncUsers } = useAuthStore();
+    const { log } = useAudit();
 
     // Siempre sincronizar al montar para tener UUIDs frescos de Supabase
     useEffect(() => {
@@ -204,6 +206,7 @@ export default function UsersManager({ triggerHaptic }) {
 
             showToast(`Usuario "${newName.trim()}" creado`, 'success');
             triggerHaptic?.();
+            log('USUARIO', 'ROL_CAMBIADO', `Usuario "${newName.trim()}" creado con rol ${newRole}`, { nombre: newName.trim(), rol: newRole });
             setNewName('');
             setNewRole('CAJERO');
             setNewPin('');

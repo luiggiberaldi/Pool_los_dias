@@ -51,6 +51,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         // Registro silencioso del ajuste de inventario
         try {
             const product = products.find(p => p.id === productId);
+            auditLog('INVENTARIO', 'AJUSTE_STOCK', `Stock de ${product?.name || 'Producto'}: ${delta > 0 ? '+' : ''}${delta}`, { productoId: productId, productName: product?.name || 'Producto', delta, stockAnterior: product?.stock ?? 0 });
             const record = {
                 id: `adj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                 timestamp: new Date().toISOString(),
@@ -300,10 +301,18 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         }, effectiveRate);
 
         if (editingId) {
+            const oldProduct = products.find(p => p.id === editingId);
+            const oldPrice = oldProduct?.priceUsdt ?? 0;
+            const newPrice = productData.priceUsdt ?? 0;
+            const meta = { productoId: editingId, productName: name };
+            if (oldPrice !== newPrice) {
+                meta.oldPrice = oldPrice;
+                meta.newPrice = newPrice;
+            }
             setProducts(products.map(p =>
                 p.id === editingId ? { ...p, ...productData, image: image || p.image } : p
             ));
-            auditLog('INVENTARIO', 'PRODUCTO_EDITADO', `Producto "${name}" editado`);
+            auditLog('INVENTARIO', 'PRODUCTO_EDITADO', `Producto "${name}" editado${oldPrice !== newPrice ? ` (precio: $${oldPrice} → $${newPrice})` : ''}`, meta);
         } else {
             setProducts([{
                 id: crypto.randomUUID(),

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
+import { logEvent } from '../services/auditService';
 import { BODEGA_CATEGORIES } from '../config/categories';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { fetchCloudProducts } from '../hooks/useCloudSync';
@@ -216,6 +217,31 @@ export function ProductProvider({ children, rates }) {
         };
     }, []);
 
+    // ─── Audit-wrapped setters ─────────────────────────────
+    const setCustomRateWithAudit = (val) => {
+        const prev = customRate;
+        setCustomRate(val);
+        if (val && val !== prev) {
+            logEvent('CONFIG', 'TASA_MANUAL_CAMBIADA', `Tasa manual cambiada de ${prev || 'vacío'} a ${val}`, null, { prev: prev || null, next: val });
+        }
+    };
+
+    const setUseAutoRateWithAudit = (val) => {
+        const prev = useAutoRate;
+        setUseAutoRate(val);
+        if (val !== prev) {
+            logEvent('CONFIG', 'TASA_AUTO_TOGGLE', `Tasa automática ${val ? 'activada' : 'desactivada'}`, null, { enabled: val });
+        }
+    };
+
+    const setTasaCopManualWithAudit = (val) => {
+        const prev = tasaCopManual;
+        setTasaCopManual(val);
+        if (val && val !== prev) {
+            logEvent('CONFIG', 'TASA_COP_CAMBIADA', `Tasa COP cambiada de ${prev || 'vacío'} a ${val}`, null, { prev: prev || null, next: val });
+        }
+    };
+
     const adjustStock = (productId, delta) => {
         setProducts(prevProducts => prevProducts.map(p => {
             if (p.id === productId) {
@@ -240,16 +266,16 @@ export function ProductProvider({ children, rates }) {
             streetRate,
             setStreetRate,
             useAutoRate,
-            setUseAutoRate,
+            setUseAutoRate: setUseAutoRateWithAudit,
             customRate,
-            setCustomRate,
+            setCustomRate: setCustomRateWithAudit,
             effectiveRate,
             copEnabled,
             setCopEnabled,
             autoCopEnabled,
             setAutoCopEnabled,
             tasaCopManual,
-            setTasaCopManual,
+            setTasaCopManual: setTasaCopManualWithAudit,
             tasaCop,
             adjustStock
         }}>

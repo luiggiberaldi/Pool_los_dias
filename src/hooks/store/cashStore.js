@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { logEvent } from '../../services/auditService';
 
 // Dedicated offline cache for cash session state
 const cashCache = localforage.createInstance({
@@ -182,6 +183,8 @@ export const useCashStore = create((set, get) => ({
         } catch (err) {
             console.warn('[Caja] Sin conexión — apertura guardada localmente:', err);
         }
+
+        logEvent('VENTA', 'APERTURA_CAJA', `Caja abierta — Base: $${baseUsd} / Bs${baseBs}`, { nombre: openedBy }, { baseUsd, baseBs, sessionId: sessionPayload.id });
     },
 
     closeCashSession: async (stats, closedBy) => {
@@ -207,6 +210,8 @@ export const useCashStore = create((set, get) => ({
         } catch (err) {
             console.warn('[Caja] Sin conexión al cerrar caja:', err);
         }
+
+        logEvent('VENTA', 'CIERRE_CAJA_SESION', `Caja cerrada por ${closedBy}`, { nombre: closedBy }, { sessionId: active.id, stats });
     }
 }));
 

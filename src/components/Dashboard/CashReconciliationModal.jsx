@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DollarSign, Wallet, X, CheckCircle2 } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
+import { useAudit } from '../../hooks/useAudit';
 
 export default function CashReconciliationModal({
     isOpen,
@@ -12,16 +13,26 @@ export default function CashReconciliationModal({
 }) {
     const [actualUsd, setActualUsd] = useState('');
     const [actualBs, setActualBs] = useState('');
+    const { log } = useAudit();
 
     if (!isOpen) return null;
 
     const handleConfirm = () => {
         const declaredUsd = parseFloat(actualUsd) || 0;
         const declaredBs = parseFloat(actualBs) || 0;
-        
+
         onConfirm({
             declaredUsd,
             declaredBs,
+            diffUsd: declaredUsd - expectedUsd,
+            diffBs: declaredBs - expectedBs
+        });
+
+        log('VENTA', 'ARQUEO_CAJA', `Arqueo: $${declaredUsd} / ${formatBs(declaredBs)} Bs (esperado $${expectedUsd} / ${formatBs(expectedBs)} Bs)`, {
+            declaredUsd,
+            declaredBs,
+            expectedUsd,
+            expectedBs,
             diffUsd: declaredUsd - expectedUsd,
             diffBs: declaredBs - expectedBs
         });
