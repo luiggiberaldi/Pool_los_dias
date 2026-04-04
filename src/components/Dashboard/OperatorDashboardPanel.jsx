@@ -1,19 +1,48 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
-import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { useAuthStore } from '../../hooks/store/authStore';
+import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, DollarSign, ShoppingCart, TrendingUp } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
+import { storageService } from '../../utils/storageService';
 
 export default function OperatorDashboardPanel({ onNavigate }) {
     const { tables, activeSessions, config } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
+    const { currentUser } = useAuthStore();
     const [now, setNow] = useState(new Date());
+    const [myStats, setMyStats] = useState({ ventas: 0, revenue: 0, items: 0 });
 
     // Update time every minute
     useEffect(() => {
         const interval = setInterval(() => setNow(new Date()), 60000);
         return () => clearInterval(interval);
     }, []);
+
+    // Load personal sales stats for today
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        const loadStats = async () => {
+            const sales = await storageService.getItem('bodega_sales_v1', []);
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const mySales = sales.filter(s =>
+                s.vendedorId === currentUser.id &&
+                s.status !== 'ANULADA' &&
+                s.tipo !== 'COBRO_DEUDA' &&
+                s.timestamp?.slice(0, 10) === todayStr
+            );
+            setMyStats({
+                ventas: mySales.length,
+                revenue: mySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0),
+                items: mySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0)
+            });
+        };
+        loadStats();
+        // Reload when sales change
+        const onUpdate = (e) => { if (e.detail?.key === 'bodega_sales_v1') loadStats(); };
+        window.addEventListener('app_storage_update', onUpdate);
+        return () => window.removeEventListener('app_storage_update', onUpdate);
+    }, [currentUser?.id]);
 
     // 1. Alertas de Tiempo (Mesas por Vencerse - Pool)
     const timeAlerts = useMemo(() => {
@@ -97,11 +126,23 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                 <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
                 <h2 className="text-white text-lg font-black tracking-tight mb-4">Resumen de Turno</h2>
                 
-                <div className="flex justify-between items-end relative z-10">
+                <div className="grid grid-cols-3 gap-4 relative z-10">
                     <div>
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Mesas Activas</p>
                         <p className="text-3xl font-black text-white leading-none pl-1">
                             {activeSessions.filter(s => s.status === 'ACTIVE').length}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Mis Ventas Hoy</p>
+                        <p className="text-3xl font-black text-emerald-400 leading-none pl-1">
+                            {myStats.ventas}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Aportado</p>
+                        <p className="text-2xl font-black text-amber-400 leading-none pl-1">
+                            ${myStats.revenue.toFixed(2)}
                         </p>
                     </div>
                 </div>
