@@ -11,6 +11,14 @@ import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
 import { logEvent } from '../../services/auditService';
 import { Modal } from '../Modal';
 
+// Resolve staff ID to name from cached users
+function useStaffName(staffId) {
+    const cachedUsers = useAuthStore(s => s.cachedUsers);
+    if (!staffId || !cachedUsers?.length) return null;
+    const user = cachedUsers.find(u => u.id === staffId);
+    return user?.name || user?.nombre || null;
+}
+
 // Read live BCV rate from rates cache
 function useBcvRate() {
     try {
@@ -23,6 +31,7 @@ export default function TableCard({ table, session }) {
     const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest } = useTablesStore();
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
+    const staffName = useStaffName(session?.opened_by);
 
     const isAvailable = !session || session.status === 'CLOSED';
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
@@ -156,6 +165,11 @@ export default function TableCard({ table, session }) {
                     <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
                         {table.name}
                     </h3>
+                    {isPlaying && staffName && (
+                        <span className="text-[9px] sm:text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md truncate max-w-[80px] sm:max-w-[100px]">
+                            {staffName}
+                        </span>
+                    )}
                     {isPlaying && (
                         <>
                             <button

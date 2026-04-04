@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, ListChecks, LineChart, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, ShoppingBag, ListChecks, LineChart, Clock, ArrowUpRight, Trash2, ShoppingCart, Store, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut, Award } from 'lucide-react';
 import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -348,6 +348,18 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         });
         return Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
     }, [sales]);
+
+    // Top Meseros/Vendedores (ranking by revenue and sales count)
+    const topStaff = useMemo(() => {
+        const staffMap = {};
+        todaySales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.status !== 'ANULADA' && s.vendedorId).forEach(s => {
+            const key = s.vendedorId;
+            if (!staffMap[key]) staffMap[key] = { id: key, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || '', ventas: 0, revenue: 0 };
+            staffMap[key].ventas += 1;
+            staffMap[key].revenue += s.totalUsd || 0;
+        });
+        return Object.values(staffMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    }, [todaySales]);
 
     // Payment method breakdown (today)
     const paymentBreakdown = useMemo(() => {
@@ -920,6 +932,31 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 </div>
                                 <div className="flex flex-col items-end shrink-0 pl-2">
                                     <span className="text-xs font-black text-[#0EA5E9]">{p.qty} u</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Top Meseros / Vendedores */}
+            {isAdmin && topStaff.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-1.5"><Award size={14} /> Top Vendedores del Día</h3>
+                    <div className="space-y-3">
+                        {topStaff.map((s, i) => (
+                            <div key={s.id} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
+                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-bold text-slate-700 truncate">{s.name}</p>
+                                        <p className="text-[10px] text-slate-400">{s.ventas} {s.ventas === 1 ? 'venta' : 'ventas'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end shrink-0 pl-2">
+                                    <span className="text-sm font-black text-emerald-600">${s.revenue.toFixed(2)}</span>
                                 </div>
                             </div>
                         ))}

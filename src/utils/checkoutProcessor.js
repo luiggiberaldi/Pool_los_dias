@@ -124,10 +124,14 @@ export async function processSaleTransaction({
     }
 
     // ── GESTIÓN DE CACHÉ LOCAL (Para no bloquear al usuario) ──
+    const currentUser = useAuthStore.getState().usuarioActivo;
     const sale = {
         id: finalSaleId || crypto.randomUUID(),
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
         status: saleMode === 'online' ? 'COMPLETADA' : (saleMode === 'pending_verification' ? 'PENDIENTE_VERIFICACION' : 'PENDIENTE_SYNC'),
+        vendedorId: currentUser?.id || null,
+        vendedorNombre: currentUser?.nombre || currentUser?.name || 'Sistema',
+        vendedorRol: currentUser?.rol || currentUser?.role || null,
         items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
         cartSubtotalUsd: cartSubtotalUsd,
         discountType: discountData?.type || null,
@@ -158,9 +162,8 @@ export async function processSaleTransaction({
     await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
 
     // Audit log
-    const user = useAuthStore.getState().usuarioActivo;
     const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
-    logEvent('VENTA', tipo, `Venta #${saleNumber} [${saleMode.toUpperCase()}] - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, user, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
+    logEvent('VENTA', tipo, `Venta #${saleNumber} [${saleMode.toUpperCase()}] - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, currentUser, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
 
     // ── CLIENT-SIDE STOCK DEDUCTION (optimistic UI only) ──
     // NOTE: The RPC `process_checkout` handles authoritative stock deduction
