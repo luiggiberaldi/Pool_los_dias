@@ -34,6 +34,7 @@ import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
 import { TableQueuePanel } from '../components/tables/TableQueuePanel';
 import TableBillModal from '../components/tables/TableBillModal';
 import { useTablesStore } from '../hooks/store/useTablesStore';
+import { useCashStore } from '../hooks/store/cashStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 
@@ -43,6 +44,9 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
     // ── Global Context ──────────────────────────────────────
     const { products, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
+
+    // ── Cash Session (fuente de verdad) ──────────────────────
+    const { activeCashSession } = useCashStore();
 
     // ── State ──────────────────────────────────────
     const [customers, setCustomers] = useState([]);
@@ -54,8 +58,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
     const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
 
-    // Apertura Caja
-    const [todayAperturaData, setTodayAperturaData] = useState(null);
+    // Apertura Caja — estado removido: se usa activeCashSession de useCashStore
 
     // Cart (from global context)
     const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
@@ -145,7 +148,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                 showToast(`Producto no encontrado (${barcode})`, 'warning');
             }
         },
-        enabled: !isLoading && isActive && !!todayAperturaData
+        enabled: !isLoading && isActive && !!activeCashSession
     });
 
     // Paste Barcode Handler (Para cuando el usuario hace Ctrl+V en la barra de búsqueda)
@@ -261,21 +264,12 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             if (mounted) {
                 setCustomers(savedCustomers);
                 setPaymentMethods(methods);
-                
+
                 // Only set cart if it's currently empty (don't overwrite if user somehow added items before load)
                 if (savedCart && savedCart.length > 0 && cartRef.current.length === 0) {
                     setCart(savedCart);
                 }
 
-                // Check Apertura (timezone-safe)
-                const todayStr = getLocalISODate(new Date());
-                const apertura = savedSales.find(s => {
-                    if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
-                    const saleDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
-                    return saleDay === todayStr;
-                });
-                setTodayAperturaData(apertura || null);
-                
                 setIsLoadingLocal(false);
 
             }
@@ -310,16 +304,6 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             setPaymentMethods(methods);
             setCustomers(savedCustomers);
             setSalesData(savedSales);
-            
-            // Recalculate Apertura (uses imported getLocalISODate)
-            const todayStr = getLocalISODate(new Date());
-            
-            const apertura = savedSales.find(s => {
-                if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
-                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
-                return saleLocalDay === todayStr;
-            });
-            setTodayAperturaData(apertura || null);
         });
     }, [isActive, setProductsSilent]);
 
@@ -717,7 +701,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     // KEYBOARD SHORTCUTS (Pool Los Diaz Port)
     // ==========================================
     useSalesKeyboard({
-        todayAperturaData, showCheckout, showReceipt, hierarchyPending, weightPending, 
+        todayAperturaData: activeCashSession, showCheckout, showReceipt, hierarchyPending, weightPending,
         showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, 
         showDiscountModal, searchInputRef, setCartSelectedIndex, setShowClearCartConfirm, 
         cartRef, setShowCheckout, cartSelectedIndex, updateQty, removeFromCart
@@ -749,7 +733,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             {/* ── Mesa Queue: cuentas pendientes de mesas ── */}
             <TableQueuePanel onCheckoutTable={setTableCheckoutData} effectiveRate={effectiveRate} />
 
-            {!todayAperturaData ? (
+            {!activeCashSession ? (
                 <CajaCerradaOverlay 
                     cartCount={cart.length}
                     onOpenApertura={() => onNavigate && onNavigate('inicio')} 
