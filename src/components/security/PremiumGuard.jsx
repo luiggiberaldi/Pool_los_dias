@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, Copy, Check, Star, Sparkles, Send, Bot, Store, MessageCircle, Database, Crown, CreditCard, Gift, BarChart3, Bell, Volume2, Search } from 'lucide-react';
 import { useSecurity } from '../../hooks/useSecurity';
-import { useAuthStore } from '../../hooks/store/useAuthStore';
+import { supabaseCloud } from '../../config/supabaseCloud';
 import { Modal } from '../Modal';
 import CloudAuthModal from './CloudAuthModal';
 
 export default function PremiumGuard({ children, featureName = "Esta función", isShop = false }) {
     const { deviceId, isPremium, loading, unlockApp, activateDemo, demoUsed } = useSecurity();
-    
-    // Cloud Auth Check
-    const adminEmail = useAuthStore(state => state.adminEmail);
-    const adminPassword = useAuthStore(state => state.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+
+    // Cloud Auth Check — use Supabase session instead of stored credentials
+    const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+    const [cloudEmail, setCloudEmail] = useState(null);
+
+    useEffect(() => {
+        supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+            setIsCloudConfigured(!!session);
+            setCloudEmail(session?.user?.email || null);
+        }).catch(() => {});
+    }, []);
 
     const [copied, setCopied] = useState(false);
     const [demoLoading, setDemoLoading] = useState(false);
@@ -177,7 +183,7 @@ export default function PremiumGuard({ children, featureName = "Esta función", 
                     </button>
                     {isCloudConfigured && (
                         <p className="text-[9px] text-teal-600 dark:text-teal-400 text-center font-bold mt-2">
-                            Sesión iniciada como: {adminEmail}
+                            Sesión iniciada como: {cloudEmail}
                         </p>
                     )}
                 </div>

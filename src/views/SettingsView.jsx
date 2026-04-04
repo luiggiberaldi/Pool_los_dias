@@ -11,7 +11,6 @@ import PaymentMethodsManager from '../components/Settings/PaymentMethodsManager'
 import UsersManager from '../components/Settings/UsersManager';
 import AuditLogViewer from '../components/Settings/AuditLogViewer';
 import { useSecurity } from '../hooks/useSecurity';
-import { useNotifications } from '../hooks/useNotifications';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useProductContext } from '../context/ProductContext';
 import { useAuthStore } from '../hooks/store/authStore';
@@ -43,7 +42,7 @@ const COLOR_MAP = {
 };
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
-export default function SettingsView({ onClose, theme, toggleTheme, triggerHaptic }) {
+export default function SettingsView({ onClose: _onClose, theme, toggleTheme, triggerHaptic }) {
     const {
         products, categories, setProducts, setCategories,
         copEnabled, setCopEnabled,
@@ -133,7 +132,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
             setImportStatus('success'); setStatusMessage('Backup descargado.');
             auditLog('SISTEMA', 'BACKUP_EXPORTADO', 'Backup completo exportado');
             setTimeout(() => setImportStatus(null), 3000);
-        } catch (error) {
+        } catch (_error) {
             setImportStatus('error'); setStatusMessage('Error al generar backup.');
         }
     };
@@ -387,7 +386,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                                                 .eq('user_id', session.user.id)
                                                 .eq('doc_id', 'bodega_sales_v1');
                                         }
-                                    } catch (e) { /* sin nube configurada, ignorar */ }
+                                    } catch (_e) { /* sin nube configurada, ignorar */ }
                                     auditLog('SISTEMA', 'HISTORIAL_BORRADO', 'Historial y reportes eliminados');
                                     showToast('Historial y reportes eliminados', 'success');
                                     setTimeout(() => window.location.reload(), 1500);

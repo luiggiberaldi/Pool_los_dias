@@ -8,7 +8,7 @@ export default function CashReconciliationModal({
     onConfirm,
     expectedUsd = 0,
     expectedBs = 0,
-    bcvRate = 1
+    bcvRate: _bcvRate = 1
 }) {
     const [actualUsd, setActualUsd] = useState('');
     const [actualBs, setActualBs] = useState('');

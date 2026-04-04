@@ -51,7 +51,7 @@ const SearchBar = forwardRef(function SearchBar({
                 <button
                     onPointerDown={(e) => { e.preventDefault(); startRecording(); }}
                     onPointerUp={(e) => { e.preventDefault(); stopRecording(); }}
-                    onPointerLeave={(e) => { if (isRecording) stopRecording(); }}
+                    onPointerLeave={() => { if (isRecording) stopRecording(); }}
                     // Prevenir el menú contextual en móvil al mantener presionado
                     onContextMenu={(e) => e.preventDefault()}
                     className={`p-1.5 rounded-full transition-all flex items-center justify-center select-none ${isRecording

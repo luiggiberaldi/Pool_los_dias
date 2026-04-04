@@ -10,9 +10,6 @@ import {
     Zap, ChevronLeft, ChevronDown, ChevronUp, TerminalSquare, Trash2, Brain,
     Download, Filter, Database, RefreshCw
 } from 'lucide-react';
-import { storageService } from '../utils/storageService';
-import { FinancialEngine } from '../core/FinancialEngine';
-import { round2, sumR, mulR, subR } from '../utils/dinero';
 import { injectDeterministicSales } from '../testing/deterministicInjector';
 import { injectHybridFlowSales } from '../testing/hybridFlowInjector';
 

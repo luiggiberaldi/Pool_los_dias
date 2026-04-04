@@ -10,7 +10,7 @@ export default function AnimatedCounter({ value, prefix = '', suffix = '', durat
     const isDecimal = String(value).includes('.') || numericValue % 1 !== 0;
 
     useEffect(() => {
-        if (numericValue === 0) { setDisplay(0); return; }
+        if (numericValue === 0) return; // no animation needed, derived value handles display
 
         const startTime = performance.now();
         let rafId;
@@ -32,7 +32,9 @@ export default function AnimatedCounter({ value, prefix = '', suffix = '', durat
         return () => cancelAnimationFrame(rafId);
     }, [numericValue, duration]);
 
-    const formatted = isDecimal ? display.toFixed(2) : Math.round(display).toLocaleString();
+    // When numericValue is 0, show 0 directly without needing setState
+    const displayValue = numericValue === 0 ? 0 : display;
+    const formatted = isDecimal ? displayValue.toFixed(2) : Math.round(displayValue).toLocaleString();
 
     return <>{prefix}{formatted}{suffix}</>;
 }

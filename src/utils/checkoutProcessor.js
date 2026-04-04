@@ -7,6 +7,7 @@ import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
 
 const SALES_KEY = 'bodega_sales_v1';
+const EPSILON = 0.01;
 
 // UUID v4 regex - productos sin formato UUID no se envian al RPC de Supabase
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,7 +36,7 @@ export async function processSaleTransaction({
     const remainingUsd = round2(Math.max(0, subR(cartTotalUsd, totalPaidUsd)));
     const changeUsd = round2(Math.max(0, subR(totalPaidUsd, cartTotalUsd)));
 
-    if (!selectedCustomer && remainingUsd > 0.01) {
+    if (!selectedCustomer && remainingUsd > EPSILON) {
         return { success: false, error: 'Se requiere cliente para ventas fiadas' };
     }
 
@@ -43,11 +44,11 @@ export async function processSaleTransaction({
         return { success: false, error: 'Integridad matemática comprometida' };
     }
 
-    if (cartTotalUsd <= 0.01) {
+    if (cartTotalUsd <= EPSILON) {
         return { success: false, error: 'No se pueden generar ventas de $0.00' };
     }
 
-    const fiadoAmountUsd = remainingUsd > 0.01 ? remainingUsd : 0;
+    const fiadoAmountUsd = remainingUsd > EPSILON ? remainingUsd : 0;
     
     // Preparar el Payload para la validación centralizada
     // Se envía currency y methodLabel para que el RPC pueda mapear cuentas contables
@@ -80,6 +81,11 @@ export async function processSaleTransaction({
     let saleMode = 'online';
     let finalSaleId = null;
 
+    // Idempotency key: use a stable UUID so retries/pending verifications
+    // don't create duplicate sales on the server.
+    const idempotencyKey = crypto.randomUUID();
+    rpcPayload.idempotency_key = idempotencyKey;
+
     // Si ningún producto del carrito tiene UUID válido, ir directo a offline.
     // Esto previene el error 400 de Supabase cuando se venden productos con IDs heredados.
     if (!hasRpcCompatibleItems) {
@@ -89,15 +95,24 @@ export async function processSaleTransaction({
        try {
          // Intentar RPC Transaccional Atómica
          const rpcPromise = supabase.rpc('process_checkout', { payload: rpcPayload });
-         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 3000));
-         
+         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 8000));
+
          const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
          if (error) throw error;
-         
+
          finalSaleId = data.sale_id;
        } catch (err) {
-         console.warn('[Checkout] Fallo en RPC Supabase, cambiando a MODO OFFLINE', err);
-         saleMode = 'offline';
+         if (err.message === 'TIMEOUT') {
+           // Timeout does NOT mean the RPC failed — it may still succeed server-side.
+           // Add to pending verification queue so we can reconcile later,
+           // rather than assuming full offline mode (which could cause duplicates).
+           console.warn('[Checkout] RPC timeout — agregando a cola de verificación pendiente', err);
+           saleMode = 'pending_verification';
+           await offlineQueueService.addSaleToQueue({ ...rpcPayload, _pendingVerification: true });
+         } else {
+           console.warn('[Checkout] Fallo en RPC Supabase, cambiando a MODO OFFLINE', err);
+           saleMode = 'offline';
+         }
        }
     } else {
        saleMode = 'offline';
@@ -112,7 +127,7 @@ export async function processSaleTransaction({
     const sale = {
         id: finalSaleId || crypto.randomUUID(),
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
-        status: saleMode === 'online' ? 'COMPLETADA' : 'PENDIENTE_SYNC',
+        status: saleMode === 'online' ? 'COMPLETADA' : (saleMode === 'pending_verification' ? 'PENDIENTE_VERIFICACION' : 'PENDIENTE_SYNC'),
         items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
         cartSubtotalUsd: cartSubtotalUsd,
         discountType: discountData?.type || null,
@@ -147,7 +162,15 @@ export async function processSaleTransaction({
     const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
     logEvent('VENTA', tipo, `Venta #${saleNumber} [${saleMode.toUpperCase()}] - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, user, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
 
-    // Deduct stock in local cache immediately
+    // ── CLIENT-SIDE STOCK DEDUCTION (optimistic UI only) ──
+    // NOTE: The RPC `process_checkout` handles authoritative stock deduction
+    // server-side within a transaction. This client-side deduction is ONLY for
+    // optimistic UI updates so the user sees stock counts change immediately.
+    // When the RPC succeeds (saleMode === 'online'), we skip client-side
+    // deduction to avoid double-counting — the server is the source of truth.
+    let updatedProducts = products;
+
+    if (saleMode !== 'online') {
     // Calculate total deductions per product ID
     const deductions = {};
     cart.forEach(item => {
@@ -166,7 +189,7 @@ export async function processSaleTransaction({
         }
     });
 
-    const updatedProducts = products.map(p => {
+    updatedProducts = products.map(p => {
         if (deductions[p.id]) {
             const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
             const newStock = (p.stock ?? 0) - deductions[p.id];
@@ -176,6 +199,7 @@ export async function processSaleTransaction({
     });
 
     await storageService.setItem('bodega_products_v1', updatedProducts);
+    }
 
     let updatedCustomer = null;
     let updatedCustomers = customers;
@@ -183,9 +207,14 @@ export async function processSaleTransaction({
     if (selectedCustomer) {
         const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
 
+        // Validate that the customer actually has enough saldo a favor
+        if (amount_favor_used > (selectedCustomer?.favor || 0) + EPSILON) {
+            return { success: false, error: 'Saldo a favor insuficiente' };
+        }
+
         const transaccionOpts = {
             usaSaldoFavor: amount_favor_used,
-            esCredito: fiadoAmountUsd > 0.009,
+            esCredito: fiadoAmountUsd > EPSILON,
             deudaGenerada: fiadoAmountUsd,
             vueltoParaMonedero: 0
         };

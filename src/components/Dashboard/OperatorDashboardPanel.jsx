@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
+import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 
 export default function OperatorDashboardPanel({ onNavigate }) {
     const { tables, activeSessions, config } = useTablesStore();
@@ -27,7 +27,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
             })
             .filter(data => data.remainingMin <= 15) // Solo mesas con 15min o menos, o negativas (vencidas)
             .sort((a, b) => a.remainingMin - b.remainingMin);
-    }, [activeSessions, now]);
+    }, [activeSessions, now]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // 2. Alertas de Inactividad (+45min sin pedidos nuevos en ordenes activas, excluyendo la hora de inicio de mesa de billar vacía)
     // Para simplificar, revisaremos la fecha "created_at" o "started_at" de la mesa vs la fecha del ultimo item.
@@ -81,7 +81,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
             }
             return null;
         }).filter(Boolean).sort((a, b) => b.totalUsd - a.totalUsd);
-    }, [activeSessions, orders, orderItems, now, config]);
+    }, [activeSessions, orders, orderItems, now, config]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const getTableName = (tableId) => {
         return tables.find(t => t.id === tableId)?.name || 'Mesa ?';

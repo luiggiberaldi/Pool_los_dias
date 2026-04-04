@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, EyeOff, Eye, CheckCircle, ShieldCheck, AlertTriangle, Loader2, Mail, LogIn } from 'lucide-react';
 import { supabaseCloud } from '../config/supabaseCloud';
-import { useAuthStore } from '../hooks/store/useAuthStore';
 
 // ─── Pantalla: Elegir nueva contraseña ────────────────────────────────────────
 function ChangePasswordScreen({ onPasswordChanged }) {
@@ -162,7 +161,6 @@ function ChangePasswordScreen({ onPasswordChanged }) {
 
 // ─── Pantalla: Login tras reseteo ─────────────────────────────────────────────
 function LoginAfterResetScreen({ onDone }) {
-    const setAdminCredentials = useAuthStore(s => s.setAdminCredentials);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPass, setShowPass] = useState(false);
@@ -183,8 +181,7 @@ function LoginAfterResetScreen({ onDone }) {
             });
             if (error) throw error;
 
-            // Guardar credenciales en el store para activar la sincronización P2P
-            setAdminCredentials(email.trim().toLowerCase(), password);
+            // Supabase session is now active; no credentials stored locally
             onDone();
         } catch (err) {
             setErrorMsg(err.message || 'Correo o contraseña incorrectos.');

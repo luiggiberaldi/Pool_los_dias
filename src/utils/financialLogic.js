@@ -9,7 +9,15 @@ export function procesarImpactoCliente(clienteInicial, transaccion) {
 
     // 0. Q0: CONSUMO DE SALDO A FAVOR
     if (usaSaldoFavor > 0) {
-        cliente.favor = round2(Math.max(0, subR((cliente.favor || 0), usaSaldoFavor)));
+        // Validate: cap usaSaldoFavor to available balance to prevent over-deduction
+        const disponible = round2(cliente.favor || 0);
+        const efectivo = Math.min(usaSaldoFavor, disponible);
+        if (usaSaldoFavor > disponible) {
+            console.warn(
+                `[financialLogic] usaSaldoFavor (${usaSaldoFavor}) excede saldo disponible (${disponible}). Capped to ${disponible}.`
+            );
+        }
+        cliente.favor = round2(subR(disponible, efectivo));
     }
 
     // 1. Q1: GENERACIÓN DE DEUDA

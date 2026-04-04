@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
 import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Send, Ban, Shuffle, Receipt, Search, X, Filter, Recycle, LockIcon } from 'lucide-react';
 import { storageService } from '../utils/storageService';
-import { formatBs, formatVzlaPhone } from '../utils/calculatorUtils';
+import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../config/paymentMethods';
 import { generateTicketPDF } from '../utils/ticketGenerator';
 import { useProductContext } from '../context/ProductContext';
@@ -25,7 +25,7 @@ const RANGE_OPTIONS = [
 ];
 
 
-export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive }) {
+export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, isActive }) {
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [allSales, setAllSales] = useState([]);
@@ -236,7 +236,7 @@ export default function ReportsView({ rates, triggerHaptic, onNavigate, isActive
                         <Calendar size={12} /> Ventas por Día
                     </h3>
                     <div className="flex items-end gap-1 h-24">
-                        {salesByDay.map((day, i) => {
+                        {salesByDay.map((day) => {
                             const pct = (day.total / maxDayTotal) * 100;
                             const dayLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('es-VE', { day: 'numeric', month: 'short' });
                             return (
@@ -603,26 +603,31 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
 
 function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale }) {
     const d = new Date(s.timestamp);
-    let methodLabel = 'Efectivo';
-    let PayMethodIcon = PAYMENT_ICONS['efectivo_bs'];
 
-    if (s.tipo === 'VENTA_FIADA') {
-        methodLabel = 'Por Cobrar';
-        PayMethodIcon = Clock;
-    } else if (s.payments && s.payments.length === 1) {
-        methodLabel = toTitleCase(s.payments[0].methodLabel);
-        const m = getPaymentMethod(s.payments[0].methodId);
-        if (m) PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
-    } else if (s.payments && s.payments.length > 1) {
-        methodLabel = 'Pago Mixto';
-        PayMethodIcon = Shuffle;
-    } else if (s.paymentMethod) {
-        const m = getPaymentMethod(s.paymentMethod);
-        if (m) {
-            methodLabel = toTitleCase(m.label);
-            PayMethodIcon = getPaymentIcon(m.id) || m.Icon || null;
+    const { methodLabel, PayMethodIcon } = useMemo(() => {
+        let label = 'Efectivo';
+        let icon = PAYMENT_ICONS['efectivo_bs'];
+
+        if (s.tipo === 'VENTA_FIADA') {
+            label = 'Por Cobrar';
+            icon = Clock;
+        } else if (s.payments && s.payments.length === 1) {
+            label = toTitleCase(s.payments[0].methodLabel);
+            const m = getPaymentMethod(s.payments[0].methodId);
+            if (m) icon = getPaymentIcon(m.id) || m.Icon || null;
+        } else if (s.payments && s.payments.length > 1) {
+            label = 'Pago Mixto';
+            icon = Shuffle;
+        } else if (s.paymentMethod) {
+            const m = getPaymentMethod(s.paymentMethod);
+            if (m) {
+                label = toTitleCase(m.label);
+                icon = getPaymentIcon(m.id) || m.Icon || null;
+            }
         }
-    }
+
+        return { methodLabel: label, PayMethodIcon: icon };
+    }, [s.tipo, s.payments, s.paymentMethod]);
 
     const isCanceled = s.status === 'ANULADA';
     const dateLabel = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });

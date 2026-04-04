@@ -6,7 +6,7 @@ export default function CartPanel({
     cart,
     effectiveRate,
     cartSubtotalUsd,
-    cartSubtotalBs,
+    cartSubtotalBs: _cartSubtotalBs,
     cartTotalUsd,
     cartTotalBs,
     cartItemCount,

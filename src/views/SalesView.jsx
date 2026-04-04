@@ -24,6 +24,7 @@ import KeyboardHelpModal from '../components/Sales/KeyboardHelpModal';
 import DiscountModal from '../components/Sales/DiscountModal';
 import CajaCerradaOverlay from '../components/Sales/CajaCerradaOverlay';
 import { getLocalISODate } from '../utils/dateHelpers';
+import { buildReceiptWhatsAppUrl } from '../components/Sales/ReceiptShareHelper';
 import AperturaCajaModal from '../components/Dashboard/AperturaCajaModal';
 
 import ConfirmModal from '../components/ConfirmModal';
@@ -36,12 +37,12 @@ import { useTablesStore } from '../hooks/store/useTablesStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 
-export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }) {
+export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, isActive }) {
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
-    const { notifySaleComplete, notifyLowStock } = useNotifications();
+    const { notifyLowStock } = useNotifications();
 
     // ── Global Context ──────────────────────────────────────
-    const { products, setProducts, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
 
     // ── State ──────────────────────────────────────
     const [customers, setCustomers] = useState([]);
@@ -54,7 +55,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
     const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
 
     // Apertura Caja
-    const [isAperturaOpen, setIsAperturaOpen] = useState(false);
     const [todayAperturaData, setTodayAperturaData] = useState(null);
 
     // Cart (from global context)
@@ -88,9 +88,11 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
     // Auto-select last item when cart length changes (if user was already interacting with the cart)
     useEffect(() => {
-        if (cart.length > 0 && cartSelectedIndex !== -1) {
-            setCartSelectedIndex(Math.min(cartSelectedIndex, cart.length - 1));
-        } else if (cart.length === 0) {
+        if (cart.length > 0) {
+            setCartSelectedIndex(prev =>
+                prev !== -1 ? Math.min(prev, cart.length - 1) : prev
+            );
+        } else {
             setCartSelectedIndex(-1);
         }
     }, [cart.length]);
@@ -280,7 +282,8 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
         };
         load();
         return () => { mounted = false; };
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cartRef, setCart]);
 
     // Handle pending navigation from recycled cart (replaces old localStorage approach)
     useEffect(() => {
@@ -466,7 +469,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             searchInputRef.current?.blur();
             setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / - 
         }, 50);
-    }, [triggerHaptic, effectiveRate]);
+    }, [triggerHaptic, effectiveRate, playAdd, playError, products, cartRef, setCart]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
@@ -728,33 +731,6 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
             </div>
         );
     }
-    const handleSaveApertura = async (data) => {
-        try {
-            const today = new Date().toISOString();
-            const aperturaRecord = {
-                id: `apertura_${Date.now()}`,
-                tipo: 'APERTURA_CAJA',
-                openingUsd: data.openingUsd,
-                openingBs: data.openingBs,
-                timestamp: today,
-                cajaCerrada: false
-            };
-
-            const existingSales = await storageService.getItem(SALES_KEY, []);
-            const updatedSales = [...existingSales, aperturaRecord];
-            
-            await storageService.setItem(SALES_KEY, updatedSales);
-            setTodayAperturaData(aperturaRecord);
-            setIsAperturaOpen(false);
-            showToast('Caja abierta exitosamente', 'success');
-            if (triggerHaptic) triggerHaptic();
-
-        } catch (error) {
-            console.error('Error al guardar apertura:', error);
-            showToast('Error al abrir la caja', 'error');
-            if (playError) playError();
-        }
-    };
 
     // ── Render ─────────────────────────────────────
     return (
@@ -775,7 +751,7 @@ export default function SalesView({ rates, triggerHaptic, onNavigate, isActive }
 
             {!todayAperturaData ? (
                 <CajaCerradaOverlay 
-                    cartCount={cartRef.current.length}
+                    cartCount={cart.length}
                     onOpenApertura={() => onNavigate && onNavigate('inicio')} 
                 />
             ) : (

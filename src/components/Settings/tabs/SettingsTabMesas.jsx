@@ -5,13 +5,14 @@ import { useTablesStore } from '../../../hooks/store/useTablesStore';
 import ConfirmModal from '../../ConfirmModal';
 
 function useBcvRate() {
-    const [rate, setRate] = useState(1);
-    useEffect(() => {
+    const [rate, setRate] = useState(() => {
         try {
             const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-            if (saved?.bcv?.price) setRate(saved.bcv.price);
+            if (saved?.bcv?.price) return saved.bcv.price;
         } catch {}
-        
+        return 1;
+    });
+    useEffect(() => {
         const handleStorage = () => {
              try {
                 const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
@@ -28,13 +29,35 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const { config, updateConfig, tables, addTable, updateTable, deleteTable } = useTablesStore();
     const bcvRate = useBcvRate();
     
-    // Config State
+    // Config State — synced from store config
     const [pricePerHour, setPricePerHour] = useState(config?.pricePerHour || 0);
     const [pricePina, setPricePina] = useState(config?.pricePina || 0);
 
+    // Sync local state when external config changes (e.g., from another tab/device)
+    const configPricePerHour = config?.pricePerHour;
+    const configPricePina = config?.pricePina;
+    useEffect(() => {
+        const raf = requestAnimationFrame(() => {
+            if (configPricePerHour != null) setPricePerHour(configPricePerHour);
+            if (configPricePina != null) setPricePina(configPricePina);
+        });
+        return () => cancelAnimationFrame(raf);
+    }, [configPricePerHour, configPricePina]);
+
     // Form State for new/edit table
     const [isEditing, setIsEditing] = useState(null);
-    const [tableName, setTableName] = useState('');
+    const [tableName, setTableName] = useState(() => {
+        let maxNum = 0;
+        const currentTables = useTablesStore.getState().tables;
+        currentTables.forEach(t => {
+            const match = t.name.match(/\d+/);
+            if (match) {
+                const num = parseInt(match[0], 10);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+        return `Mesa ${maxNum + 1}`;
+    });
     const [tableType, setTableType] = useState('POOL');
     const [isSaving, setIsSaving] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
@@ -52,19 +75,16 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
         return `Mesa ${maxNum + 1}`;
     };
 
+    // Auto-fill next table name when tables change and we're not editing
+    const tablesLength = tables.length;
     useEffect(() => {
-        if (config) {
-            setPricePerHour(config.pricePerHour);
-            setPricePina(config.pricePina);
+        if (!isEditing) {
+            const raf = requestAnimationFrame(() => {
+                setTableName(getNextTableName());
+            });
+            return () => cancelAnimationFrame(raf);
         }
-    }, [config]);
-
-    // Auto-fill next table name when not editing and not typed yet
-    useEffect(() => {
-        if (!isEditing && tableName === '') {
-            setTableName(getNextTableName());
-        }
-    }, [tables, isEditing]);
+    }, [tablesLength]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSaveConfig = async () => {
         await updateConfig({

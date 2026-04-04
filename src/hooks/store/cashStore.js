@@ -53,8 +53,20 @@ export const useCashStore = create((set, get) => ({
 
             if (data) {
                 // ✅ Hay sesión activa en la nube — sincronizar
-                await cashCache.setItem('active_cash_session', data);
-                set({ activeCashSession: data });
+                // Restaurar base_bs desde el campo 'notes' donde se persiste
+                let enrichedData = { ...data };
+                if (data.notes) {
+                    try {
+                        const parsed = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes;
+                        if (parsed?.base_bs !== undefined) {
+                            enrichedData.base_bs = parsed.base_bs;
+                        }
+                    } catch {
+                        // notes no es JSON válido — ignorar
+                    }
+                }
+                await cashCache.setItem('active_cash_session', enrichedData);
+                set({ activeCashSession: enrichedData });
             } else {
                 // ⚠️  La nube devolvió null. Puede ser:
                 //   (a) No hay sesión abierta (correcto → limpiar local)
@@ -79,12 +91,15 @@ export const useCashStore = create((set, get) => ({
                         set({ activeCashSession: null });
                     } else if (!specificError && specificSession === null) {
                         // La sesión no existe en la nube en absoluto (fue de otro día/cuenta)
-                        // Solo limpiamos si la sesión local es muy antigua (> 24 horas)
+                        // Si la sesión local es muy antigua (> 24 horas), marcarla como stale
+                        // pero NO borrarla — el usuario debe cerrarla explícitamente
                         const openedAt = new Date(cachedSession.opened_at).getTime();
                         const hoursAgo = (Date.now() - openedAt) / 1000 / 3600;
-                        if (hoursAgo > 24) {
-                            await cashCache.removeItem('active_cash_session');
-                            set({ activeCashSession: null });
+                        if (hoursAgo > 24 && !cachedSession.stale) {
+                            console.warn('[Caja] La sesión local lleva más de 24 horas abierta y no se encontró en la nube. Marcada como stale. El usuario debe cerrarla manualmente.');
+                            const staleSession = { ...cachedSession, stale: true };
+                            await cashCache.setItem('active_cash_session', staleSession);
+                            set({ activeCashSession: staleSession });
                         }
                         // Si < 24 horas y no se encuentra, puede ser un problema de RLS → mantener
                     }
@@ -141,7 +156,7 @@ export const useCashStore = create((set, get) => ({
             opened_at: new Date().toISOString(),
             opened_by: openedBy,
             base_usd: baseUsd || 0,
-            base_bs: baseBs || 0,   // Solo en caché local (columna no existe en Supabase)
+            base_bs: baseBs || 0,
             status: 'OPEN'
         };
 
@@ -150,12 +165,14 @@ export const useCashStore = create((set, get) => ({
         set({ activeCashSession: sessionPayload });
 
         // Payload para Supabase: SOLO columnas que existen en el schema de la tabla
+        // base_bs se persiste dentro del campo 'notes' (JSONB/text) ya que la columna no existe
         const supabasePayload = {
             id: sessionPayload.id,
             opened_at: sessionPayload.opened_at,
             opened_by: sessionPayload.opened_by,
             base_usd: sessionPayload.base_usd,
             status: sessionPayload.status,
+            notes: JSON.stringify({ base_bs: sessionPayload.base_bs }),
         };
 
         try {

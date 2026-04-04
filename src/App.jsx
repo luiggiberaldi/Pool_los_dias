@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
 import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X, Settings, Layers } from 'lucide-react';
 
 import SalesView from './views/SalesView';
@@ -161,7 +161,7 @@ export default function App() {
   
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
-  const { rates, loading, isOffline, updateData } = useRates();
+  const { rates } = useRates();
   const { deviceId } = useSecurity();
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(false, false, deviceId);
@@ -269,23 +269,9 @@ export default function App() {
   }, []);
 
   // === Auth Local via PIN ===
-  const { isAuthenticated, role, currentUser } = useAuthStore();
-  const isCajero = role === 'CAJERO';
+  const { isAuthenticated, role } = useAuthStore();
 
   const confirm = useConfirm();
-
-  const handleLogout = async () => {
-    const ok = await confirm({
-      title: 'Cerrar sesión',
-      message: 'Se cerrará tu sesión en la nube. Tendrás que iniciar sesión nuevamente para acceder a la aplicación.',
-      confirmText: 'Cerrar sesión',
-      cancelText: 'Cancelar',
-      variant: 'logout',
-    });
-    if (!ok) return;
-    await supabaseCloud.auth.signOut();
-    setCloudSession(null);
-  };
 
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
@@ -301,11 +287,10 @@ export default function App() {
                role === 'CAJERO' ? ALL_TABS.filter(t => !t.adminOnly && !t.hiddenForCajero) : 
                ALL_TABS.filter(t => !t.adminOnly && !t.adminOrCashier && !t.hiddenForMesero);
 
-  // Auto-redirect CAJERO away from mesas (they use SalesView with TableQueuePanel)
-  useEffect(() => {
-    if (role === 'CAJERO' && activeTab === 'mesas') {
-        setActiveTab('ventas');
-    }
+  // Auto-redirect CAJERO away from mesas (derive effective tab instead of setState in effect)
+  const effectiveTab = useMemo(() => {
+    if (role === 'CAJERO' && activeTab === 'mesas') return 'ventas';
+    return activeTab;
   }, [role, activeTab]);
 
   // Global Hard Gate: Loading State
@@ -379,15 +364,15 @@ export default function App() {
         ></div>
 
         {/* Eager views — always mounted, visibility toggled via CSS */}
-        <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'ventas' ? '' : 'hidden'}`}>
+        <div className={`flex-1 min-h-0 flex flex-col ${effectiveTab === 'ventas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AnyStaffRoute>
-              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'ventas'} />
+              <SalesView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={effectiveTab === 'ventas'} />
             </AnyStaffRoute>
           </ErrorBoundary>
         </div>
 
-        <div className={`flex-1 flex flex-col ${activeTab === 'catalogo' ? '' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col ${effectiveTab === 'catalogo' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AdminRoute>
               <ProductsView rates={rates} triggerHaptic={triggerHaptic} />
@@ -395,39 +380,39 @@ export default function App() {
           </ErrorBoundary>
         </div>
 
-        <div className={`flex-1 flex flex-col ${activeTab === 'inicio' ? '' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col ${effectiveTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AnyStaffRoute>
-              <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={activeTab === 'inicio'} />
+              <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={effectiveTab === 'inicio'} />
             </AnyStaffRoute>
           </ErrorBoundary>
         </div>
 
         {/* Mesas de Pool / Cola de Cobros */}
-        <div className={`flex-1 flex flex-col ${activeTab === 'mesas' ? '' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col ${effectiveTab === 'mesas' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AnyStaffRoute>
-              <TablesView triggerHaptic={triggerHaptic} isActive={activeTab === 'mesas'} />
+              <TablesView triggerHaptic={triggerHaptic} isActive={effectiveTab === 'mesas'} />
             </AnyStaffRoute>
           </ErrorBoundary>
         </div>
 
         {/* Lazy views — mount on first access, then stay persistent */}
         <Suspense fallback={<div className="flex-1 p-4 space-y-4"><div className="skeleton h-10 w-40" /><div className="skeleton h-32" /><div className="skeleton h-48" /></div>}>
-          {(activeTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
-            <div data-view="clientes" className={`flex-1 flex flex-col ${activeTab === 'clientes' ? '' : 'hidden'}`}>
+          {(effectiveTab === 'clientes' || document.querySelector('[data-view="clientes"]')) && (
+            <div data-view="clientes" className={`flex-1 flex flex-col ${effectiveTab === 'clientes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <CashierRoute>
-                  <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={activeTab === 'clientes'} />
+                  <CustomersView triggerHaptic={triggerHaptic} rates={rates} isActive={effectiveTab === 'clientes'} />
                 </CashierRoute>
               </ErrorBoundary>
             </div>
           )}
-          {(activeTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
-            <div data-view="reportes" className={`flex-1 flex flex-col ${activeTab === 'reportes' ? '' : 'hidden'}`}>
+          {(effectiveTab === 'reportes' || document.querySelector('[data-view="reportes"]')) && (
+            <div data-view="reportes" className={`flex-1 flex flex-col ${effectiveTab === 'reportes' ? '' : 'hidden'}`}>
               <ErrorBoundary>
                 <AdminRoute>
-                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={activeTab === 'reportes'} />
+                  <ReportsView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} isActive={effectiveTab === 'reportes'} />
                 </AdminRoute>
               </ErrorBoundary>
             </div>
@@ -435,7 +420,7 @@ export default function App() {
         </Suspense>
 
         {/* Settings — mounted as tab inside providers */}
-        <div className={`flex-1 flex flex-col min-h-0 ${activeTab === 'ajustes' ? '' : 'hidden'}`}>
+        <div className={`flex-1 flex flex-col min-h-0 ${effectiveTab === 'ajustes' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AdminRoute>
               <SettingsView
@@ -467,22 +452,22 @@ export default function App() {
             {TABS.map(tab => (
               <TabButton
                 key={tab.id}
-                icon={<tab.icon size={18} strokeWidth={activeTab === tab.id ? 3 : 2} />}
+                icon={<tab.icon size={18} strokeWidth={effectiveTab === tab.id ? 3 : 2} />}
                 label={tab.label}
-                isActive={activeTab === tab.id}
+                isActive={effectiveTab === tab.id}
                 onClick={() => { triggerHaptic(); setActiveTab(tab.id); }}
                 data-tour={`tab-${tab.id}`}
               />
             ))}
 
-            {installPrompt && activeTab === 'inicio' && (
+            {installPrompt && effectiveTab === 'inicio' && (
               <button onClick={() => { triggerHaptic(); handleInstall(); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-brand text-white shadow-md animate-pulse">
                 <Download size={20} strokeWidth={3} />
               </button>
             )}
 
             {/* iOS: botón manual de instalación */}
-            {!installPrompt && showIOSButton && activeTab === 'inicio' && (
+            {!installPrompt && showIOSButton && effectiveTab === 'inicio' && (
               <button onClick={() => { triggerHaptic(); setShowIOSInstall(true); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-xl transition-all duration-300 bg-brand text-white shadow-md animate-pulse">
                 <Download size={20} strokeWidth={3} />
               </button>

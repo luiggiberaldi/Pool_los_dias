@@ -1,3 +1,5 @@
+import { round2 } from './dinero';
+
 export function calculateElapsedTime(startTimeISO) {
     const start = new Date(startTimeISO);
     const now = new Date();
@@ -16,14 +18,13 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
 
     if (gameMode === 'NORMAL') {
         const pricePerHour = config.pricePerHour || 0;
-        
+
         if (elapsedMinutes <= 0 && hoursPaid <= 0) return 0;
-        
-        const billedHours = Math.ceil(elapsedMinutes / 60);
-        // Si hay horas pagadas, siempre se cobra el mínimo de las horas pagadas. Si se pasa, cobra las extra
-        const finalHours = Math.max(billedHours, hoursPaid);
-        
-        return finalHours * pricePerHour;
+
+        // Pro-rata billing: charge exact fractional hours instead of rounding up
+        const billedHours = Math.max(elapsedMinutes / 60, hoursPaid);
+
+        return round2(billedHours * pricePerHour);
     }
 
     return 0;

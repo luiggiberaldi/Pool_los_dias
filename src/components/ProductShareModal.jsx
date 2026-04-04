@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Modal } from './Modal';
 import { Copy, Share2, Check, Smartphone, Building2, Wallet } from 'lucide-react';
 import { formatBs, formatUsd, smartCashRounding } from '../utils/calculatorUtils';
 
 export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, streetRate }) => {
-    const [selectedAccountId, setSelectedAccountId] = useState('');
+    const [selectedAccountId, setSelectedAccountId] = useState(() =>
+        accounts?.length > 0 ? accounts[0].id : ''
+    );
     const [config, setConfig] = useState({
         showUsdt: true,
         showEfectivo: true,
@@ -13,12 +15,14 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
         showRefEuro: false
     });
 
-    // Auto-seleccionar primera cuenta al abrir
+    // Auto-seleccionar primera cuenta al abrir (tracked via effect, not during render)
+    const wasOpenRef = useRef(false);
     useEffect(() => {
-        if (isOpen && accounts.length > 0 && !selectedAccountId) {
+        if (isOpen && !wasOpenRef.current && accounts.length > 0 && !selectedAccountId) {
             setSelectedAccountId(accounts[0].id);
         }
-    }, [isOpen, accounts]);
+        wasOpenRef.current = isOpen;
+    }, [isOpen, accounts, selectedAccountId]);
 
     if (!product) return null;
 

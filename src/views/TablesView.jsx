@@ -21,7 +21,7 @@ function FilterPill({ label, active, onClick }) {
     );
 }
 
-export default function TablesView({ triggerHaptic, isActive }) {
+export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) {
     const { tables, activeSessions, loading, syncTablesAndSessions } = useTablesStore();
 
     const [typeFilter,   setTypeFilter]   = useState('Todas');

@@ -80,7 +80,7 @@ export default function WalletView({ rates }) {
 
     // Estado del Modal de Cobro
     const [amountBs, setAmountBs] = useState('');
-    const [selectedRate, setSelectedRate] = useState('bcv');
+    const [selectedRate, _setSelectedRate] = useState('bcv');
 
     // Save accounts to storageService (IndexedDB) whenever they change
     useEffect(() => {

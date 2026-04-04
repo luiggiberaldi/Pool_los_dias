@@ -26,6 +26,7 @@ import { useCashStore } from '../hooks/store/cashStore';
 import { useAudit } from '../hooks/useAudit';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
+import { shareSaleWhatsApp } from '../utils/dashboardActions';
 
 import Skeleton from '../components/Skeleton';
 
@@ -42,9 +43,6 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     // Legacy Config checking
     const requireLogin = useLegacyAuthStore(s => s.requireLogin ?? false);
-    const adminEmail = useLegacyAuthStore(s => s.adminEmail);
-    const adminPassword = useLegacyAuthStore(s => s.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
     const { log: auditLog } = useAudit();
     const confirm = useConfirm();
     const [sales, setSales] = useState([]);

@@ -23,13 +23,15 @@ export default function TableCard({ table, session }) {
     const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest } = useTablesStore();
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
-    const [elapsed, setElapsed] = useState(0);
-    const [showOrderPanel, setShowOrderPanel] = useState(false);
-
 
     const isAvailable = !session || session.status === 'CLOSED';
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
     const isCheckoutPending = session?.status === 'CHECKOUT';
+
+    const [elapsed, setElapsed] = useState(() =>
+        isPlaying && session?.started_at ? calculateElapsedTime(session.started_at) : 0
+    );
+    const [showOrderPanel, setShowOrderPanel] = useState(false);
 
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -66,19 +68,27 @@ export default function TableCard({ table, session }) {
     // Live Timer Update
     useEffect(() => {
         let interval;
-        if (isPlaying && session.started_at) {
-            // Initial sync
-            setElapsed(calculateElapsedTime(session.started_at));
-            
-            // Re-calculate every 30 secs instead of 1 sec to save renders
+        if (isPlaying && session?.started_at) {
+            // Use rAF for initial sync to avoid synchronous setState in effect
+            const raf = requestAnimationFrame(() => {
+                setElapsed(calculateElapsedTime(session.started_at));
+            });
+
+            // Re-calculate every second so the timer feels live for customers watching
             interval = setInterval(() => {
                 setElapsed(calculateElapsedTime(session.started_at));
-            }, 30000);
-        } else {
-            setElapsed(0);
-        }
+            }, 1000);
 
-        return () => clearInterval(interval);
+            return () => {
+                cancelAnimationFrame(raf);
+                clearInterval(interval);
+            };
+        } else {
+            const raf = requestAnimationFrame(() => {
+                setElapsed(0);
+            });
+            return () => cancelAnimationFrame(raf);
+        }
     }, [isPlaying, session?.started_at]);
 
     const handleStartNormal = async (hours = 0) => {

@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { storageService } from '../utils/storageService';
-import { useAuthStore } from './store/useAuthStore';
 
 const SYNC_KEYS = [
     'bodega_products_v1',
@@ -11,7 +10,6 @@ const SYNC_KEYS = [
     'monitor_rates_v12',
     'bodega_accounts_v2',
     'abasto_audit_log_v1',
-    'abasto-auth-storage',
     'bodega_custom_rate',
     'bodega_use_auto_rate',
     'tasa_cop',
@@ -244,7 +242,7 @@ async function _applyFromCloud(docId, collection, payload) {
                 storageArea: localStorage
               }));
             if (docId === 'abasto-auth-storage') {
-                useAuthStore.persist.rehydrate();
+                // Auth storage is no longer synced to cloud - skip rehydration
             }
         } else {
             // Use storageService directly (consistent localforage instance, avoids config issues)
@@ -296,10 +294,19 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
 }
 
 export function useCloudSync() {
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+    const [isCloudConfigured, setIsCloudConfigured] = useState(false);
     const isInitialized = useRef(false);
+
+    // Check Supabase session to determine cloud configuration status
+    useEffect(() => {
+        supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+            setIsCloudConfigured(!!session);
+        }).catch(() => {});
+        const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((_event, session) => {
+            setIsCloudConfigured(!!session);
+        });
+        return () => subscription.unsubscribe();
+    }, []);
 
     useEffect(() => {
         if (!isCloudConfigured) {
@@ -393,7 +400,7 @@ export function useCloudSync() {
         };
 
         initSync();
-    }, [isCloudConfigured, adminEmail, adminPassword]);
+    }, [isCloudConfigured]);
 
     return {
         forcePullFromCloud,

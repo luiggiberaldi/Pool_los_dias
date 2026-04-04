@@ -9,8 +9,8 @@ export default function BulkPriceAdjustModal({
     products,
     setProducts,
     categories,
-    activeCategory,
-    effectiveRate,
+    activeCategory: _activeCategory,
+    effectiveRate: _effectiveRate,
     triggerHaptic,
     showToast,
 }) {
@@ -91,7 +91,6 @@ export default function BulkPriceAdjustModal({
     };
 
     const isUp = direction === 'up';
-    const accentColor = isUp ? 'emerald' : 'red';
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">

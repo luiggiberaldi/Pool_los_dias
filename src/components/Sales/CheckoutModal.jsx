@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { X, Users, Receipt, ChevronDown, Wallet, Zap, UserPlus, Check, ArrowLeftRight, AlertTriangle, Clock, Coffee, Layers } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 import { round2, mulR, divR, subR, sumR } from '../../utils/dinero';
+
+const EPSILON = 0.01;
 
 /**
  * CheckoutModal — Zona de Cobro con Barras de Pago (Estilo Pool Los Diaz)
@@ -42,6 +44,7 @@ export default function CheckoutModal({
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
     const [confirmFiar, setConfirmFiar] = useState(false);
+    const submittingRef = useRef(false);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
@@ -51,7 +54,7 @@ export default function CheckoutModal({
             const val = parseFloat(barValues[m.id]) || 0;
             if (val === 0) return 0;
             if (m.currency === 'USD') return round2(val);
-            if (m.currency === 'COP') return divR(val, tasaCop);
+            if (m.currency === 'COP') return tasaCop ? divR(val, tasaCop) : 0;
             return divR(val, effectiveRate);
         });
         return sumR(amounts);
@@ -62,7 +65,7 @@ export default function CheckoutModal({
             const val = parseFloat(barValues[m.id]) || 0;
             if (val === 0) return 0;
             if (m.currency === 'BS') return round2(val);
-            if (m.currency === 'COP') return mulR(divR(val, tasaCop), effectiveRate);
+            if (m.currency === 'COP') return tasaCop ? mulR(divR(val, tasaCop), effectiveRate) : 0;
             return mulR(val, effectiveRate);
         });
         return sumR(amounts);
@@ -73,7 +76,7 @@ export default function CheckoutModal({
     
     const changeUsd = round2(Math.max(0, subR(totalPaidUsd, cartTotalUsd)));
     const changeBs = round2(Math.max(0, subR(totalPaidBs, cartTotalBs)));
-    const isPaid = remainingUsd < 0.009;
+    const isPaid = remainingUsd < EPSILON;
 
     // -- Handlers --
     const handleBarChange = useCallback((methodId, value) => {
@@ -91,7 +94,7 @@ export default function CheckoutModal({
         if (currency === 'USD') {
             val = remainingUsd > 0 ? round2(remainingUsd).toString() : null;
         } else if (currency === 'COP') {
-            val = remainingUsd > 0 ? mulR(remainingUsd, tasaCop).toString() : null;
+            val = remainingUsd > 0 && tasaCop ? mulR(remainingUsd, tasaCop).toString() : null;
         } else {
             val = remainingBs > 0 ? round2(remainingBs).toString() : null;
         }
@@ -101,31 +104,37 @@ export default function CheckoutModal({
     }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
 
     // Construir payments[] desde barValues al confirmar
-    const handleConfirm = useCallback(() => {
-        triggerHaptic && triggerHaptic();
-        const payments = paymentMethods
-            .filter(m => parseFloat(barValues[m.id]) > 0)
-            .map(m => {
-                const amount = round2(parseFloat(barValues[m.id]));
-                return {
-                    id: crypto.randomUUID(),
-                    methodId: m.id,
-                    methodLabel: m.label,
-                    currency: m.currency,
-                    amountInput: amount,
-                    amountInputCurrency: m.currency,
-                    amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? divR(amount, tasaCop) : divR(amount, effectiveRate),
-                    amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? mulR(divR(amount, tasaCop), effectiveRate) : mulR(amount, effectiveRate),
-                };
-            });
-        const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
-        const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
+    const handleConfirm = useCallback(async () => {
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+        try {
+            triggerHaptic && triggerHaptic();
+            const payments = paymentMethods
+                .filter(m => parseFloat(barValues[m.id]) > 0)
+                .map(m => {
+                    const amount = round2(parseFloat(barValues[m.id]));
+                    return {
+                        id: crypto.randomUUID(),
+                        methodId: m.id,
+                        methodLabel: m.label,
+                        currency: m.currency,
+                        amountInput: amount,
+                        amountInputCurrency: m.currency,
+                        amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? (tasaCop ? divR(amount, tasaCop) : 0) : divR(amount, effectiveRate),
+                        amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? (tasaCop ? mulR(divR(amount, tasaCop), effectiveRate) : 0) : mulR(amount, effectiveRate),
+                    };
+                });
+            const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
+            const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
 
-        onConfirmSale(payments, {
-            changeUsdGiven: round2(Math.min(defaultUsdChange, changeUsd)),
-            changeBsGiven: round2(Math.min(defaultBsChange, mulR(changeUsd, effectiveRate))),
-        });
-    }, [barValues, paymentMethods, effectiveRate, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
+            await onConfirmSale(payments, {
+                changeUsdGiven: round2(Math.min(defaultUsdChange, changeUsd)),
+                changeBsGiven: round2(Math.min(defaultBsChange, mulR(changeUsd, effectiveRate))),
+            });
+        } finally {
+            submittingRef.current = false;
+        }
+    }, [barValues, paymentMethods, effectiveRate, tasaCop, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
 
     // Saldo a favor
     const handleSaldoFavor = useCallback(() => {
@@ -194,7 +203,7 @@ export default function CheckoutModal({
         const hasValue = parseFloat(val) > 0;
         const equivUsd = method.currency === 'BS' && hasValue
             ? (parseFloat(val) / effectiveRate).toFixed(2)
-            : method.currency === 'COP' && hasValue
+            : method.currency === 'COP' && hasValue && tasaCop
             ? (parseFloat(val) / tasaCop).toFixed(2)
             : null;
 
@@ -316,7 +325,7 @@ export default function CheckoutModal({
                         </span>
                         {copEnabled && (
                             <span className="block text-sm sm:text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                COP {(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                COP {(cartTotalUsd * (tasaCop || 0)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                         )}
                     </div>
@@ -390,14 +399,14 @@ export default function CheckoutModal({
                                 {copEnabled && (
                                     <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'
                                         }`}>
-                                        COP {isPaid ? (changeUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        COP {isPaid ? (changeUsd * (tasaCop || 0)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * (tasaCop || 0)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 )}
                             </div>
                         </div>
 
                         {/* DESGLOSE DE VUELTO — solo visible cuando hay vuelto */}
-                        {isPaid && changeUsd > 0.009 && (
+                        {isPaid && changeUsd >= EPSILON && (
                             <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800 space-y-2">
                                 <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
                                     <ArrowLeftRight size={10} />
@@ -417,7 +426,7 @@ export default function CheckoutModal({
                                                 const v = e.target.value;
                                                 const usd = Math.min(Math.max(0, parseFloat(v) || 0), changeUsd);
                                                 setChangeUsdGiven(v);
-                                                setChangeBsGiven(Math.max(0, (changeUsd - usd) * effectiveRate).toFixed(0));
+                                                setChangeBsGiven(Math.max(0, mulR(subR(changeUsd, usd), effectiveRate)).toFixed(0));
                                             }}
                                             className="w-full py-2 px-3 pr-10 rounded-lg border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
                                         />
@@ -435,10 +444,10 @@ export default function CheckoutModal({
                                             value={changeBsGiven}
                                             onChange={e => {
                                                 const v = e.target.value;
-                                                const bsTotal = changeUsd * effectiveRate;
+                                                const bsTotal = mulR(changeUsd, effectiveRate);
                                                 const bs = Math.min(Math.max(0, parseFloat(v) || 0), bsTotal);
                                                 setChangeBsGiven(v);
-                                                setChangeUsdGiven(Math.max(0, changeUsd - bs / effectiveRate).toFixed(2));
+                                                setChangeUsdGiven(Math.max(0, subR(changeUsd, divR(bs, effectiveRate))).toFixed(2));
                                             }}
                                             className="w-full py-2 px-3 pr-8 rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
                                         />
@@ -454,7 +463,7 @@ export default function CheckoutModal({
                                         Todo $
                                     </button>
                                     <button
-                                        onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven((changeUsd * effectiveRate).toFixed(0)); }}
+                                        onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven(mulR(changeUsd, effectiveRate).toFixed(0)); }}
                                         className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:scale-95 transition-all border border-blue-200 dark:border-blue-800"
                                     >
                                         Todo Bs
@@ -603,7 +612,7 @@ export default function CheckoutModal({
                     </div>
 
                 {/* Saldo a Favor */}
-                {selectedCustomer?.deuda < -0.01 && remainingUsd > 0.01 && (
+                {selectedCustomer?.deuda < -EPSILON && remainingUsd >= EPSILON && (
                     <div className="px-3 py-1">
                         <button
                             onClick={handleSaldoFavor}
@@ -619,14 +628,14 @@ export default function CheckoutModal({
             <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                     onClick={() => {
-                        if (!isPaid && selectedCustomerId && remainingUsd > 0.01) {
+                        if (!isPaid && selectedCustomerId && remainingUsd >= EPSILON) {
                             triggerHaptic && triggerHaptic();
                             setConfirmFiar(true);
                         } else {
                             handleConfirm();
                         }
                     }}
-                    disabled={!selectedCustomerId && remainingUsd > 0.01}
+                    disabled={!selectedCustomerId && remainingUsd >= EPSILON}
                     className={`w-full py-4 text-white font-black text-base rounded-2xl shadow-lg transition-all tracking-wide flex items-center justify-center gap-2 ${isPaid
                         ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25 active:scale-[0.98]'
                         : selectedCustomerId
@@ -671,17 +680,17 @@ export default function CheckoutModal({
                                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
                                     Se registrara como deuda a nombre de <span className="font-black text-slate-800 dark:text-white">{selectedCustomer?.name}</span>.
                                 </p>
-                                {totalPaidUsd > 0.01 && (
+                                {totalPaidUsd > EPSILON && (
                                     <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
                                         El cliente abona <span className="font-bold text-emerald-600">${totalPaidUsd.toFixed(2)}</span> ahora y el restante queda pendiente.
                                     </p>
                                 )}
-                                {totalPaidUsd <= 0.01 && (
+                                {totalPaidUsd <= EPSILON && (
                                     <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
                                         El monto total de la venta quedara como deuda del cliente.
                                     </p>
                                 )}
-                                {selectedCustomer && (selectedCustomer.deuda || 0) > 0.01 && (
+                                {selectedCustomer && (selectedCustomer.deuda || 0) > EPSILON && (
                                     <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-2.5 mt-2">
                                         <p className="text-[11px] sm:text-xs font-bold text-red-600 dark:text-red-400">
                                             Este cliente ya tiene una deuda de ${(selectedCustomer.deuda || 0).toFixed(2)}. La deuda total pasara a ser ${((selectedCustomer.deuda || 0) + remainingUsd).toFixed(2)}.

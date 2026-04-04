@@ -53,8 +53,15 @@ export class FinancialEngine {
         
         // Sum the profit of each individual item (Revenue - Cost)
         const itemProfits = sale.items.map(item => {
+            // Guard: skip items with missing or invalid qty
+            const qty = Number(item.qty);
+            if (qty === undefined || item.qty === null || isNaN(qty)) {
+                console.warn(`[FinancialEngine] Item "${item.name || item.id}" has invalid qty (${item.qty}), treating as 0.`);
+                return 0;
+            }
+
             let costBs = 0;
-            
+
             if (item.costUsd) {
                 costBs = mulR(item.costUsd, saleRate);
             } else if (item.costBs) {
@@ -71,14 +78,18 @@ export class FinancialEngine {
             }
             
             // Revenue = price * qty * rate (rounded at each step)
-            const itemRevenueBs = mulR(mulR(item.priceUsd, item.qty), saleRate);
-            const itemCostBs = mulR(costBs, item.qty);
+            const itemRevenueBs = mulR(mulR(item.priceUsd, qty), saleRate);
+            const itemCostBs = mulR(costBs, qty);
             return subR(itemRevenueBs, itemCostBs);
         });
 
         const itemsProfit = sumR(itemProfits);
 
         // Subtract the global cart discount spread (represented in Bs)
+        // NOTE: Discount is intentionally converted using the sale's own exchange rate
+        // (saleRate) captured at transaction time. Even if the sale has mixed-currency
+        // payments, the discount was agreed upon in USD at this rate, so applying it
+        // uniformly here is correct and consistent with the receipt.
         const discountBs = mulR((sale.discountAmountUsd || 0), saleRate);
         
         return subR(itemsProfit, discountBs);

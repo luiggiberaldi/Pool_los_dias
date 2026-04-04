@@ -3,14 +3,8 @@ import React, { useState, useEffect } from 'react';
 export default function SpotlightTour({ steps, onComplete }) {
     const [currentStep, setCurrentStep] = useState(0);
     const [rect, setRect] = useState(null);
-    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
-    useEffect(() => {
-        if (!isMounted) return;
         const updateRect = () => {
              const targetSelector = steps[currentStep]?.target;
              if (!targetSelector) {
@@ -34,9 +28,9 @@ export default function SpotlightTour({ steps, onComplete }) {
             clearTimeout(t);
             window.removeEventListener('resize', updateRect);
         };
-    }, [currentStep, steps, isMounted]);
+    }, [currentStep, steps]);
 
-    if (!rect || !isMounted) return null;
+    if (!rect) return null;
 
     const isCenter = rect === 'center';
 

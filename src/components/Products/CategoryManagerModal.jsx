@@ -8,8 +8,8 @@ export default function CategoryManagerModal({
     categories,
     newCategoryName,
     setNewCategoryName,
-    newCategoryIcon,
-    setNewCategoryIcon,
+    newCategoryIcon: _newCategoryIcon,
+    setNewCategoryIcon: _setNewCategoryIcon,
     onAddCategory,
     onDeleteCategory,
     onEditCategory

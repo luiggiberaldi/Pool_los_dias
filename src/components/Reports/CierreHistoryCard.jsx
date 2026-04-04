@@ -4,7 +4,7 @@ import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase, PAYMENT_ICONS } from '../../config/paymentMethods';
 import { generateDailyClosePDF } from '../../utils/dailyCloseGenerator';
 
-export default function CierreHistoryCard({ cierre, bcvRate, products }) {
+export default function CierreHistoryCard({ cierre, bcvRate, products: _products }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const dateLabel = new Date(cierre.cierreId).toLocaleString('es-VE', { 

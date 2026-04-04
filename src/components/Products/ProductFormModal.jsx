@@ -22,13 +22,13 @@ export default function ProductFormModal({
     stock, setStock,
     lowStockAlert, setLowStockAlert,
 
-    unitsPerPackage, setUnitsPerPackage,
-    sellByUnit, setSellByUnit,
-    unitPriceUsd, setUnitPriceUsd,
+    unitsPerPackage, setUnitsPerPackage: _setUnitsPerPackage,
+    sellByUnit, setSellByUnit: _setSellByUnit,
+    unitPriceUsd, setUnitPriceUsd: _setUnitPriceUsd,
 
-    packagingType, setPackagingType,
-    stockInLotes, setStockInLotes,
-    granelUnit, setGranelUnit,
+    packagingType, setPackagingType: _setPackagingType,
+    stockInLotes, setStockInLotes: _setStockInLotes,
+    granelUnit, setGranelUnit: _setGranelUnit,
     effectiveRate,
     copEnabled,
     tasaCop,
@@ -115,13 +115,13 @@ export default function ProductFormModal({
     const unitMarginPct = unitCost > 0 ? ((effectiveUnitPrice - unitCost) / unitCost * 100) : null;
     const unitMarginUsd = effectiveUnitPrice - unitCost;
 
-    // Stock equivalence for lote
-    const parsedStockLotes = parseInt(stockInLotes) || 0;
-    const stockUnitsCalc = parsedStockLotes * (parsedUnits || 1);
+    // Stock equivalence for lote (unused)
+    // const parsedStockLotes = parseInt(stockInLotes) || 0;
+    // const stockUnitsCalc = parsedStockLotes * (parsedUnits || 1);
 
-    // Alert equivalence
-    const parsedAlert = parseInt(lowStockAlert) || 0;
-    const alertLotesCalc = parsedUnits > 0 ? (parsedAlert / parsedUnits) : 0;
+    // Alert equivalence (unused)
+    // const parsedAlert = parseInt(lowStockAlert) || 0;
+    // const alertLotesCalc = parsedUnits > 0 ? (parsedAlert / parsedUnits) : 0;
 
     // Unit label for granel
     const granelLabel = granelUnit === 'kg' ? 'Kilo' : 'Litro';

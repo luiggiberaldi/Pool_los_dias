@@ -6,11 +6,11 @@ const DEFAULT_RATES = {
     lastUpdate: new Date().toISOString()
 };
 
-const EXCHANGERATE_KEY = 'F1a3af26247a97a33ee5ad90';
+const EXCHANGERATE_KEY = import.meta.env.VITE_EXCHANGERATE_KEY || '';
 const DEFAULT_EUR_USD_RATIO = 1.18;
 const UPDATE_INTERVAL = 30000;
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxT9sKz_XWRWuQx_XP-BJ33T0hoAgJsLwhZA00v6nPt4Ij4jRjq-90mDGLVCsS6FXwW9Q/exec?token=Lvbp1994';
+const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 
 export function useRates() {
     const [rates, setRates] = useState(() => {

@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { logEvent } from '../../services/auditService';
+import { hashPin } from '../../utils/crypto';
 
+// Pre-computed SHA-256 hashes of default PINs (never store plaintext)
 const DEFAULT_USERS = [
-    { id: 1, nombre: 'Administrador', rol: 'ADMIN', pin: '1234' },
-    { id: 2, nombre: 'Cajero', rol: 'CAJERO', pin: '0000' }
+    { id: 1, nombre: 'Administrador', rol: 'ADMIN', pin_hash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4' },
+    { id: 2, nombre: 'Cajero', rol: 'CAJERO', pin_hash: '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0' }
 ];
+
+// Rate limiting constants
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 30_000; // 30 seconds
 
 export const useAuthStore = create(
     persist(
@@ -18,32 +24,61 @@ export const useAuthStore = create(
             })(),
             usuarios: DEFAULT_USERS,
             requireLogin: false, // Login opcional, por defecto desactivado
-            adminEmail: '',
-            adminPassword: '',
+
+            // Rate limiting state
+            failedAttempts: 0,
+            lockoutUntil: null,
 
 
             // ACCIONES
             login: async (pinInput, userId) => {
+                // Check lockout
+                const { lockoutUntil } = get();
+                if (lockoutUntil && Date.now() < lockoutUntil) {
+                    const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+                    return { locked: true, remainingSec };
+                }
+
+                // Clear expired lockout
+                if (lockoutUntil && Date.now() >= lockoutUntil) {
+                    set({ lockoutUntil: null, failedAttempts: 0 });
+                }
+
                 // Simular un pequeño retardo para feedback visual (UX)
                 await new Promise(r => setTimeout(r, 400));
-                
+
                 const { usuarios } = get();
-                
+
+                // Hash the input PIN before comparing
+                const hashedInput = await hashPin(pinInput);
+
                 let userEncontrado;
-                
+
                 if (userId) {
-                    userEncontrado = usuarios.find(u => u.id === userId && u.pin === pinInput);
+                    userEncontrado = usuarios.find(u => u.id === userId && u.pin_hash === hashedInput);
                 } else {
-                    userEncontrado = usuarios.find(u => u.pin === pinInput);
+                    userEncontrado = usuarios.find(u => u.pin_hash === hashedInput);
                 }
 
                 if (userEncontrado) {
-                    set({ usuarioActivo: userEncontrado });
+                    set({ usuarioActivo: userEncontrado, failedAttempts: 0, lockoutUntil: null });
                     localStorage.setItem('abasto-device-session', JSON.stringify(userEncontrado));
                     logEvent('AUTH', 'LOGIN', `${userEncontrado.nombre} inicio sesion`, userEncontrado);
                     return true;
                 }
-                
+
+                // Failed attempt — increment counter and possibly lock out
+                const newFailedAttempts = get().failedAttempts + 1;
+                if (newFailedAttempts >= MAX_FAILED_ATTEMPTS) {
+                    const lockoutUntilTs = Date.now() + LOCKOUT_DURATION_MS;
+                    set({ failedAttempts: newFailedAttempts, lockoutUntil: lockoutUntilTs });
+                    logEvent('AUTH', 'LOCKOUT', `Cuenta bloqueada por ${LOCKOUT_DURATION_MS / 1000}s tras ${newFailedAttempts} intentos fallidos`);
+                    const remainingSec = Math.ceil(LOCKOUT_DURATION_MS / 1000);
+                    return { locked: true, remainingSec };
+                } else {
+                    set({ failedAttempts: newFailedAttempts });
+                }
+
                 return false;
             },
 
@@ -54,17 +89,18 @@ export const useAuthStore = create(
                 localStorage.removeItem('abasto-device-session');
             },
 
-            cambiarPin: (userId, nuevoPin) => {
+            cambiarPin: async (userId, nuevoPin) => {
+                const nuevoPinHash = await hashPin(nuevoPin);
                 set((state) => ({
-                    usuarios: state.usuarios.map(u => 
-                        u.id === userId ? { ...u, pin: nuevoPin } : u
+                    usuarios: state.usuarios.map(u =>
+                        u.id === userId ? { ...u, pin_hash: nuevoPinHash } : u
                     )
                 }));
-                
+
                 // Si el usuario que cambió el PIN es el activo, actualizar su sesión local
                 const { usuarioActivo } = get();
                 if (usuarioActivo && usuarioActivo.id === userId) {
-                    const nuevoActivo = { ...usuarioActivo, pin: nuevoPin };
+                    const nuevoActivo = { ...usuarioActivo, pin_hash: nuevoPinHash };
                     set({ usuarioActivo: nuevoActivo });
                     localStorage.setItem('abasto-device-session', JSON.stringify(nuevoActivo));
                 }
@@ -72,11 +108,12 @@ export const useAuthStore = create(
                 logEvent('AUTH', 'PIN_CAMBIADO', `PIN cambiado para ${target?.nombre || 'usuario'}`, get().usuarioActivo);
             },
 
-            agregarUsuario: (nombre, rol, pin) => {
+            agregarUsuario: async (nombre, rol, pin) => {
+                const pinHash = await hashPin(pin);
                 set((state) => {
                     const maxId = state.usuarios.reduce((max, u) => Math.max(max, u.id), 0);
                     return {
-                        usuarios: [...state.usuarios, { id: maxId + 1, nombre, rol, pin }]
+                        usuarios: [...state.usuarios, { id: maxId + 1, nombre, rol, pin_hash: pinHash }]
                     };
                 });
                 logEvent('USUARIO', 'USUARIO_CREADO', `Usuario "${nombre}" (${rol}) creado`, get().usuarioActivo);
@@ -90,7 +127,7 @@ export const useAuthStore = create(
                 if (target?.rol === 'ADMIN' && admins.length <= 1) return false;
                 // No permitir eliminarse a sí mismo
                 if (usuarioActivo?.id === userId) return false;
-                
+
                 set({ usuarios: usuarios.filter(u => u.id !== userId) });
                 logEvent('USUARIO', 'USUARIO_ELIMINADO', `Usuario "${target.nombre}" (${target.rol}) eliminado`, usuarioActivo);
                 return true;
@@ -98,7 +135,7 @@ export const useAuthStore = create(
 
             editarUsuario: (userId, datos) => {
                 set((state) => ({
-                    usuarios: state.usuarios.map(u => 
+                    usuarios: state.usuarios.map(u =>
                         u.id === userId ? { ...u, ...datos } : u
                     )
                 }));
@@ -114,19 +151,12 @@ export const useAuthStore = create(
                 set({ requireLogin: val });
                 logEvent('CONFIG', 'LOGIN_REQUERIDO_MODIFICADO', `Login requerido establecido a ${val ? 'SI' : 'NO'}`);
             },
-
-            setAdminCredentials: (email, password) => {
-                set({ adminEmail: email, adminPassword: password });
-                logEvent('CONFIG', 'CREDENCIALES_REMOTAS_ESTABLECIDAS', `Se ha registrado el acceso remoto para la cuenta administradora.`);
-            }
         }),
         {
             name: 'abasto-auth-storage', // Nombre para localStorage
-            partialize: (state) => ({ 
-                usuarios: state.usuarios, 
+            partialize: (state) => ({
+                usuarios: state.usuarios,
                 requireLogin: state.requireLogin,
-                adminEmail: state.adminEmail,
-                adminPassword: state.adminPassword
             }),
             storage: {
                 getItem: (name) => {

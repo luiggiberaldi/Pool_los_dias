@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Users, Lock, Rocket, Clock
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import UsersManager from '../UsersManager';
 import CloudAuthModal from '../../security/CloudAuthModal';
+import { useConfirm } from '../../../hooks/useConfirm';
+import { supabaseCloud } from '../../../config/supabaseCloud';
 
 // ─── CONTROL DE PRÓXIMAMENTE ────────────────────────────────────────────────
 const SHOW_COMING_SOON = false;

@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { storageService } from '../utils/storageService';
-import { useAuthStore } from './store/useAuthStore';
 import { useAudit } from './useAudit';
 import { useSecurity } from './useSecurity';
 import { showToast } from '../components/Toast';
@@ -10,18 +9,22 @@ export function useCloudAuthLogic() {
     // Tomamos businessName del localStorage directamente
     const businessName = localStorage.getItem('business_name') || '';
 
-    const adminEmail = useAuthStore(s => s.adminEmail);
-    const adminPassword = useAuthStore(s => s.adminPassword);
-    const setAdminCredentials = useAuthStore(s => s.setAdminCredentials);
-
     const { deviceId } = useSecurity();
     const { log: auditLog } = useAudit();
 
     // ─── STATE ──────────────────────────────────────────
-    const [inputEmail, setInputEmail] = useState(adminEmail || '');
+    const [inputEmail, setInputEmail] = useState('');
     const [inputPassword, setInputPassword] = useState(''); // ← Siempre en blanco por seguridad
-    const isCloudConfigured = Boolean(adminEmail && adminPassword);
+    // Cloud is configured if there is an active Supabase session (checked asynchronously)
+    const [isCloudConfigured, setIsCloudConfigured] = useState(false);
     const [isCloudLogin, setIsCloudLogin] = useState(true);
+
+    // Check if there is an active Supabase session (replaces stored credentials)
+    useEffect(() => {
+        supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+            setIsCloudConfigured(!!session);
+        }).catch(() => {});
+    }, []);
     
     const [localDeviceAlias, _setLocalDeviceAlias] = useState(() => localStorage.getItem('pda_device_alias') || '');
     
@@ -162,7 +165,7 @@ export function useCloudAuthLogic() {
                 await uploadLocalBackup(email, localBackup);
                 showToast('Datos locales guardados en la nube', 'success');
             }
-            setAdminCredentials(email, inputPassword);
+            setIsCloudConfigured(true);
             auditLog('NUBE', 'CONFLICTO_RESUELTO', `Resuelto: ${choice}`);
             setImportStatus(null);
         } catch (err) {
@@ -282,7 +285,7 @@ export function useCloudAuthLogic() {
             if (isCloudLogin && hasCloudData && hasLocalData) {
                 setDataConflictPending({ email: emailToUse, cloudBackup, localBackup });
                 await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
+                setIsCloudConfigured(true);
                 setImportStatus(null);
                 setStatusMessage('');
                 auditLog('NUBE', 'LOGIN_NUBE', `Conflicto a resolver: ${emailToUse}`);
@@ -293,7 +296,7 @@ export function useCloudAuthLogic() {
                 setStatusMessage('Restaurando nube...');
                 await applyCloudBackup(cloudBackup);
                 await registerDevice(emailToUse);
-                setAdminCredentials(emailToUse, inputPassword);
+                setIsCloudConfigured(true);
                 showToast('Datos restaurados desde la nube', 'success');
                 setImportStatus('success');
                 setTimeout(() => window.location.reload(), 1500);
@@ -328,7 +331,7 @@ export function useCloudAuthLogic() {
                 await registerDevice(emailToUse);
             }
 
-            setAdminCredentials(emailToUse, inputPassword);
+            setIsCloudConfigured(true);
             showToast('Sincronizado', 'success');
             setImportStatus(null);
             setStatusMessage('');
