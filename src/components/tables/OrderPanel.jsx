@@ -24,7 +24,7 @@ function getCatColor(category) {
 }
 
 export function OrderPanel({ session, table, onClose }) {
-    const { addItemToSession, deleteItem, syncOrders } = useOrdersStore();
+    const { addItemToSession, deleteItem, updateItemQty, syncOrders } = useOrdersStore();
     const allOrders = useOrdersStore(state => state.orders);
     const allItems = useOrdersStore(state => state.orderItems);
     const { currentUser } = useAuthStore();
@@ -34,6 +34,8 @@ export function OrderPanel({ session, table, onClose }) {
     const [removingItem, setRemovingItem] = useState(null);
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('Todos');
+    const [qtyModalItem, setQtyModalItem] = useState(null);
+    const [qtyInputValue, setQtyInputValue] = useState(1);
     const searchRef = useRef(null);
 
     // Derive order and items
@@ -121,10 +123,17 @@ export function OrderPanel({ session, table, onClose }) {
                         {currentItems.map(item => (
                             <div key={item.id}
                                 className={`flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl px-4 py-3 transition-all duration-300 ${removingItem === item.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                                {/* Qty badge */}
-                                <div className="w-8 h-8 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0">
-                                    <span className="text-indigo-700 font-black text-sm">{item.qty}</span>
-                                </div>
+                                {/* Editable Qty badge */}
+                                <button 
+                                    onClick={() => {
+                                        setQtyModalItem(item);
+                                        setQtyInputValue(item.qty);
+                                    }}
+                                    className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0 hover:bg-indigo-200 hover:scale-105 active:scale-95 transition-all shadow-sm group"
+                                >
+                                    <span className="text-indigo-700 font-black text-sm group-hover:hidden">{item.qty}</span>
+                                    <span className="text-indigo-700 font-black text-lg hidden group-hover:block">#</span>
+                                </button>
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="text-slate-800 font-bold text-sm truncate">{item.product_name}</div>
@@ -245,6 +254,71 @@ export function OrderPanel({ session, table, onClose }) {
                     )}
                 </div>
             </div>
+
+            {/* ── QTY MODAL ── */}
+            {qtyModalItem && (
+                <div className="absolute inset-0 z-[100] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setQtyModalItem(null)} />
+                    
+                    {/* Modal Content */}
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in-95 duration-200 text-center relative z-10 text-slate-800">
+                        <div className="w-12 h-12 mx-auto bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-2xl flex items-center justify-center mb-3">
+                            <ShoppingBag size={24} />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 dark:text-white mb-0.5 line-clamp-1">
+                            {qtyModalItem.product_name}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
+                            Modifica la cantidad en la orden
+                        </p>
+                        
+                        <div className="flex items-center justify-center gap-3 mb-6">
+                            <button onClick={() => setQtyInputValue(Math.max(1, qtyInputValue - 1))} className="w-12 h-12 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-2xl flex items-center justify-center transition-all active:scale-95">
+                                -
+                            </button>
+                            <input
+                                type="number"
+                                min="1"
+                                className="w-24 bg-slate-50 border-2 border-slate-200 rounded-2xl text-center text-3xl font-black text-indigo-600 focus:border-indigo-500 focus:ring-0 py-2.5 transition-all shadow-inner"
+                                value={qtyInputValue}
+                                onChange={e => setQtyInputValue(parseInt(e.target.value) || 1)}
+                                onFocus={e => e.target.select()}
+                                autoFocus
+                            />
+                            <button onClick={() => setQtyInputValue(qtyInputValue + 1)} className="w-12 h-12 rounded-2xl bg-indigo-100 hover:bg-indigo-200 text-indigo-600 font-black text-2xl flex items-center justify-center transition-all active:scale-95">
+                                +
+                            </button>
+                        </div>
+                        
+                        {/* Quick presets */}
+                        <div className="grid grid-cols-3 gap-2 mb-6">
+                            {[6, 12, 24].map(preset => (
+                                <button key={preset} onClick={() => setQtyInputValue(preset)} className="py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 active:bg-slate-200 text-slate-600 font-bold text-sm transition-colors cursor-pointer">
+                                    {preset} un
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button onClick={() => setQtyModalItem(null)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition-all active:scale-95">
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        await updateItemQty(qtyModalItem.id, qtyInputValue);
+                                    } catch(e) {}
+                                    setQtyModalItem(null);
+                                }}
+                                className="flex-1 py-3.5 text-sm font-bold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 active:scale-95 transition-all shadow-md shadow-indigo-500/20"
+                            >
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── BOTTOM SAFE AREA ── */}
             <div className="h-safe-bottom shrink-0" />

@@ -118,10 +118,29 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             }
         };
         load();
-        // Solicitar permiso de notificaciones al primer uso
         requestPermission();
         return () => { mounted = false; };
     }, [isActive]);
+
+    // ── Escuchar actualizaciones de la nube en tiempo real ──
+    // Cuando useCloudSync descarga ventas de otro dispositivo, el dashboard
+    // se actualiza automáticamente sin recargar la página.
+    useEffect(() => {
+        const handleCloudUpdate = async (e) => {
+            const key = e.detail?.key;
+            if (key === SALES_KEY) {
+                const updatedSales = await storageService.getItem(SALES_KEY, []);
+                setSales(updatedSales);
+            }
+            if (key === 'bodega_customers_v1') {
+                const updatedCustomers = await storageService.getItem('bodega_customers_v1', []);
+                setCustomers(updatedCustomers);
+            }
+        };
+        window.addEventListener('app_storage_update', handleCloudUpdate);
+        return () => window.removeEventListener('app_storage_update', handleCloudUpdate);
+    }, []);
+
 
 
 

@@ -22,7 +22,7 @@ function FilterPill({ label, active, onClick }) {
 }
 
 export default function TablesView({ triggerHaptic, isActive }) {
-    const { tables, activeSessions, loading, syncTablesAndSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
+    const { tables, activeSessions, loading, syncTablesAndSessions } = useTablesStore();
 
     const [typeFilter,   setTypeFilter]   = useState('Todas');
     const [statusFilter, setStatusFilter] = useState('Todas');
@@ -30,10 +30,8 @@ export default function TablesView({ triggerHaptic, isActive }) {
     useEffect(() => {
         if (isActive) {
             syncTablesAndSessions();
-            subscribeToRealtime();
         }
-        return () => unsubscribeFromRealtime();
-    }, [isActive, syncTablesAndSessions, subscribeToRealtime, unsubscribeFromRealtime]);
+    }, [isActive, syncTablesAndSessions]);
 
     const filteredTables = useMemo(() => {
         return tables.filter(table => {

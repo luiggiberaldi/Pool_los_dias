@@ -35,6 +35,8 @@ import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
 import { supabaseCloud } from './config/supabaseCloud';
 import { useConfirm } from './hooks/useConfirm.jsx';
+import { useTablesStore } from './hooks/store/useTablesStore';
+import { useOrdersStore } from './hooks/store/useOrdersStore';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
@@ -57,6 +59,21 @@ export default function App() {
   // Cloud Auth Session State
   const [cloudSession, setCloudSession] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+
+  // ── Suscripción Realtime Global (activa en TODAS las pantallas) ──────────
+  const subscribeToTablesRealtime = useTablesStore(s => s.subscribeToRealtime);
+  const subscribeToOrdersRealtime = useOrdersStore(s => s.subscribeToRealtime);
+  const unsubscribeFromTablesRealtime = useTablesStore(s => s.unsubscribeFromRealtime);
+  const syncTablesAndSessionsGlobal = useTablesStore(s => s.syncTablesAndSessions);
+
+  useEffect(() => {
+    if (!cloudSession) return;
+    // Sync inicial + suscripciones activas para TODAS las vistas
+    syncTablesAndSessionsGlobal();
+    subscribeToTablesRealtime();
+    subscribeToOrdersRealtime();
+    return () => unsubscribeFromTablesRealtime();
+  }, [cloudSession, syncTablesAndSessionsGlobal, subscribeToTablesRealtime, subscribeToOrdersRealtime, unsubscribeFromTablesRealtime]);
 
   // ── Sesión Supabase + límite de dispositivos vía RPC ─────────────────────
   useEffect(() => {

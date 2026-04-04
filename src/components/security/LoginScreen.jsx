@@ -58,12 +58,12 @@ export default function LoginScreen() {
             <div className="relative z-10 min-h-screen flex flex-col items-center justify-between px-6 py-8 gap-6">
 
                 {/* ── LOGO + TÍTULO ── */}
-                <div className="text-center flex flex-col items-center gap-3 w-full">
+                <div className="text-center flex flex-col items-center gap-2 w-full">
                     <img
                         src="/logo.png"
                         alt="Logo"
-                        className="w-auto object-contain drop-shadow-md"
-                        style={{ height: 'clamp(80px, 20vw, 180px)' }}
+                        className="w-auto object-contain drop-shadow-xl"
+                        style={{ height: 'clamp(110px, 28vw, 180px)' }}
                     />
                     <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-500">
                         Quien esta <strong className="text-slate-800 font-bold">operando</strong>?

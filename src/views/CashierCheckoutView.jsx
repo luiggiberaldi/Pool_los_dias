@@ -19,7 +19,7 @@ function useBcvRate() {
 }
 
 export default function CashierCheckoutView({ triggerHaptic, isActive }) {
-    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
+    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
     const tasaUSD = useBcvRate();
@@ -31,10 +31,8 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
     useEffect(() => {
         if (isActive) {
             syncTablesAndSessions();
-            subscribeToRealtime();
         }
-        return () => unsubscribeFromRealtime();
-    }, [isActive, syncTablesAndSessions, subscribeToRealtime, unsubscribeFromRealtime]);
+    }, [isActive, syncTablesAndSessions]);
 
     // Only show sessions that are waiting for checkout
     const checkoutSessions = activeSessions.filter(s => s.status === 'CHECKOUT');

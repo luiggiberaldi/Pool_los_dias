@@ -56,8 +56,16 @@ export function useAutoLock() {
 
         const handleVisibilityChange = () => {
             if (document.hidden) {
-                // Suspender sesión automáticamente si minimiza la app (ADMIN only)
-                performLock('app_minimizada');
+                // Verificar si la funcion de bloqueo al minimizar esta activa
+                const lockOnMinimize = localStorage.getItem('admin_auto_lock_on_minimize') !== 'false';
+                
+                if (lockOnMinimize) {
+                    // Suspender sesión automáticamente si minimiza la app (ADMIN only)
+                    performLock('app_minimizada');
+                } else {
+                    // Solo pausamos el temporizador, pero no bloqueamos de inmediato
+                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                }
             } else {
                 resetTimer();
             }

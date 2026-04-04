@@ -8,6 +8,10 @@ import { offlineQueueService } from '../services/offlineQueueService';
 
 const SALES_KEY = 'bodega_sales_v1';
 
+// UUID v4 regex - productos sin formato UUID no se envian al RPC de Supabase
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidUUID = (id) => UUID_REGEX.test(id);
+
 export async function processSaleTransaction({
     cart,
     cartTotalUsd,
@@ -48,9 +52,15 @@ export async function processSaleTransaction({
     // Preparar el Payload para la validación centralizada
     // Se envía currency y methodLabel para que el RPC pueda mapear cuentas contables
     // correctamente sin depender del methodId hardcodeado.
+    //
+    // NOTA: Solo se incluyen productos con IDs en formato UUID.
+    // Productos con IDs heredados (ej. "p-snack-2") se procesan solo localmente.
+    const cartForRpc = cart.filter(i => isValidUUID(i._originalId || i.id));
+    const hasRpcCompatibleItems = cartForRpc.length > 0;
+
     const rpcPayload = {
       total: cartTotalUsd,
-      cart: cart.map(i => ({
+      cart: cartForRpc.map(i => ({
           id: i._originalId || i.id,
           qty: i.qty,
           priceUsd: i.priceUsd,
@@ -70,7 +80,12 @@ export async function processSaleTransaction({
     let saleMode = 'online';
     let finalSaleId = null;
 
-    if (navigator.onLine) {
+    // Si ningún producto del carrito tiene UUID válido, ir directo a offline.
+    // Esto previene el error 400 de Supabase cuando se venden productos con IDs heredados.
+    if (!hasRpcCompatibleItems) {
+        console.log('[Checkout] Carrito sin UUIDs válidos — usando MODO OFFLINE directamente.');
+        saleMode = 'offline';
+    } else if (navigator.onLine) {
        try {
          // Intentar RPC Transaccional Atómica
          const rpcPromise = supabase.rpc('process_checkout', { payload: rpcPayload });
@@ -81,7 +96,7 @@ export async function processSaleTransaction({
          
          finalSaleId = data.sale_id;
        } catch (err) {
-         console.warn("[Checkout] Fallo en RPC Supabase, cambiando a MODO OFFLINE", err);
+         console.warn('[Checkout] Fallo en RPC Supabase, cambiando a MODO OFFLINE', err);
          saleMode = 'offline';
        }
     } else {

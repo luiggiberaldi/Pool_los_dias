@@ -166,6 +166,7 @@ function CloudLicenseViewer({ adminEmail, showToast }) {
 
 export default function SettingsTabUsuarios({
     autoLockMinutes, setAutoLockMinutes,
+    autoLockOnMinimize, setAutoLockOnMinimize,
     showToast, triggerHaptic,
 }) {
     return (
@@ -177,6 +178,23 @@ export default function SettingsTabUsuarios({
             </SectionCard>
 
             <SectionCard icon={Lock} title="Seguridad Local" subtitle="Protección física del dispositivo" iconColor="text-rose-500">
+                <div className="mb-4 pb-4 border-b border-rose-100 dark:border-rose-900/30">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block">Bloquear al Minimizar App</label>
+                        <Toggle 
+                            enabled={autoLockOnMinimize} 
+                            color="rose"
+                            onChange={() => {
+                                const newVal = !autoLockOnMinimize;
+                                setAutoLockOnMinimize(newVal);
+                                localStorage.setItem('admin_auto_lock_on_minimize', newVal ? 'true' : 'false');
+                                triggerHaptic?.('light');
+                            }} 
+                        />
+                    </div>
+                    <p className="text-[10px] text-slate-400">Exigir PIN inmediatamente si sales de la aplicación o cambias de pestaña en el navegador.</p>
+                </div>
+
                 <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Bloqueo Automático</label>
                     <p className="text-[10px] text-slate-400 mb-3">Tu sesión se bloqueará exigiendo el PIN tras estos minutos de inactividad.</p>

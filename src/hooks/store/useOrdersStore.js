@@ -11,6 +11,7 @@ export const useOrdersStore = create((set, get) => ({
     orders: [], // Todas las órdenes abiertas
     orderItems: [], // Todos los items pertenecientes a órdenes abiertas
     loading: true,
+    realtimeChannel: null,
 
     init: async () => {
         set({ loading: true });
@@ -18,9 +19,58 @@ export const useOrdersStore = create((set, get) => ({
             const cachedOrders = await ordersCache.getItem('active_orders') || [];
             const cachedItems = await ordersCache.getItem('active_order_items') || [];
             set({ orders: cachedOrders, orderItems: cachedItems, loading: false });
+            
+            // Sync initial state
+            get().syncOrders();
         } catch (e) {
             console.error('Error loading orders cache:', e);
             set({ loading: false });
+        }
+    },
+
+    subscribeToRealtime: () => {
+        if (get().realtimeChannel) return;
+
+        let syncTimeout;
+        const debouncedSync = () => {
+            clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(() => get().syncOrders(), 300);
+        };
+
+        const channel = supabaseCloud
+            .channel('pool_orders_sync')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+                console.log("[REALTIME] orders change received:", payload);
+                if (payload.eventType === 'UPDATE') {
+                    set(state => ({ orders: state.orders.map(o => o.id === payload.new.id ? payload.new : o) }));
+                } else if (payload.eventType === 'INSERT') {
+                    set(state => ({ orders: [...state.orders.filter(o => o.id !== payload.new.id), payload.new] }));
+                } else if (payload.eventType === 'DELETE') {
+                    set(state => ({ orders: state.orders.filter(o => o.id !== payload.old.id) }));
+                }
+                debouncedSync();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
+                console.log("[REALTIME] order_items change received:", payload);
+                if (payload.eventType === 'UPDATE') {
+                    set(state => ({ orderItems: state.orderItems.map(i => i.id === payload.new.id ? payload.new : i) }));
+                } else if (payload.eventType === 'INSERT') {
+                    set(state => ({ orderItems: [...state.orderItems.filter(i => i.id !== payload.new.id), payload.new] }));
+                } else if (payload.eventType === 'DELETE') {
+                    set(state => ({ orderItems: state.orderItems.filter(i => i.id !== payload.old.id) }));
+                }
+                debouncedSync();
+            })
+            .subscribe((status) => {
+                console.log("[REALTIME] status pool_orders_sync:", status);
+            });
+        set({ realtimeChannel: channel });
+    },
+
+    unsubscribeFromRealtime: () => {
+        if (get().realtimeChannel) {
+            supabaseCloud.removeChannel(get().realtimeChannel);
+            set({ realtimeChannel: null });
         }
     },
 
@@ -143,25 +193,49 @@ export const useOrdersStore = create((set, get) => ({
          }
     },
 
+    updateItemQty: async (itemId, newQty) => {
+        try {
+            if (newQty <= 0) {
+                return get().deleteItem(itemId);
+            }
+            const { data: updatedItem, error } = await supabaseCloud
+                .from('order_items')
+                .update({ qty: newQty })
+                .eq('id', itemId)
+                .select()
+                .single();
+            if (error) throw error;
+
+            const newItems = get().orderItems.map(i => i.id === itemId ? updatedItem : i);
+            set({ orderItems: newItems });
+            await ordersCache.setItem('active_order_items', newItems);
+        } catch (e) {
+            console.error('Error updating item qty:', e);
+            throw e;
+        }
+    },
+
     cancelOrderBySessionId: async (sessionId) => {
         let order = get().getOrderBySessionId(sessionId);
         if (!order) return;
         
+        // Optimistic update FIRST
+        const newOrders = get().orders.filter(o => o.id !== order.id);
+        const newItems = get().orderItems.filter(i => i.order_id !== order.id);
+        
+        set({ orders: newOrders, orderItems: newItems });
+        await ordersCache.setItem('active_orders', newOrders);
+        await ordersCache.setItem('active_order_items', newItems);
+
         try {
+            // Background network tasks
             // Delete items first
             await supabaseCloud.from('order_items').delete().eq('order_id', order.id);
             // Delete the order
             await supabaseCloud.from('orders').delete().eq('id', order.id);
-
-            // Update local state
-            const newOrders = get().orders.filter(o => o.id !== order.id);
-            const newItems = get().orderItems.filter(i => i.order_id !== order.id);
-            
-            set({ orders: newOrders, orderItems: newItems });
-            await ordersCache.setItem('active_orders', newOrders);
-            await ordersCache.setItem('active_order_items', newItems);
         } catch (e) {
-            console.error('Error canceling order:', e);
+            console.error('Error canceling order (network):', e);
+            // Normally we would rollback, but since it's a cancellation, we want it gone locally anyway.
             throw e;
         }
     }

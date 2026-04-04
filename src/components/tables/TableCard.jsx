@@ -49,13 +49,17 @@ export default function TableCard({ table, session }) {
     const handleCancelTable = async () => {
         setShowCancelModal(false); // Feeds instant UX feedback
         try {
-            await cancelOrderBySessionId(session.id).catch(e => console.warn("cancelOrder offline", e));
-            await closeSession(session.id, currentUser?.id || "SYSTEM", 0).catch(e => console.warn("closeSession offline", e));
+            // Run both optimistic operations concurrently so the UI updates instantly
+            // They will do their network synchronization in the background
+            Promise.all([
+                cancelOrderBySessionId(session.id).catch(e => console.warn("cancelOrder offline", e)),
+                closeSession(session.id, currentUser?.id || "SYSTEM", 0).catch(e => console.warn("closeSession offline", e))
+            ]);
             
             logEvent('MESAS', 'ANULACION', `Mesa ${table.name} anulada manualmente. ${currentItems.length} items descartados.`, currentUser);
         } catch (error) {
             console.error("Error anlando mesa", error);
-            alert("No se pudo conectar a la base de datos para anular. Verifique su internet.");
+            alert("Ocurrió un error local al preparar la anulación.");
         }
     };
 
@@ -319,15 +323,13 @@ export default function TableCard({ table, session }) {
                                     <Clock size={14} className="animate-pulse" />
                                     Esperando al cajero...
                                 </div>
-                                {/* Admin puede revertir */}
-                                {(currentUser?.role === 'ADMIN' || currentUser?.rol === 'ADMIN') && (
-                                    <button
-                                        onClick={() => cancelCheckoutRequest(session.id)}
-                                        className="w-full text-[10px] font-bold text-slate-400 hover:text-rose-400 transition-colors py-1"
-                                    >
-                                        Retirar solicitud
-                                    </button>
-                                )}
+                                {/* Admin y mesero pueden revertir la solicitud */}
+                                <button
+                                    onClick={() => cancelCheckoutRequest(session.id)}
+                                    className="w-full text-[10px] font-bold text-slate-400 hover:text-rose-400 transition-colors py-1"
+                                >
+                                    Retirar solicitud
+                                </button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-1.5">

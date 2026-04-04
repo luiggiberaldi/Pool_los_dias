@@ -8,6 +8,11 @@ const cashCache = localforage.createInstance({
     storeName: "cash_cache"
 });
 
+// Singletons para no crear duplicados entre re-renders
+let cashRealtimeChannel = null;
+let cashPollingInterval = null;
+let cashVisibilityBound = false;
+
 export const useCashStore = create((set, get) => ({
     activeCashSession: null,
     loading: true,
@@ -15,18 +20,26 @@ export const useCashStore = create((set, get) => ({
     init: async () => {
         set({ loading: true });
         try {
+            // 1. Mostrar caché local inmediatamente — UI no bloquea al usuario
             const cachedSession = await cashCache.getItem('active_cash_session');
             set({ activeCashSession: cachedSession, loading: false });
-            get().syncCashSession(); // Background sync
+
+            // 2. Sincronizar desde la nube para obtener el estado real
+            await get().syncCashSession();
+
+            // 3. Triple redundancia para multi-dispositivo:
+            get()._subscribeRealtime();   // Capa A: Realtime Supabase (instantáneo si habilitado)
+            get()._startPolling();        // Capa B: Polling cada 45s (fallback garantizado)
+            get()._subscribeVisibility(); // Capa C: Al volver al primer plano (clave en móviles)
         } catch (error) {
-            console.error('Error initializing cash store:', error);
+            console.error('[Caja] Error de inicialización:', error);
             set({ loading: false });
         }
     },
 
+    // Consulta directa a Supabase y actualiza el estado local
     syncCashSession: async () => {
         try {
-            // Get the most recent open session
             const { data, error } = await supabaseCloud
                 .from('cash_sessions')
                 .select('*')
@@ -35,41 +48,122 @@ export const useCashStore = create((set, get) => ({
                 .limit(1)
                 .maybeSingle();
 
+            // Si hay error, mantener estado local (puede ser RLS, offline, etc.)
             if (error) throw error;
-            
+
             if (data) {
+                // ✅ Hay sesión activa en la nube — sincronizar
                 await cashCache.setItem('active_cash_session', data);
                 set({ activeCashSession: data });
+            } else {
+                // ⚠️  La nube devolvió null. Puede ser:
+                //   (a) No hay sesión abierta (correcto → limpiar local)
+                //   (b) RLS bloquea el SELECT (falso negativo → NO limpiar local)
+                //
+                // Para distinguir (a) de (b): verificamos si la sesión local existe
+                // con un ID conocido. Si la buscamos en la nube por su ID y tampoco
+                // la encontramos, asumimos que no existe. Si ni siquiera podemos buscar,
+                // mantenemos el estado local como verdad.
+                const cachedSession = await cashCache.getItem('active_cash_session');
+                if (cachedSession?.id) {
+                    // Verificar explícitamente si ESTA sesión específica está cerrada en la nube
+                    const { data: specificSession, error: specificError } = await supabaseCloud
+                        .from('cash_sessions')
+                        .select('id, status')
+                        .eq('id', cachedSession.id)
+                        .maybeSingle();
+
+                    if (!specificError && specificSession?.status === 'CLOSED') {
+                        // Confirmado: la sesión específica está cerrada → limpiar local
+                        await cashCache.removeItem('active_cash_session');
+                        set({ activeCashSession: null });
+                    } else if (!specificError && specificSession === null) {
+                        // La sesión no existe en la nube en absoluto (fue de otro día/cuenta)
+                        // Solo limpiamos si la sesión local es muy antigua (> 24 horas)
+                        const openedAt = new Date(cachedSession.opened_at).getTime();
+                        const hoursAgo = (Date.now() - openedAt) / 1000 / 3600;
+                        if (hoursAgo > 24) {
+                            await cashCache.removeItem('active_cash_session');
+                            set({ activeCashSession: null });
+                        }
+                        // Si < 24 horas y no se encuentra, puede ser un problema de RLS → mantener
+                    }
+                    // Si specificError → no podemos confirmar estado → mantener local
+                } else {
+                    // No había caché local tampoco → estado correcto (sin caja)
+                    set({ activeCashSession: null });
+                }
             }
-            // IF it returns null, don't wipe local cache automatically. 
-            // It could be RLS blocking or just that the session hasn't synced yet.
-        } catch (error) {
-            console.error('Failed to sync cash session:', error);
-            // Fallback to local cache if offline
+        } catch {
+            // Offline o error de red: mantener caché local sin modificar
             const cachedSession = await cashCache.getItem('active_cash_session');
             if (cachedSession) set({ activeCashSession: cachedSession });
         }
     },
 
+    // Capa A: Realtime de Supabase — instantáneo si la tabla tiene replication activo
+    _subscribeRealtime: () => {
+        if (cashRealtimeChannel) return;
+        cashRealtimeChannel = supabaseCloud
+            .channel('cash_sessions_realtime')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'cash_sessions',
+            }, async () => {
+                await get().syncCashSession();
+            })
+            .subscribe();
+    },
+
+    // Capa B: Polling cada 45s — garantiza sync aunque el realtime falle
+    _startPolling: () => {
+        if (cashPollingInterval) return;
+        cashPollingInterval = setInterval(() => {
+            get().syncCashSession();
+        }, 45_000);
+    },
+
+    // Capa C: Al volver al primer plano — crítico para PWA en móvil
+    _subscribeVisibility: () => {
+        if (typeof document === 'undefined' || cashVisibilityBound) return;
+        cashVisibilityBound = true;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                get().syncCashSession();
+            }
+        });
+    },
+
     openCashSession: async (baseUsd, baseBs, openedBy) => {
         const sessionPayload = {
-            id: `cash_${Date.now()}`,
+            id: crypto.randomUUID(),
             opened_at: new Date().toISOString(),
             opened_by: openedBy,
             base_usd: baseUsd || 0,
-            base_bs: baseBs || 0,
+            base_bs: baseBs || 0,   // Solo en caché local (columna no existe en Supabase)
             status: 'OPEN'
         };
 
-        // Guardar locamente para acceso inmediato
+        // Actualizar UI y caché local inmediatamente
         await cashCache.setItem('active_cash_session', sessionPayload);
         set({ activeCashSession: sessionPayload });
 
-        // Intentar registrar en Supabase (si falla, se sincronizará luego, pero la UI ya se desbloqueó)
+        // Payload para Supabase: SOLO columnas que existen en el schema de la tabla
+        const supabasePayload = {
+            id: sessionPayload.id,
+            opened_at: sessionPayload.opened_at,
+            opened_by: sessionPayload.opened_by,
+            base_usd: sessionPayload.base_usd,
+            status: sessionPayload.status,
+        };
+
         try {
-            await supabaseCloud.from('cash_sessions').insert(sessionPayload);
+            const { error } = await supabaseCloud.from('cash_sessions').insert(supabasePayload);
+            if (error) console.warn('[Caja] Error al subir apertura a nube:', error.message);
+            else console.log('[Caja] Apertura sincronizada en la nube ✓');
         } catch (err) {
-            console.warn('Could not sync open session to cloud:', err);
+            console.warn('[Caja] Sin conexión — apertura guardada localmente:', err);
         }
     },
 
@@ -77,25 +171,27 @@ export const useCashStore = create((set, get) => ({
         const active = get().activeCashSession;
         if (!active) return;
 
-        const updatePayload = {
-            ...active,
-            ...stats,
-            closed_at: new Date().toISOString(),
-            closed_by: closedBy,
-            status: 'CLOSED'
-        };
-
+        // Limpiar local inmediatamente para desbloquear la UI al instante
         await cashCache.removeItem('active_cash_session');
         set({ activeCashSession: null });
 
         try {
-            await supabaseCloud.from('cash_sessions')
-                .update(updatePayload)
+            const { error } = await supabaseCloud
+                .from('cash_sessions')
+                .update({
+                    closed_at: new Date().toISOString(),
+                    closed_by: closedBy,
+                    status: 'CLOSED',
+                })
                 .eq('id', active.id);
+
+            if (error) console.warn('[Caja] Error al cerrar sesión en nube:', error.message);
+            else console.log('[Caja] Cierre sincronizado en la nube ✓');
         } catch (err) {
-            console.warn('Could not sync close session to cloud:', err);
+            console.warn('[Caja] Sin conexión al cerrar caja:', err);
         }
     }
 }));
 
+// Inicializar al cargar el módulo
 useCashStore.getState().init();

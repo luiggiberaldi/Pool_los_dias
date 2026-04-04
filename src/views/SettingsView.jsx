@@ -83,6 +83,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
     const [paperWidth, setPaperWidth] = useState(localStorage.getItem('printer_paper_width') || '58');
     const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') !== 'false');
     const [autoLockMinutes, setAutoLockMinutes] = useState(localStorage.getItem('admin_auto_lock_minutes') || '5');
+    const [autoLockOnMinimize, setAutoLockOnMinimize] = useState(localStorage.getItem('admin_auto_lock_on_minimize') !== 'false');
 
 
     const handleSaveBusinessData = () => {
@@ -308,6 +309,7 @@ export default function SettingsView({ onClose, theme, toggleTheme, triggerHapti
                     {activeTab === 'usuarios' && isAdmin && (
                         <SettingsTabUsuarios
                             autoLockMinutes={autoLockMinutes} setAutoLockMinutes={setAutoLockMinutes}
+                            autoLockOnMinimize={autoLockOnMinimize} setAutoLockOnMinimize={setAutoLockOnMinimize}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
                         />

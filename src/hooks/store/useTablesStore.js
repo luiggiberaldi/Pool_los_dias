@@ -109,6 +109,16 @@ export const useTablesStore = create((set, get) => ({
         const merged = { ...get().config, ...newConfig };
         set({ config: merged });
         await tablesCache.setItem('pool_config', merged);
+
+        try {
+            await supabaseCloud.from('pool_config').update({
+                price_per_hour: merged.pricePerHour,
+                price_pina: merged.pricePina,
+                updated_at: new Date().toISOString()
+            }).eq('id', 1);
+        } catch (e) {
+            console.error('Error updating config in cloud', e);
+        }
     },
 
     syncTablesAndSessions: async () => {
@@ -128,6 +138,21 @@ export const useTablesStore = create((set, get) => ({
 
             if (sessionsError) throw sessionsError;
 
+            const { data: configData, error: configError } = await supabaseCloud
+                .from('pool_config')
+                .select('*')
+                .eq('id', 1)
+                .single();
+
+            if (!configError && configData) {
+                const cloudConfig = {
+                    pricePerHour: Number(configData.price_per_hour) || get().config.pricePerHour,
+                    pricePina: Number(configData.price_pina) || get().config.pricePina
+                };
+                set({ config: cloudConfig });
+                await tablesCache.setItem('pool_config', cloudConfig);
+            }
+
             const finalTables = sortTables(tablesData);
             set({ tables: finalTables, activeSessions: sessionsData });
             
@@ -141,11 +166,52 @@ export const useTablesStore = create((set, get) => ({
 
     subscribeToRealtime: () => {
         if (get().realtimeChannel) return;
+
+        let syncTimeout;
+        const debouncedSync = () => {
+            clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(() => get().syncTablesAndSessions(), 300);
+        };
+
         const channel = supabaseCloud
             .channel('pool_tables_sync_v2')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions' }, () => get().syncTablesAndSessions())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, () => get().syncTablesAndSessions())
-            .subscribe();
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions' }, (payload) => {
+                console.log("[REALTIME] table_sessions change received:", payload);
+                if (payload.eventType === 'UPDATE') {
+                    set(state => ({ activeSessions: state.activeSessions.map(s => s.id === payload.new.id ? payload.new : s) }));
+                } else if (payload.eventType === 'INSERT') {
+                    set(state => ({ activeSessions: [...state.activeSessions.filter(s => s.id !== payload.new.id), payload.new] }));
+                } else if (payload.eventType === 'DELETE') {
+                    set(state => ({ activeSessions: state.activeSessions.filter(s => s.id !== payload.old.id) }));
+                }
+                debouncedSync();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, (payload) => {
+                 console.log("[REALTIME] tables change received:", payload);
+                 if (payload.eventType === 'UPDATE') {
+                    set(state => ({ tables: state.tables.map(t => t.id === payload.new.id ? payload.new : t) }));
+                } else if (payload.eventType === 'INSERT') {
+                    set(state => ({ tables: [...state.tables.filter(t => t.id !== payload.new.id), payload.new] }));
+                } else if (payload.eventType === 'DELETE') {
+                    set(state => ({ tables: state.tables.filter(t => t.id !== payload.old.id) }));
+                }
+                debouncedSync();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pool_config' }, (payload) => {
+                console.log("[REALTIME] pool_config change received:", payload);
+                if (payload.eventType === 'UPDATE' && payload.new) {
+                    set(state => ({
+                        config: {
+                            pricePerHour: Number(payload.new.price_per_hour) || state.config.pricePerHour,
+                            pricePina: Number(payload.new.price_pina) || state.config.pricePina
+                        }
+                    }));
+                }
+                debouncedSync();
+            })
+            .subscribe((status) => {
+                console.log("[REALTIME] status pool_tables_sync_v2:", status);
+            });
         set({ realtimeChannel: channel });
     },
 

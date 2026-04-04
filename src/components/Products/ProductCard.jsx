@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Tag, AlertTriangle, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer, Check } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
@@ -23,18 +23,31 @@ export default function ProductCard({
     // Staged delta: tracks uncommitted stock changes before the user confirms
     const [delta, setDelta] = useState(0);
     const [isConfirming, setIsConfirming] = useState(false);
+    // baseStockRef: captura el stock EN EL MOMENTO que el usuario empieza a editar.
+    // Esto evita que actualizaciones de fondo (sync entre dispositivos) cambien el
+    // número mostrado en el botón de confirmar mientras el usuario está editando.
+    const baseStockRef = useRef(null);
 
     const valBs = p.priceUsdt * effectiveRate;
     const valCop = p.priceUsdt * tasaCop;
-    const stagedStock = (p.stock ?? 0) + delta;
+    // Si hay una edición en curso, usar el stock base capturado; si no, el actual del contexto
+    const currentBase = baseStockRef.current !== null ? baseStockRef.current : (p.stock ?? 0);
+    const stagedStock = currentBase + delta;
     const isLowStock = stagedStock <= (p.lowStockAlert ?? 5);
     const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
     const catInfo = categories.find(c => c.id === p.category);
     const unitInfo = UNITS.find(u => u.id === p.unit);
     const efectivoPrecio = streetRate > 0 ? `$${smartCashRounding(valBs / streetRate)}` : null;
 
-    const handleMinus = () => setDelta(prev => prev - 1);
-    const handlePlus  = () => setDelta(prev => prev + 1);
+    const handleMinus = () => {
+        // Capturar base la primera vez que se toca +/-
+        if (baseStockRef.current === null) baseStockRef.current = p.stock ?? 0;
+        setDelta(prev => prev - 1);
+    };
+    const handlePlus = () => {
+        if (baseStockRef.current === null) baseStockRef.current = p.stock ?? 0;
+        setDelta(prev => prev + 1);
+    };
 
     const handleConfirm = async () => {
         if (delta === 0) return;
@@ -46,12 +59,16 @@ export default function ProductCard({
                 onAdjustStock(p.id, delta);
             }
             setDelta(0);
+            baseStockRef.current = null; // Liberar el bloqueo
         } finally {
             setIsConfirming(false);
         }
     };
 
-    const handleCancel = () => setDelta(0);
+    const handleCancel = () => {
+        setDelta(0);
+        baseStockRef.current = null; // Liberar el bloqueo
+    };
 
     return (
         <div className={`bg-white dark:bg-slate-900 rounded-2xl shadow-sm border flex flex-col overflow-hidden group transition-all ${isLowStock && delta === 0 ? 'border-amber-300 dark:border-amber-700' : delta !== 0 ? 'border-brand ring-2 ring-brand/30 shadow-brand/10' : 'border-slate-100 dark:border-slate-800'} ${isSelected ? 'ring-2 ring-brand border-brand shadow-brand/20 bg-brand/5 dark:bg-brand/10' : ''}`}>

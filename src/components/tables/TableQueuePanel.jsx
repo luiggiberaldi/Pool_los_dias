@@ -10,15 +10,16 @@ import { formatElapsedTime, calculateElapsedTime, calculateSessionCost } from '.
  */
 export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const { tables, activeSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
-    const { orders, orderItems } = useOrdersStore();
+    const { orders, orderItems, subscribeToRealtime: subscribeOrders } = useOrdersStore();
     const config = useTablesStore(s => s.config);
     const tasaUSD = effectiveRate;
 
     // Ensure realtime is active while this panel is mounted
     useEffect(() => {
         subscribeToRealtime();
+        subscribeOrders();
         return () => {}; // don't unsubscribe — shared channel
-    }, [subscribeToRealtime]);
+    }, [subscribeToRealtime, subscribeOrders]);
 
     const pendingSessions = activeSessions.filter(s => s.status === 'CHECKOUT');
 

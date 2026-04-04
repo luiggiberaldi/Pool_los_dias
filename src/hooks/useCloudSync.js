@@ -34,6 +34,7 @@ let globalSubscription = null;
 let isSyncingFromCloud = false; 
 let isInitialSyncCompleted = false; // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
 let pendingPush = {};           
+let isVisibilityBound = false; 
 
 const IMPORT_GUARD_KEY = '_poolbar_import_guard';
 const SYNC_QUEUE_KEY = '_poolbar_sync_queue'; // Cola persistente para offline
@@ -263,16 +264,17 @@ export const pullLatestFromCloud = async () => {
     try {
         const { data: { session } } = await supabaseCloud.auth.getSession();
         if (!session?.user?.id) return;
+        
         const queue = getSyncQueue();
         const { data: docs } = await supabaseCloud
             .from('sync_documents')
             .select('collection, doc_id, data')
             .eq('user_id', session.user.id)
-            .in('doc_id', ['bodega_products_v1', 'poolbar_categories_v1']);
+            .in('doc_id', SYNC_KEYS); // Sync everything, not just products/categories
 
         if (docs?.length > 0) {
             for (const doc of docs) {
-                // Skip if we have local pending changes for this key
+                // SALT ARRANQUE: No bajamos si hay algo pendiente de subir localmente
                 if (queue.includes(doc.doc_id)) continue;
                 await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
             }
@@ -283,7 +285,8 @@ export const pullLatestFromCloud = async () => {
 };
 
 // Auto-pull when app returns to foreground (recovers from WebSocket drops during sleep)
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && !isVisibilityBound) {
+    isVisibilityBound = true;
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && isInitialSyncCompleted) {
             console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
