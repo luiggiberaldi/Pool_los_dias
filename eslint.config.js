@@ -24,6 +24,24 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]' }],
+      // Downgraded: rule fires false positives on legitimate async data-loading patterns
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/immutability': 'warn',
+    },
+  },
+  // Node.js serverless functions (Vercel API routes)
+  {
+    files: ['api/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  // Service workers
+  {
+    files: ['public/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker },
     },
   },
 ])

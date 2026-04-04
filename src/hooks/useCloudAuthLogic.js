@@ -122,7 +122,7 @@ export function useCloudAuthLogic() {
                 }
                 for (const [key, value] of Object.entries(backupData.data.ls || {})) {
                     let finalVal = value;
-                    try { finalVal = JSON.parse(value); } catch(e) {}
+                    try { finalVal = JSON.parse(value); } catch(e) { /* ignore parse errors */ }
                     syncPayloads.push({
                         user_id: session.user.id,
                         collection: 'local',

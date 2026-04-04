@@ -374,13 +374,11 @@ export const useTablesStore = create((set, get) => ({
 
     // --- ADMINISTRACIÓN DE MESAS ---
     addTable: async (name, type = 'POOL') => {
-        try {
             const { data, error } = await supabaseCloud.from('tables').insert([{ name, type, status: 'libre', active: true }]).select().single();
             if (error) throw error;
             set(state => ({ tables: sortTables([...state.tables, data]) }));
             await tablesCache.setItem('tables', get().tables);
             return data;
-        } catch (e) { throw e; }
     },
 
     updateTable: async (id, updates) => {

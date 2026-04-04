@@ -9,7 +9,7 @@ function useBcvRate() {
         try {
             const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
             if (saved?.bcv?.price) return saved.bcv.price;
-        } catch {}
+        } catch { /* ignore parse errors */ }
         return 1;
     });
     useEffect(() => {
@@ -17,7 +17,7 @@ function useBcvRate() {
              try {
                 const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
                 if (saved?.bcv?.price) setRate(saved.bcv.price);
-            } catch {}
+            } catch { /* ignore parse errors */ }
         };
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);

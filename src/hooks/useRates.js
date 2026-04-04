@@ -100,7 +100,7 @@ export function useRates() {
                         cop: data.conversion_rates?.COP || null
                     };
                 }
-            } catch (e) { }
+            } catch (e) { /* ignore fetch errors, return defaults */ }
             return { eur: DEFAULT_EUR_USD_RATIO, cop: null };
         };
 

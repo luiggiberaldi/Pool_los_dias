@@ -29,6 +29,7 @@ export const ManualMode = ({ rates, accounts, theme, triggerHaptic, isKeyboardOp
     const [mainCurrency, setMainCurrency] = useState('auto'); // 'auto', 'BS', 'USD', 'EUR'
     const [showReference, setShowReference] = useState(true);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         try {
             const saved = localStorage.getItem('calc_history');

@@ -73,7 +73,7 @@ export const processSyncQueue = async () => {
             let value;
             if (LOCAL_KEYS.includes(key)) {
                 value = localStorage.getItem(key);
-                try { value = JSON.parse(value); } catch(e) {}
+                try { value = JSON.parse(value); } catch(e) { /* not JSON, use raw string */ }
             } else {
                 value = await storageService.getItem(key);
             }

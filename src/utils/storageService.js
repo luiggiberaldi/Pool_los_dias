@@ -92,7 +92,7 @@ export const storageService = {
     async setItem(key, value) {
         try {
             await localforage.setItem(key, value);
-            try { localStorage.removeItem(key); } catch(e) {} // Ensure stale localStorage fallback is wiped to prevent zombie data
+            try { localStorage.removeItem(key); } catch(e) { /* ignore */ } // Ensure stale localStorage fallback is wiped to prevent zombie data
             if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("app_storage_update", { detail: { key } }));
             }
@@ -120,7 +120,7 @@ export const storageService = {
     async setItemSilent(key, value) {
         try {
             await localforage.setItem(key, value);
-            try { localStorage.removeItem(key); } catch(e) {}
+            try { localStorage.removeItem(key); } catch(e) { /* ignore */ }
             // No cloud push, no scheduleCloudPush
         } catch (error) {
             console.error(`[Storage Error Silent] Guardando ${key}:`, error);

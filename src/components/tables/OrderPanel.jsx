@@ -308,7 +308,7 @@ export function OrderPanel({ session, table, onClose }) {
                                 onClick={async () => {
                                     try {
                                         await updateItemQty(qtyModalItem.id, qtyInputValue);
-                                    } catch(e) {}
+                                    } catch(e) { /* ignore update errors */ }
                                     setQtyModalItem(null);
                                 }}
                                 className="flex-1 py-3.5 text-sm font-bold text-white bg-indigo-500 rounded-xl hover:bg-indigo-600 active:scale-95 transition-all shadow-md shadow-indigo-500/20"

@@ -15,17 +15,18 @@ export default function LoginScreen() {
     const [selectedUser, setSelectedUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    useEffect(() => {
-        if (cachedUsers.length === 0) {
-            handleForceSync();
-        }
-    }, [cachedUsers.length]);
-
     const handleForceSync = async () => {
         setIsSyncing(true);
         await syncUsers();
         setIsSyncing(false);
     };
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => {
+        if (cachedUsers.length === 0) {
+            handleForceSync();
+        }
+    }, [cachedUsers.length]);
 
     const handlePinSubmit = async (pin, userId) => {
         const success = await login(userId, pin);

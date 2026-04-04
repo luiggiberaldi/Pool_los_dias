@@ -51,6 +51,7 @@ function CloudLicenseViewer({ adminEmail, showToast }) {
         setLoading(false);
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         if (adminEmail) loadData();
     }, [adminEmail]);

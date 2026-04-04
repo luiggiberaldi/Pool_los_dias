@@ -4,15 +4,12 @@ import { Search, ChevronRight, Package, Users, FileText, Settings, X } from 'luc
 export default function CommandPalette({ isOpen, onClose, onToggle, navigateTo }) {
     const [query, setQuery] = useState('');
     const inputRef = useRef(null);
-    const wasOpenRef = useRef(false);
-
-    // Reset query when palette opens, and track open state in effect (not during render)
-    useEffect(() => {
-        if (isOpen && !wasOpenRef.current) {
-            setQuery('');
-        }
-        wasOpenRef.current = isOpen;
-    }, [isOpen]);
+    // Reset query during render when palette opens (avoids cascading effect)
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (prevIsOpen !== isOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen) setQuery('');
+    }
 
     const commands = [
         { id: 'nav-sales', title: 'Ir a Ventas', icon: Package, action: () => navigateTo('ventas') },

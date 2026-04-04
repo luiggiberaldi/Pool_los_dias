@@ -93,6 +93,7 @@ export function ProductProvider({ children, rates }) {
     }, []);
 
     // Set Initial Street Rate (from BCV)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         if (!streetRate && rates.bcv?.price > 0 && !localStorage.getItem('street_rate_bs')) {
             setStreetRate(rates.bcv.price);
@@ -210,6 +211,7 @@ export function ProductProvider({ children, rates }) {
     );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useProductContext = () => {
     const context = useContext(ProductContext);
     if (!context) {

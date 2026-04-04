@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Package, Calculator, ChevronDown } from 'lucide-react';
 import { BODEGA_CATEGORIES, CATEGORY_ICONS } from '../../config/categories';
 
@@ -15,15 +15,12 @@ export default function CategoryBar({
     products = [],
 }) {
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-    // Reset pagination when category changes (tracked via effect, not during render)
-    const prevCategoryRef = useRef(selectedCategory);
-    useEffect(() => {
-        if (prevCategoryRef.current !== selectedCategory) {
-            prevCategoryRef.current = selectedCategory;
-            setVisibleCount(PAGE_SIZE);
-        }
-    }, [selectedCategory]);
+    // Reset pagination during render when category changes (no cascading effect)
+    const [prevCategory, setPrevCategory] = useState(selectedCategory);
+    if (prevCategory !== selectedCategory) {
+        setPrevCategory(selectedCategory);
+        setVisibleCount(PAGE_SIZE);
+    }
 
     const visibleProducts = filteredByCategory.slice(0, visibleCount);
     const hasMore = filteredByCategory.length > visibleCount;

@@ -90,6 +90,7 @@ export function ConfirmProvider({ children }) {
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfirm() {
     const ctx = useContext(ConfirmContext);
     if (!ctx) throw new Error('useConfirm must be used inside ConfirmProvider');

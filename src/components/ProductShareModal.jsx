@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Modal } from './Modal';
 import { Copy, Share2, Check, Smartphone, Building2, Wallet } from 'lucide-react';
 import { formatBs, formatUsd, smartCashRounding } from '../utils/calculatorUtils';
@@ -15,14 +15,14 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
         showRefEuro: false
     });
 
-    // Auto-seleccionar primera cuenta al abrir (tracked via effect, not during render)
-    const wasOpenRef = useRef(false);
-    useEffect(() => {
-        if (isOpen && !wasOpenRef.current && accounts.length > 0 && !selectedAccountId) {
+    // Auto-select first account when modal opens
+    const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+    if (prevIsOpen !== isOpen) {
+        setPrevIsOpen(isOpen);
+        if (isOpen && accounts.length > 0 && !selectedAccountId) {
             setSelectedAccountId(accounts[0].id);
         }
-        wasOpenRef.current = isOpen;
-    }, [isOpen, accounts, selectedAccountId]);
+    }
 
     if (!product) return null;
 

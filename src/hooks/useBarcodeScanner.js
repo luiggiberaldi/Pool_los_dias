@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
  */
 export function useBarcodeScanner({ onScan, enabled = true, timeout = 50 }) {
     const buffer = useRef('');
+    // eslint-disable-next-line react-hooks/purity
     const lastKeyTime = useRef(Date.now());
 
     useEffect(() => {

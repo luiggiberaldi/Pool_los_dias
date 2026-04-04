@@ -9,22 +9,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   const [processing, setProcessing] = useState(false);
   const inputRef = useRef(null);
 
-  // Focus el input invisible al abrir
-  useEffect(() => {
-    if (isOpen) {
-      setPin('');
-      setError(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen]);
-
-  // Auto-submit cuando se completan los N dígitos
-  useEffect(() => {
-    if (pin.length === targetPinLength && !processing) {
-      handleSubmit();
-    }
-  }, [pin, processing, targetPinLength]);
-
   const handleSubmit = async () => {
     if (pin.length !== targetPinLength || processing) return;
     setProcessing(true);
@@ -40,6 +24,22 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
     }
     // Si fue exitoso, el componente padre cierra el modal
   };
+
+  // Focus el input invisible al abrir
+  useEffect(() => {
+    if (isOpen) {
+      setPin('');
+      setError(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  // Auto-submit cuando se completan los N dígitos
+  useEffect(() => {
+    if (pin.length === targetPinLength && !processing) {
+      handleSubmit();
+    }
+  }, [pin, processing, targetPinLength]);
 
   const handlePadPress = (digit) => {
     if (pin.length >= targetPinLength || processing) return;

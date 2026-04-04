@@ -542,7 +542,7 @@ export function printThermalTicket(sale, bcvRate) {
     
     // Fallback si onload no dispara
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) {}
+        try { printWindow.print(); } catch(_) { /* ignore if print dialog fails */ }
     }, 1500);
 }
 

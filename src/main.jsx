@@ -6,6 +6,8 @@ import { ToastProvider } from './components/Toast.jsx'
 import { supabaseCloud } from './config/supabaseCloud.js'
 import './index.css'
 
+/* eslint-disable react-refresh/only-export-components */
+
 // ── Evitar que la rueda del mouse cambie valores en inputs numéricos ──
 document.addEventListener('wheel', (e) => {
   if (e.target?.type === 'number') {

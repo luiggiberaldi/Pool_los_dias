@@ -109,6 +109,7 @@ export function useSecurity() {
 
             // Auto-registro: Desactivado. Migrado a CloudAuthModal y useCloudAuthLogic.
 
+            // eslint-disable-next-line react-hooks/immutability
             checkLicense(storedId);
         };
 
@@ -170,7 +171,7 @@ export function useSecurity() {
                         window.location.reload();
                         return;
                     }
-                } catch { }
+                } catch { /* ignore remote check errors */ }
                 // Si no hay licencia activa en servidor y estaba premium → revocar
                 if (isPremium) {
                     setIsPremium(false);
@@ -312,7 +313,7 @@ export function useSecurity() {
                     '_pda_s',
                     encodeToken('VALID_SESSION:' + currentDeviceId)
                 );
-            } catch { }
+            } catch { /* ignore */ }
         }
 
         // Migración silenciosa: asegurar registro en Supabase via RPC seguro
@@ -447,7 +448,7 @@ export function useSecurity() {
                     try {
                         supabase.from('licenses').update({ expires_at: new Date(expiresAt).toISOString() })
                             .eq('device_id', deviceId).eq('product_id', PRODUCT_ID).then();
-                    } catch (e) { }
+                    } catch (e) { /* ignore */ }
                 }
 
                 const token = { deviceId, code: inputCode, type: 'demo7', expires: expiresAt };

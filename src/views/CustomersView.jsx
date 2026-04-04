@@ -87,12 +87,14 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         setActivePaymentMethods(savedMethods);
     };
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         loadData();
     }, []);
 
     // Re-sincronizar cuando el usuario navega a esta tab para reflejar cambios
     // realizados por otras vistas (e.g. ventas fiadas, abonos desde el ticket)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
         if (isActive) loadData();
     }, [isActive]);

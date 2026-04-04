@@ -201,6 +201,7 @@ export default function AuditLogViewer({ triggerHaptic }) {
         setTotalCount(count);
     }, [catFilter, visibleCount]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { loadLog(); }, [loadLog]);
 
     const handleClear = async () => {
