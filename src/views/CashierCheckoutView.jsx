@@ -159,6 +159,7 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
 function PaymentModal({ session, table, config, rates, currentUser, onClose, onSuccess }) {
     const { closeSession } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
+    const cachedUsers = useAuthStore(s => s.cachedUsers);
     const { products, copEnabled, tasaCop, useAutoRate } = useProductContext();
     
     const [method, setMethod] = useState('EFECTIVO');
@@ -241,7 +242,8 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 paymentPayload.push({ methodId: method, amountUsd: 0, currency: 'USD' });
             }
 
-            // 4. Invocar transaccionario
+            // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa
+            const meseroUser = session.opened_by ? cachedUsers?.find(u => u.id === session.opened_by) : null;
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
@@ -256,7 +258,9 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 tasaCop: tasaCop || 0,
                 copEnabled: copEnabled || false,
                 discountData: null,
-                useAutoRate: useAutoRate || true
+                useAutoRate: useAutoRate || true,
+                meseroId: session.opened_by || null,
+                meseroNombre: meseroUser?.name || meseroUser?.nombre || null
             });
 
             if (!saleResult.success) {

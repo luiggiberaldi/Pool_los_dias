@@ -27,7 +27,9 @@ export async function processSaleTransaction({
     tasaCop,
     copEnabled,
     discountData,
-    useAutoRate
+    useAutoRate,
+    meseroId = null,
+    meseroNombre = null
 }) {
     if (cart.length === 0) return { success: false, error: 'Carrito vacío' };
 
@@ -132,6 +134,8 @@ export async function processSaleTransaction({
         vendedorId: currentUser?.id || null,
         vendedorNombre: currentUser?.nombre || currentUser?.name || 'Sistema',
         vendedorRol: currentUser?.rol || currentUser?.role || null,
+        meseroId: meseroId || null,
+        meseroNombre: meseroNombre || null,
         items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
         cartSubtotalUsd: cartSubtotalUsd,
         discountType: discountData?.type || null,

@@ -352,11 +352,21 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // Top Meseros/Vendedores (ranking by revenue and sales count)
     const topStaff = useMemo(() => {
         const staffMap = {};
-        todaySales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.status !== 'ANULADA' && s.vendedorId).forEach(s => {
-            const key = s.vendedorId;
-            if (!staffMap[key]) staffMap[key] = { id: key, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || '', ventas: 0, revenue: 0 };
-            staffMap[key].ventas += 1;
-            staffMap[key].revenue += s.totalUsd || 0;
+        todaySales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.status !== 'ANULADA').forEach(s => {
+            // Credit mesero for table sales, cajero for direct sales
+            if (s.meseroId) {
+                const key = s.meseroId;
+                if (!staffMap[key]) staffMap[key] = { id: key, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
+                staffMap[key].ventas += 1;
+                staffMap[key].revenue += s.totalUsd || 0;
+            }
+            // Also credit the cajero who processed the sale
+            if (s.vendedorId && s.vendedorId !== s.meseroId) {
+                const key = s.vendedorId;
+                if (!staffMap[key]) staffMap[key] = { id: key, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || '', ventas: 0, revenue: 0 };
+                staffMap[key].ventas += 1;
+                staffMap[key].revenue += s.totalUsd || 0;
+            }
         });
         return Object.values(staffMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
     }, [todaySales]);

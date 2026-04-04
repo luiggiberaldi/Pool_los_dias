@@ -20,17 +20,21 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     }, []);
 
     // Load personal sales stats for today
+    // Meseros: credited via meseroId (table sales attributed to them)
+    // Cajeros: credited via vendedorId (they processed the sale)
     useEffect(() => {
         if (!currentUser?.id) return;
+        const userRole = currentUser?.rol || currentUser?.role;
         const loadStats = async () => {
             const sales = await storageService.getItem('bodega_sales_v1', []);
             const todayStr = new Date().toISOString().slice(0, 10);
-            const mySales = sales.filter(s =>
-                s.vendedorId === currentUser.id &&
-                s.status !== 'ANULADA' &&
-                s.tipo !== 'COBRO_DEUDA' &&
-                s.timestamp?.slice(0, 10) === todayStr
-            );
+            const mySales = sales.filter(s => {
+                if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA') return false;
+                if (s.timestamp?.slice(0, 10) !== todayStr) return false;
+                // Meseros get credit from meseroId, cajeros from vendedorId
+                if (userRole === 'MESERO') return s.meseroId === currentUser.id;
+                return s.vendedorId === currentUser.id;
+            });
             setMyStats({
                 ventas: mySales.length,
                 revenue: mySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0),
