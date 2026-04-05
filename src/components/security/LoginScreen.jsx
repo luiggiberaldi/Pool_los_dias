@@ -23,10 +23,9 @@ export default function LoginScreen() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
-        if (cachedUsers.length === 0) {
-            handleForceSync();
-        }
-    }, [cachedUsers.length]);
+        // Siempre sincronizar al montar para tener usuarios actualizados
+        handleForceSync();
+    }, []);
 
     const handlePinSubmit = async (pin, userId) => {
         const success = await login(userId, pin);
