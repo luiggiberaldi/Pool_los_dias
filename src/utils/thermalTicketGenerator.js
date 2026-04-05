@@ -1,10 +1,25 @@
 import { formatBs } from './calculatorUtils';
+import { printReceiptEscPos } from '../services/webSerialPrinter';
 
 /**
- * Imprime un ticket de venta en impresora termica via window.print().
- * Compatible con impresoras USB (PC) y Bluetooth emparejadas (movil Android/iOS).
+ * Imprime un ticket de venta.
+ * 1. Intenta ESC/POS directo via Web Serial (sin diálogo)
+ * 2. Fallback: window.print() con HTML formateado
  */
-export function printThermalTicket(sale, bcvRate) {
+export async function printThermalTicket(sale, bcvRate) {
+    // Intentar impresión directa ESC/POS
+    try {
+        const printed = await printReceiptEscPos(sale, bcvRate);
+        if (printed) return; // Éxito — sin diálogo
+    } catch (err) {
+        console.warn('[Ticket] ESC/POS falló, usando fallback HTML:', err.message);
+    }
+
+    // Fallback: HTML + window.print()
+    _printThermalHTML(sale, bcvRate);
+}
+
+function _printThermalHTML(sale, bcvRate) {
     // ── CONFIGURACIÓN DE TAMAÑOS (Fija en 58mm) ──
     const cssPageSize = '58mm auto';
     const cssBodyWidth = '48mm';
