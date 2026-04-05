@@ -329,10 +329,6 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                         <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
                             <Trophy size={12} /> Ranking Meseros
                         </h3>
-                        <button onClick={handleResetRanking}
-                            className="text-[10px] font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors active:scale-95">
-                            <RotateCcw size={10} /> Reiniciar
-                        </button>
                     </div>
                     <div className="space-y-3">
                         {topMeseros.map((m, i) => {
