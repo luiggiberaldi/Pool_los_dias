@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList, Trophy } from 'lucide-react';
+import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList, Trophy, RotateCcw } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 import { storageService } from '../../utils/storageService';
 
@@ -31,6 +31,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const [myStats, setMyStats] = useState({ cobros: 0, mesas: 0, pedidos: 0 });
     const [lastSale, setLastSale] = useState(null);
     const [topMeseros, setTopMeseros] = useState([]);
+    const [rankingSince, setRankingSince] = useState(() => localStorage.getItem('ranking_meseros_since') || null);
 
     useEffect(() => {
         const interval = setInterval(() => setNow(new Date()), 30000);
@@ -58,10 +59,13 @@ export default function OperatorDashboardPanel({ onNavigate }) {
 
             // Ranking de meseros (solo para rol MESERO)
             if (isMesero) {
+                const sinceDate = rankingSince || null;
                 const meseroMap = {};
                 sales.filter(s => {
                     if (s.status === 'ANULADA' || ['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','APERTURA_CAJA'].includes(s.tipo)) return false;
-                    return !!s.meseroId;
+                    if (!s.meseroId) return false;
+                    if (sinceDate && s.timestamp < sinceDate) return false;
+                    return true;
                 }).forEach(s => {
                     if (!meseroMap[s.meseroId]) meseroMap[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', ventas: 0, revenue: 0 };
                     meseroMap[s.meseroId].ventas += 1;
@@ -75,7 +79,15 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         const onUpdate = (e) => { if (e.detail?.key === 'bodega_sales_v1') load(); };
         window.addEventListener('app_storage_update', onUpdate);
         return () => window.removeEventListener('app_storage_update', onUpdate);
-    }, [currentUser?.id, isMesero]);
+    }, [currentUser?.id, isMesero, rankingSince]);
+
+    const handleResetRanking = () => {
+        if (!window.confirm('¿Reiniciar el ranking de meseros? El conteo empezará desde cero.')) return;
+        const now = new Date().toISOString();
+        localStorage.setItem('ranking_meseros_since', now);
+        setRankingSince(now);
+        setTopMeseros([]);
+    };
 
     const activeTables = useMemo(() =>
         activeSessions
@@ -313,9 +325,15 @@ export default function OperatorDashboardPanel({ onNavigate }) {
             {/* ── TOP MESEROS (solo mesero) ── */}
             {isMesero && topMeseros.length > 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                    <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                        <Trophy size={12} /> Ranking Meseros
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <Trophy size={12} /> Ranking Meseros
+                        </h3>
+                        <button onClick={handleResetRanking}
+                            className="text-[10px] font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors active:scale-95">
+                            <RotateCcw size={10} /> Reiniciar
+                        </button>
+                    </div>
                     <div className="space-y-3">
                         {topMeseros.map((m, i) => {
                             const maxRev = topMeseros[0]?.revenue || 1;
