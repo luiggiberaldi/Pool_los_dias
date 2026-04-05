@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { CreditCard, Clock, X, ChevronRight, Coffee, Timer } from 'lucide-react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
+import { useAuthStore } from '../../hooks/store/authStore';
 import { formatElapsedTime, calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 
 /**
@@ -12,6 +13,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const { tables, activeSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
     const { orders, orderItems, subscribeToRealtime: subscribeOrders } = useOrdersStore();
     const config = useTablesStore(s => s.config);
+    const cachedUsers = useAuthStore(s => s.cachedUsers);
     const tasaUSD = effectiveRate;
 
     // Ensure realtime is active while this panel is mounted
@@ -56,6 +58,10 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     const elapsed = session.started_at ? calculateElapsedTime(session.started_at) : 0;
                     const timeCost = calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times);
                     const grandTotal = timeCost + totalConsumption;
+                    const mesero = session.opened_by && cachedUsers?.length
+                        ? cachedUsers.find(u => u.id === session.opened_by)
+                        : null;
+                    const meseroName = mesero?.name || mesero?.nombre || null;
 
                     return (
                         <button
@@ -71,6 +77,9 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                             {/* Info */}
                             <div className="flex-1 min-w-0">
                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{table.name}</p>
+                                {meseroName && (
+                                    <p className="text-[10px] font-bold text-orange-500/80 truncate">{meseroName}</p>
+                                )}
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <span className="flex items-center gap-1 text-[10px] text-slate-400">
                                         <Timer size={10} /> {formatElapsedTime(elapsed)}
