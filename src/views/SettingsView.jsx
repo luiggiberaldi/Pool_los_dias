@@ -299,7 +299,11 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                             return (
                                 <button
                                     key={tab.id}
-                                    onClick={() => { setActiveTab(tab.id); triggerHaptic?.(); }}
+                                    onClick={() => {
+                                        setActiveTab(tab.id);
+                                        triggerHaptic?.();
+                                        if (tab.id === 'sistema') setDangerZoneClicks(c => c >= 5 ? c : c + 1);
+                                    }}
                                     className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 ${
                                         isActive
                                             ? `${c.pill} ${c.pillText} shadow-md scale-105`
@@ -322,7 +326,6 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                     {/* Section header accent */}
                     <div
                         className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl ${colors.iconBg} select-none`}
-                        onClick={activeTab === 'sistema' ? () => setDangerZoneClicks(c => c >= 5 ? c : c + 1) : undefined}
                     >
                         {React.createElement(currentTab?.icon || Store, { size: 16, className: colors.icon })}
                         <span className={`text-xs font-black tracking-wide uppercase ${colors.icon}`}>

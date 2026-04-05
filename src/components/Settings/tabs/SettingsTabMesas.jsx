@@ -126,6 +126,12 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
 
     const handleDelete = async () => {
         if (!deleteTargetId) return;
+        const { activeSessions } = useTablesStore.getState();
+        if (activeSessions.some(s => s.table_id === deleteTargetId)) {
+            showToast('No puedes borrar una mesa que está abierta', 'error');
+            setDeleteTargetId(null);
+            return;
+        }
         try {
             await deleteTable(deleteTargetId);
             showToast('Mesa eliminada', 'success');
