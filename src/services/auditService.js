@@ -30,8 +30,8 @@ export async function logEvent(cat, action, desc, user = null, meta = null) {
             action,
             desc,
             userId: user?.id ?? null,
-            userName: user?.nombre ?? 'Sistema',
-            userRole: user?.rol ?? 'SYSTEM',
+            userName: user?.nombre ?? user?.name ?? 'Sistema',
+            userRole: user?.rol ?? user?.role ?? 'SYSTEM',
         };
         if (meta) entry.meta = meta;
 
@@ -44,6 +44,7 @@ export async function logEvent(cat, action, desc, user = null, meta = null) {
         }
 
         await storageService.setItem(AUDIT_KEY, log);
+        window.dispatchEvent(new CustomEvent('audit-log-updated'));
     } catch (err) {
         // Silencioso — el audit log nunca debe romper la app
         console.warn('[AuditService] Error writing log:', err);

@@ -162,11 +162,11 @@ export default function TableCard({ table, session }) {
             {/* Header: Title / Flow Actions */}
             <div className="flex flex-wrap items-start justify-between mb-2 gap-2 border-b border-white/5 pb-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                    <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
+                    <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight whitespace-nowrap shrink-0 ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
                         {table.name}
                     </h3>
                     {isPlaying && staffName && (
-                        <span className="text-[9px] sm:text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md truncate max-w-[80px] sm:max-w-[100px]">
+                        <span className="text-[9px] sm:text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md truncate max-w-[70px] sm:max-w-[100px]">
                             {staffName}
                         </span>
                     )}
@@ -179,7 +179,7 @@ export default function TableCard({ table, session }) {
                             >
                                 <Printer size={12} />
                             </button>
-                            {(currentUser?.role === 'ADMIN' || currentUser?.rol === 'ADMIN') && (
+                            {(currentUser?.role === 'ADMIN') && (
                                 <button
                                     onClick={() => setShowCancelModal(true)}
                                     className="w-6 h-6 rounded-full flex items-center justify-center bg-rose-500/80 hover:bg-rose-500 text-white transition-all active:scale-95 shrink-0 ml-1 shadow-sm"
@@ -282,7 +282,7 @@ export default function TableCard({ table, session }) {
                         </div>
                         {session.game_mode === 'PINA' && (
                             <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mt-1 text-center">
-                                {1 + (Number(session.extended_times) || 0)} partida{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
+                                {1 + (Number(session.extended_times) || 0)} piña{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
                             </div>
                         )}
                     </>
@@ -326,14 +326,14 @@ export default function TableCard({ table, session }) {
                                     }}
                                     className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs py-3 rounded-xl shadow-md transition-all whitespace-nowrap"
                                 >
-                                    + Nueva Partida
+                                    + Nueva Piña
                                 </button>
-                                {(currentUser?.role === 'ADMIN' || currentUser?.rol === 'ADMIN') && (Number(session?.extended_times) || 0) > 0 && (
+                                {(currentUser?.role === 'ADMIN') && (Number(session?.extended_times) || 0) > 0 && (
                                     <button
                                         onClick={() => useTablesStore.getState().removeRoundFromSession(session.id)}
                                         className="w-full text-[10px] font-bold text-white/80 bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/30 transition-colors py-1 rounded-lg flex items-center justify-center gap-1 whitespace-nowrap"
                                     >
-                                        <X size={10} strokeWidth={2.5} /> Quitar última partida
+                                        <X size={10} strokeWidth={2.5} /> Quitar última piña
                                     </button>
                                 )}
                             </div>
@@ -433,18 +433,18 @@ export default function TableCard({ table, session }) {
         </Modal>
 
         {/* Modal Modificar Tiempo / Partidas */}
-        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={session?.game_mode === 'PINA' ? "Añadir Partidas" : "Modificar Tiempo"}>
+        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={session?.game_mode === 'PINA' ? "Añadir Piñas" : "Modificar Tiempo"}>
             <div className="flex flex-col gap-4 py-2">
                 {session?.game_mode === 'PINA' ? (
                     <>
                         <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                            Añade más partidas a esta mesa de Piña sin tener que cerrarla y volverla a abrir.
+                            Añade más piñas a esta mesa sin tener que cerrarla y volverla a abrir.
                         </p>
                         <button 
                             onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }} 
                             className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg"
                         >
-                            <TargetIcon size={20} /> + 1 Partida de Piña
+                            <TargetIcon size={20} /> + 1 Piña
                         </button>
                     </>
                 ) : hasLimit ? (
@@ -502,7 +502,7 @@ export default function TableCard({ table, session }) {
                 <div className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/10">
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                            {session?.game_mode === 'PINA' ? 'Partidas (Piña)' : 'Tiempo de Juego'}
+                            {session?.game_mode === 'PINA' ? 'Piñas jugadas' : 'Tiempo de Juego'}
                         </span>
                         <div className="flex flex-col items-end">
                             <span className="text-lg font-black">${timeCost.toFixed(2)}</span>
@@ -510,7 +510,7 @@ export default function TableCard({ table, session }) {
                         </div>
                     </div>
                     <span className="text-xs text-slate-500">
-                         {session?.game_mode === 'PINA' ? `${1 + (Number(session?.extended_times) || 0)} partida(s)` : `${formatElapsedTime(elapsed)} horas jugadas`}
+                         {session?.game_mode === 'PINA' ? `${1 + (Number(session?.extended_times) || 0)} piña(s)` : `${formatElapsedTime(elapsed)} horas jugadas`}
                     </span>
                 </div>
                 )}

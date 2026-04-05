@@ -41,7 +41,10 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     <div className="flex-1 min-w-0">
                         <h2 className="font-black text-slate-800 dark:text-white text-lg leading-tight">{table.name}</h2>
                         <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <Timer size={11} /> {formatElapsedTime(elapsed)} de sesión
+                            <Timer size={11} />
+                            {session.game_mode === 'PINA'
+                                ? `${1 + (Number(session.extended_times) || 0)} piña(s) · La Piña`
+                                : `${formatElapsedTime(elapsed)} de sesión`}
                         </p>
                     </div>
                     <button
@@ -60,14 +63,25 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-blue-100 dark:border-blue-900/30">
                                 <Clock size={13} className="text-blue-500" />
-                                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">Tiempo de Juego</p>
+                                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                                    {session.game_mode === 'PINA' ? 'Piñas jugadas' : 'Tiempo de Juego'}
+                                </p>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3">
                                 <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {session.game_mode === 'por_hora' ? 'Tarifa por hora' : 'Tarifa fija'}
-                                    </p>
+                                    {session.game_mode === 'PINA' ? (
+                                        <>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-white">
+                                                {1 + (Number(session.extended_times) || 0)} piña{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Precio fijo por piña</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Tarifa por hora</p>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="text-right">
                                     <p className="text-base font-black text-slate-800 dark:text-white">${timeCost.toFixed(2)}</p>

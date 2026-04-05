@@ -2,258 +2,386 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, DollarSign, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 import { storageService } from '../../utils/storageService';
+
+function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Buenos días';
+    if (h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+}
+
+function formatElapsed(startedAt) {
+    const mins = calculateElapsedTime(startedAt);
+    if (mins < 60) return `${Math.floor(mins)}min`;
+    const h = Math.floor(mins / 60);
+    const m = Math.floor(mins % 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
 export default function OperatorDashboardPanel({ onNavigate }) {
     const { tables, activeSessions, config } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
+    const role = currentUser?.role || currentUser?.rol;
+    const isMesero = role === 'MESERO';
     const [now, setNow] = useState(new Date());
-    const [myStats, setMyStats] = useState({ ventas: 0, revenue: 0, items: 0 });
+    const [myStats, setMyStats] = useState({ cobros: 0, mesas: 0, pedidos: 0 });
+    const [lastSale, setLastSale] = useState(null);
 
-    // Update time every minute
     useEffect(() => {
-        const interval = setInterval(() => setNow(new Date()), 60000);
+        const interval = setInterval(() => setNow(new Date()), 30000);
         return () => clearInterval(interval);
     }, []);
 
-    // Load personal sales stats for today
-    // Meseros: credited via meseroId (table sales attributed to them)
-    // Cajeros: credited via vendedorId (they processed the sale)
     useEffect(() => {
         if (!currentUser?.id) return;
-        const userRole = currentUser?.rol || currentUser?.role;
-        const loadStats = async () => {
+        const load = async () => {
             const sales = await storageService.getItem('bodega_sales_v1', []);
             const todayStr = new Date().toISOString().slice(0, 10);
             const mySales = sales.filter(s => {
                 if (s.status === 'ANULADA' || s.tipo === 'COBRO_DEUDA') return false;
                 if (s.timestamp?.slice(0, 10) !== todayStr) return false;
-                // Meseros get credit from meseroId, cajeros from vendedorId
-                if (userRole === 'MESERO') return s.meseroId === currentUser.id;
-                return s.vendedorId === currentUser.id;
-            });
-            setMyStats({
-                ventas: mySales.length,
-                revenue: mySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0),
-                items: mySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0)
-            });
+                return isMesero ? s.meseroId === currentUser.id : s.vendedorId === currentUser.id;
+            }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            // Para mesero: contar mesas únicas atendidas hoy
+            const mesasHoy = isMesero ? new Set(mySales.map(s => s.tableId).filter(Boolean)).size : 0;
+            // Para mesero: contar pedidos (items totales)
+            const pedidosHoy = isMesero ? mySales.reduce((sum, s) => sum + (s.items?.reduce((is, i) => is + i.qty, 0) || 0), 0) : 0;
+
+            setMyStats({ cobros: mySales.length, mesas: mesasHoy, pedidos: pedidosHoy });
+            setLastSale(mySales[0] || null);
         };
-        loadStats();
-        // Reload when sales change
-        const onUpdate = (e) => { if (e.detail?.key === 'bodega_sales_v1') loadStats(); };
+        load();
+        const onUpdate = (e) => { if (e.detail?.key === 'bodega_sales_v1') load(); };
         window.addEventListener('app_storage_update', onUpdate);
         return () => window.removeEventListener('app_storage_update', onUpdate);
-    }, [currentUser?.id]);
+    }, [currentUser?.id, isMesero]);
 
-    // 1. Alertas de Tiempo (Mesas por Vencerse - Pool)
-    const timeAlerts = useMemo(() => {
-        return activeSessions
+    const activeTables = useMemo(() =>
+        activeSessions
+            .filter(s => s.status === 'ACTIVE')
+            .map(s => ({
+                ...s,
+                tableName: tables.find(t => t.id === s.table_id)?.name || 'Mesa',
+                elapsedMin: calculateElapsedTime(s.started_at),
+            }))
+            .sort((a, b) => b.elapsedMin - a.elapsedMin),
+        [activeSessions, tables, now] // eslint-disable-line react-hooks/exhaustive-deps
+    );
+
+    const checkoutTables = useMemo(() =>
+        activeSessions
+            .filter(s => s.status === 'CHECKOUT')
+            .map(s => ({
+                ...s,
+                tableName: tables.find(t => t.id === s.table_id)?.name || 'Mesa',
+            })),
+        [activeSessions, tables]
+    );
+
+    const timeAlerts = useMemo(() =>
+        activeSessions
             .filter(s => s.status === 'ACTIVE' && s.game_mode === 'NORMAL' && s.hours_paid > 0)
-            .map(session => {
-                const elapsedMin = calculateElapsedTime(session.started_at);
-                const paidMin = (session.hours_paid || 0) * 60;
-                const remainingMin = paidMin - elapsedMin;
-                return { session, remainingMin };
+            .map(s => {
+                const elapsedMin = calculateElapsedTime(s.started_at);
+                const remainingMin = (s.hours_paid || 0) * 60 - elapsedMin;
+                return { session: s, remainingMin };
             })
-            .filter(data => data.remainingMin <= 15) // Solo mesas con 15min o menos, o negativas (vencidas)
-            .sort((a, b) => a.remainingMin - b.remainingMin);
-    }, [activeSessions, now]); // eslint-disable-line react-hooks/exhaustive-deps
+            .filter(d => d.remainingMin <= 15)
+            .sort((a, b) => a.remainingMin - b.remainingMin),
+        [activeSessions, now] // eslint-disable-line react-hooks/exhaustive-deps
+    );
 
-    // 2. Alertas de Inactividad (+45min sin pedidos nuevos en ordenes activas, excluyendo la hora de inicio de mesa de billar vacía)
-    // Para simplificar, revisaremos la fecha "created_at" o "started_at" de la mesa vs la fecha del ultimo item.
     const inactivityAlerts = useMemo(() => {
         const alerts = [];
-        activeSessions.forEach(session => {
-            if (session.status !== 'ACTIVE') return;
-            const order = orders.find(o => o.table_session_id === session.id);
+        activeSessions.forEach(s => {
+            if (s.status !== 'ACTIVE') return;
+            const order = orders.find(o => o.table_session_id === s.id);
             const items = orderItems.filter(i => i.order_id === order?.id);
-            
-            // Determinar la última interacción (creación de sesión o agregado de un ítem)
-            let lastInteractionStr = session.started_at; 
+            let lastStr = s.started_at;
             if (items.length > 0) {
-                // Buscamos el ítem insertado más recientemente
-                const latestItemStr = items.reduce((latest, item) => {
-                    return (!latest || new Date(item.created_at || now) > new Date(latest)) ? item.created_at : latest;
-                }, null);
-                if (latestItemStr) lastInteractionStr = latestItemStr;
+                const latest = items.reduce((l, i) => (!l || new Date(i.created_at || now) > new Date(l)) ? i.created_at : l, null);
+                if (latest) lastStr = latest;
             }
-
-            const diffMin = Math.floor((now - new Date(lastInteractionStr)) / 60000);
-            
-            // Si pasaron más de 45 minutos sin interacciones...
-            if (diffMin >= 45) {
-                alerts.push({ session, idleMinutes: diffMin });
-            }
+            const diffMin = Math.floor((now - new Date(lastStr)) / 60000);
+            if (diffMin >= 45) alerts.push({ session: s, idleMinutes: diffMin });
         });
-        return alerts.sort((a, b) => b.idleMinutes - a.idleMinutes); // Mayor inactividad primero
+        return alerts.sort((a, b) => b.idleMinutes - a.idleMinutes);
     }, [activeSessions, orders, orderItems, now]);
 
-    // 3. Monitoreo de Seguridad (Cuentas > $30 USD)
     const HIGH_BILL_THRESHOLD = 30;
-    const highBillAlerts = useMemo(() => {
-        return activeSessions.map(session => {
-            if (session.status !== 'ACTIVE') return null;
-            // Game Cost
-            const elapsedMin = calculateElapsedTime(session.started_at);
-            const gameCost = calculateSessionCost(elapsedMin, session.game_mode, config, session.hours_paid, session.extended_times);
-            
-            // Consumption Cost
-            let consumptionCost = 0;
-            const order = orders.find(o => o.table_session_id === session.id);
-            if (order) {
-                const items = orderItems.filter(i => i.order_id === order.id);
-                consumptionCost = items.reduce((sum, item) => sum + ((item.unit_price_usd || 0) * item.qty), 0);
-            }
-
+    const highBillAlerts = useMemo(() =>
+        activeSessions.map(s => {
+            if (s.status !== 'ACTIVE') return null;
+            const elapsedMin = calculateElapsedTime(s.started_at);
+            const gameCost = calculateSessionCost(elapsedMin, s.game_mode, config, s.hours_paid, s.extended_times);
+            const order = orders.find(o => o.table_session_id === s.id);
+            const consumptionCost = order
+                ? orderItems.filter(i => i.order_id === order.id).reduce((sum, i) => sum + (i.unit_price_usd || 0) * i.qty, 0)
+                : 0;
             const totalUsd = gameCost + consumptionCost;
-            if (totalUsd >= HIGH_BILL_THRESHOLD) {
-                return { session, totalUsd };
-            }
-            return null;
-        }).filter(Boolean).sort((a, b) => b.totalUsd - a.totalUsd);
-    }, [activeSessions, orders, orderItems, now, config]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const getTableName = (tableId) => {
-        return tables.find(t => t.id === tableId)?.name || 'Mesa ?';
-    };
+            return totalUsd >= HIGH_BILL_THRESHOLD ? { session: s, totalUsd } : null;
+        }).filter(Boolean).sort((a, b) => b.totalUsd - a.totalUsd),
+        [activeSessions, orders, orderItems, now, config] // eslint-disable-line react-hooks/exhaustive-deps
+    );
 
     const hasAnyAlert = timeAlerts.length > 0 || inactivityAlerts.length > 0 || highBillAlerts.length > 0;
+    const firstName = currentUser?.name?.split(' ')[0] || (isMesero ? 'Mesero' : 'Cajero');
+
+    // ── Colores por rol ──
+    const accent = isMesero
+        ? { from: '#F97316', to: '#EA580C', glow: 'rgba(249,115,22,0.15)', text: 'text-orange-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' }
+        : { from: '#1E293B', to: '#334155', glow: 'rgba(20,184,166,0.1)', text: 'text-teal-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' };
 
     return (
-        <div className="space-y-4 pt-1">
-            {/* HEROLINE / SUMARIO */}
-            <div className="bg-slate-800 rounded-[1.5rem] p-5 shadow-lg relative overflow-hidden" 
-                 style={{ background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)' }}>
-                <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
-                <h2 className="text-white text-lg font-black tracking-tight mb-4">Resumen de Turno</h2>
-                
-                <div className="grid grid-cols-3 gap-4 relative z-10">
-                    <div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Mesas Activas</p>
-                        <p className="text-3xl font-black text-white leading-none pl-1">
-                            {activeSessions.filter(s => s.status === 'ACTIVE').length}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Mis Ventas Hoy</p>
-                        <p className="text-3xl font-black text-emerald-400 leading-none pl-1">
-                            {myStats.ventas}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest pl-1 mb-1">Aportado</p>
-                        <p className="text-2xl font-black text-amber-400 leading-none pl-1">
-                            ${myStats.revenue.toFixed(2)}
-                        </p>
+        <div className="space-y-3 pt-1">
+
+            {/* ── HERO SALUDO ── */}
+            <div className="relative rounded-[1.5rem] overflow-hidden p-5 shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${accent.from} 0%, ${accent.to} 100%)` }}>
+                <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+                <div className="absolute -left-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl" />
+                <div className="relative z-10">
+                    <p className={`text-white/60 text-[11px] font-bold uppercase tracking-widest mb-0.5`}>{getGreeting()}</p>
+                    <h2 className="text-white text-2xl font-black tracking-tight mb-4">{firstName} {isMesero ? '🎱' : '👋'}</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {isMesero ? (
+                            <>
+                                <div className="bg-white/15 rounded-2xl p-3">
+                                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Mesas activas</p>
+                                    <p className="text-3xl font-black text-white leading-none">{activeTables.length + checkoutTables.length}</p>
+                                </div>
+                                <div className="bg-white/15 rounded-2xl p-3">
+                                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1">Pedidos hoy</p>
+                                    <p className="text-3xl font-black text-white leading-none">{myStats.pedidos}</p>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-white/10 rounded-2xl p-3">
+                                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">En juego</p>
+                                    <p className="text-3xl font-black text-white leading-none">{activeTables.length}</p>
+                                </div>
+                                <div className={`rounded-2xl p-3 ${checkoutTables.length > 0 ? accent.badge : 'bg-white/10'}`}>
+                                    <p className={`${accent.badgeText} text-[10px] font-bold uppercase tracking-widest mb-1`}>
+                                        {checkoutTables.length > 0 ? '⚡ Para cobrar' : 'Mis cobros hoy'}
+                                    </p>
+                                    <p className={`text-3xl font-black leading-none ${checkoutTables.length > 0 ? 'text-white' : accent.text}`}>
+                                        {checkoutTables.length > 0 ? checkoutTables.length : myStats.cobros}
+                                    </p>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* ALERTAS */}
-            {!hasAnyAlert && (
-                <div className="bg-white rounded-2xl border border-slate-100 p-8 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-4">
-                        <CheckCircle2 size={32} />
+            {/* ── BOTÓN PRINCIPAL ── */}
+            {isMesero ? (
+                <button
+                    onClick={() => onNavigate?.('mesas')}
+                    className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group"
+                    style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', boxShadow: '0 6px 20px rgba(249,115,22,0.3)' }}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                            <UtensilsCrossed size={22} className="text-white" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-sm font-black text-white">Mis Mesas</p>
+                            <p className="text-[11px] text-white/70 font-medium">Ver y atender mesas activas</p>
+                        </div>
                     </div>
-                    <p className="font-black text-slate-800 text-lg mb-1">Todo bajo control</p>
-                    <p className="text-xs text-slate-500 font-medium px-4">No hay alertas urgentes pendientes. ¡Excelente servicio!</p>
+                    <ArrowRight size={18} className="text-white/60 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+            ) : (
+                <button
+                    onClick={() => onNavigate?.('ventas')}
+                    className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group"
+                    style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 6px 20px rgba(14,165,233,0.3)' }}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                            <ShoppingCart size={22} className="text-white" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-sm font-black text-white">Punto de Venta</p>
+                            <p className="text-[11px] text-white/70 font-medium">Registrar ventas y cobros</p>
+                        </div>
+                    </div>
+                    <ArrowRight size={18} className="text-white/60 group-hover:translate-x-0.5 transition-transform" />
+                </button>
+            )}
+
+            {/* ── MESAS LISTAS PARA COBRAR (solo cajero) ── */}
+            {!isMesero && checkoutTables.length > 0 && (
+                <div>
+                    <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest px-1 mb-2 flex items-center gap-1.5">
+                        <Zap size={11} /> Listas para cobrar
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                        {checkoutTables.map(t => (
+                            <button key={t.id}
+                                onClick={() => onNavigate?.('ventas')}
+                                className="rounded-xl p-3 border border-orange-300 bg-orange-50 text-left active:scale-95 transition-all shadow-sm">
+                                <p className="text-xs font-black text-orange-800 leading-none mb-1">{t.tableName}</p>
+                                <div className="flex items-center gap-1">
+                                    <Clock size={10} className="text-orange-500" />
+                                    <span className="text-[10px] font-bold text-orange-600">{formatElapsed(t.started_at)}</span>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {/* TIME ALERTS */}
+            {/* ── MESAS EN JUEGO ── */}
+            {activeTables.length > 0 && (
+                <div>
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 mb-2 flex items-center gap-1.5">
+                        <TableProperties size={11} /> Mesas en juego
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2">
+                        {activeTables.map(t => {
+                            const isLong = t.elapsedMin >= 90;
+                            return isMesero ? (
+                                <button key={t.id}
+                                    onClick={() => onNavigate?.('mesas')}
+                                    className={`rounded-xl p-3 border text-left active:scale-95 transition-all ${isLong ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
+                                    <p className={`text-xs font-black leading-none mb-1 ${isLong ? 'text-amber-800' : 'text-slate-800'}`}>{t.tableName}</p>
+                                    <div className="flex items-center gap-1">
+                                        <Clock size={10} className={isLong ? 'text-amber-500' : 'text-slate-400'} />
+                                        <span className={`text-[10px] font-bold ${isLong ? 'text-amber-600' : 'text-slate-500'}`}>{formatElapsed(t.started_at)}</span>
+                                    </div>
+                                </button>
+                            ) : (
+                                <div key={t.id}
+                                    className={`rounded-xl p-3 border ${isLong ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
+                                    <p className={`text-xs font-black leading-none mb-1 ${isLong ? 'text-amber-800' : 'text-slate-800'}`}>{t.tableName}</p>
+                                    <div className="flex items-center gap-1">
+                                        <Clock size={10} className={isLong ? 'text-amber-500' : 'text-slate-400'} />
+                                        <span className={`text-[10px] font-bold ${isLong ? 'text-amber-600' : 'text-slate-500'}`}>{formatElapsed(t.started_at)}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── ÚLTIMA VENTA (solo cajero) ── */}
+            {!isMesero && lastSale && (() => {
+                const mins = Math.floor((now - new Date(lastSale.timestamp)) / 60000);
+                const timeAgo = mins < 1 ? 'ahora mismo' : mins < 60 ? `hace ${mins} min` : `hace ${Math.floor(mins/60)}h`;
+                return (
+                    <div className="bg-white border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+                        <div className="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center shrink-0">
+                            <CheckCircle size={18} className="text-teal-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Última venta</p>
+                            <p className="text-sm font-black text-slate-800 truncate">
+                                {lastSale.customerName || lastSale.items?.[0]?.name || 'Venta'}
+                            </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                            <p className="text-sm font-black text-teal-600">${(lastSale.totalUsd || 0).toFixed(2)}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{timeAgo}</p>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── ALERTAS ── */}
+            {!hasAnyAlert && (
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 flex flex-col items-center justify-center text-center shadow-sm">
+                    <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-3">
+                        <CheckCircle2 size={28} />
+                    </div>
+                    <p className="font-black text-slate-800 mb-0.5">Todo bajo control</p>
+                    <p className="text-[11px] text-slate-500 font-medium">Sin alertas urgentes. ¡Excelente servicio!</p>
+                </div>
+            )}
+
             {timeAlerts.length > 0 && (
                 <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5 mt-4">
-                        <Timer size={12} /> Tiempos Críticos
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                        <Timer size={11} /> Tiempos Críticos
                     </h3>
                     {timeAlerts.map(({ session, remainingMin }) => {
-                        const isExpired = remainingMin <= 0;
-                        const tableName = getTableName(session.table_id);
+                        const expired = remainingMin <= 0;
+                        const tName = tables.find(t => t.id === session.table_id)?.name || 'Mesa';
                         return (
-                            <div key={session.id} 
-                                onClick={() => { if(onNavigate) onNavigate('mesas'); }}
-                                className={`rounded-xl p-3 border shadow-sm relative overflow-hidden active:scale-95 transition-all cursor-pointer flex items-center justify-between
-                                    ${isExpired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}
-                                `}>
-                                <div className="flex items-center gap-3 relative z-10">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center
-                                        ${isExpired ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}
-                                    `}>
-                                        <AlertTriangle size={18} strokeWidth={2.5} />
+                            <div key={session.id} onClick={() => onNavigate?.(isMesero ? 'mesas' : 'ventas')}
+                                className={`rounded-xl p-3 border shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer ${expired ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${expired ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                        <AlertTriangle size={16} strokeWidth={2.5} />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-800 leading-none mb-1">{tableName}</p>
-                                        <p className={`text-xs font-bold ${isExpired ? 'text-red-500' : 'text-amber-600'}`}>
-                                            {isExpired ? `Tiempo vencido por ${Math.abs(remainingMin)} min` : `Quedan ${remainingMin} min`}
+                                        <p className="text-sm font-black text-slate-800 leading-none mb-0.5">{tName}</p>
+                                        <p className={`text-xs font-bold ${expired ? 'text-red-500' : 'text-amber-600'}`}>
+                                            {expired ? `Vencido por ${Math.abs(remainingMin)} min` : `Quedan ${remainingMin} min`}
                                         </p>
                                     </div>
                                 </div>
-                                <ArrowRight size={16} className={isExpired ? 'text-red-300' : 'text-amber-300'} />
+                                <ArrowRight size={15} className={expired ? 'text-red-300' : 'text-amber-300'} />
                             </div>
-                        )
+                        );
                     })}
                 </div>
             )}
 
-            {/* HIGH BILL ALERTS */}
             {highBillAlerts.length > 0 && (
                 <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5 mt-4">
-                        <AlertTriangle size={12} /> Cuentas Altas (&gt;&nbsp;${HIGH_BILL_THRESHOLD})
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                        <Zap size={11} /> Cuentas Altas (&gt;&nbsp;${HIGH_BILL_THRESHOLD})
                     </h3>
                     {highBillAlerts.map(({ session, totalUsd }) => {
-                        const tableName = getTableName(session.table_id);
+                        const tName = tables.find(t => t.id === session.table_id)?.name || 'Mesa';
                         return (
-                            <div key={session.id} 
-                                onClick={() => { if(onNavigate) onNavigate('mesas'); }}
-                                className="rounded-xl p-3 border border-pink-200 shadow-sm relative overflow-hidden bg-pink-50 active:scale-95 transition-all cursor-pointer flex items-center justify-between">
-                                <div className="flex items-center gap-3 relative z-10">
-                                    <div className="w-10 h-10 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center">
-                                        <span className="font-black">$</span>
-                                    </div>
+                            <div key={session.id} onClick={() => onNavigate?.(isMesero ? 'mesas' : 'ventas')}
+                                className="rounded-xl p-3 border border-pink-200 bg-pink-50 shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center font-black text-sm">$</div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-800 leading-none mb-1">{tableName}</p>
-                                        <p className="text-xs font-bold text-pink-600">
-                                            Cuenta alcanza los ${totalUsd.toFixed(2)}
-                                        </p>
+                                        <p className="text-sm font-black text-slate-800 leading-none mb-0.5">{tName}</p>
+                                        <p className="text-xs font-bold text-pink-600">Cuenta: ${totalUsd.toFixed(2)}</p>
                                     </div>
                                 </div>
-                                <ArrowRight size={16} className="text-pink-300" />
+                                <ArrowRight size={15} className="text-pink-300" />
                             </div>
-                        )
+                        );
                     })}
                 </div>
             )}
 
-            {/* INACTIVITY ALERTS */}
             {inactivityAlerts.length > 0 && (
                 <div className="space-y-2">
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5 mt-4">
-                        <Coffee size={12} /> Mesas Inactivas (+45min)
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                        <Coffee size={11} /> Sin Atención (+45min)
                     </h3>
                     {inactivityAlerts.map(({ session, idleMinutes }) => {
-                        const tableName = getTableName(session.table_id);
+                        const tName = tables.find(t => t.id === session.table_id)?.name || 'Mesa';
                         return (
-                            <div key={session.id} 
-                                onClick={() => { if(onNavigate) onNavigate('mesas'); }}
-                                className="rounded-xl p-3 border border-slate-200 shadow-sm relative overflow-hidden bg-white active:scale-95 transition-all cursor-pointer flex items-center justify-between">
-                                <div className="flex items-center gap-3 relative z-10">
-                                    <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center">
-                                        <Clock size={18} strokeWidth={2.5} />
+                            <div key={session.id} onClick={() => onNavigate?.(isMesero ? 'mesas' : 'ventas')}
+                                className="rounded-xl p-3 border border-slate-200 bg-white shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center">
+                                        <Clock size={16} strokeWidth={2.5} />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-800 leading-none mb-1">{tableName}</p>
+                                        <p className="text-sm font-black text-slate-800 leading-none mb-0.5">{tName}</p>
                                         <p className="text-xs font-bold text-slate-500">
-                                            {Math.floor(idleMinutes / 60) > 0 ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m` : `${idleMinutes} min`} sin atención
+                                            {Math.floor(idleMinutes / 60) > 0 ? `${Math.floor(idleMinutes / 60)}h ${idleMinutes % 60}m` : `${idleMinutes}min`} sin atención
                                         </p>
                                     </div>
                                 </div>
-                                <ArrowRight size={16} className="text-slate-300" />
+                                <ArrowRight size={15} className="text-slate-300" />
                             </div>
-                        )
+                        );
                     })}
                 </div>
             )}

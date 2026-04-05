@@ -46,13 +46,20 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     dash(y);
     y += 6;
 
-    // TIEMPO
+    // TIEMPO / PARTIDAS
     if (timeCost > 0) {
+        const isPina = session.game_mode === 'PINA';
         doc.setFont('helvetica', 'bold');
-        doc.text("Tiempo de Mesa", M, y);
+        doc.text(isPina ? "Partidas (La Piña)" : "Tiempo de Mesa", M, y);
         y += 4;
         doc.setFont('helvetica', 'normal');
-        doc.text(`${Math.ceil(elapsed / 60)}h (${session.game_mode})`, M, y);
+        if (isPina) {
+            const partidas = 1 + (Number(session.extended_times) || 0);
+            doc.text(`${partidas} piña${partidas !== 1 ? 's' : ''} x $${(timeCost / partidas).toFixed(2)}`, M, y);
+        } else {
+            const horas = elapsed / 60;
+            doc.text(`${horas < 1 ? Math.ceil(horas * 60) + ' min' : (horas).toFixed(1) + 'h'}`, M, y);
+        }
         doc.text(`$${timeCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
         y += 6;
     }

@@ -29,16 +29,6 @@ export default function SettingsTabNegocio({
             {/* Mi Negocio */}
             <SectionCard icon={Store} title="Mi Negocio" subtitle="Datos que aparecen en tickets" iconColor="text-indigo-500">
                 <div>
-                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Nombre del Negocio</label>
-                    <input
-                        type="text"
-                        placeholder="Ej: Mi Bodega C.A."
-                        value={businessName}
-                        onChange={e => setBusinessName(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
-                    />
-                </div>
-                <div>
                     <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">RIF o Documento</label>
                     <input
                         type="text"

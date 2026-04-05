@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    Store, CreditCard, Database, Users,
+    Store, CreditCard, Database, Users, FileText,
     AlertTriangle, Download, Upload, Share2,
     Sun, Moon, LogOut, Trash2, Copy, Check,
     ChevronRight, ShieldCheck, Package, Printer, Layers
@@ -22,14 +22,15 @@ import SettingsTabVentas from '../components/Settings/tabs/SettingsTabVentas';
 import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios';
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
 import SettingsTabMesas from '../components/Settings/tabs/SettingsTabMesas';
+import SettingsTabBitacora from '../components/Settings/tabs/SettingsTabBitacora';
 import { setImportGuard } from '../hooks/useCloudSync';
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 const TABS = [
-    { id: 'negocio',   label: 'Negocio',   icon: Store,        color: 'indigo' },
-    { id: 'mesas',     label: 'Mesas',     icon: Layers,       color: 'sky', adminOnly: true },
+    { id: 'mesas',     label: 'Mesas',     icon: Layers,       color: 'sky',    adminOnly: true },
     { id: 'ventas',    label: 'Ventas',     icon: CreditCard,   color: 'emerald' },
     { id: 'usuarios',  label: 'Usuarios',   icon: Users,        color: 'violet', adminOnly: true },
+    { id: 'bitacora',  label: 'Bitácora',   icon: FileText,     color: 'indigo', adminOnly: true },
     { id: 'sistema',   label: 'Sistema',    icon: Database,     color: 'amber' },
 ];
 
@@ -67,7 +68,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
         });
     }, []);
 
-    const [activeTab, setActiveTab] = useState('negocio');
+    const [activeTab, setActiveTab] = useState('ventas');
     const [idCopied, setIdCopied] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [shareCustomers, setShareCustomers] = useState([]);
@@ -81,6 +82,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [businessRif, setBusinessRif] = useState(localStorage.getItem('business_rif') || '');
     const [paperWidth, setPaperWidth] = useState(localStorage.getItem('printer_paper_width') || '58');
     const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') !== 'false');
+    const [maxDiscountCajero, setMaxDiscountCajero] = useState(parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100);
     const [autoLockMinutes, setAutoLockMinutes] = useState(localStorage.getItem('admin_auto_lock_minutes') || '5');
     const [autoLockOnMinimize, setAutoLockOnMinimize] = useState(localStorage.getItem('admin_auto_lock_on_minimize') !== 'false');
 
@@ -242,14 +244,14 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                                 <button
                                     key={tab.id}
                                     onClick={() => { setActiveTab(tab.id); triggerHaptic?.(); }}
-                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 ${
+                                    className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 ${
                                         isActive
                                             ? `${c.pill} ${c.pillText} shadow-md scale-105`
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                     }`}
                                 >
                                     <Icon size={12} />
-                                    {tab.label}
+                                    <span className="hidden sm:inline">{tab.label}</span>
                                 </button>
                             );
                         })}
@@ -269,23 +271,6 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                         </span>
                     </div>
 
-                    {/* ═══ TAB NEGOCIO ═══ */}
-                    {activeTab === 'negocio' && (
-                        <SettingsTabNegocio
-                            businessName={businessName} setBusinessName={setBusinessName}
-                            businessRif={businessRif} setBusinessRif={setBusinessRif}
-                            paperWidth={paperWidth} setPaperWidth={setPaperWidth}
-                            copEnabled={copEnabled} setCopEnabled={setCopEnabled}
-                            autoCopEnabled={autoCopEnabled} setAutoCopEnabled={setAutoCopEnabled}
-                            tasaCopManual={tasaCopManual} setTasaCopManual={setTasaCopManual}
-                            calculatedTasaCop={calculatedTasaCop}
-                            handleSaveBusinessData={handleSaveBusinessData}
-                            forceHeartbeat={forceHeartbeat}
-                            showToast={showToast}
-                            triggerHaptic={triggerHaptic}
-                        />
-                    )}
-
                     {/* ═══ TAB MESAS ═══ */}
                     {activeTab === 'mesas' && isAdmin && (
                         <SettingsTabMesas
@@ -298,6 +283,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                     {activeTab === 'ventas' && (
                         <SettingsTabVentas
                             allowNegativeStock={allowNegativeStock} setAllowNegativeStock={setAllowNegativeStock}
+                            maxDiscountCajero={maxDiscountCajero} setMaxDiscountCajero={setMaxDiscountCajero}
                             forceHeartbeat={forceHeartbeat}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
@@ -312,6 +298,11 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
                         />
+                    )}
+
+                    {/* ═══ TAB BITÁCORA ═══ */}
+                    {activeTab === 'bitacora' && isAdmin && (
+                        <SettingsTabBitacora triggerHaptic={triggerHaptic} />
                     )}
 
                     {/* ═══ TAB SISTEMA ═══ */}

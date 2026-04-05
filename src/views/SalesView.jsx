@@ -28,6 +28,7 @@ import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
 import { TableQueuePanel } from '../components/tables/TableQueuePanel';
 import TableBillModal from '../components/tables/TableBillModal';
 import { useCashStore } from '../hooks/store/cashStore';
+import { useAuthStore } from '../hooks/store/authStore';
 
 // Extracted hooks
 import { useSalesData } from '../hooks/useSalesData';
@@ -39,6 +40,8 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
     const { products, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
     const { activeCashSession } = useCashStore();
+    const { role: userRole } = useAuthStore();
+    const maxDiscountPercent = parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100;
     const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
 
     // ── UI State ──
@@ -372,7 +375,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                                         <CartPanel cart={cart} effectiveRate={effectiveRate}
                                             cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
                                             cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
-                                            discountData={discountData} onOpenDiscount={() => { setIsCartSheetOpen(false); setShowDiscountModal(true); }}
+                                            discountData={discountData} onOpenDiscount={() => { setIsCartSheetOpen(false); setShowDiscountModal('sheet'); }}
                                             updateQty={updateQty} removeFromCart={removeFromCart}
                                             onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
                                             onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
@@ -416,9 +419,10 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
             {showDiscountModal && (
                 <DiscountModal currentDiscount={discount}
-                    onApply={(newDiscount) => { setDiscount(newDiscount); setShowDiscountModal(false); }}
-                    onClose={() => setShowDiscountModal(false)}
-                    cartSubtotalUsd={cartSubtotalUsd} effectiveRate={effectiveRate} tasaCop={tasaCop} copEnabled={copEnabled} />
+                    onApply={(newDiscount) => { setDiscount(newDiscount); setShowDiscountModal(false); if (showDiscountModal === 'sheet') setIsCartSheetOpen(true); }}
+                    onClose={() => { setShowDiscountModal(false); if (showDiscountModal === 'sheet') setIsCartSheetOpen(true); }}
+                    cartSubtotalUsd={cartSubtotalUsd} effectiveRate={effectiveRate} tasaCop={tasaCop} copEnabled={copEnabled}
+                    userRole={userRole || 'ADMIN'} maxDiscountPercent={maxDiscountPercent} />
             )}
 
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}

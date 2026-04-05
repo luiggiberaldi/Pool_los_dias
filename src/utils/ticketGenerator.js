@@ -99,6 +99,18 @@ export async function generateTicketPDF(sale, bcvRate) {
         y += 6;
     }
 
+    const staffName = sale.meseroNombre || sale.vendedorNombre;
+    if (staffName && staffName !== 'Sistema') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...INK);
+        doc.text('Atendido:', M, y);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...BODY);
+        doc.text(staffName, M + 14, y);
+        y += 6;
+    }
+
     dash(y); y += 5;
 
     // ════════════════════════════════════

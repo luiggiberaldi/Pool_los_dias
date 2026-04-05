@@ -3,7 +3,7 @@ import { X, Delete, Loader2 } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
-  const targetPinLength = user?.role === 'ADMIN' ? 6 : 4;
+  const targetPinLength = (user?.role === 'ADMIN' || user?.rol === 'ADMIN') ? 6 : 4;
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -30,6 +30,20 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
       setError(false);
     }
   }, [isOpen]);
+
+  // Teclado físico — solo en desktop (no touch)
+  useEffect(() => {
+    if (!isOpen) return;
+    const isTouchDevice = 'ontouchstart' in window && window.innerWidth < 1024;
+    if (isTouchDevice) return;
+
+    const handleKey = (e) => {
+      if (e.key >= '0' && e.key <= '9') handlePadPress(e.key);
+      else if (e.key === 'Backspace') handleDelete();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, pin, processing]);
 
   // Auto-submit cuando se completan los N dígitos
   useEffect(() => {

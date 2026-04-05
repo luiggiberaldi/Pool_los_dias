@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { logEvent } from '../../services/auditService';
+import { useAuthStore } from './authStore';
+
+const getUser = () => useAuthStore.getState().currentUser;
 
 const tablesCache = localforage.createInstance({
     name: "PoolLosDiaz",
@@ -235,15 +239,19 @@ export const useTablesStore = create((set, get) => ({
         // ID temporal para UI
         const fakeId = 'temp-' + Date.now();
         const optimisticSession = { ...sessionPayload, id: fakeId };
-        
+
         const newSessions = [...get().activeSessions, optimisticSession];
         set({ activeSessions: newSessions });
         await tablesCache.setItem('active_sessions', newSessions);
 
+        const tableName = get().tables.find(t => t.id === tableId)?.name ?? tableId;
+        const modeLabel = gameMode === 'PINA' ? 'La Piña' : gameMode === 'PREPAGO' ? `Prepago ${hoursPaid}h` : 'Normal';
+        logEvent('MESAS', 'MESA_ABIERTA', `Mesa ${tableName} abierta · ${modeLabel}`, getUser(), { tableId, gameMode, hoursPaid });
+
         try {
             const { data, error } = await supabaseCloud.from('table_sessions').insert(sessionPayload).select().single();
             if (error) throw error;
-            
+
             set(state => ({
                 activeSessions: state.activeSessions.map(s => s.id === fakeId ? data : s)
             }));
@@ -256,11 +264,17 @@ export const useTablesStore = create((set, get) => ({
     },
 
     closeSession: async (sessionId, staffId, totalCost, paymentMethod = null) => {
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        const tableName = session ? (get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id) : sessionId;
+
         const updatedList = get().activeSessions.filter(s => s.id !== sessionId);
         set({ activeSessions: updatedList });
         await tablesCache.setItem('active_sessions', updatedList);
 
-        const updatePayload = { 
+        const cost = Number(totalCost);
+        logEvent('MESAS', 'MESA_CERRADA', `Mesa ${tableName} cerrada${cost > 0 ? ` · $${cost.toFixed(2)}` : ''}`, getUser(), { sessionId, totalCost, paymentMethod });
+
+        const updatePayload = {
             status: 'CLOSED',
             closed_at: new Date().toISOString(),
             total_cost_usd: totalCost
@@ -312,10 +326,13 @@ export const useTablesStore = create((set, get) => ({
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
         const newRounds = (Number(session.extended_times) || 0) + 1;
-        
+        const tableName = get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id;
+
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, extended_times: newRounds } : s);
         set({ activeSessions: newSessions });
         await tablesCache.setItem('active_sessions', newSessions);
+
+        logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Piña añadida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
@@ -329,10 +346,13 @@ export const useTablesStore = create((set, get) => ({
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
         const newRounds = Math.max(0, (Number(session.extended_times) || 0) - 1);
-        
+        const tableName = get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id;
+
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, extended_times: newRounds } : s);
         set({ activeSessions: newSessions });
         await tablesCache.setItem('active_sessions', newSessions);
+
+        logEvent('MESAS', 'MESA_PIÑA_QUITADA', `Mesa ${tableName} · Piña removida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
@@ -378,6 +398,7 @@ export const useTablesStore = create((set, get) => ({
             if (error) throw error;
             set(state => ({ tables: sortTables([...state.tables, data]) }));
             await tablesCache.setItem('tables', get().tables);
+            logEvent('MESAS', 'MESA_CREADA', `Mesa "${name}" creada (${type})`, getUser(), { tableId: data.id, name, type });
             return data;
     },
 
@@ -391,8 +412,10 @@ export const useTablesStore = create((set, get) => ({
     },
 
     deleteTable: async (id) => {
+        const tableName = get().tables.find(t => t.id === id)?.name ?? id;
         set(state => ({ tables: state.tables.filter(t => t.id !== id) }));
         await tablesCache.setItem('tables', get().tables);
+        logEvent('MESAS', 'MESA_ELIMINADA', `Mesa "${tableName}" eliminada`, getUser(), { tableId: id });
         try {
             const { error } = await supabaseCloud.from('tables').delete().eq('id', id);
             if (error) throw error;

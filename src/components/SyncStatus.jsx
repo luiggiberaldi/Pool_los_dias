@@ -77,8 +77,16 @@ export default function SyncStatus() {
         }
     }, [isSyncing, checkHealth, checkQueue]);
 
+    // Auto-sync: cuando hay pendientes y hay internet, sincronizar sin que el usuario haga nada
     useEffect(() => {
-        const goOnline = () => { setIsOnline(true); checkHealth(); };
+        if (pendingCount > 0 && isOnline && !isSyncing) {
+            const timer = setTimeout(() => handleForceSync(), 2500);
+            return () => clearTimeout(timer);
+        }
+    }, [pendingCount, isOnline, isSyncing, handleForceSync]);
+
+    useEffect(() => {
+        const goOnline = () => { setIsOnline(true); checkHealth(); checkQueue(); };
         const goOffline = () => setIsOnline(false);
 
         window.addEventListener('online', goOnline);

@@ -21,6 +21,7 @@ import { useInventoryVelocity } from '../hooks/useInventoryVelocity';
 import { useProductForm } from '../hooks/useProductForm';
 import { useProductPagination } from '../hooks/useProductPagination';
 import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore as useNewAuthStore } from '../hooks/store/authStore';
 import { useAudit } from '../hooks/useAudit';
 import { forcePushToCloud } from '../hooks/useCloudSync';
 
@@ -30,7 +31,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
         streetRate, useAutoRate, setUseAutoRate, customRate, setCustomRate,
         effectiveRate, copEnabled, tasaCop, adjustStock: baseAdjustStock
     } = useProductContext();
-    const isCajero = useAuthStore(s => s.usuarioActivo)?.rol === 'CAJERO';
+    const { role: newRole } = useNewAuthStore();
+    const legacyRol = useAuthStore(s => s.usuarioActivo)?.rol;
+    const isCajero = (newRole || legacyRol) === 'CAJERO';
     const { log: auditLog } = useAudit();
 
     const adjustStock = async (productId, delta) => {

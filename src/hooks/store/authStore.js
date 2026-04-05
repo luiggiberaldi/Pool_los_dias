@@ -155,8 +155,16 @@ export const useAuthStore = create((set, get) => ({
 
     // ── Métodos legados (por compatibilidad con SettingsView / DashboardView) ──
 
-    setRequireLogin: () => {},   // no-op: PIN siempre requerido
-    setAdminCredentials: () => {}, // no-op: credenciales manejadas por Supabase Auth
+    setRequireLogin: () => {},
+    setAdminCredentials: () => {},
+
+    // ── Verificar PIN de admin sin cambiar sesión activa ─────────────────────
+    verifyAdminPin: async (pin) => {
+        const admins = get().cachedUsers.filter(u => u.role === 'ADMIN');
+        if (!admins.length) return false;
+        const hashedPin = await sha256(pin);
+        return admins.some(u => u.pin_hash === hashedPin);
+    },
 
     // ── Lock automático (lo llama useAutoLock) ────────────────────────────────
     lockSession: async () => {

@@ -160,7 +160,24 @@ export default function CheckoutModal({
                         <div className="divide-y divide-orange-100 dark:divide-orange-800/20">
                             {tableContext.timeCost > 0 && (
                                 <div className="flex items-center justify-between px-3 py-2">
-                                    <span className="flex items-center gap-1.5 text-xs text-slate-500"><Clock size={11} className="text-blue-400" /> Tiempo de juego</span>
+                                    {tableContext.session?.game_mode === 'PINA' ? (() => {
+                                        const count = 1 + (Number(tableContext.session?.extended_times) || 0);
+                                        return (
+                                            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                🎱 {count} piña{count !== 1 ? 's' : ''}
+                                            </span>
+                                        );
+                                    })() : (() => {
+                                        const mins = tableContext.elapsed || 0;
+                                        const timeLabel = mins < 60
+                                            ? `${Math.ceil(mins)} min`
+                                            : `${(mins / 60).toFixed(1).replace('.0', '')}h`;
+                                        return (
+                                            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                <Clock size={11} className="text-blue-400" /> Tiempo de juego · {timeLabel}
+                                            </span>
+                                        );
+                                    })()}
                                     <span className="text-xs font-black text-slate-700 dark:text-white">${tableContext.timeCost.toFixed(2)}</span>
                                 </div>
                             )}

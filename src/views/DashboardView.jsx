@@ -271,18 +271,24 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[120px] sm:min-h-[160px]">
                 <div className="flex items-center justify-start gap-2 sm:gap-3 z-20">
                     <SyncStatus />
-                    {usuarioActivo && (
-                        <div className={`flex items-center gap-1.5 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-50 border-sky-100/50' : 'bg-teal-50 border-teal-100/50'} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
-                            <div className="relative flex h-2 w-2 ml-1 sm:ml-0">
-                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-400' : 'bg-teal-400'}`}></span>
-                                <span className={`relative inline-flex rounded-full h-2 w-2 ${usuarioActivo.role === 'ADMIN' ? 'bg-sky-500' : 'bg-teal-500'}`}></span>
+                    {usuarioActivo && (() => {
+                        const r = usuarioActivo.role || usuarioActivo.rol;
+                        const c = r === 'ADMIN' ? {bg:'bg-sky-50',border:'border-sky-100/50',ping:'bg-sky-400',dot:'bg-sky-500',text:'text-sky-800',btn:'text-sky-500 hover:bg-sky-100 hover:text-sky-700'}
+                                : r === 'MESERO' ? {bg:'bg-orange-50',border:'border-orange-100/50',ping:'bg-orange-400',dot:'bg-orange-500',text:'text-orange-800',btn:'text-orange-500 hover:bg-orange-100 hover:text-orange-700'}
+                                : {bg:'bg-teal-50',border:'border-teal-100/50',ping:'bg-teal-400',dot:'bg-teal-500',text:'text-teal-800',btn:'text-teal-500 hover:bg-teal-100 hover:text-teal-700'};
+                        return (
+                            <div className={`flex items-center gap-1.5 ${c.bg} ${c.border} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
+                                <div className="relative flex h-2 w-2 ml-1 sm:ml-0">
+                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${c.ping}`}></span>
+                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${c.dot}`}></span>
+                                </div>
+                                <span className={`hidden sm:block text-xs font-black sm:max-w-[120px] truncate ${c.text}`}>{usuarioActivo.name.split(' ')[0]}</span>
+                                <button onClick={() => { triggerHaptic?.(); authLogout(); }} className={`p-1.5 ml-0.5 transition-all rounded-full active:scale-90 ${c.btn}`}>
+                                    <LockIcon size={14} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <span className={`hidden sm:block text-xs font-black sm:max-w-[120px] truncate ${usuarioActivo.role === 'ADMIN' ? 'text-sky-800' : 'text-teal-800'}`}>{usuarioActivo.name.split(' ')[0]}</span>
-                            <button onClick={() => { triggerHaptic?.(); authLogout(); }} className={`p-1.5 ml-0.5 transition-all rounded-full active:scale-90 ${usuarioActivo.role === 'ADMIN' ? 'text-sky-500 hover:bg-sky-100 hover:text-sky-700' : 'text-teal-500 hover:bg-teal-100 hover:text-teal-700'}`}>
-                                <LockIcon size={14} strokeWidth={2.5} />
-                            </button>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </div>
                 <div className="hidden sm:flex absolute z-0 pointer-events-none inset-x-0 top-2 justify-center">
                     <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '139px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
@@ -387,12 +393,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             <div className={`bg-white rounded-2xl p-3 border border-slate-100 shadow-sm ${!isAdmin ? 'mt-3' : ''}`}>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Acciones Rápidas</p>
                 <div className="flex gap-2">
-                    <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('mesas'); } }}
-                        className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
-                        style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 12px rgba(14,165,233,0.25)' }}>
-                        <ListChecks size={22} className="text-white" />
-                        <span className="text-[11px] font-black text-white">{usuarioActivo?.role === 'CAJERO' ? 'Cobros' : 'Mesas'}</span>
-                    </button>
+                    {isAdmin && (
+                        <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('mesas'); } }}
+                            className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                            style={{ background: 'linear-gradient(135deg, #0EA5E9, #0284C7)', boxShadow: '0 4px 12px rgba(14,165,233,0.25)' }}>
+                            <ListChecks size={22} className="text-white" />
+                            <span className="text-[11px] font-black text-white">Mesas</span>
+                        </button>
+                    )}
                     {isAdmin && (
                         <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('reportes'); } }}
                             className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"

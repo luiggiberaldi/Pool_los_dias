@@ -417,15 +417,6 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                     {passwordError && <p className="text-[11px] text-red-500 font-bold mt-1 ml-1">{passwordError}</p>}
                                 </div>
 
-                                {/* Identificador de Estación */}
-                                <div className="group relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none"><Smartphone size={16} className="text-slate-400 group-focus-within:text-sky-500 transition-colors" /></div>
-                                    <input
-                                        type="text" value={localDeviceAlias} onChange={e => setLocalDeviceAlias(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all placeholder:text-slate-300 placeholder:font-normal"
-                                        placeholder="Identificador de Estación (ej: Barra)"
-                                    />
-                                </div>
 
                                 {/* Olvidé contraseña */}
                                 {isCloudLogin && (

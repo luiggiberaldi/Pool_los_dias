@@ -1,10 +1,11 @@
 import React from 'react';
 import {
-    Database, Palette, Fingerprint, Upload, Download, Share2,
+    Database, Palette, Upload, Download, Share2,
     Check, Sun, Moon, ChevronRight, Trash2, AlertTriangle, FileText
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import AuditLogViewer from '../AuditLogViewer';
+import WebSerialPanel from '../WebSerialPanel';
 import { useAudit } from '../../../hooks/useAudit';
 
 export default function SettingsTabSistema({
@@ -74,15 +75,6 @@ export default function SettingsTabSistema({
                         </div>
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
-
-                    <button onClick={handleShareWithAudit} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
-                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"><Share2 size={18} className="text-indigo-500" /></div>
-                        <div className="text-left flex-1">
-                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Compartir Base de Datos</p>
-                            <p className="text-[10px] text-slate-400">Codigo de 6 digitos, 24h</p>
-                        </div>
-                        <ChevronRight size={16} className="text-slate-300" />
-                    </button>
                 </div>
 
                 {importStatus && (
@@ -94,34 +86,6 @@ export default function SettingsTabSistema({
             </SectionCard>
 
 
-            {/* Dispositivo */}
-            <SectionCard icon={Fingerprint} title="Dispositivo" subtitle="Informacion tecnica" iconColor="text-slate-500">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                        <p className="text-[9px] uppercase tracking-wider font-bold text-slate-400 mb-1">ID de Instalacion</p>
-                        <p className="font-mono text-xs font-black text-slate-600 dark:text-slate-300 select-all truncate">{deviceId || '...'}</p>
-                    </div>
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(deviceId).then(() => {
-                                setIdCopied(true);
-                                setTimeout(() => setIdCopied(false), 2000);
-                            });
-                        }}
-                        className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all"
-                    >
-                        {idCopied ? <Check size={14} className="text-emerald-500" /> : <Fingerprint size={14} />}
-                    </button>
-                </div>
-                <p className="text-[9px] text-slate-400">Comparte este ID si necesitas soporte tecnico.</p>
-            </SectionCard>
-
-            {/* Audit Log */}
-            {isAdmin && (
-                <SectionCard icon={FileText} title="Bitacora de Actividad" subtitle="Registro de todas las acciones" iconColor="text-slate-500">
-                    <AuditLogViewer triggerHaptic={triggerHaptic} />
-                </SectionCard>
-            )}
 
             {/* Zona de Peligro */}
             <SectionCard icon={AlertTriangle} title="Zona de Peligro" subtitle="Acciones irreversibles" iconColor="text-red-500">
@@ -141,6 +105,9 @@ export default function SettingsTabSistema({
                     </div>
                 </button>
             </SectionCard>
+
+            {/* Impresora USB & Cajón */}
+            <WebSerialPanel />
         </>
     );
 }
