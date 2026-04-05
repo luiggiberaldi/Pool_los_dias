@@ -29,10 +29,13 @@ const LOCAL_KEYS = [
 
 // ─── Estado Global del Motor ───────────────────────────────────────────────
 let globalSubscription = null;
-let isSyncingFromCloud = false; 
-let isInitialSyncCompleted = false; // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
-let pendingPush = {};           
-let isVisibilityBound = false; 
+let globalSubscriptionUserId = null; // Track which user the subscription belongs to
+let isSyncingFromCloud = false;
+let syncingFromCloudCount = 0;      // Counter-based guard (safer than boolean)
+let isInitialSyncCompleted = false;  // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
+let pendingPush = {};
+let isVisibilityBound = false;
+let visibilityDebounceTimer = null;
 
 const IMPORT_GUARD_KEY = '_poolbar_import_guard';
 const SYNC_QUEUE_KEY = '_poolbar_sync_queue'; // Cola persistente para offline
@@ -84,7 +87,7 @@ export const processSyncQueue = async () => {
             // NOTA: removeFromSyncQueue ahora se llama dentro de pushCloudSync si tiene éxito
         } catch (e) {
             console.warn(`[CloudSync] Reintento fallido para ${key}:`, e.message);
-            break; 
+            continue; // No bloquear la cola entera por un solo fallo
         }
     }
 };
@@ -231,6 +234,7 @@ export const pushCloudSync = async (key, value, force = false) => {
 };
 
 async function _applyFromCloud(docId, collection, payload) {
+    syncingFromCloudCount++;
     isSyncingFromCloud = true;
     try {
         if (collection === 'local') {
@@ -250,7 +254,11 @@ async function _applyFromCloud(docId, collection, payload) {
             window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: docId } }));
         }
     } finally {
-        isSyncingFromCloud = false;
+        syncingFromCloudCount--;
+        if (syncingFromCloudCount <= 0) {
+            syncingFromCloudCount = 0;
+            isSyncingFromCloud = false;
+        }
     }
 }
 
@@ -315,8 +323,12 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
     isVisibilityBound = true;
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && isInitialSyncCompleted) {
-            console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
-            pullLatestFromCloud();
+            // Debounce: evitar múltiples pulls si el usuario cambia tabs rápido
+            if (visibilityDebounceTimer) clearTimeout(visibilityDebounceTimer);
+            visibilityDebounceTimer = setTimeout(() => {
+                console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
+                pullLatestFromCloud();
+            }, 1500);
         }
     });
 }
@@ -395,7 +407,14 @@ export function useCloudSync() {
                 processSyncQueue();
 
                 // ── Suscripción Realtime ─────────────────────────
+                // Si el userId cambió (logout/login), limpiar la suscripción anterior
+                if (globalSubscription && globalSubscriptionUserId !== userId) {
+                    globalSubscription.unsubscribe();
+                    globalSubscription = null;
+                    globalSubscriptionUserId = null;
+                }
                 if (!globalSubscription) {
+                    globalSubscriptionUserId = userId;
                     globalSubscription = supabaseCloud
                         .channel(`sync:${userId}`)
                         .on('postgres_changes', {

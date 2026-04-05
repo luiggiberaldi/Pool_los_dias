@@ -13,6 +13,9 @@ const cashCache = localforage.createInstance({
 let cashRealtimeChannel = null;
 let cashPollingInterval = null;
 let cashVisibilityBound = false;
+let cashVisibilityTimer = null;
+let lastSyncTime = 0;
+const SYNC_DEBOUNCE = 3000; // No sincronizar más de una vez cada 3s
 
 export const useCashStore = create((set, get) => ({
     activeCashSession: null,
@@ -39,7 +42,12 @@ export const useCashStore = create((set, get) => ({
     },
 
     // Consulta directa a Supabase y actualiza el estado local
-    syncCashSession: async () => {
+    syncCashSession: async (force = false) => {
+        // Debounce: no sincronizar si ya se hizo recientemente (salvo force)
+        const now = Date.now();
+        if (!force && now - lastSyncTime < SYNC_DEBOUNCE) return;
+        lastSyncTime = now;
+
         try {
             const { data, error } = await supabaseCloud
                 .from('cash_sessions')
@@ -146,7 +154,11 @@ export const useCashStore = create((set, get) => ({
         cashVisibilityBound = true;
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                get().syncCashSession();
+                // Debounce: evitar ráfagas al cambiar tabs rápido
+                if (cashVisibilityTimer) clearTimeout(cashVisibilityTimer);
+                cashVisibilityTimer = setTimeout(() => {
+                    get().syncCashSession();
+                }, 1500);
             }
         });
     },
@@ -194,6 +206,16 @@ export const useCashStore = create((set, get) => ({
         // Limpiar local inmediatamente para desbloquear la UI al instante
         await cashCache.removeItem('active_cash_session');
         set({ activeCashSession: null });
+
+        // Cleanup: detener polling y realtime para no sincronizar data fantasma
+        if (cashPollingInterval) {
+            clearInterval(cashPollingInterval);
+            cashPollingInterval = null;
+        }
+        if (cashRealtimeChannel) {
+            cashRealtimeChannel.unsubscribe();
+            cashRealtimeChannel = null;
+        }
 
         try {
             const { error } = await supabaseCloud

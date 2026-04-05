@@ -45,28 +45,35 @@ export default function SyncStatus() {
         if (isSyncing) return;
         setIsSyncing(true);
         setJustSynced(false);
+        let syncSuccess = false;
         try {
             await checkHealth();
             if (!navigator.onLine) return;
 
             // 1. Subir ventas offline pendientes
-            await offlineQueueService.syncPendingSales();
+            const result = await offlineQueueService.syncPendingSales();
 
             // 2. Jalar el inventario más reciente de la nube
             await pullLatestFromCloud();
 
-            // 3. Marcar como sincronizado
-            const now = Date.now();
-            setLastSyncedAt(now);
-            localStorage.setItem('_poolbar_last_synced', now.toString());
-            setJustSynced(true);
-            setTimeout(() => setJustSynced(false), 3000);
+            // 3. Solo marcar como sincronizado si no quedaron pendientes
+            const hasRemaining = result?.pending > 0;
+            if (!hasRemaining) {
+                const now = Date.now();
+                setLastSyncedAt(now);
+                localStorage.setItem('_poolbar_last_synced', now.toString());
+                syncSuccess = true;
+            }
 
             await checkQueue();
         } catch (e) {
             console.warn('[SyncStatus] Error en force sync:', e);
         } finally {
             setIsSyncing(false);
+            if (syncSuccess) {
+                setJustSynced(true);
+                setTimeout(() => setJustSynced(false), 3000);
+            }
         }
     }, [isSyncing, checkHealth, checkQueue]);
 
@@ -80,7 +87,7 @@ export default function SyncStatus() {
         checkHealth();
         checkQueue();
 
-        const healthInterval = setInterval(checkHealth, 30000);
+        const healthInterval = setInterval(checkHealth, 60000);
         const queueInterval = setInterval(checkQueue, 4000);
 
         return () => {

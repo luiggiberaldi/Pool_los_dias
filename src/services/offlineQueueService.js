@@ -2,10 +2,63 @@ import localforage from 'localforage';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
 const QUEUE_KEY = 'offline_sales_queue';
+const SYNC_LOCK_KEY = '_poolbar_offline_sync_lock';
+const LOCK_TTL = 30_000; // 30s — si un tab crashea, el lock expira
+const RPC_TIMEOUT = 12_000; // 12s timeout para cada RPC
+
+// Errores de PostgreSQL que NUNCA van a resolverse reintentando
+const UNRECOVERABLE_CODES = new Set([
+  '22P02', // invalid_text_representation
+  '23505', // unique_violation (venta ya procesada)
+  '23001', // restrict_violation
+  '23502', // not_null_violation
+  '23503', // foreign_key_violation
+  '42501', // insufficient_privilege
+]);
+
+// ─── Lock Multi-Tab ────────────────────────────────────────────────────────
+function acquireSyncLock() {
+    try {
+        const raw = localStorage.getItem(SYNC_LOCK_KEY);
+        if (raw) {
+            const existing = JSON.parse(raw);
+            if (existing && Date.now() - existing.ts < LOCK_TTL) return false;
+        }
+        localStorage.setItem(SYNC_LOCK_KEY, JSON.stringify({ ts: Date.now() }));
+        return true;
+    } catch { return true; } // Si falla lectura, proceder
+}
+
+function releaseSyncLock() {
+    try { localStorage.removeItem(SYNC_LOCK_KEY); } catch {}
+}
+
+// ─── Timeout wrapper ───────────────────────────────────────────────────────
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('SYNC_TIMEOUT')), ms)
+        )
+    ]);
+}
 
 export const offlineQueueService = {
   async addSaleToQueue(salePayload) {
     const queue = await localforage.getItem(QUEUE_KEY) || [];
+
+    // Deduplicación: si ya existe un item pending con la misma idempotency_key, no duplicar
+    if (salePayload.idempotency_key) {
+        const duplicate = queue.find(q =>
+            q.sync_status === 'pending' &&
+            q.payload?.idempotency_key === salePayload.idempotency_key
+        );
+        if (duplicate) {
+            console.warn('[Offline Sync] Venta duplicada detectada, ignorando:', salePayload.idempotency_key);
+            return duplicate;
+        }
+    }
+
     const newEntry = {
       id: crypto.randomUUID(),
       payload: salePayload,
@@ -18,66 +71,93 @@ export const offlineQueueService = {
   },
 
   async syncPendingSales() {
-    const queue = await localforage.getItem(QUEUE_KEY) || [];
-    const now = Date.now();
-    const pending = queue.filter(q =>
-      q.sync_status === 'pending' &&
-      !(q.next_retry_at && now < q.next_retry_at)
-    );
-
-    if (pending.length === 0) {
-      // Still purge old synced/failed items even when nothing to sync
-      const purged = queue.filter(q => {
-        if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
-        if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
-        return true;
-      });
-      if (purged.length !== queue.length) {
-        await localforage.setItem(QUEUE_KEY, purged);
-      }
-      return;
+    // Lock multi-tab: solo un tab sincroniza a la vez
+    if (!acquireSyncLock()) {
+        console.log('[Offline Sync] Otra pestaña está sincronizando. Saltando.');
+        return { synced: 0, failed: 0, pending: 0 };
     }
 
-    let updatedQueue = [...queue];
+    let synced = 0, failed = 0;
 
-    for (const item of pending) {
-      try {
-        const payloadWithOrigin = {
-          ...item.payload,
-          sync_origin: 'offline_sync',
-          original_created_at: item.created_at
-        };
+    try {
+        const queue = await localforage.getItem(QUEUE_KEY) || [];
+        const now = Date.now();
+        const pending = queue.filter(q =>
+          q.sync_status === 'pending' &&
+          !(q.next_retry_at && now < q.next_retry_at)
+        );
 
-        const { data, error } = await supabase.rpc('process_checkout', { payload: payloadWithOrigin });
-
-        if (error) throw error;
-
-        updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'synced', synced_at: Date.now() } : q);
-      } catch (err) {
-        console.error('[Offline Sync] Fallo al sincronizar venta offline:', err);
-        const attempts = item.attempts + 1;
-
-        // Unrecoverable constraint violation - mark as failed immediately
-        if (err?.code === '22P02') {
-            console.warn(`[Offline Sync] Venta marcada como fallida (error irreparable ${err.code}): ${err.message}`);
-            updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), last_error: err.message } : q);
-        } else if (attempts >= 10) {
-            console.warn(`[Offline Sync] Venta marcada como fallida tras ${attempts} intentos: ${err.message}`);
-            updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), attempts, last_error: err.message } : q);
-        } else {
-            const nextRetryAt = Date.now() + Math.min(300000, 1000 * Math.pow(2, attempts));
-            updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, attempts, next_retry_at: nextRetryAt } : q);
+        if (pending.length === 0) {
+          // Purgar items viejos synced/failed (> 24h)
+          const purged = queue.filter(q => {
+            if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
+            if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
+            return true;
+          });
+          if (purged.length !== queue.length) {
+            await localforage.setItem(QUEUE_KEY, purged);
+          }
+          return { synced: 0, failed: 0, pending: 0 };
         }
-      }
-    }
 
-    // Keep all items; only purge synced/failed items older than 24 hours
-    const purgedQueue = updatedQueue.filter(q => {
-      if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
-      if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
-      return true;
-    });
-    await localforage.setItem(QUEUE_KEY, purgedQueue);
+        let updatedQueue = [...queue];
+
+        for (const item of pending) {
+          try {
+            const payloadWithOrigin = {
+              ...item.payload,
+              sync_origin: 'offline_sync',
+              original_created_at: item.created_at
+            };
+
+            // RPC con timeout — no colgar indefinidamente
+            const { data, error } = await withTimeout(
+                supabase.rpc('process_checkout', { payload: payloadWithOrigin }),
+                RPC_TIMEOUT
+            );
+
+            if (error) throw error;
+
+            updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'synced', synced_at: Date.now() } : q);
+            synced++;
+          } catch (err) {
+            console.error('[Offline Sync] Fallo al sincronizar venta offline:', err);
+            const attempts = item.attempts + 1;
+            const errCode = err?.code;
+            const isTimeout = err?.message === 'SYNC_TIMEOUT';
+
+            // Errores irrecuperables — no reintentar jamás
+            if (UNRECOVERABLE_CODES.has(errCode)) {
+                console.warn(`[Offline Sync] Venta marcada como fallida (error irreparable ${errCode}): ${err.message}`);
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), last_error: `${errCode}: ${err.message}` } : q);
+                failed++;
+            } else if (attempts >= 10) {
+                console.warn(`[Offline Sync] Venta marcada como fallida tras ${attempts} intentos: ${err.message}`);
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), attempts, last_error: err.message } : q);
+                failed++;
+            } else {
+                // Backoff exponencial: 2s, 4s, 8s, 16s... hasta max 5 min
+                // Si fue timeout, backoff más agresivo (x2)
+                const baseDelay = isTimeout ? 2000 : 1000;
+                const nextRetryAt = Date.now() + Math.min(300_000, baseDelay * Math.pow(2, attempts));
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, attempts, next_retry_at: nextRetryAt } : q);
+            }
+          }
+        }
+
+        // Purgar items viejos synced/failed (> 24h)
+        const purgedQueue = updatedQueue.filter(q => {
+          if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
+          if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
+          return true;
+        });
+        await localforage.setItem(QUEUE_KEY, purgedQueue);
+
+        const remainingPending = purgedQueue.filter(q => q.sync_status === 'pending').length;
+        return { synced, failed, pending: remainingPending };
+    } finally {
+        releaseSyncLock();
+    }
   }
 };
 
@@ -89,5 +169,5 @@ window.addEventListener('online', () => {
         syncScheduled = false;
         console.log("[Offline Sync] Internet restaurado. Sincronizando ventas pendientes...");
         offlineQueueService.syncPendingSales();
-    }, 2000); // 2 second debounce
+    }, 2000);
 });
