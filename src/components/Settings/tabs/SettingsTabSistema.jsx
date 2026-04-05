@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Database, Palette, Upload, Download, Share2,
-    Check, Sun, Moon, ChevronRight, Trash2, AlertTriangle, FileText
+    Check, Sun, Moon, ChevronRight, Trash2, AlertTriangle, FileText, RotateCcw
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import AuditLogViewer from '../AuditLogViewer';
@@ -16,8 +16,10 @@ export default function SettingsTabSistema({
     handleExport, handleImportClick,
     setIsShareOpen,
     setShowDeleteConfirm,
-    triggerHaptic,
+    onFactoryReset,
     dangerZoneUnlocked,
+    onDangerZoneClick,
+    triggerHaptic,
 }) {
     const { log } = useAudit();
 
@@ -104,6 +106,17 @@ export default function SettingsTabSistema({
                     <div className="text-left flex-1">
                         <p className="text-sm font-bold text-red-700 dark:text-red-400">Borrar Historial de Ventas</p>
                         <p className="text-[10px] text-red-500/80 dark:text-red-400/80">El inventario no se borrara</p>
+                    </div>
+                </button>
+
+                <button
+                    onClick={onFactoryReset}
+                    className="w-full flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors group active:scale-[0.98] mt-2"
+                >
+                    <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg"><RotateCcw size={18} className="text-red-600 dark:text-red-400" /></div>
+                    <div className="text-left flex-1">
+                        <p className="text-sm font-bold text-red-700 dark:text-red-400">Restablecer Fábrica</p>
+                        <p className="text-[10px] text-red-500/80 dark:text-red-400/80">Borra todo: productos, ventas, caja, nube</p>
                     </div>
                 </button>
             </SectionCard>

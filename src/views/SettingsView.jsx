@@ -101,6 +101,54 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
         triggerHaptic?.('light');
     };
 
+    const handleFactoryReset = async () => {
+        const ok1 = await confirm({
+            title: '⚠ Restablecer Fábrica',
+            message: 'Esto borrará TODO: productos, ventas, clientes, caja, configuraciones y datos en la nube. La app quedará como nueva instalación. No hay vuelta atrás.',
+            confirmText: 'Sí, borrar todo',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok1) return;
+
+        const ok2 = await confirm({
+            title: '¿Completamente seguro?',
+            message: 'Esta acción es permanente e irreversible. Se perderá todo el historial y el inventario.',
+            confirmText: 'Confirmar — Borrar todo',
+            cancelText: 'Cancelar',
+            variant: 'danger',
+        });
+        if (!ok2) return;
+
+        try {
+            showToast('Restableciendo...', 'info');
+
+            // 1. Borrar datos en la nube
+            const { data: { session } } = await supabaseCloud.auth.getSession();
+            if (session) {
+                await Promise.allSettled([
+                    supabaseCloud.from('cash_sessions').delete().not('id', 'is', null),
+                    supabaseCloud.from('sync_documents').delete().not('doc_id', 'is', null),
+                    supabaseCloud.from('cloud_backups').delete().eq('email', session.user.email),
+                    supabaseCloud.from('account_devices').delete().not('device_id', 'is', null),
+                ]);
+                await supabaseCloud.auth.signOut();
+            }
+
+            // 2. Borrar IndexedDB (localforage)
+            const lf = await import('localforage');
+            await lf.default.clear();
+
+            // 3. Borrar localStorage
+            localStorage.clear();
+
+            // 4. Recargar
+            window.location.reload();
+        } catch (err) {
+            showToast('Error al restablecer: ' + err.message, 'error');
+        }
+    };
+
     const handleExport = async () => {
         try {
             setImportStatus('loading');
@@ -272,7 +320,10 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                 <div className="max-w-lg md:max-w-xl lg:max-w-2xl mx-auto p-4 space-y-4">
 
                     {/* Section header accent */}
-                    <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl ${colors.iconBg}`}>
+                    <div
+                        className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl ${colors.iconBg} select-none`}
+                        onClick={activeTab === 'sistema' ? () => setDangerZoneClicks(c => c >= 5 ? c : c + 1) : undefined}
+                    >
                         {React.createElement(currentTab?.icon || Store, { size: 16, className: colors.icon })}
                         <span className={`text-xs font-black tracking-wide uppercase ${colors.icon}`}>
                             {currentTab?.label}
@@ -335,8 +386,10 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                                 setIsShareOpen(true);
                             }}
                             setShowDeleteConfirm={setShowDeleteConfirm}
-                            triggerHaptic={triggerHaptic}
+                            onFactoryReset={handleFactoryReset}
                             dangerZoneUnlocked={dangerZoneUnlocked}
+                            onDangerZoneClick={() => setDangerZoneClicks(c => c >= 5 ? c : c + 1)}
+                            triggerHaptic={triggerHaptic}
                         />
                     )}
 

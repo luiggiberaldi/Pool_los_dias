@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
     Mail, Key, Phone, ArrowRight, ShieldCheck, 
     Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw
@@ -44,25 +44,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
     const { forcePullFromCloud, forcePushToCloud } = useCloudSync();
 
     const [showPassword, setShowPassword] = useState(false);
-    const [logoClicks, setLogoClicks] = useState(0);
-    const [isRegistrationUnlocked, setIsRegistrationUnlocked] = useState(false);
     const confirm = useConfirm();
-
-    const clickTimeoutRef = useRef(null);
-
-    const handleLogoClick = () => {
-        if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
-        
-        const nextClicks = logoClicks + 1;
-        setLogoClicks(nextClicks);
-        
-        if (nextClicks >= 5) {
-            setIsRegistrationUnlocked(true);
-            setLogoClicks(0);
-        } else {
-            clickTimeoutRef.current = setTimeout(() => setLogoClicks(0), 2000);
-        }
-    };
 
     const handleForceRestore = async () => {
         const ok = await confirm({
@@ -217,7 +199,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
     }
 
     // ── Vista Principal: Login / Registro ───────────────────────────
-    if (isCloudConfigured && !forceLogin && !isRegistrationUnlocked) {
+    if (isCloudConfigured && !forceLogin) {
         return (
             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
                 <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden relative">
@@ -312,13 +294,12 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                 )}
 
                 <div className="p-6 relative z-10">
-                    {/* Logo con Gesto Secreto */}
+                    {/* Logo */}
                     <div className="flex flex-col items-center justify-center mt-2 mb-6 group">
                         <img
                             src="/logo.png"
                             alt="Pool Los Diaz"
-                            onClick={handleLogoClick}
-                            className={`h-28 sm:h-32 w-auto object-contain select-none cursor-default transition-transform active:scale-90 ${logoClicks > 0 ? 'animate-pulse' : ''}`}
+                            className="h-28 sm:h-32 w-auto object-contain select-none"
                             draggable={false}
                         />
                         <p className="text-slate-400 text-[10px] mt-3 font-bold uppercase tracking-widest text-center opacity-60">
@@ -326,25 +307,8 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                         </p>
                     </div>
 
-                    {/* Tabs Login / Registro (Solo si está desbloqueado) */}
-                    {(isRegistrationUnlocked || !isCloudLogin) && !isRecoveringPassword && (
-                        <div className="flex p-1 bg-slate-100 rounded-xl mb-5 animate-in slide-in-from-top-2">
-                            <button
-                                onClick={() => { setIsCloudLogin(true); setEmailError(''); setPasswordError(''); }}
-                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isCloudLogin ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Acceso Propietario
-                            </button>
-                            <button
-                                onClick={() => { setIsCloudLogin(false); setEmailError(''); setPasswordError(''); }}
-                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isCloudLogin ? 'bg-white text-sky-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                Registrar Local
-                            </button>
-                        </div>
-                    )}
-
-                    {!isRegistrationUnlocked && isCloudLogin && !isRecoveringPassword && (
+                    {/* Título */}
+                    {isCloudLogin && !isRecoveringPassword && (
                         <div className="mb-4 text-center">
                             <h2 className="text-lg font-black text-slate-800">Conectar Punto de Venta</h2>
                             <p className="text-xs text-slate-400 font-medium">Ingresa tus credenciales de administrador</p>
@@ -389,17 +353,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                     {emailError && <p className="text-[11px] text-red-500 font-bold mt-1 ml-1">{emailError}</p>}
                                 </div>
 
-                                {/* Teléfono (solo registro) */}
-                                {!isCloudLogin && (
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none"><Phone size={16} className="text-slate-400" /></div>
-                                        <input
-                                            type="tel" value={inputPhone} onChange={e => setInputPhone(e.target.value)}
-                                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 outline-none transition-all"
-                                            placeholder="WhatsApp del negocio"
-                                        />
-                                    </div>
-                                )}
+                                {/* Teléfono — eliminado (registro deshabilitado) */}
 
                                 {/* Contraseña */}
                                 <div>
@@ -445,18 +399,11 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
                                         <>
-                                            {isCloudLogin ? 'Conectar Punto de Venta' : 'Registrar Nuevo Local'}
-                                            <ArrowRight size={16} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
+                                            Conectar Punto de Venta
+                                            <ArrowRight size={16} strokeWidth={3} />
                                         </>
                                     )}
                                 </button>
-
-                                {!isCloudLogin && (
-                                    <p className="text-[10px] text-center text-slate-400 mt-1 flex items-center justify-center gap-1">
-                                        <ShieldCheck size={11} />
-                                        Conexión encriptada. 7 días de prueba gratuita.
-                                    </p>
-                                )}
                             </>
                         )}
                     </div>

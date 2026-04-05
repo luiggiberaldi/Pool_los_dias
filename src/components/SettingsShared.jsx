@@ -18,7 +18,7 @@ export function Toggle({ enabled, onChange, color = 'emerald' }) {
     );
 }
 
-export function SectionCard({ icon: Icon, title, subtitle, iconColor = 'text-slate-500', children }) {
+export function SectionCard({ icon: Icon, title, subtitle, iconColor = 'text-slate-500', onSubtitleClick, children }) {
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-50 dark:border-slate-800/50 flex items-center gap-3">
@@ -27,7 +27,7 @@ export function SectionCard({ icon: Icon, title, subtitle, iconColor = 'text-sla
                 </div>
                 <div>
                     <h3 className="text-sm font-black text-slate-800 dark:text-white">{title}</h3>
-                    {subtitle && <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>}
+                    {subtitle && <p className="text-[10px] text-slate-400 mt-0.5 select-none" onClick={onSubtitleClick}>{subtitle}</p>}
                 </div>
             </div>
             <div className="p-5 space-y-4">{children}</div>
