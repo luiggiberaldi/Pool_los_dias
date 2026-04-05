@@ -242,8 +242,9 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 paymentPayload.push({ methodId: method, amountUsd: 0, currency: 'USD' });
             }
 
-            // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa
-            const meseroUser = session.opened_by ? cachedUsers?.find(u => u.id === session.opened_by) : null;
+            // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa (solo si es rol MESERO)
+            const openerUser = session.opened_by ? cachedUsers?.find(u => u.id === session.opened_by) : null;
+            const meseroUser = (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') ? openerUser : null;
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
@@ -259,7 +260,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 copEnabled: copEnabled || false,
                 discountData: null,
                 useAutoRate: useAutoRate || true,
-                meseroId: session.opened_by || null,
+                meseroId: meseroUser?.id || null,
                 meseroNombre: meseroUser?.name || meseroUser?.nombre || null
             });
 
