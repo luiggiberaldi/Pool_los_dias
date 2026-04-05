@@ -5,6 +5,7 @@ import { useAuthStore } from '../../hooks/store/authStore';
 import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList, Trophy, RotateCcw } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 import { storageService } from '../../utils/storageService';
+import { useConfirm } from '../../hooks/useConfirm';
 
 function getGreeting() {
     const h = new Date().getHours();
@@ -25,6 +26,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const { tables, activeSessions, config } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
+    const confirm = useConfirm();
     const role = currentUser?.role || currentUser?.rol;
     const isMesero = role === 'MESERO';
     const [now, setNow] = useState(new Date());
@@ -81,8 +83,9 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         return () => window.removeEventListener('app_storage_update', onUpdate);
     }, [currentUser?.id, isMesero, rankingSince]);
 
-    const handleResetRanking = () => {
-        if (!window.confirm('¿Reiniciar el ranking de meseros? El conteo empezará desde cero.')) return;
+    const handleResetRanking = async () => {
+        const ok = await confirm({ title: 'Reiniciar ranking', message: '¿Reiniciar el ranking de meseros? El conteo empezará desde cero.', confirmText: 'Reiniciar', variant: 'danger' });
+        if (!ok) return;
         const now = new Date().toISOString();
         localStorage.setItem('ranking_meseros_since', now);
         setRankingSince(now);

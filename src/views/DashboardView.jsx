@@ -604,8 +604,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5"><Award size={14} /> Ranking Meseros</h3>
                         {topStaff.length > 0 && (
-                            <button onClick={() => {
-                                if (!window.confirm('¿Reiniciar el ranking de meseros? El conteo empezará desde cero.')) return;
+                            <button onClick={async () => {
+                                const ok = await confirm({ title: 'Reiniciar ranking', message: '¿Reiniciar el ranking de meseros? El conteo empezará desde cero.', confirmText: 'Reiniciar', variant: 'danger' });
+                                if (!ok) return;
                                 localStorage.setItem('ranking_meseros_since', new Date().toISOString());
                                 window.location.reload();
                             }}
