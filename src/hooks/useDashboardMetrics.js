@@ -115,17 +115,17 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     }, [sales]);
 
     const topStaff = useMemo(() => {
+        const sinceDate = localStorage.getItem('ranking_meseros_since') || null;
         const map = {};
-        sales.filter(s => !['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','APERTURA_CAJA'].includes(s.tipo) && s.status !== 'ANULADA').forEach(s => {
-            if (s.meseroId) {
-                if (!map[s.meseroId]) map[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
-                map[s.meseroId].ventas += 1;
-                map[s.meseroId].revenue += s.totalUsd || 0;
-            } else if (s.vendedorId) {
-                if (!map[s.vendedorId]) map[s.vendedorId] = { id: s.vendedorId, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || 'CAJERO', ventas: 0, revenue: 0 };
-                map[s.vendedorId].ventas += 1;
-                map[s.vendedorId].revenue += s.totalUsd || 0;
-            }
+        sales.filter(s => {
+            if (['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','APERTURA_CAJA'].includes(s.tipo) || s.status === 'ANULADA') return false;
+            if (!s.meseroId) return false;
+            if (sinceDate && s.timestamp < sinceDate) return false;
+            return true;
+        }).forEach(s => {
+            if (!map[s.meseroId]) map[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
+            map[s.meseroId].ventas += 1;
+            map[s.meseroId].revenue += s.totalUsd || 0;
         });
         return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
     }, [sales]);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, TrendingDown, ArrowUpRight, Trash2, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut, Award, LineChart, ListChecks } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, TrendingDown, ArrowUpRight, Trash2, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut, Award, LineChart, ListChecks, RotateCcw } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -597,6 +597,57 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 </div>
             )}
 
+
+            {/* Top Meseros — visible para admin con botón reiniciar */}
+            {isAdmin && (
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5"><Award size={14} /> Ranking Meseros</h3>
+                        {topStaff.length > 0 && (
+                            <button onClick={() => {
+                                if (!window.confirm('¿Reiniciar el ranking de meseros? El conteo empezará desde cero.')) return;
+                                localStorage.setItem('ranking_meseros_since', new Date().toISOString());
+                                window.location.reload();
+                            }}
+                                className="text-[10px] font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors active:scale-95">
+                                <RotateCcw size={10} /> Reiniciar
+                            </button>
+                        )}
+                    </div>
+                    {topStaff.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-4 gap-1.5">
+                            <Users size={24} className="text-slate-200" />
+                            <p className="text-xs text-slate-400 text-center">Aún no hay ventas de meseros registradas.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {topStaff.map((s, i) => {
+                                const maxRevenue = topStaff[0]?.revenue || 1;
+                                const pct = Math.round((s.revenue / maxRevenue) * 100);
+                                return (
+                                    <div key={s.id}>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
+                                                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-slate-700 truncate">{s.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{s.ventas} {s.ventas === 1 ? 'venta' : 'ventas'}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-sm font-black text-emerald-600 shrink-0 pl-2">${s.revenue.toFixed(2)}</span>
+                                        </div>
+                                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className={`h-1 rounded-full ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-300' : i === 2 ? 'bg-orange-300' : 'bg-orange-200'}`} style={{ width: `${pct}%` }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {isAdmin && (
                 <SalesHistory sales={sales} recentSales={recentSales} bcvRate={bcvRate} totalSalesCount={sales.length} isAdmin={isAdmin}
