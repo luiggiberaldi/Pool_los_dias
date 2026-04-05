@@ -81,7 +81,8 @@ function PinInput({ value, onChange, label, length = 4 }) {
 // ─── User Row ──────────────────────────────────────
 function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, triggerHaptic }) {
     const roleString = user.role || user.rol || 'CAJERO';
-    const nameString = user.name || user.nombre || 'Desconocido';
+    const rawName = user.name || user.nombre || 'Desconocido';
+    const nameString = rawName.charAt(0).toUpperCase() + rawName.slice(1);
     
     const roleConf = ROLE_CONFIG[roleString] || ROLE_CONFIG.CAJERO;
     const RoleIcon = roleConf.icon;

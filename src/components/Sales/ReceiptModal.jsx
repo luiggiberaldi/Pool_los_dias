@@ -30,6 +30,9 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                             <div className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-20"></div>
                         </div>
                         <h3 className="text-2xl font-black text-slate-800 tracking-tight mb-1">Orden #{(receipt.id.substring(0, 6)).toUpperCase()}</h3>
+                        {receipt.tableName && (
+                            <p className="text-sm font-bold text-blue-500 mb-1">Mesa {receipt.tableName}</p>
+                        )}
                         {receipt.customerName && <p className="text-sm font-bold text-slate-500 mb-0 uppercase tracking-tight">{receipt.customerName}</p>}
                         {receipt.customerDocument && (
                             <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">

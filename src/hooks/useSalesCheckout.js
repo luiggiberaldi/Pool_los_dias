@@ -99,6 +99,9 @@ export function useSalesCheckout({
             useAutoRate
         };
 
+        // Nombre de la mesa
+        opts.tableName = tableCheckoutData.table?.name || null;
+
         // Atribuir venta al mesero que abrió la mesa (solo si tiene rol MESERO)
         if (tableCheckoutData.session?.opened_by) {
             const cachedUsers = useAuthStore.getState().cachedUsers || [];

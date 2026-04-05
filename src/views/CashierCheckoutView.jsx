@@ -273,7 +273,8 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 discountData: null,
                 useAutoRate: useAutoRate || true,
                 meseroId: meseroUser?.id || null,
-                meseroNombre: meseroUser?.name || meseroUser?.nombre || null
+                meseroNombre: meseroUser?.name || meseroUser?.nombre || null,
+                tableName: table?.name || null
             });
 
             if (!saleResult.success) {

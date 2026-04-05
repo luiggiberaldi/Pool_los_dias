@@ -30,7 +30,8 @@ export async function processSaleTransaction({
     discountData,
     useAutoRate,
     meseroId = null,
-    meseroNombre = null
+    meseroNombre = null,
+    tableName = null
 }) {
     if (cart.length === 0) return { success: false, error: 'Carrito vacío' };
 
@@ -139,6 +140,7 @@ export async function processSaleTransaction({
         vendedorRol: currentUser?.rol || currentUser?.role || null,
         meseroId: meseroId || null,
         meseroNombre: meseroNombre || null,
+        tableName: tableName || null,
         items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
         cartSubtotalUsd: cartSubtotalUsd,
         discountType: discountData?.type || null,
