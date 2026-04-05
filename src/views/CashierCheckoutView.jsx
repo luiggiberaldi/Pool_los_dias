@@ -243,8 +243,22 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
             }
 
             // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa (solo si es rol MESERO)
-            const openerUser = session.opened_by ? cachedUsers?.find(u => u.id === session.opened_by) : null;
-            const meseroUser = (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') ? openerUser : null;
+            let meseroUser = null;
+            if (session.opened_by) {
+                // Buscar en cache local primero
+                let openerUser = cachedUsers?.find(u => u.id === session.opened_by) || null;
+                // Si no está en cache, intentar buscar en Supabase
+                if (!openerUser) {
+                    try {
+                        const { supabaseCloud } = await import('../config/supabaseCloud');
+                        const { data } = await supabaseCloud.from('staff_users').select('id, name, role').eq('id', session.opened_by).single();
+                        if (data) openerUser = data;
+                    } catch (_) { /* silently fail */ }
+                }
+                if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') {
+                    meseroUser = openerUser;
+                }
+            }
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
