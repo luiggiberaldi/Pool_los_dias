@@ -342,7 +342,7 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
             visibilityDebounceTimer = setTimeout(() => {
                 console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
                 pullLatestFromCloud();
-            }, 1500);
+            }, 60_000);
         }
     });
 }

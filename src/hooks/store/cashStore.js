@@ -142,12 +142,12 @@ export const useCashStore = create((set, get) => ({
             .subscribe();
     },
 
-    // Capa B: Polling cada 45s — garantiza sync aunque el realtime falle
+    // Capa B: Polling cada 10min — garantiza sync aunque el realtime falle
     _startPolling: () => {
         if (cashPollingInterval) return;
         cashPollingInterval = setInterval(() => {
             get().syncCashSession();
-        }, 45_000);
+        }, 10 * 60_000);
     },
 
     // Capa C: Al volver al primer plano — crítico para PWA en móvil
@@ -156,11 +156,11 @@ export const useCashStore = create((set, get) => ({
         cashVisibilityBound = true;
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                // Debounce: evitar ráfagas al cambiar tabs rápido
+                // Debounce extendido: evitar ráfagas al cambiar tabs rápido
                 if (cashVisibilityTimer) clearTimeout(cashVisibilityTimer);
                 cashVisibilityTimer = setTimeout(() => {
                     get().syncCashSession();
-                }, 1500);
+                }, 60_000);
             }
         });
     },
