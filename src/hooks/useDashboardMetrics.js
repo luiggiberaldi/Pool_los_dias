@@ -107,6 +107,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         const map = {};
         sales.filter(s => !['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','VENTA_FIADA'].includes(s.tipo) && s.status !== 'ANULADA').forEach(s => {
             s.items?.forEach(item => {
+                if (item.name?.startsWith('Tiempo Jugado')) return;
                 if (!map[item.name]) map[item.name] = { name: item.name, qty: 0, revenue: 0 };
                 map[item.name].qty += item.qty;
                 map[item.name].revenue += item.priceUsd * item.qty;
@@ -140,6 +141,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         const map = {};
         todaySales.forEach(s => {
             s.items?.forEach(item => {
+                if (item.name?.startsWith('Tiempo Jugado')) return;
                 if (!map[item.name]) map[item.name] = { name: item.name, qty: 0, revenue: 0 };
                 map[item.name].qty += item.qty;
                 map[item.name].revenue += item.priceUsd * item.qty;
