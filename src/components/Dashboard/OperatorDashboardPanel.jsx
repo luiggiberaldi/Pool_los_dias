@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList } from 'lucide-react';
+import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, ShoppingCart, Zap, TableProperties, CheckCircle, UtensilsCrossed, ClipboardList, Trophy } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 import { storageService } from '../../utils/storageService';
 
@@ -30,6 +30,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const [now, setNow] = useState(new Date());
     const [myStats, setMyStats] = useState({ cobros: 0, mesas: 0, pedidos: 0 });
     const [lastSale, setLastSale] = useState(null);
+    const [topMeseros, setTopMeseros] = useState([]);
 
     useEffect(() => {
         const interval = setInterval(() => setNow(new Date()), 30000);
@@ -54,6 +55,21 @@ export default function OperatorDashboardPanel({ onNavigate }) {
 
             setMyStats({ cobros: mySales.length, mesas: mesasHoy, pedidos: pedidosHoy });
             setLastSale(mySales[0] || null);
+
+            // Ranking de meseros (solo para rol MESERO)
+            if (isMesero) {
+                const meseroMap = {};
+                sales.filter(s => {
+                    if (s.status === 'ANULADA' || ['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','APERTURA_CAJA'].includes(s.tipo)) return false;
+                    return !!s.meseroId;
+                }).forEach(s => {
+                    if (!meseroMap[s.meseroId]) meseroMap[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', ventas: 0, revenue: 0 };
+                    meseroMap[s.meseroId].ventas += 1;
+                    meseroMap[s.meseroId].revenue += s.totalUsd || 0;
+                });
+                const ranked = Object.values(meseroMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+                setTopMeseros(ranked);
+            }
         };
         load();
         const onUpdate = (e) => { if (e.detail?.key === 'bodega_sales_v1') load(); };
@@ -135,7 +151,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     // ── Colores por rol ──
     const accent = isMesero
         ? { from: '#F97316', to: '#EA580C', glow: 'rgba(249,115,22,0.15)', text: 'text-orange-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' }
-        : { from: '#059669', to: '#10B981', glow: 'rgba(16,185,129,0.2)', text: 'text-emerald-100', badge: 'bg-emerald-800/60', badgeText: 'text-emerald-100' };
+        : { from: '#0D9488', to: '#14B8A6', glow: 'rgba(20,184,166,0.2)', text: 'text-teal-100', badge: 'bg-teal-800/60', badgeText: 'text-teal-100' };
 
     return (
         <div className="space-y-3 pt-1">
@@ -293,6 +309,59 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                     </div>
                 );
             })()}
+
+            {/* ── TOP MESEROS (solo mesero) ── */}
+            {isMesero && topMeseros.length > 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Trophy size={12} /> Ranking Meseros
+                    </h3>
+                    <div className="space-y-3">
+                        {topMeseros.map((m, i) => {
+                            const maxRev = topMeseros[0]?.revenue || 1;
+                            const pct = Math.round((m.revenue / maxRev) * 100);
+                            const isMe = m.id === currentUser?.id;
+                            return (
+                                <div key={m.id} className={`${isMe ? 'bg-orange-50 border border-orange-200 rounded-xl p-2.5 -mx-1' : ''}`}>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
+                                                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <p className={`text-xs font-black truncate ${isMe ? 'text-orange-700' : 'text-slate-700'}`}>
+                                                    {m.name}{isMe ? ' (Tú)' : ''}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400">{m.ventas} {m.ventas === 1 ? 'venta' : 'ventas'}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-sm font-black shrink-0 pl-2 ${isMe ? 'text-orange-600' : 'text-emerald-600'}`}>${m.revenue.toFixed(2)}</span>
+                                    </div>
+                                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className={`h-1.5 rounded-full transition-all ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-300' : i === 2 ? 'bg-orange-300' : 'bg-slate-200'}`}
+                                            style={{ width: `${pct}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {topMeseros.length > 0 && !topMeseros.find(m => m.id === currentUser?.id) && (
+                        <p className="text-[10px] text-slate-400 text-center mt-3 font-medium">¡Vende más para aparecer en el ranking!</p>
+                    )}
+                </div>
+            )}
+
+            {isMesero && topMeseros.length === 0 && (
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Trophy size={12} /> Ranking Meseros
+                    </h3>
+                    <div className="flex flex-col items-center justify-center py-3 gap-1.5">
+                        <Trophy size={24} className="text-slate-200" />
+                        <p className="text-xs text-slate-400 text-center">Aún no hay ventas registradas.<br/>¡Sé el primero en el ranking!</p>
+                    </div>
+                </div>
+            )}
 
             {/* ── ALERTAS ── */}
             {!hasAnyAlert && (
