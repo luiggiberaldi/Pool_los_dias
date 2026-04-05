@@ -34,11 +34,11 @@ export function procesarImpactoCliente(clienteInicial, transaccion) {
             // PRIORITY: DEBT FIRST
             if (deudaActual >= vueltoParaMonedero) {
                 // Paga parte de la deuda
-                cliente.deuda = subR(deudaActual, vueltoParaMonedero);
+                cliente.deuda = round2(subR(deudaActual, vueltoParaMonedero));
                 // Nada al favor real, todo se consumió en deuda
             } else {
                 // Paga toda la deuda y sobra
-                const sobra = subR(vueltoParaMonedero, deudaActual);
+                const sobra = round2(subR(vueltoParaMonedero, deudaActual));
                 cliente.deuda = 0;
                 cliente.favor = round2((cliente.favor || 0) + sobra); // Q3
             }

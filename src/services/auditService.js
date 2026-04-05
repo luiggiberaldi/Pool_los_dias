@@ -9,7 +9,7 @@ import { storageService } from '../utils/storageService';
 
 const AUDIT_KEY = 'abasto_audit_log_v1';
 const MAX_ENTRIES = 15000;
-const MAX_AGE_DAYS = 90;
+const MAX_AGE_DAYS = 365;
 
 // ─── Core ──────────────────────────────────────────────
 

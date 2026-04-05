@@ -63,6 +63,13 @@ export const useOrdersStore = create((set, get) => ({
             })
             .subscribe((status) => {
                 console.log("[REALTIME] status pool_orders_sync:", status);
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.warn('[REALTIME] Error en canal orders — reintentando en 5s');
+                    setTimeout(() => {
+                        get().unsubscribeFromRealtime();
+                        get().subscribeToRealtime();
+                    }, 5000);
+                }
             });
         set({ realtimeChannel: channel });
     },
@@ -162,7 +169,7 @@ export const useOrdersStore = create((set, get) => ({
                         order_id: order.id,
                         product_id: productInfo.id,
                         product_name: productInfo.name,
-                        unit_price_usd: productInfo.priceUsdt || productInfo.priceUsd || productInfo.price || 0,
+                        unit_price_usd: productInfo.priceUsd || productInfo.priceUsdt || productInfo.price || 0,
                         qty: 1,
                         added_by: creatorId
                     }])
@@ -218,24 +225,29 @@ export const useOrdersStore = create((set, get) => ({
     cancelOrderBySessionId: async (sessionId) => {
         let order = get().getOrderBySessionId(sessionId);
         if (!order) return;
-        
+
+        // Guardar estado previo para rollback
+        const prevOrders = get().orders;
+        const prevItems = get().orderItems;
+
         // Optimistic update FIRST
-        const newOrders = get().orders.filter(o => o.id !== order.id);
-        const newItems = get().orderItems.filter(i => i.order_id !== order.id);
-        
+        const newOrders = prevOrders.filter(o => o.id !== order.id);
+        const newItems = prevItems.filter(i => i.order_id !== order.id);
+
         set({ orders: newOrders, orderItems: newItems });
         await ordersCache.setItem('active_orders', newOrders);
         await ordersCache.setItem('active_order_items', newItems);
 
         try {
             // Background network tasks
-            // Delete items first
             await supabaseCloud.from('order_items').delete().eq('order_id', order.id);
-            // Delete the order
             await supabaseCloud.from('orders').delete().eq('id', order.id);
         } catch (e) {
-            console.error('Error canceling order (network):', e);
-            // Normally we would rollback, but since it's a cancellation, we want it gone locally anyway.
+            console.error('Error canceling order (network) — rolling back:', e);
+            // Rollback: restaurar estado local
+            set({ orders: prevOrders, orderItems: prevItems });
+            await ordersCache.setItem('active_orders', prevOrders);
+            await ordersCache.setItem('active_order_items', prevItems);
             throw e;
         }
     }

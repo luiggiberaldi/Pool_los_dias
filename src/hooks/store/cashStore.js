@@ -61,10 +61,12 @@ export const useCashStore = create((set, get) => ({
             if (error) throw error;
 
             if (data) {
-                // ✅ Hay sesión activa en la nube — sincronizar
-                // Restaurar base_bs desde el campo 'notes' donde se persiste
+                // Hay sesión activa en la nube — sincronizar
+                // Restaurar base_bs: preferir columna directa, fallback a notes (legacy)
                 let enrichedData = { ...data };
-                if (data.notes) {
+                if (data.base_bs !== undefined && data.base_bs !== null) {
+                    // Columna base_bs existe — usar directamente
+                } else if (data.notes) {
                     try {
                         const parsed = typeof data.notes === 'string' ? JSON.parse(data.notes) : data.notes;
                         if (parsed?.base_bs !== undefined) {
@@ -177,13 +179,13 @@ export const useCashStore = create((set, get) => ({
         await cashCache.setItem('active_cash_session', sessionPayload);
         set({ activeCashSession: sessionPayload });
 
-        // Payload para Supabase: SOLO columnas que existen en el schema de la tabla
-        // base_bs se persiste dentro del campo 'notes' (JSONB/text) ya que la columna no existe
+        // Payload para Supabase: incluye base_bs como columna directa + notes como fallback
         const supabasePayload = {
             id: sessionPayload.id,
             opened_at: sessionPayload.opened_at,
             opened_by: sessionPayload.opened_by,
             base_usd: sessionPayload.base_usd,
+            base_bs: sessionPayload.base_bs,
             status: sessionPayload.status,
             notes: JSON.stringify({ base_bs: sessionPayload.base_bs }),
         };

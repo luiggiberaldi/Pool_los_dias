@@ -160,7 +160,12 @@ export async function processSaleTransaction({
     };
 
     const existingSales = await storageService.getItem(SALES_KEY, []);
-    const saleNumber = existingSales.reduce((mx, s) => Math.max(mx, s.saleNumber || 0), 0) + 1;
+    // saleNumber robusto: timestamp + random para evitar duplicados entre tabs
+    const now = new Date();
+    const datePart = now.toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD
+    const timePart = now.toTimeString().slice(0, 8).replace(/:/g, '');  // HHMMSS
+    const randomPart = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+    const saleNumber = `${datePart}-${timePart}-${randomPart}`;
     const finalPersistedSale = Object.freeze({ ...sale, saleNumber });
 
     await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);

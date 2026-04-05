@@ -1,9 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { logEvent } from '../../services/auditService';
-import { hashPin } from '../../utils/crypto';
+import { hashPin, hashPinWithSalt, validatePin } from '../../utils/crypto';
 
-// Pre-computed SHA-256 hashes of default PINs (never store plaintext)
+// Pre-computed SHA-256 hashes of default PINs (legacy — unsalted)
+// These are detected at login to force a PIN change
+const LEGACY_DEFAULT_HASHES = new Set([
+    '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', // "0000"
+    '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0', // "1111"
+]);
+
 const DEFAULT_USERS = [
     { id: 1, nombre: 'Administrador', rol: 'ADMIN', pin_hash: '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4' },
     { id: 2, nombre: 'Cajero', rol: 'CAJERO', pin_hash: '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0' }
@@ -49,21 +55,45 @@ export const useAuthStore = create(
 
                 const { usuarios } = get();
 
-                // Hash the input PIN before comparing
-                const hashedInput = await hashPin(pinInput);
+                // Try salted hash first (new format), then legacy unsalted
+                let userEncontrado = null;
 
-                let userEncontrado;
+                for (const u of usuarios) {
+                    if (userId && u.id !== userId) continue;
 
-                if (userId) {
-                    userEncontrado = usuarios.find(u => u.id === userId && u.pin_hash === hashedInput);
-                } else {
-                    userEncontrado = usuarios.find(u => u.pin_hash === hashedInput);
+                    // New: salted hash
+                    const saltedHash = await hashPinWithSalt(pinInput, u.id);
+                    if (u.pin_hash === saltedHash) {
+                        userEncontrado = u;
+                        break;
+                    }
+
+                    // Legacy: unsalted hash (for migration)
+                    const legacyHash = await hashPin(pinInput);
+                    if (u.pin_hash === legacyHash) {
+                        userEncontrado = u;
+                        // Detect if using a weak default PIN
+                        if (LEGACY_DEFAULT_HASHES.has(u.pin_hash)) {
+                            userEncontrado = { ...u, _mustChangePin: true };
+                        } else {
+                            // Auto-migrate to salted hash
+                            set((state) => ({
+                                usuarios: state.usuarios.map(existing =>
+                                    existing.id === u.id ? { ...existing, pin_hash: saltedHash } : existing
+                                )
+                            }));
+                        }
+                        break;
+                    }
                 }
 
                 if (userEncontrado) {
                     set({ usuarioActivo: userEncontrado, failedAttempts: 0, lockoutUntil: null });
                     localStorage.setItem('abasto-device-session', JSON.stringify(userEncontrado));
                     logEvent('AUTH', 'LOGIN', `${userEncontrado.nombre} inicio sesion`, userEncontrado);
+                    if (userEncontrado._mustChangePin) {
+                        return { success: true, mustChangePin: true };
+                    }
                     return true;
                 }
 
@@ -90,7 +120,13 @@ export const useAuthStore = create(
             },
 
             cambiarPin: async (userId, nuevoPin) => {
-                const nuevoPinHash = await hashPin(nuevoPin);
+                // Validar PIN antes de aceptarlo
+                const validation = validatePin(nuevoPin);
+                if (!validation.valid) {
+                    return { success: false, error: validation.reason };
+                }
+
+                const nuevoPinHash = await hashPinWithSalt(nuevoPin, userId);
                 set((state) => ({
                     usuarios: state.usuarios.map(u =>
                         u.id === userId ? { ...u, pin_hash: nuevoPinHash } : u
@@ -106,17 +142,23 @@ export const useAuthStore = create(
                 }
                 const target = get().usuarios.find(u => u.id === userId);
                 logEvent('AUTH', 'PIN_CAMBIADO', `PIN cambiado para ${target?.nombre || 'usuario'}`, get().usuarioActivo);
+                return { success: true };
             },
 
             agregarUsuario: async (nombre, rol, pin) => {
-                const pinHash = await hashPin(pin);
-                set((state) => {
-                    const maxId = state.usuarios.reduce((max, u) => Math.max(max, u.id), 0);
-                    return {
-                        usuarios: [...state.usuarios, { id: maxId + 1, nombre, rol, pin_hash: pinHash }]
-                    };
-                });
+                const validation = validatePin(pin);
+                if (!validation.valid) {
+                    return { success: false, error: validation.reason };
+                }
+
+                const maxId = get().usuarios.reduce((max, u) => Math.max(max, u.id), 0);
+                const newId = maxId + 1;
+                const pinHash = await hashPinWithSalt(pin, newId);
+                set((state) => ({
+                    usuarios: [...state.usuarios, { id: newId, nombre, rol, pin_hash: pinHash }]
+                }));
                 logEvent('USUARIO', 'USUARIO_CREADO', `Usuario "${nombre}" (${rol}) creado`, get().usuarioActivo);
+                return { success: true };
             },
 
             eliminarUsuario: (userId) => {
@@ -134,14 +176,16 @@ export const useAuthStore = create(
             },
 
             editarUsuario: (userId, datos) => {
+                // No permitir cambiar campos sensibles directamente
+                const { id, pin_hash, ...safeDatos } = datos;
                 set((state) => ({
                     usuarios: state.usuarios.map(u =>
-                        u.id === userId ? { ...u, ...datos } : u
+                        u.id === userId ? { ...u, ...safeDatos } : u
                     )
                 }));
                 const { usuarioActivo } = get();
                 if (usuarioActivo && usuarioActivo.id === userId) {
-                    const nuevoActivo = { ...usuarioActivo, ...datos };
+                    const nuevoActivo = { ...usuarioActivo, ...safeDatos };
                     set({ usuarioActivo: nuevoActivo });
                     localStorage.setItem('abasto-device-session', JSON.stringify(nuevoActivo));
                 }
