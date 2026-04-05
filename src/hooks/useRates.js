@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabaseCloud } from '../config/supabaseCloud';
 
 const DEFAULT_RATES = {
     bcv: { price: 36.35, source: 'BCV Oficial', change: 0.05 },
@@ -11,6 +12,8 @@ const DEFAULT_EUR_USD_RATIO = 1.18;
 const UPDATE_INTERVAL = 30000;
 
 const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
+
+const RATES_DEVICE_ID = crypto.randomUUID();
 
 export function useRates() {
     const [rates, setRates] = useState(() => {
@@ -31,6 +34,7 @@ export function useRates() {
     const [logs, setLogs] = useState([]);
 
     const ratesRef = useRef(rates);
+    const channelRef = useRef(null);
 
     useEffect(() => {
         ratesRef.current = rates;
@@ -214,6 +218,12 @@ export function useRates() {
 
             newRates.lastUpdate = new Date();
             setRates(newRates);
+            // Broadcast a otros dispositivos
+            channelRef.current?.send({
+                type: 'broadcast',
+                event: 'rate_data',
+                payload: { senderId: RATES_DEVICE_ID, rates: newRates }
+            }).catch(() => {});
             if (!isAutoUpdate) addLog("Actualización completada", 'success');
 
         } catch (e) {
@@ -228,7 +238,23 @@ export function useRates() {
     useEffect(() => {
         updateData(false);
         const intervalId = setInterval(() => { updateData(true); }, UPDATE_INTERVAL);
-        return () => clearInterval(intervalId);
+
+        // Escuchar tasas desde otros dispositivos via Supabase Broadcast
+        const channel = supabaseCloud.channel('rate_data_sync');
+        channel.on('broadcast', { event: 'rate_data' }, ({ payload }) => {
+            if (!payload || payload.senderId === RATES_DEVICE_ID) return;
+            if (payload.rates) {
+                console.log('[RateSync] Tasa recibida de otro dispositivo');
+                setRates(payload.rates);
+            }
+        });
+        channel.subscribe();
+        channelRef.current = channel;
+
+        return () => {
+            clearInterval(intervalId);
+            supabaseCloud.removeChannel(channel);
+        };
     }, [updateData]);
 
     const currentRates = rates || DEFAULT_RATES;
