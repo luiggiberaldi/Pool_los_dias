@@ -1,7 +1,7 @@
 # 📓 Bitácora de Desarrollo — Pool Los Diaz POS
 
-> Registro cronológico de avances, bugs resueltos y decisiones técnicas.  
-> Última actualización: **02 Abril 2026**
+> Registro cronológico de avances, bugs resueltos y decisiones técnicas.
+> Última actualización: **05 Abril 2026**
 
 ---
 
@@ -108,3 +108,48 @@ La base de datos, el motor de ventas y el branding están listos. Los componente
 | **PIN hasheado SHA-256** | Nunca texto plano en BD. Se usa Web Crypto API nativa (sin dependencias externas) |
 | **Papel fijo 58mm** | El cliente tiene únicamente impresora térmica de 58mm |
 | **Moneda base USD** | Bs y COP son conversiones dinámicas; nunca se almacenan como base |
+
+---
+
+## ✅ FASE 6 — Refactorización de Código (COMPLETADA — 05/04/2026)
+
+Modularización de todos los archivos con más de 600 líneas. Se extrajeron hooks personalizados y sub-componentes sin romper funcionalidad. Build verificado green.
+
+### Vistas Refactorizadas
+
+| Archivo | Antes | Después | Extracciones |
+|---------|-------|---------|--------------|
+| `DashboardView.jsx` | 1257 | ~580 | `useDashboardMetrics.js` (cálculos useMemo) |
+| `CustomersView.jsx` | 1010 | 438 | `CustomerCard.jsx`, `CustomerModals.jsx` (3 modales) |
+| `ProductsView.jsx` | 1000 | 522 | `useProductForm.js` (22 estados + handlers), `useProductPagination.js` |
+| `SalesView.jsx` | 968 | 445 | `useSalesData.js` (carga + listeners), `useSalesCheckout.js` (checkout handlers) |
+| `ticketGenerator.js` | 751 | 381 | `thermalTicketGenerator.js`, `tableTicketGenerator.js` |
+| `ReportsView.jsx` | 748 | 448 | `TransactionRow.jsx`, `PaymentBreakdownCard.jsx`, `useReportsData.js` |
+| `CheckoutModal.jsx` | 724 | 449 | `useCheckoutPayments.js`, `CustomerPickerSection.jsx` |
+
+### Nuevos Hooks (`src/hooks/`)
+- `useDashboardMetrics.js` — Métricas del dashboard (ventas del día, ganancias, top productos, etc.)
+- `useProductForm.js` — Estado del formulario de productos y handlers (imagen, precios, guardado)
+- `useProductPagination.js` — Paginación, filtrado y ordenamiento de productos
+- `useSalesData.js` — Carga de datos de ventas, listeners de visibilidad/storage
+- `useSalesCheckout.js` — Handlers de checkout con cliente, checkout de mesa, custom amounts
+- `useReportsData.js` — Carga de ventas, cálculo de métricas y agrupación por cierre
+- `useCheckoutPayments.js` — Estado de barras de pago, cálculos bimoneda, confirmación
+
+### Nuevos Componentes
+- `src/components/Customers/CustomerCard.jsx` — Tarjeta compacta de cliente
+- `src/components/Customers/CustomerModals.jsx` — DetailSheet, EditModal, AddModal
+- `src/components/Reports/TransactionRow.jsx` — Fila expandible de transacción
+- `src/components/Reports/PaymentBreakdownCard.jsx` — Desglose por método de pago
+- `src/components/Sales/CustomerPickerSection.jsx` — Selector de cliente + crear inline
+
+### Nuevos Utils
+- `src/utils/thermalTicketGenerator.js` — Impresión térmica via window.print()
+- `src/utils/tableTicketGenerator.js` — Pre-cuenta PDF para mesas de pool
+
+### Patrón de Refactorización
+- **Hooks**: Extraen estado + lógica de negocio. Reciben dependencias como parámetros, retornan estado + handlers.
+- **Componentes**: Extraen JSX auto-contenido con su propio estado local cuando aplica.
+- **Re-exports**: `ticketGenerator.js` re-exporta funciones movidas para compatibilidad hacia atrás.
+
+> **Commit:** `6234389` — `refactor: modularize large files into hooks and components`
