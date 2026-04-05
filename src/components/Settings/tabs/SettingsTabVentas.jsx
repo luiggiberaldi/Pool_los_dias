@@ -39,14 +39,24 @@ export default function SettingsTabVentas({
                     <div className="flex items-center gap-1.5 shrink-0">
                         <input
                             type="number"
+                            inputMode="numeric"
                             min="0"
                             max="100"
                             value={maxDiscountCajero}
+                            onFocus={e => e.target.select()}
                             onChange={e => {
-                                const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                                const raw = e.target.value;
+                                if (raw === '') { setMaxDiscountCajero(''); return; }
+                                const val = Math.min(100, Math.max(0, parseInt(raw) || 0));
                                 setMaxDiscountCajero(val);
                                 localStorage.setItem('max_discount_cajero', String(val));
                                 triggerHaptic?.();
+                            }}
+                            onBlur={() => {
+                                if (maxDiscountCajero === '' || maxDiscountCajero === null) {
+                                    setMaxDiscountCajero(0);
+                                    localStorage.setItem('max_discount_cajero', '0');
+                                }
                             }}
                             className="w-16 text-center text-sm font-black text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2 px-2 focus:outline-none focus:ring-2 focus:ring-violet-400"
                         />
