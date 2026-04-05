@@ -6,6 +6,7 @@ import { useAuthStore as useNewAuthStore } from '../hooks/store/authStore';
 import { round2, subR, sumR } from './dinero';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
+import { capitalizeName } from './calculatorUtils';
 
 const SALES_KEY = 'bodega_sales_v1';
 const EPSILON = 0.01;
@@ -136,10 +137,10 @@ export async function processSaleTransaction({
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
         status: saleMode === 'online' ? 'COMPLETADA' : (saleMode === 'pending_verification' ? 'PENDIENTE_VERIFICACION' : 'PENDIENTE_SYNC'),
         vendedorId: currentUser?.id || null,
-        vendedorNombre: currentUser?.nombre || currentUser?.name || 'Sistema',
+        vendedorNombre: capitalizeName(currentUser?.nombre || currentUser?.name || 'Sistema'),
         vendedorRol: currentUser?.rol || currentUser?.role || null,
         meseroId: meseroId || null,
-        meseroNombre: meseroNombre || null,
+        meseroNombre: capitalizeName(meseroNombre) || null,
         tableName: tableName || null,
         items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
         cartSubtotalUsd: cartSubtotalUsd,

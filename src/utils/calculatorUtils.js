@@ -5,6 +5,12 @@
 export const formatBs = (val) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 export const formatUsd = (val) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
 
+/** Capitaliza la primera letra de cada palabra en un nombre */
+export const capitalizeName = (str) => {
+    if (!str || typeof str !== 'string') return str || '';
+    return str.replace(/\b\w/g, c => c.toUpperCase());
+};
+
 // [REDONDEO INTELIGENTE PARA EFECTIVO]
 // Regla: Si decimal <= 0.20 -> Redondeo abajo (Floor)
 //        Si decimal > 0.20  -> Redondeo arriba (Ceil)

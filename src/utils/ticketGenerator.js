@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatBs, formatUsd } from './calculatorUtils';
+import { formatBs, formatUsd, capitalizeName } from './calculatorUtils';
 
 // Re-exports for backward compatibility
 export { printThermalTicket } from './thermalTicketGenerator';
@@ -110,7 +110,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         y += 6;
     }
 
-    const staffName = sale.meseroNombre || sale.vendedorNombre;
+    const staffName = capitalizeName(sale.meseroNombre || sale.vendedorNombre);
     if (staffName && staffName !== 'Sistema') {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);

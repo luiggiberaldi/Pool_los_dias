@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
+import { capitalizeName } from '../utils/calculatorUtils';
 
 export function getLocalISODate(d = new Date()) {
     const year = d.getFullYear();
@@ -123,7 +124,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (sinceDate && s.timestamp < sinceDate) return false;
             return true;
         }).forEach(s => {
-            if (!map[s.meseroId]) map[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
+            if (!map[s.meseroId]) map[s.meseroId] = { id: s.meseroId, name: capitalizeName(s.meseroNombre) || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
             map[s.meseroId].ventas += 1;
             map[s.meseroId].revenue += s.totalUsd || 0;
         });

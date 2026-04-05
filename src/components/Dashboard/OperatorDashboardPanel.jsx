@@ -6,6 +6,7 @@ import { Clock, AlertTriangle, Coffee, Timer, ArrowRight, CheckCircle2, Shopping
 import { calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
 import { storageService } from '../../utils/storageService';
 import { useConfirm } from '../../hooks/useConfirm';
+import { capitalizeName } from '../../utils/calculatorUtils';
 
 function getGreeting() {
     const h = new Date().getHours();
@@ -69,7 +70,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                     if (sinceDate && s.timestamp < sinceDate) return false;
                     return true;
                 }).forEach(s => {
-                    if (!meseroMap[s.meseroId]) meseroMap[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', ventas: 0, revenue: 0 };
+                    if (!meseroMap[s.meseroId]) meseroMap[s.meseroId] = { id: s.meseroId, name: capitalizeName(s.meseroNombre) || 'Desconocido', ventas: 0, revenue: 0 };
                     meseroMap[s.meseroId].ventas += 1;
                     meseroMap[s.meseroId].revenue += s.totalUsd || 0;
                 });

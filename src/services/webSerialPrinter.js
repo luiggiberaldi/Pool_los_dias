@@ -1,11 +1,13 @@
 /**
  * webSerialPrinter.js
  * Servicio de integración nativa con impresoras térmicas USB/Serial mediante Web Serial API.
- * 
+ *
  * ESC/POS Comandos Básicos
  * Init: [27, 64]
  * Open Drawer: [27, 112, 0, 50, 250]
  */
+
+import { capitalizeName } from '../utils/calculatorUtils';
 
 let activePort = null;
 
@@ -183,8 +185,8 @@ export async function printReceiptEscPos(sale, bcvRate) {
     }
 
     // Cliente
-    p.text('Cliente: ' + (sale.customerName || 'Consumidor Final')).newline();
-    if (sale.meseroNombre) p.text('Atendido: ' + sale.meseroNombre).newline();
+    p.text('Cliente: ' + (capitalizeName(sale.customerName) || 'Consumidor Final')).newline();
+    if (sale.meseroNombre) p.text('Atendido: ' + capitalizeName(sale.meseroNombre)).newline();
 
     p.align(0).line('=', W);
 

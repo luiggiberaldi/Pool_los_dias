@@ -19,6 +19,7 @@
 
 import { create } from 'zustand';
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { capitalizeName } from '../../utils/calculatorUtils';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -80,11 +81,12 @@ export const useAuthStore = create((set, get) => ({
     hydrate: async () => {
         if (get()._hydrated) return;
         const [session, users] = await Promise.all([loadPersistedSession(), loadCachedUsers()]);
+        if (session?.name) session.name = capitalizeName(session.name);
         set({
             currentUser:     session,
             isAuthenticated: !!session,
             role:            session?.role || null,
-            cachedUsers:     users,
+            cachedUsers:     users.map(u => ({ ...u, name: capitalizeName(u.name) })),
             _hydrated:       true,
         });
     },
@@ -100,7 +102,7 @@ export const useAuthStore = create((set, get) => ({
 
             if (error) throw error;
 
-            const users = data || [];
+            const users = (data || []).map(u => ({ ...u, name: capitalizeName(u.name) }));
             const lf = await getLocalForage();
             await lf.setItem(USERS_CACHE_KEY, users);
             set({ cachedUsers: users });
@@ -123,7 +125,7 @@ export const useAuthStore = create((set, get) => ({
         const hashedPin = await sha256(pin);
         if (hashedPin !== user.pin_hash) return false;
 
-        const session = { ...user };
+        const session = { ...user, name: capitalizeName(user.name) };
 
         try {
             const lf = await getLocalForage();

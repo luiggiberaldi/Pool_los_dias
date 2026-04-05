@@ -1,4 +1,4 @@
-import { formatBs } from './calculatorUtils';
+import { formatBs, capitalizeName } from './calculatorUtils';
 import { printReceiptEscPos } from '../services/webSerialPrinter';
 
 /**
@@ -175,11 +175,11 @@ function _printThermalHTML(sale, bcvRate) {
         </tr>
     </table>
     <div style="font-size:${fSmall};margin:3px 0 2px;">
-        <span style="font-weight:bold;">Cliente:</span> ${sale.customerName || 'Consumidor Final'}
+        <span style="font-weight:bold;">Cliente:</span> ${capitalizeName(sale.customerName) || 'Consumidor Final'}
     </div>
     ${sale.tableName ? `<div style="font-size:${fSmall};margin:2px 0;"><span style="font-weight:bold;">Mesa:</span> ${sale.tableName}</div>` : ''}
     ${sale.customerDocument ? `<div style="font-size:${fTiny};color:#555;">C.I/RIF: ${sale.customerDocument}</div>` : ''}
-    ${(sale.meseroNombre || sale.vendedorNombre) && (sale.meseroNombre || sale.vendedorNombre) !== 'Sistema' ? `<div style="font-size:${fTiny};color:#555;"><span style="font-weight:bold;">Atendido:</span> ${sale.meseroNombre || sale.vendedorNombre}</div>` : ''}
+    ${(sale.meseroNombre || sale.vendedorNombre) && (sale.meseroNombre || sale.vendedorNombre) !== 'Sistema' ? `<div style="font-size:${fTiny};color:#555;"><span style="font-weight:bold;">Atendido:</span> ${capitalizeName(sale.meseroNombre || sale.vendedorNombre)}</div>` : ''}
 
     <hr class="dash">
 
