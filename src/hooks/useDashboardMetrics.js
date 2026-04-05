@@ -1,0 +1,158 @@
+import { useMemo } from 'react';
+import { FinancialEngine } from '../core/FinancialEngine';
+
+export function getLocalISODate(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate }) {
+    const today = getLocalISODate();
+
+    const todaySales = useMemo(() =>
+        sales.filter(s => {
+            if (s.status === 'ANULADA') return false;
+            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
+            if (s.cajaCerrada === true) return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+            return saleLocalDay === today;
+        }),
+        [sales, today]
+    );
+
+    const todayCashFlow = useMemo(() =>
+        sales.filter(s => {
+            if (s.status === 'ANULADA') return false;
+            if (!['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'].includes(s.tipo)) return false;
+            if (s.cajaCerrada === true) return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+            return saleLocalDay === today;
+        }),
+        [sales, today]
+    );
+
+    const todayApertura = useMemo(() =>
+        sales.find(s => {
+            if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+            return saleLocalDay === today;
+        }),
+        [sales, today]
+    );
+
+    const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [todaySales]);
+    const todayTotalUsd = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [todaySales]);
+    const todayItemsSold = useMemo(() =>
+        todaySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0),
+        [todaySales]
+    );
+
+    const todayExpenses = useMemo(() =>
+        sales.filter(s => {
+            if (s.tipo !== 'PAGO_PROVEEDOR') return false;
+            if (s.cajaCerrada === true) return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+            return saleLocalDay === today;
+        }),
+        [sales, today]
+    );
+    const todayExpensesUsd = useMemo(() =>
+        todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0),
+        [todayExpenses]
+    );
+
+    const todayProfit = useMemo(() =>
+        FinancialEngine.calculateAggregateProfit(todaySales, bcvRate, products),
+        [todaySales, bcvRate, products]
+    );
+
+    const recentSales = useMemo(() => {
+        if (selectedChartDate) {
+            return sales.filter(s => {
+                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+                return saleLocalDay === selectedChartDate;
+            });
+        }
+        return sales.slice(0, 7);
+    }, [sales, selectedChartDate, today]);
+
+    const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        const dateStr = getLocalISODate(d);
+        const daySales = sales.filter(s => {
+            if (['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','VENTA_FIADA'].includes(s.tipo) || s.status === 'ANULADA') return false;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+            return saleLocalDay === dateStr;
+        });
+        return { date: dateStr, total: daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), count: daySales.length };
+    }), [sales, today]);
+
+    const lowStockProducts = useMemo(() =>
+        products.filter(p => (p.stock ?? 0) <= (p.lowStockAlert ?? 5))
+            .sort((a, b) => (a.stock ?? 0) - (b.stock ?? 0)).slice(0, 6),
+        [products]
+    );
+
+    const totalDeudas = useMemo(() => {
+        const deudores = customers.filter(c => (c.deuda || 0) > 0.01);
+        const totalUsd = deudores.reduce((sum, c) => sum + (c.deuda || 0), 0);
+        return { count: deudores.length, totalUsd, top5: [...deudores].sort((a, b) => (b.deuda || 0) - (a.deuda || 0)).slice(0, 5) };
+    }, [customers]);
+
+    const topProducts = useMemo(() => {
+        const map = {};
+        sales.filter(s => !['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','VENTA_FIADA'].includes(s.tipo) && s.status !== 'ANULADA').forEach(s => {
+            s.items?.forEach(item => {
+                if (!map[item.name]) map[item.name] = { name: item.name, qty: 0, revenue: 0 };
+                map[item.name].qty += item.qty;
+                map[item.name].revenue += item.priceUsd * item.qty;
+            });
+        });
+        return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 5);
+    }, [sales]);
+
+    const topStaff = useMemo(() => {
+        const map = {};
+        sales.filter(s => !['COBRO_DEUDA','AJUSTE_ENTRADA','AJUSTE_SALIDA','APERTURA_CAJA'].includes(s.tipo) && s.status !== 'ANULADA').forEach(s => {
+            if (s.meseroId) {
+                if (!map[s.meseroId]) map[s.meseroId] = { id: s.meseroId, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
+                map[s.meseroId].ventas += 1;
+                map[s.meseroId].revenue += s.totalUsd || 0;
+            } else if (s.vendedorId) {
+                if (!map[s.vendedorId]) map[s.vendedorId] = { id: s.vendedorId, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || 'CAJERO', ventas: 0, revenue: 0 };
+                map[s.vendedorId].ventas += 1;
+                map[s.vendedorId].revenue += s.totalUsd || 0;
+            }
+        });
+        return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    }, [sales]);
+
+    const paymentBreakdown = useMemo(() =>
+        FinancialEngine.calculatePaymentBreakdown(todayCashFlow),
+        [todayCashFlow]
+    );
+
+    const todayTopProducts = useMemo(() => {
+        const map = {};
+        todaySales.forEach(s => {
+            s.items?.forEach(item => {
+                if (!map[item.name]) map[item.name] = { name: item.name, qty: 0, revenue: 0 };
+                map[item.name].qty += item.qty;
+                map[item.name].revenue += item.priceUsd * item.qty;
+            });
+        });
+        return Object.values(map).sort((a, b) => b.qty - a.qty).slice(0, 10);
+    }, [todaySales]);
+
+    return {
+        today, todaySales, todayCashFlow, todayApertura,
+        todayTotalBs, todayTotalUsd, todayItemsSold,
+        todayExpenses, todayExpensesUsd, todayProfit,
+        recentSales, weekData, lowStockProducts,
+        totalDeudas, topProducts, topStaff,
+        paymentBreakdown, todayTopProducts,
+    };
+}

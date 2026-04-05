@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useDeferredValue } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
-import { round2, divR } from '../utils/dinero';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
-import { getActivePaymentMethods } from '../config/paymentMethods';
 import { showToast } from '../components/Toast';
-import { ShoppingCart, X, DollarSign, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useProductContext } from '../context/ProductContext';
 
@@ -23,223 +21,136 @@ import CustomAmountModal from '../components/Sales/CustomAmountModal';
 import KeyboardHelpModal from '../components/Sales/KeyboardHelpModal';
 import DiscountModal from '../components/Sales/DiscountModal';
 import CajaCerradaOverlay from '../components/Sales/CajaCerradaOverlay';
-import { getLocalISODate } from '../utils/dateHelpers';
 import { buildReceiptWhatsAppUrl } from '../components/Sales/ReceiptShareHelper';
-import AperturaCajaModal from '../components/Dashboard/AperturaCajaModal';
-
 import ConfirmModal from '../components/ConfirmModal';
 import Confetti from '../components/Confetti';
-import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useSalesKeyboard } from '../hooks/useSalesKeyboard';
 import { TableQueuePanel } from '../components/tables/TableQueuePanel';
 import TableBillModal from '../components/tables/TableBillModal';
-import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useCashStore } from '../hooks/store/cashStore';
 
-const SALES_KEY = 'bodega_sales_v1';
+// Extracted hooks
+import { useSalesData } from '../hooks/useSalesData';
+import { useSalesCheckout } from '../hooks/useSalesCheckout';
 
 export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, isActive }) {
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
     const { notifyLowStock } = useNotifications();
 
-    // ── Global Context ──────────────────────────────────────
     const { products, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
-
-    // ── Cash Session (fuente de verdad) ──────────────────────
     const { activeCashSession } = useCashStore();
+    const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
 
-    // ── State ──────────────────────────────────────
-    const [customers, setCustomers] = useState([]);
-    const [paymentMethods, setPaymentMethods] = useState([]);
-    const [isLoadingLocal, setIsLoadingLocal] = useState(true);
-    const isLoading = isLoadingProducts || isLoadingLocal;
+    // ── UI State ──
     const [showConfetti, setShowConfetti] = useState(false);
     const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
     const [showCustomAmountModal, setShowCustomAmountModal] = useState(false);
-    const [showKeyboardHelp, setShowKeyboardHelp] = useState(false); // Keyboard shortcuts modal state
-
-    // Apertura Caja — estado removido: se usa activeCashSession de useCashStore
-
-    // Cart (from global context)
-    const { cart, setCart, cartRef, pendingNavigate, setPendingNavigate, discount, setDiscount } = useCart();
+    const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
     const [showDiscountModal, setShowDiscountModal] = useState(false);
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [showReceipt, setShowReceipt] = useState(null);
+    const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
+    const [showRateConfig, setShowRateConfig] = useState(false);
 
-    // Search
+    // ── Search ──
     const searchInputRef = useRef(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState('todos');
+    const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
 
-    // Modals
-    const [showCheckout, setShowCheckout] = useState(false);
-    const [showReceipt, setShowReceipt] = useState(null);
+    // ── Modals ──
     const [hierarchyPending, setHierarchyPending] = useState(null);
     const [weightPending, setWeightPending] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
-
-    // Rate config
-    const [showRateConfig, setShowRateConfig] = useState(false);
-
-    const [isCartSheetOpen, setIsCartSheetOpen] = useState(false);
-
-    // ── Mesa Queue (Checkout pedido por mesero) ──────────
     const [tableCheckoutData, setTableCheckoutData] = useState(null);
     const [showTablePayment, setShowTablePayment] = useState(false);
 
-    // Cart Navigation State
-    const [cartSelectedIndex, setCartSelectedIndex] = useState(-1);
+    // ── Data hook ──
+    const { customers, setCustomers, paymentMethods, salesData, setSalesData, isLoadingLocal, buildCurrentFloat } = useSalesData({
+        isActive, setProductsSilent, cart, cartRef, setCart
+    });
+    const isLoading = isLoadingProducts || isLoadingLocal;
+    const currentFloat = useMemo(() => buildCurrentFloat(salesData), [salesData, buildCurrentFloat]);
 
-    // Auto-select last item when cart length changes (if user was already interacting with the cart)
-    useEffect(() => {
-        if (cart.length > 0) {
-            setCartSelectedIndex(prev =>
-                prev !== -1 ? Math.min(prev, cart.length - 1) : prev
-            );
-        } else {
-            setCartSelectedIndex(-1);
-        }
-    }, [cart.length]);
+    // ── Cart totals ──
+    const { subtotalUsd: cartSubtotalUsd, subtotalBs: cartSubtotalBs, discountAmountUsd, discountAmountBs, totalUsd: cartTotalUsd, totalBs: cartTotalBs } = useMemo(() =>
+        FinancialEngine.buildCartTotals(cart, discount, effectiveRate, copEnabled ? tasaCop : 0),
+        [cart, discount, effectiveRate, copEnabled, tasaCop]);
 
-    // Voice
+    const discountData = { active: discount?.value > 0, amountUsd: discountAmountUsd, amountBs: discountAmountBs, type: discount?.type, value: discount?.value };
+    const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
+    const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+    // ── Checkout hook ──
+    const { handleCheckoutWithCustomer, handleTableCheckout, handleCreateCustomer, handleAddCustomAmount } = useSalesCheckout({
+        cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
+        effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
+        customers, setCustomers, products,
+        setProductsSilent, setSalesData,
+        setCart, setShowCheckout, setShowReceipt, setSelectedCustomerId, setCartSelectedIndex,
+        setShowConfetti, tableCheckoutData, setTableCheckoutData,
+        playCheckout, playError, triggerHaptic, notifyLowStock,
+    });
+
     const handleSetSearchTerm = (text) => { setSearchTerm(text); setSelectedIndex(0); };
+
+    // ── Voice Search ──
     const { isRecording, isProcessingAudio, startRecording, stopRecording } = useVoiceSearch({
-        onResult: (text) => { 
+        onResult: (text) => {
             if (!text) return;
             const normalizedTerm = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const bestMatches = products.filter(p => {
-                const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return normalizedName.includes(normalizedTerm);
-            });
-
-            if (bestMatches.length > 0) {
-                // Auto-agregar la primera (mejor) coincidencia
-                addToCart(bestMatches[0]);
-                handleSetSearchTerm('');
-            } else {
-                playError();
-                showToast(`No encontré ningún producto parecido a "${text}"`, 'warning');
-                // Al menos dejamos el texto en el buscador por si el usuario quiere corregirlo manualmente
-                handleSetSearchTerm(text);
-                searchInputRef.current?.focus();
-            }
+            const bestMatches = products.filter(p => p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(normalizedTerm));
+            if (bestMatches.length > 0) { addToCart(bestMatches[0]); handleSetSearchTerm(''); }
+            else { playError(); showToast(`No encontré ningún producto parecido a "${text}"`, 'warning'); handleSetSearchTerm(text); searchInputRef.current?.focus(); }
         },
         triggerHaptic,
     });
 
-    // Barcode Scanner Global
-    useBarcodeScanner({
-        onScan: (barcode) => {
-            if (showCheckout || showReceipt || showClearCartConfirm) return;
-
-            // Pesa electrónica con PLU
-            if (barcode.startsWith('21') && barcode.length >= 13) {
-                const pluCode = parseInt(barcode.substring(2, 7), 10).toString();
-                const weightKg = parseInt(barcode.substring(7, 12), 10) / 1000;
-                const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(barcode.substring(0, 7)));
-                if (p) { addToCart({ ...p, isWeight: true }, weightKg); return; }
-            }
-
-            // Producto regular
-            const product = products.find(p => p.barcode === barcode || p.id === barcode);
-            if (product) {
-                addToCart(product);
-            } else {
-                playError();
-                showToast(`Producto no encontrado (${barcode})`, 'warning');
-            }
-        },
-        enabled: !isLoading && isActive && !!activeCashSession
-    });
-
-    // Paste Barcode Handler (Para cuando el usuario hace Ctrl+V en la barra de búsqueda)
-    const handlePasteBarcode = (pastedText) => {
-        // Ignoramos si hay popups activos
+    // ── Barcode Scanner ──
+    const scanProduct = (barcode) => {
         if (showCheckout || showReceipt || showClearCartConfirm) return;
+        if (barcode.startsWith('21') && barcode.length >= 13) {
+            const pluCode = parseInt(barcode.substring(2, 7), 10).toString();
+            const weightKg = parseInt(barcode.substring(7, 12), 10) / 1000;
+            const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(barcode.substring(0, 7)));
+            if (p) { addToCart({ ...p, isWeight: true }, weightKg); return; }
+        }
+        const product = products.find(p => p.barcode === barcode || p.id === barcode);
+        if (product) addToCart(product);
+        else { playError(); showToast(`Producto no encontrado (${barcode})`, 'warning'); }
+    };
+    useBarcodeScanner({ onScan: scanProduct, enabled: !isLoading && isActive && !!activeCashSession });
 
-        // Intentar Pesa Electrónica
+    const handlePasteBarcode = (pastedText) => {
+        if (showCheckout || showReceipt || showClearCartConfirm) return;
         if (pastedText.startsWith('21') && pastedText.length >= 13) {
             const pluCode = parseInt(pastedText.substring(2, 7), 10).toString();
             const weightKg = parseInt(pastedText.substring(7, 12), 10) / 1000;
             const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(pastedText.substring(0, 7)));
-            if (p) { 
-                addToCart({ ...p, isWeight: true }, weightKg); 
-                // Limpiamos el texto que se acaba de pegar
-                setTimeout(() => setSearchTerm(''), 10);
-                return; 
-            }
+            if (p) { addToCart({ ...p, isWeight: true }, weightKg); setTimeout(() => setSearchTerm(''), 10); return; }
         }
-
-        // Buscar producto regular por código de barras o ID exactamente
         const product = products.find(p => p.barcode === pastedText || p.id === pastedText);
-        if (product) {
-            addToCart(product);
-            // Limpiamos la barra tras pegarse
-            setTimeout(() => setSearchTerm(''), 10);
-        }
-        // Si no es un código exacto, no hacemos nada extra, el navegador lo pegará como texto normal para buscar.
+        if (product) { addToCart(product); setTimeout(() => setSearchTerm(''), 10); }
     };
 
-    // ── Derived (memos) ───────────────────────────
+    // ── Derived ──
     const deferredSearchTerm = useDeferredValue(searchTerm);
-
     const searchResults = useMemo(() => {
         if (deferredSearchTerm.length < 1) return [];
         const normalizedTerm = deferredSearchTerm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        return products.filter(p => {
-            if (p.barcode?.includes(deferredSearchTerm)) return true;
-            const normalizedName = p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            return normalizedName.includes(normalizedTerm);
-        }).slice(0, 6);
+        return products.filter(p => p.barcode?.includes(deferredSearchTerm) || p.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(normalizedTerm)).slice(0, 6);
     }, [deferredSearchTerm, products]);
 
-    const filteredByCategory = useMemo(() => selectedCategory === 'todos'
-        ? products
-        : products.filter(p => p.category === selectedCategory), [selectedCategory, products]);
+    const filteredByCategory = useMemo(() => selectedCategory === 'todos' ? products : products.filter(p => p.category === selectedCategory), [selectedCategory, products]);
 
-    const { 
-        subtotalUsd: cartSubtotalUsd, 
-        subtotalBs: cartSubtotalBs,
-        discountAmountUsd, 
-        discountAmountBs, 
-        totalUsd: cartTotalUsd, 
-        totalBs: cartTotalBs 
-    } = useMemo(() => 
-        FinancialEngine.buildCartTotals(cart, discount, effectiveRate, copEnabled ? tasaCop : 0)
-    , [cart, discount, effectiveRate, copEnabled, tasaCop]);
-    
-    // Variables estáticas para pasar a los componentes hijos
-    const discountData = {
-        active: discount?.value > 0,
-        amountUsd: discountAmountUsd,
-        amountBs: discountAmountBs,
-        type: discount?.type,
-        value: discount?.value
-    };
+    // ── Effects ──
+    useEffect(() => { if (cart.length > 0) setCartSelectedIndex(prev => prev !== -1 ? Math.min(prev, cart.length - 1) : prev); else setCartSelectedIndex(-1); }, [cart.length]);
+    useEffect(() => { if (pendingNavigate && cart.length > 0 && isActive) setPendingNavigate(null); }, [pendingNavigate, cart, isActive, setPendingNavigate]);
+    useEffect(() => { if (!isLoading && searchInputRef.current) searchInputRef.current.focus(); }, [isLoading]);
+    useEffect(() => { if (!showCheckout && !showReceipt && searchInputRef.current) searchInputRef.current.focus(); }, [showCheckout, showReceipt]);
 
-    // ── Current cash float (for soft change warning in CheckoutModal) ──
-    const [salesData, setSalesData] = useState([]);
-    const currentFloat = useMemo(() => {
-        const todayStr = getLocalISODate(new Date());
-        const todayOpen = salesData.filter(s => {
-            if (s.cajaCerrada) return false;
-            const saleDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
-            return saleDay === todayStr;
-        });
-        const bd = FinancialEngine.calculatePaymentBreakdown(todayOpen);
-        return {
-            usd: bd['efectivo_usd']?.total ?? 0,
-            bs:  bd['efectivo_bs']?.total  ?? 0,
-        };
-    }, [salesData]);
-
-    const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
-
-    const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-
-    // Search Deferred Value for Performance (moved to top of memos)
-
-    // Persist cart (With Debounce to avoid blocking UI on rapid scans)
+    // Persist cart
     const isCartInitialized = useRef(false);
     useEffect(() => {
         if (!isCartInitialized.current) { isCartInitialized.current = true; return; }
@@ -250,97 +161,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         return () => clearTimeout(timer);
     }, [cart]);
 
-    // Load data
-    useEffect(() => {
-        let mounted = true;
-        const load = async () => {
-            const [savedCustomers, methods, savedCart, savedSales] = await Promise.all([
-                storageService.getItem('bodega_customers_v1', []),
-                getActivePaymentMethods(),
-                storageService.getItem('bodega_pending_cart_v1', []),
-                storageService.getItem(SALES_KEY, [])
-            ]);
-            if (mounted) { setSalesData(savedSales); }
-            if (mounted) {
-                setCustomers(savedCustomers);
-                setPaymentMethods(methods);
-
-                // Only set cart if it's currently empty (don't overwrite if user somehow added items before load)
-                if (savedCart && savedCart.length > 0 && cartRef.current.length === 0) {
-                    setCart(savedCart);
-                }
-
-                setIsLoadingLocal(false);
-
-            }
-        };
-        load();
-        return () => { mounted = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cartRef, setCart]);
-
-    // Handle pending navigation from recycled cart (replaces old localStorage approach)
-    useEffect(() => {
-        if (pendingNavigate && cart.length > 0 && isActive) {
-            setPendingNavigate(null);
-        }
-    }, [pendingNavigate, cart, isActive, setPendingNavigate]);
-
-    // Auto-focus search
-    useEffect(() => { if (!isLoading && searchInputRef.current) searchInputRef.current.focus(); }, [isLoading]);
-
-    // Refresh products, payment methods, and customers when tab becomes active (consolidates window focus + isActive)
-    const handleReloadContent = useCallback(() => {
-        if (!isActive) return;
-        Promise.all([
-            storageService.getItem('bodega_products_v1', []),
-            getActivePaymentMethods(),
-            storageService.getItem('bodega_customers_v1', []),
-            storageService.getItem(SALES_KEY, [])
-        ]).then(([savedProducts, methods, savedCustomers, savedSales]) => {
-            // setProductsSilent: Only updates the UI, does NOT save to cloud.
-            // This prevents a feedback loop where loading from cloud triggers an upload back.
-            setProductsSilent(savedProducts);
-            setPaymentMethods(methods);
-            setCustomers(savedCustomers);
-            setSalesData(savedSales);
-        });
-    }, [isActive, setProductsSilent]);
-
-    useEffect(() => {
-        handleReloadContent();
-    }, [handleReloadContent]);
-
-    // Recargar cuando la app vuelve desde el background en móviles (PWA) o cuando hay un cambio en el storage
-    useEffect(() => {
-        const onVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                handleReloadContent();
-            }
-        };
-
-        const onStorageUpdate = (e) => {
-            if (e.detail && e.detail.key === SALES_KEY) {
-                // Pequeño timeout para dar margen a que IndexedDB haya persistido los datos
-                setTimeout(handleReloadContent, 50);
-            }
-        };
-
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        window.addEventListener('focus', handleReloadContent);
-        window.addEventListener('app_storage_update', onStorageUpdate);
-        
-        return () => {
-            document.removeEventListener('visibilitychange', onVisibilityChange);
-            window.removeEventListener('focus', handleReloadContent);
-            window.removeEventListener('app_storage_update', onStorageUpdate);
-        };
-    }, [handleReloadContent]);
-
-    // Return focus after closing modals
-    useEffect(() => { if (!showCheckout && !showReceipt && searchInputRef.current) searchInputRef.current.focus(); }, [showCheckout, showReceipt]);
-
-    // Global keybinds (F9 = checkout, Escape = close modals)
+    // F9/Escape shortcuts
     useEffect(() => {
         const handler = (e) => {
             if (e.key === 'F9') { e.preventDefault(); if (cart.length > 0 && !showCheckout && !showReceipt) setShowCheckout(true); }
@@ -353,28 +174,14 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         return () => window.removeEventListener('keydown', handler);
     }, [cart, showCheckout, showReceipt]);
 
-    // ── Callbacks ─────────────────────────────────
+    // ── Cart Handlers ──
     const addToCart = useCallback((product, qtyOverride = null, forceMode = null) => {
         triggerHaptic && triggerHaptic();
-
-        // Validación temprana: rechazar productos sin precio válido
-        if (!product.priceUsdt || isNaN(product.priceUsdt) || product.priceUsdt <= 0) {
-            playError();
-            showToast('Este producto no tiene precio válido. Edítalo primero.', 'warning');
-            return;
-        }
-
-        // Validación temprana de stock (si la configuración lo exige)
+        if (!product.priceUsdt || isNaN(product.priceUsdt) || product.priceUsdt <= 0) { playError(); showToast('Este producto no tiene precio válido. Edítalo primero.', 'warning'); return; }
         const allowNegativeStock = localStorage.getItem('allow_negative_stock') === 'true';
         const currentStock = parseFloat(product.stock) || 0;
-        if (!allowNegativeStock && currentStock <= 0) {
-            playError();
-            showToast(`${product.name}: sin stock`, 'warning');
-            return;
-        }
-
+        if (!allowNegativeStock && currentStock <= 0) { playError(); showToast(`${product.name}: sin stock`, 'warning'); return; }
         playAdd();
-
         if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) { setHierarchyPending(product); return; }
         if ((product.unit === 'kg' || product.unit === 'litro') && !qtyOverride) { setWeightPending(product); return; }
 
@@ -383,13 +190,8 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         let cartName = product.name;
         let qtyToAdd = qtyOverride || 1;
 
-        if (forceMode === 'unit') {
-            priceToUse = product.unitPriceUsd;
-            cartId = product.id + '_unit';
-            cartName = product.name + ' (Ud.)';
-        }
+        if (forceMode === 'unit') { priceToUse = product.unitPriceUsd; cartId = product.id + '_unit'; cartName = product.name + ' (Ud.)'; }
 
-        // Pre-calculate stock check BEFORE setCart to avoid React StrictMode double-firing
         if (!allowNegativeStock) {
             const currentCart = cartRef.current;
             const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
@@ -397,48 +199,29 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
             const newQty = existingQtyForThis + addingQty;
             const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
-
             const otherCartItems = currentCart.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
-            const otherStockUsed = otherCartItems.reduce((sum, item) => {
-                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                return sum + item.qty;
-            }, 0);
-
-            if (stockNeeded + otherStockUsed > currentStock) {
-                playError();
-                showToast(`${product.name}: stock maximo alcanzado`, 'warning');
-                return;
-            }
+            const otherStockUsed = otherCartItems.reduce((sum, item) => item._mode === 'unit' ? sum + (item.qty / (item._unitsPerPackage || 1)) : sum + item.qty, 0);
+            if (stockNeeded + otherStockUsed > currentStock) { playError(); showToast(`${product.name}: stock maximo alcanzado`, 'warning'); return; }
         }
 
-        // Soft warning when allowNegativeStock is ON but stock just ran out
         if (allowNegativeStock && currentStock > 0) {
             const currentCart = cartRef.current;
             const existingInCart = currentCart.find(i => i.id === cartId && i.priceUsd === priceToUse);
             const existingQtyForThis = existingInCart ? existingInCart.qty : 0;
             const newQty = existingQtyForThis + (qtyOverride || 1);
             const stockNeeded = forceMode === 'unit' ? newQty / (product.unitsPerPackage || 1) : newQty;
-
             const otherCartItems = currentCart.filter(i => (i._originalId || i.id) === product.id && i.id !== cartId);
-            const otherStockUsed = otherCartItems.reduce((sum, item) => {
-                if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                return sum + item.qty;
-            }, 0);
-
-            if (stockNeeded + otherStockUsed > currentStock) {
-                showToast(`${product.name}: stock agotado, vendiendo sin inventario`, 'info');
-            }
+            const otherStockUsed = otherCartItems.reduce((sum, item) => item._mode === 'unit' ? sum + (item.qty / (item._unitsPerPackage || 1)) : sum + item.qty, 0);
+            if (stockNeeded + otherStockUsed > currentStock) showToast(`${product.name}: stock agotado, vendiendo sin inventario`, 'info');
         }
 
         setCart(prev => {
             const existing = prev.find(i => i.id === cartId && i.priceUsd === priceToUse);
             if (existing && !qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + 1 } : i);
             if (existing && qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + qtyOverride } : i);
-
             const itemCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
             return [{
-                ...product, id: cartId, name: cartName, priceUsd: priceToUse,
-                exactBs: product.exactBs || null,
+                ...product, id: cartId, name: cartName, priceUsd: priceToUse, exactBs: product.exactBs || null,
                 costBs: forceMode === 'unit' ? itemCostBs / (product.unitsPerPackage || 1) : itemCostBs,
                 costUsd: forceMode === 'unit' ? (product.costUsd || 0) / (product.unitsPerPackage || 1) : (product.costUsd || 0),
                 qty: qtyToAdd, isWeight: !!qtyOverride,
@@ -447,21 +230,13 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         });
         handleSetSearchTerm('');
         setHierarchyPending(null);
-        
-        // --- Pool Los Diaz Flow: blur search to enter cart mode and auto-select ---
-        setTimeout(() => {
-            searchInputRef.current?.blur();
-            setCartSelectedIndex(0); // Ensure cart item is selected and ready for + / - 
-        }, 50);
-    }, [triggerHaptic, effectiveRate, playAdd, playError, products, cartRef, setCart]);
+        setTimeout(() => { searchInputRef.current?.blur(); setCartSelectedIndex(0); }, 50);
+    }, [triggerHaptic, effectiveRate, playAdd, playError, cartRef, setCart]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
         if (delta < 0) playRemove();
-
         const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
-
-        // Pre-check stock BEFORE setCart to avoid React StrictMode double toast
         if (!allowNeg && delta > 0) {
             const currentCart = cartRef.current;
             const cartItem = currentCart.find(i => i.id === id);
@@ -474,50 +249,28 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     const totalUsed = currentCart.reduce((sum, item) => {
                         if ((item._originalId || item.id) !== originalId) return sum;
                         if (item.id === id) return sum;
-                        if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                        return sum + item.qty;
+                        return item._mode === 'unit' ? sum + (item.qty / (item._unitsPerPackage || 1)) : sum + item.qty;
                     }, 0);
                     const thisItemStock = cartItem._mode === 'unit' ? newQty / (cartItem._unitsPerPackage || 1) : newQty;
-                    if (totalUsed + thisItemStock > availableStock) {
-                        playError();
-                        showToast(`${cartItem.name}: stock maximo alcanzado`, 'warning');
-                        return;
-                    }
+                    if (totalUsed + thisItemStock > availableStock) { playError(); showToast(`${cartItem.name}: stock maximo alcanzado`, 'warning'); return; }
                 }
             }
         }
-
-        setCart(prev => prev.map(i => {
-            if (i.id !== id) return i;
-            let newQty = Math.round((i.qty + delta) * 1000) / 1000;
-            if (newQty < 0) newQty = 0;
-            return newQty === 0 ? null : { ...i, qty: newQty };
-        }).filter(Boolean));
+        setCart(prev => prev.map(i => { if (i.id !== id) return i; let newQty = Math.round((i.qty + delta) * 1000) / 1000; if (newQty < 0) newQty = 0; return newQty === 0 ? null : { ...i, qty: newQty }; }).filter(Boolean));
     };
 
-    const removeFromCart = (id) => {
-        triggerHaptic && triggerHaptic();
-        playRemove();
-        setCart(prev => prev.filter(i => i.id !== id));
-    };
+    const removeFromCart = (id) => { triggerHaptic && triggerHaptic(); playRemove(); setCart(prev => prev.filter(i => i.id !== id)); };
 
     const handleSearchKeyDown = (e) => {
         if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex(prev => Math.min(prev + 1, searchResults.length - 1)); }
         else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex(prev => Math.max(prev - 1, 0)); }
-        else if (e.key === 'ArrowRight') {
-            // Jump to cart navigation if items exist
-            if (cart.length > 0) {
-                e.preventDefault();
-                searchInputRef.current?.blur();
-            }
-        }
+        else if (e.key === 'ArrowRight') { if (cart.length > 0) { e.preventDefault(); searchInputRef.current?.blur(); } }
         else if (e.key === 'Enter') {
             e.preventDefault();
-            // Barcode scanner (prefix 21)
             if (searchTerm.startsWith('21') && searchTerm.length >= 13) {
                 const pluCode = parseInt(searchTerm.substring(2, 7), 10).toString();
                 const weightKg = parseInt(searchTerm.substring(7, 12), 10) / 1000;
-                const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode) || p.barcode?.includes(searchTerm.substring(0, 7)));
+                const p = products.find(p => p.id === pluCode || p.barcode?.includes(pluCode));
                 if (p) { addToCart({ ...p, isWeight: true }, weightKg); handleSetSearchTerm(''); return; }
             }
             if (searchResults[selectedIndex]) addToCart(searchResults[selectedIndex]);
@@ -529,439 +282,163 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         }
     };
 
-
-
-    const handleTableCheckout = async (payments, changeBreakdown) => {
-        if (!tableCheckoutData) return;
-        triggerHaptic && triggerHaptic();
-
-        const syntheticCart = [];
-        
-        if (tableCheckoutData.timeCost > 0) {
-            syntheticCart.push({
-                id: crypto.randomUUID(),
-                name: `Tiempo Jugado (${tableCheckoutData.table.name})`,
-                priceUsdt: tableCheckoutData.timeCost,
-                priceUsd: tableCheckoutData.timeCost,
-                qty: 1,
-                costUsd: 0,
-                costBs: 0,
-                category: 'servicios',
-                unit: 'servicio',
-                stock: 9999
-            });
-        }
-        
-        if (tableCheckoutData.currentItems && tableCheckoutData.currentItems.length > 0) {
-             tableCheckoutData.currentItems.forEach(item => {
-                 const p = products.find(p => p.id === item.product_id);
-                 if (p) {
-                     syntheticCart.push({
-                         ...p,
-                         id: p.id,
-                         priceUsdt: Number(item.unit_price_usd),
-                         priceUsd: Number(item.unit_price_usd),
-                         qty: Number(item.qty),
-                         costBs: p.costBs || 0,
-                         costUsd: p.costUsd || 0,
-                     });
-                 }
-             });
-        }
-
-        const opts = {
-            cart: syntheticCart, 
-            cartTotalUsd: tableCheckoutData.grandTotal, 
-            cartTotalBs: tableCheckoutData.grandTotal * effectiveRate, 
-            cartSubtotalUsd: tableCheckoutData.grandTotal, 
-            payments, 
-            changeBreakdown,
-            selectedCustomerId, 
-            customers, 
-            products, 
-            effectiveRate, 
-            tasaCop, 
-            copEnabled,
-            discountData: { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 }, 
-            useAutoRate
-        };
-
-        const result = await processSaleTransaction(opts);
-        
-        if (!result.success) {
-            console.error('Abortando venta de mesa:', result.error);
-            showToast(result.error, result.error.includes('No se pueden') ? 'warning' : 'error');
-            playError();
-            return;
-        }
-
-        setProductsSilent(result.updatedProducts);
-        if (result.updatedCustomers) setCustomers(result.updatedCustomers);
-        setSalesData(prev => [result.sale, ...prev]);
-
-        try {
-            await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
-        } catch (error) {
-            console.error("Error al cerrar la mesa:", error);
-            showToast("Venta completa, pero falló al liberar la mesa.", "warning");
-        }
-
-        setShowReceipt(result.sale); 
-        playCheckout(); 
-        setShowConfetti(true);
-        notifyLowStock(result.updatedProducts);
-        
-        setTableCheckoutData(null); 
-        setSelectedCustomerId(''); 
-    };
-
-
-    const handleCheckout = async (payments, changeBreakdown) => {
-        triggerHaptic && triggerHaptic();
-
-        const opts = {
-            cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, payments, changeBreakdown,
-            selectedCustomerId, customers, products, effectiveRate, tasaCop, copEnabled,
-            discountData, useAutoRate
-        };
-
-        const result = await processSaleTransaction(opts);
-        
-        if (!result.success) {
-            console.error('Abortando venta:', result.error);
-            showToast(result.error, result.error.includes('No se pueden') ? 'warning' : 'error');
-            playError();
-            return;
-        }
-
-        // checkoutProcessor already persisted to storage. setProductsSilent updates UI only.
-        setProductsSilent(result.updatedProducts);
-        
-        if (result.updatedCustomers) {
-            setCustomers(result.updatedCustomers);
-        }
-
-        setSalesData(prev => [result.sale, ...prev]);
-
-        setShowReceipt(result.sale); 
-        playCheckout(); 
-        setShowConfetti(true);
-        notifyLowStock(result.updatedProducts);
-        
-        setCart([]); 
-        setShowCheckout(false); 
-        setSelectedCustomerId(''); 
-        setCartSelectedIndex(-1);
-    };
-
-    const handleCreateCustomer = async (name, documentId, phone) => {
-        const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };
-        const updated = [...customers, newCustomer];
-        setCustomers(updated);
-        await storageService.setItem('bodega_customers_v1', updated);
-        return newCustomer;
-    };
-
-    const handleAddCustomAmount = (amount, currency) => {
-        let amountUsd = 0;
-        let exactBsToStore = null;
-        
-        if (currency === 'USD') {
-            amountUsd = round2(amount);
-            // exactBsToStore remains null to float with effectiveRate
-        } else if (currency === 'COP') {
-            const tasaCopVal = typeof tasaCop !== 'undefined' ? tasaCop : (parseFloat(localStorage.getItem('tasa_cop')) || 4150);
-            amountUsd = divR(amount, tasaCopVal);
-            // exactBsToStore remains null to float with effectiveRate
-        } else {
-            // Default BS
-            amountUsd = divR(amount, effectiveRate);
-            exactBsToStore = round2(amount);
-        }
-
-        if (amountUsd <= 0) return;
-        
-        const customProduct = {
-            id: crypto.randomUUID(),
-            name: 'Venta Libre',
-            priceUsdt: amountUsd, // Usamos priceUsdt para que la validación temprana lo acepte
-            exactBs: exactBsToStore, // Monto exacto original en Bs, o null si debe flotar
-            costBs: 0,
-            costUsd: 0,
-            unit: 'unidad',
-            category: 'otros',
-            stock: 9999,
-        };
-
-        addToCart(customProduct);
-        setShowCustomAmountModal(false);
-    };
-
-    // ==========================================
-    // KEYBOARD SHORTCUTS (Pool Los Diaz Port)
-    // ==========================================
     useSalesKeyboard({
         todayAperturaData: activeCashSession, showCheckout, showReceipt, hierarchyPending, weightPending,
-        showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp, 
-        showDiscountModal, searchInputRef, setCartSelectedIndex, setShowClearCartConfirm, 
+        showClearCartConfirm, showCustomAmountModal, showRateConfig, showKeyboardHelp,
+        showDiscountModal, searchInputRef, setCartSelectedIndex, setShowClearCartConfirm,
         cartRef, setShowCheckout, cartSelectedIndex, updateQty, removeFromCart
     });
 
-    // ── Loading ───────────────────────────────────
     if (isLoading) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="w-8 h-8 rounded-full border-4 border-slate-200 dark:border-slate-800 border-t-emerald-500 animate-spin" />
-            </div>
-        );
+        return <div className="flex-1 flex flex-col items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-slate-200 dark:border-slate-800 border-t-emerald-500 animate-spin" /></div>;
     }
 
-    // ── Render ─────────────────────────────────────
     return (
         <div className="flex-1 min-h-0 flex flex-col dark:bg-slate-950 p-2 sm:p-4 sm:pb-4 overflow-hidden relative">
 
-            {/* Header + Rate Config */}
-            <SalesHeader
-                effectiveRate={effectiveRate}
-                useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
+            <SalesHeader effectiveRate={effectiveRate} useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
                 customRate={customRate} setCustomRate={setCustomRate}
                 showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
-                setShowKeyboardHelp={setShowKeyboardHelp}
-                triggerHaptic={triggerHaptic}
-            />
+                setShowKeyboardHelp={setShowKeyboardHelp} triggerHaptic={triggerHaptic} />
 
-            {/* ── Mesa Queue: cuentas pendientes de mesas ── */}
             <TableQueuePanel onCheckoutTable={setTableCheckoutData} effectiveRate={effectiveRate} />
 
             {!activeCashSession ? (
-                <CajaCerradaOverlay 
-                    cartCount={cart.length}
-                    onOpenApertura={() => onNavigate && onNavigate('inicio')} 
-                />
+                <CajaCerradaOverlay cartCount={cart.length} onOpenApertura={() => onNavigate && onNavigate('inicio')} />
             ) : (
                 <>
-                    {/* ── Split Layout: Products (left) + Cart Sidebar (right) on desktop ── */}
                     <div className="flex-1 min-h-0 flex flex-col lg:flex-row lg:gap-4">
-
-                        {/* ── Left Column: Search + Categories ── */}
                         <div className="flex-1 min-h-0 flex flex-col lg:min-w-0 overflow-y-auto lg:overflow-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
-                            {/* Search + Popups */}
                             <div className="shrink-0 mb-3 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                                <SearchBar
-                                    ref={searchInputRef}
-                                    searchTerm={searchTerm}
-                                    onSearchChange={handleSetSearchTerm}
-                                    onKeyDown={handleSearchKeyDown}
-                                    onPasteBarcode={handlePasteBarcode}
-                                    searchResults={searchResults}
-                                    selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
-                                    effectiveRate={effectiveRate}
-                                    addToCart={addToCart}
+                                <SearchBar ref={searchInputRef} searchTerm={searchTerm} onSearchChange={handleSetSearchTerm}
+                                    onKeyDown={handleSearchKeyDown} onPasteBarcode={handlePasteBarcode}
+                                    searchResults={searchResults} selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
+                                    effectiveRate={effectiveRate} addToCart={addToCart}
                                     isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
                                     hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
-                                    weightPending={weightPending} setWeightPending={setWeightPending}
-                                />
+                                    weightPending={weightPending} setWeightPending={setWeightPending} />
                             </div>
-
-                            {/* Category Chips + Product Grid */}
                             {!showCheckout && !showReceipt && (
-                                <CategoryBar
-                                    selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
-                                    filteredByCategory={filteredByCategory}
-                                    addToCart={addToCart}
-                                    triggerHaptic={triggerHaptic}
-                                    searchTerm={searchTerm}
-                                    onOpenCustomAmount={() => setShowCustomAmountModal(true)}
-
-                            products={products}
-                        />
-                    )}
-                </div>
-
-                {/* ── Right Column: Cart Sidebar — desktop only ── */}
-                <div className="hidden lg:flex lg:w-[380px] lg:shrink-0 lg:flex-col">
-                    <CartPanel
-                        cart={cart} effectiveRate={effectiveRate}
-                        cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                        cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
-                        discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
-                        updateQty={updateQty} removeFromCart={removeFromCart}
-                        onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
-                        onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
-                        triggerHaptic={triggerHaptic}
-                        cartSelectedIndex={cartSelectedIndex}
-                        copEnabled={copEnabled}
-                        tasaCop={tasaCop}
-                    />
-                </div>
-
-            </div>
-
-            {/* ── Mobile Cart FAB & Bottom Sheet (lg:hidden) ── */}
-            <div className="lg:hidden">
-                {/* Floating Action Button */}
-                {cart.length > 0 && !isCartSheetOpen && !showCheckout && !showReceipt && (
-                    <button 
-                        onClick={() => { triggerHaptic && triggerHaptic(); setIsCartSheetOpen(true); }}
-                        className="fixed bottom-[max(5rem,env(safe-area-inset-bottom)+4.5rem)] left-4 right-4 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-between z-40 active:scale-95 transition-all animate-in slide-in-from-bottom"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="bg-white/20 p-2 rounded-xl">
-                                <ShoppingCart size={20} />
-                            </div>
-                            <div className="text-left">
-                                <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Ver Cesta</div>
-                                <div className="font-black leading-none">{cartItemCount} artículo{cartItemCount !== 1 && 's'}</div>
-                            </div>
+                                <CategoryBar selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
+                                    filteredByCategory={filteredByCategory} addToCart={addToCart}
+                                    triggerHaptic={triggerHaptic} searchTerm={searchTerm}
+                                    onOpenCustomAmount={() => setShowCustomAmountModal(true)} products={products} />
+                            )}
                         </div>
-                        <div className="text-right">
-                            <div className="text-2xl font-black leading-none">${cartTotalUsd.toFixed(2)}</div>
-                            <div className="text-xs font-bold text-emerald-100 mt-1">Bs {formatBs(cartTotalBs)}</div>
-                        </div>
-                    </button>
-                )}
 
-                {/* Bottom Sheet Overlay */}
-                {isCartSheetOpen && !showCheckout && !showReceipt && (
-                    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 pb-[max(0px,env(safe-area-inset-bottom))]"
-                         onClick={() => setIsCartSheetOpen(false)}>
-                        <div className="bg-slate-50 dark:bg-slate-950 w-full rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-full duration-300"
-                             onClick={e => e.stopPropagation()}>
-                            <div className="shrink-0 flex justify-center pt-3 pb-2" onClick={() => setIsCartSheetOpen(false)}>
-                                <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full cursor-pointer" />
-                            </div>
-                            <div className="shrink-0 px-4 pb-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                                <h3 className="font-black text-slate-800 dark:text-white text-lg flex items-center gap-2">
-                                    <ShoppingCart size={20} className="text-emerald-500" /> Cesta Actual
-                                </h3>
-                                <button onClick={() => setIsCartSheetOpen(false)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                    <X size={20} />
-                                </button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto">
-                                <CartPanel
-                                    cart={cart} effectiveRate={effectiveRate}
-                                    cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
-                                    discountData={discountData} onOpenDiscount={() => setIsCartSheetOpen(false) || setShowDiscountModal(true)}
-                                    updateQty={updateQty} removeFromCart={removeFromCart}
-                                    onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
-                                    onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
-                                    triggerHaptic={triggerHaptic}
-                                    cartSelectedIndex={cartSelectedIndex}
-                                    copEnabled={copEnabled}
-                                    tasaCop={tasaCop}
-                                />
-                            </div>
+                        <div className="hidden lg:flex lg:w-[380px] lg:shrink-0 lg:flex-col">
+                            <CartPanel cart={cart} effectiveRate={effectiveRate}
+                                cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
+                                cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                                discountData={discountData} onOpenDiscount={() => setShowDiscountModal(true)}
+                                updateQty={updateQty} removeFromCart={removeFromCart}
+                                onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); }}
+                                onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
+                                triggerHaptic={triggerHaptic} cartSelectedIndex={cartSelectedIndex}
+                                copEnabled={copEnabled} tasaCop={tasaCop} />
                         </div>
                     </div>
-                )}
-            </div>
-            </>
+
+                    {/* Mobile Cart FAB & Sheet */}
+                    <div className="lg:hidden">
+                        {cart.length > 0 && !isCartSheetOpen && !showCheckout && !showReceipt && (
+                            <button onClick={() => { triggerHaptic && triggerHaptic(); setIsCartSheetOpen(true); }}
+                                className="fixed bottom-[max(5rem,env(safe-area-inset-bottom)+4.5rem)] left-4 right-4 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-between z-40 active:scale-95 transition-all animate-in slide-in-from-bottom">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white/20 p-2 rounded-xl"><ShoppingCart size={20} /></div>
+                                    <div className="text-left">
+                                        <div className="text-xs font-bold text-emerald-100 uppercase tracking-wider">Ver Cesta</div>
+                                        <div className="font-black leading-none">{cartItemCount} artículo{cartItemCount !== 1 && 's'}</div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-2xl font-black leading-none">${cartTotalUsd.toFixed(2)}</div>
+                                    <div className="text-xs font-bold text-emerald-100 mt-1">Bs {formatBs(cartTotalBs)}</div>
+                                </div>
+                            </button>
+                        )}
+                        {isCartSheetOpen && !showCheckout && !showReceipt && (
+                            <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 pb-[max(0px,env(safe-area-inset-bottom))]"
+                                onClick={() => setIsCartSheetOpen(false)}>
+                                <div className="bg-slate-50 dark:bg-slate-950 w-full rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-full duration-300" onClick={e => e.stopPropagation()}>
+                                    <div className="shrink-0 flex justify-center pt-3 pb-2" onClick={() => setIsCartSheetOpen(false)}>
+                                        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full cursor-pointer" />
+                                    </div>
+                                    <div className="shrink-0 px-4 pb-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                                        <h3 className="font-black text-slate-800 dark:text-white text-lg flex items-center gap-2"><ShoppingCart size={20} className="text-emerald-500" /> Cesta Actual</h3>
+                                        <button onClick={() => setIsCartSheetOpen(false)} className="p-2 -mr-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={20} /></button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto">
+                                        <CartPanel cart={cart} effectiveRate={effectiveRate}
+                                            cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
+                                            cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
+                                            discountData={discountData} onOpenDiscount={() => { setIsCartSheetOpen(false); setShowDiscountModal(true); }}
+                                            updateQty={updateQty} removeFromCart={removeFromCart}
+                                            onCheckout={() => { triggerHaptic && triggerHaptic(); setShowCheckout(true); setIsCartSheetOpen(false); }}
+                                            onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
+                                            triggerHaptic={triggerHaptic} cartSelectedIndex={cartSelectedIndex}
+                                            copEnabled={copEnabled} tasaCop={tasaCop} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
 
-            {/* Checkout Modal */}
             {showCheckout && (
-                <CheckoutModal
-                    onClose={() => { setShowCheckout(false); setSelectedCustomerId(''); }}
+                <CheckoutModal onClose={() => { setShowCheckout(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
-                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} 
+                    cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs}
                     discountData={discountData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={handleCheckout} onCreateCustomer={handleCreateCustomer}
-                    triggerHaptic={triggerHaptic}
-                    copEnabled={copEnabled}
-                    tasaCop={tasaCop}
-                    currentFloatUsd={currentFloat.usd}
-                    currentFloatBs={currentFloat.bs}
-                />
+                    onConfirmSale={(payments, change) => handleCheckoutWithCustomer(payments, change, selectedCustomerId)}
+                    onCreateCustomer={handleCreateCustomer}
+                    triggerHaptic={triggerHaptic} copEnabled={copEnabled} tasaCop={tasaCop}
+                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} />
             )}
 
-            {/* Receipt Modal */}
-            <ReceiptModal
-                receipt={showReceipt}
-                onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
+            <ReceiptModal receipt={showReceipt} onClose={() => { setShowReceipt(null); setSelectedCustomerId(''); }}
                 onShareWhatsApp={(r) => { window.open(buildReceiptWhatsAppUrl(r, effectiveRate), '_blank'); }}
-                currentRate={effectiveRate}
-            />
+                currentRate={effectiveRate} />
 
-            {/* Custom Amount Modal */}
             {showCustomAmountModal && (
-                <CustomAmountModal
-                    onClose={() => setShowCustomAmountModal(false)}
-                    onConfirm={handleAddCustomAmount}
-                    effectiveRate={effectiveRate}
-                    triggerHaptic={triggerHaptic}
-                />
+                <CustomAmountModal onClose={() => setShowCustomAmountModal(false)}
+                    onConfirm={(amount, currency) => handleAddCustomAmount(amount, currency, addToCart, setShowCustomAmountModal)}
+                    effectiveRate={effectiveRate} triggerHaptic={triggerHaptic} />
             )}
 
-            {/* Clear Cart Confirm */}
-            <ConfirmModal
-                isOpen={showClearCartConfirm}
-                onClose={() => setShowClearCartConfirm(false)}
+            <ConfirmModal isOpen={showClearCartConfirm} onClose={() => setShowClearCartConfirm(false)}
                 onConfirm={() => { setCart([]); setDiscount({ type: 'percentage', value: 0 }); setShowClearCartConfirm(false); setCartSelectedIndex(-1); }}
-                title="¿Vaciar toda la cesta?"
-                message="Todos los productos serán eliminados de la cesta actual. Esta acción no se puede deshacer."
-                confirmText="Sí, vaciar"
-                variant="cart"
-            />
+                title="¿Vaciar toda la cesta?" message="Todos los productos serán eliminados de la cesta actual. Esta acción no se puede deshacer."
+                confirmText="Sí, vaciar" variant="cart" />
 
-            {/* Discount Modal */}
             {showDiscountModal && (
-                <DiscountModal
-                    currentDiscount={discount}
-                    onApply={(newDiscount) => {
-                        setDiscount(newDiscount);
-                        setShowDiscountModal(false);
-                    }}
+                <DiscountModal currentDiscount={discount}
+                    onApply={(newDiscount) => { setDiscount(newDiscount); setShowDiscountModal(false); }}
                     onClose={() => setShowDiscountModal(false)}
-                    cartSubtotalUsd={cartSubtotalUsd}
-                    effectiveRate={effectiveRate}
-                    tasaCop={tasaCop}
-                    copEnabled={copEnabled}
-                />
+                    cartSubtotalUsd={cartSubtotalUsd} effectiveRate={effectiveRate} tasaCop={tasaCop} copEnabled={copEnabled} />
             )}
 
-            {/* Confetti */}
             {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
+            <KeyboardHelpModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
-            {/* Keyboard Shortcuts Help Modal (Desktop Only) */}
-            <KeyboardHelpModal 
-                isOpen={showKeyboardHelp} 
-                onClose={() => setShowKeyboardHelp(false)} 
-            />
-
-
-            {/* ── PASO 1: Desglose de cuenta de mesa ── */}
             {tableCheckoutData && !showTablePayment && (
-                <TableBillModal
-                    data={tableCheckoutData}
-                    onClose={() => setTableCheckoutData(null)}
-                    onProceedToPayment={() => setShowTablePayment(true)}
-                />
+                <TableBillModal data={tableCheckoutData} onClose={() => setTableCheckoutData(null)} onProceedToPayment={() => setShowTablePayment(true)} />
             )}
 
-            {/* ── PASO 2: Cobro de mesa ── */}
             {tableCheckoutData && showTablePayment && (
-                <CheckoutModal
-                    onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
-                    cartSubtotalUsd={tableCheckoutData.grandTotal}
-                    cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
-                    cartTotalUsd={tableCheckoutData.grandTotal}
-                    cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
-                    discountData={{ active: false, amountUsd: 0, amountBs: 0 }}
-                    effectiveRate={effectiveRate}
+                <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
+                    cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
+                    cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
+                    discountData={{ active: false, amountUsd: 0, amountBs: 0 }} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={handleTableCheckout} onCreateCustomer={handleCreateCustomer}
-                    triggerHaptic={triggerHaptic}
-                    copEnabled={copEnabled}
-                    tasaCop={tasaCop}
-                    currentFloatUsd={currentFloat.usd}
-                    currentFloatBs={currentFloat.bs}
-                    tableContext={tableCheckoutData}
-                />
+                    onConfirmSale={(payments, change) => handleTableCheckout(payments, change, selectedCustomerId)}
+                    onCreateCustomer={handleCreateCustomer} triggerHaptic={triggerHaptic}
+                    copEnabled={copEnabled} tasaCop={tasaCop}
+                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData} />
             )}
         </div>
     );
