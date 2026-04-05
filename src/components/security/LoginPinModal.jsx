@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Delete, Loader2 } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 
@@ -7,7 +7,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const inputRef = useRef(null);
 
   const handleSubmit = async () => {
     if (pin.length !== targetPinLength || processing) return;
@@ -20,17 +19,15 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
       setPin('');
       setProcessing(false);
       setTimeout(() => setError(false), 600);
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
     // Si fue exitoso, el componente padre cierra el modal
   };
 
-  // Focus el input invisible al abrir
+  // Reset al abrir
   useEffect(() => {
     if (isOpen) {
       setPin('');
       setError(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
 
@@ -90,21 +87,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit }) {
             />
           ))}
         </div>
-
-        {/* Input invisible para teclado nativo */}
-        <input
-          ref={inputRef}
-          type="tel"
-          maxLength={targetPinLength}
-          value={pin}
-          onChange={e => {
-            const val = e.target.value.replace(/\D/g, '').slice(0, targetPinLength);
-            setPin(val);
-          }}
-          className="absolute opacity-0 w-0 h-[1px] -z-10 pointer-events-none"
-          autoComplete="off"
-          inputMode="none"
-        />
 
         {/* Numpad */}
         <div className="grid grid-cols-3 gap-3 max-w-[280px] sm:max-w-xs md:max-w-sm mx-auto">
