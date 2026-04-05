@@ -45,11 +45,12 @@ Funciona como **Progressive Web App (PWA)** instalable en cualquier dispositivo 
 | Fase | Descripción | Estado |
 |------|-------------|--------|
 | **0** | Infraestructura base, branding, motor de ventas | ✅ Completa |
-| **1** | Login con PIN y roles (Admin/Cajero/Mesero) | 🔄 En progreso |
+| **1** | Login con PIN y roles (Admin/Cajero/Mesero) | ✅ Completa |
 | **2** | Plano interactivo de mesas con timers | ⏳ Pendiente |
 | **3** | Órdenes y comandas por mesa | ⏳ Pendiente |
 | **4** | Apertura y cierre de caja formal | ⏳ Pendiente |
 | **5** | Inventario de barra y cocina | ⏳ Pendiente |
+| **6** | Refactorización y modularización del código | ✅ Completa |
 
 ---
 
@@ -75,16 +76,30 @@ poolbar/
 ├── public/              # Estáticos, logo-ticket.png, íconos PWA
 ├── src/
 │   ├── components/      # Componentes reutilizables
+│   │   ├── Customers/   # CustomerCard, CustomerModals
+│   │   ├── Reports/     # TransactionRow, PaymentBreakdownCard, CierreHistoryCard
+│   │   ├── Sales/       # CheckoutModal, CustomerPickerSection
 │   │   ├── security/    # LoginScreen, PinPad, Guards de rol
 │   │   ├── Settings/    # Tabs de configuración, UsersManager
 │   │   └── ...
 │   ├── config/          # supabaseCloud.js, paymentMethods.js
-│   ├── context/         # ProductContext, AuthContext
+│   ├── context/         # ProductContext, CartContext, AuthContext
+│   ├── core/            # FinancialEngine.js
 │   ├── hooks/
-│   │   └── store/       # authStore.js, useCloudSync.js
-│   ├── utils/           # ticketGenerator.js, checkoutProcessor.js
+│   │   ├── store/       # authStore.js, cashStore.js, useTablesStore.js
+│   │   ├── useDashboardMetrics.js
+│   │   ├── useProductForm.js
+│   │   ├── useProductPagination.js
+│   │   ├── useSalesData.js
+│   │   ├── useSalesCheckout.js
+│   │   ├── useReportsData.js
+│   │   ├── useCheckoutPayments.js
+│   │   └── ...
+│   ├── utils/           # ticketGenerator.js, thermalTicketGenerator.js
+│   │                    # tableTicketGenerator.js, checkoutProcessor.js
 │   │                    # dailyCloseGenerator.js, offlineQueueService.js
-│   ├── views/           # SalesView, DashboardView, SettingsView...
+│   ├── views/           # SalesView, DashboardView, ProductsView,
+│   │                    # CustomersView, ReportsView, SettingsView...
 │   ├── App.jsx          # Componente raíz y navegación por estado
 │   └── main.jsx         # Punto de entrada
 ├── ROADMAP.md           # Hoja de ruta del proyecto
@@ -140,4 +155,6 @@ npm run build
 
 - Principios **SOLID** y **Clean Architecture**
 - Componentes atómicos y reutilizables
+- Hooks personalizados para separar lógica de negocio de la presentación
+- Archivos de vista limitados a ~450 líneas máximo
 - Manejo de errores con fallback offline en cada capa
