@@ -39,6 +39,11 @@ import { useTablesStore } from './hooks/store/useTablesStore';
 import { useOrdersStore } from './hooks/store/useOrdersStore';
 
 export default function App() {
+  // Nombre del negocio fijo para todos los dispositivos
+  if (!localStorage.getItem('business_name')) {
+    localStorage.setItem('business_name', 'Pool los diaz');
+  }
+
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIOSInstall, setShowIOSInstall] = useState(false);

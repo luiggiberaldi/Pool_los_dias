@@ -78,11 +78,16 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleteInput, setDeleteInput] = useState('');
 
-    const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || '');
+    const [dangerZoneClicks, setDangerZoneClicks] = useState(0);
+    const dangerZoneUnlocked = dangerZoneClicks >= 5;
+
+    const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || 'Pool los diaz');
     const [businessRif, setBusinessRif] = useState(localStorage.getItem('business_rif') || '');
     const [paperWidth, setPaperWidth] = useState(localStorage.getItem('printer_paper_width') || '58');
     const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') !== 'false');
     const [maxDiscountCajero, setMaxDiscountCajero] = useState(parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100);
+    const [cajeroAbreCaja, setCajeroAbreCaja] = useState(localStorage.getItem('cajero_puede_abrir_caja') === 'true');
+    const [cajeroCierraCaja, setCajeroCierraCaja] = useState(localStorage.getItem('cajero_puede_cerrar_caja') === 'true');
     const [autoLockMinutes, setAutoLockMinutes] = useState(localStorage.getItem('admin_auto_lock_minutes') || '5');
     const [autoLockOnMinimize, setAutoLockOnMinimize] = useState(localStorage.getItem('admin_auto_lock_on_minimize') !== 'false');
 
@@ -204,8 +209,11 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Configuración</h1>
-                            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                {businessName || 'Tu negocio'}
+                            <p
+                                className="text-[11px] text-slate-400 font-medium mt-0.5 select-none cursor-default"
+                                onClick={() => setDangerZoneClicks(c => c >= 5 ? c : c + 1)}
+                            >
+                                {businessName || 'Pool los diaz'}
                             </p>
                         </div>
                         {/* Cloud session badge + logout */}
@@ -284,6 +292,8 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                         <SettingsTabVentas
                             allowNegativeStock={allowNegativeStock} setAllowNegativeStock={setAllowNegativeStock}
                             maxDiscountCajero={maxDiscountCajero} setMaxDiscountCajero={setMaxDiscountCajero}
+                            cajeroAbreCaja={cajeroAbreCaja} setCajeroAbreCaja={setCajeroAbreCaja}
+                            cajeroCierraCaja={cajeroCierraCaja} setCajeroCierraCaja={setCajeroCierraCaja}
                             forceHeartbeat={forceHeartbeat}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}
@@ -326,6 +336,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                             }}
                             setShowDeleteConfirm={setShowDeleteConfirm}
                             triggerHaptic={triggerHaptic}
+                            dangerZoneUnlocked={dangerZoneUnlocked}
                         />
                     )}
 

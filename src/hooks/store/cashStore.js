@@ -165,7 +165,7 @@ export const useCashStore = create((set, get) => ({
         });
     },
 
-    openCashSession: async (baseUsd, baseBs, openedBy) => {
+    openCashSession: async (baseUsd, baseBs, openedBy, openedByRole) => {
         const sessionPayload = {
             id: crypto.randomUUID(),
             opened_at: new Date().toISOString(),
@@ -198,7 +198,7 @@ export const useCashStore = create((set, get) => ({
             console.warn('[Caja] Sin conexión — apertura guardada localmente:', err);
         }
 
-        logEvent('VENTA', 'APERTURA_CAJA', `Caja abierta — Base: $${baseUsd} / Bs${baseBs}`, { nombre: openedBy }, { baseUsd, baseBs, sessionId: sessionPayload.id });
+        logEvent('VENTA', 'APERTURA_CAJA', `Caja abierta — Base: $${baseUsd} / Bs${baseBs}`, { nombre: openedBy, rol: openedByRole || 'DESCONOCIDO' }, { baseUsd, baseBs, sessionId: sessionPayload.id, openedByRole });
     },
 
     closeCashSession: async (stats, closedBy) => {

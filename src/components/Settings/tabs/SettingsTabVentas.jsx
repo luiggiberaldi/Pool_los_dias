@@ -1,11 +1,13 @@
 import React from 'react';
-import { Package, CreditCard, ShieldCheck } from 'lucide-react';
+import { Package, CreditCard, ShieldCheck, KeyRound } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import PaymentMethodsManager from '../PaymentMethodsManager';
 
 export default function SettingsTabVentas({
     allowNegativeStock, setAllowNegativeStock,
     maxDiscountCajero, setMaxDiscountCajero,
+    cajeroAbreCaja, setCajeroAbreCaja,
+    cajeroCierraCaja, setCajeroCierraCaja,
     forceHeartbeat, showToast, triggerHaptic
 }) {
     return (
@@ -24,6 +26,50 @@ export default function SettingsTabVentas({
                             localStorage.setItem('allow_negative_stock', newVal.toString());
                             forceHeartbeat();
                             showToast(newVal ? 'Se permite vender sin stock' : 'No se permite vender sin stock', 'success');
+                            triggerHaptic?.();
+                        }}
+                    />
+                </div>
+            </SectionCard>
+
+            <SectionCard icon={KeyRound} title="Permisos de Cajero" subtitle="Acciones permitidas al cajero" iconColor="text-amber-500">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Puede abrir caja</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">El cajero puede iniciar el turno sin admin</p>
+                    </div>
+                    <Toggle
+                        enabled={cajeroAbreCaja}
+                        onChange={() => {
+                            const newVal = !cajeroAbreCaja;
+                            setCajeroAbreCaja(newVal);
+                            localStorage.setItem('cajero_puede_abrir_caja', newVal.toString());
+                            // Si se desactiva abrir caja, también se desactiva cerrar caja
+                            if (!newVal && cajeroCierraCaja) {
+                                setCajeroCierraCaja(false);
+                                localStorage.setItem('cajero_puede_cerrar_caja', 'false');
+                            }
+                            showToast(newVal ? 'Cajero puede abrir caja' : 'Solo el admin puede abrir caja', 'success');
+                            triggerHaptic?.();
+                        }}
+                    />
+                </div>
+
+                <div className={`flex items-center justify-between ${!cajeroAbreCaja ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <div>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Puede cerrar caja</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                            {cajeroAbreCaja ? 'El cajero puede cerrar el turno' : 'Requiere activar "Puede abrir caja"'}
+                        </p>
+                    </div>
+                    <Toggle
+                        enabled={cajeroCierraCaja}
+                        onChange={() => {
+                            if (!cajeroAbreCaja) return;
+                            const newVal = !cajeroCierraCaja;
+                            setCajeroCierraCaja(newVal);
+                            localStorage.setItem('cajero_puede_cerrar_caja', newVal.toString());
+                            showToast(newVal ? 'Cajero puede cerrar caja' : 'Solo el admin puede cerrar caja', 'success');
                             triggerHaptic?.();
                         }}
                     />

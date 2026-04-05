@@ -9,6 +9,7 @@ import SalesChart from '../components/Dashboard/SalesChart';
 import ConfirmModal from '../components/ConfirmModal';
 import CierreCajaWizard from '../components/Dashboard/CierreCajaWizard';
 import AperturaCajaModal from '../components/Dashboard/AperturaCajaModal';
+import ReporteTurnoModal from '../components/Dashboard/ReporteTurnoModal';
 import OperatorDashboardPanel from '../components/Dashboard/OperatorDashboardPanel';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
 import { generateDailyClosePDF } from '../utils/dailyCloseGenerator';
@@ -36,6 +37,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const { deviceId } = useSecurity();
     const { currentUser: usuarioActivo, role, logout: authLogout } = useAuthStore();
     const isAdmin = role === 'ADMIN';
+    const cajeroAbreCaja = localStorage.getItem('cajero_puede_abrir_caja') === 'true';
+    const cajeroCierraCaja = localStorage.getItem('cajero_puede_cerrar_caja') === 'true';
     const { activeCashSession, openCashSession, closeCashSession } = useCashStore();
     const requireLogin = useLegacyAuthStore(s => s.requireLogin ?? false);
     const { log: auditLog } = useAudit();
@@ -62,6 +65,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [selectedChartDate, setSelectedChartDate] = useState(null);
     const [showTopDeudas, setShowTopDeudas] = useState(false);
     const [isAperturaOpen, setIsAperturaOpen] = useState(false);
+    const [isReporteTurnoOpen, setIsReporteTurnoOpen] = useState(false);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
 
@@ -126,7 +130,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             const updatedSales = [...existingSales, aperturaRecord];
             await storageService.setItem(SALES_KEY, updatedSales);
             setSales(updatedSales);
-            await openCashSession(data.openingUsd, data.openingBs, data.cashierName || usuarioActivo?.name);
+            await openCashSession(data.openingUsd, data.openingBs, data.cashierName || usuarioActivo?.name, role);
+            auditLog('VENTA', 'APERTURA_CAJA', `Caja abierta por ${role === 'ADMIN' ? 'Administrador' : 'Cajero'}: ${usuarioActivo?.name || '—'} — Base: $${data.openingUsd} / Bs${data.openingBs}`, { role, openedBy: usuarioActivo?.name });
             setIsAperturaOpen(false);
             showToast('Turno de Caja Abierto', 'success');
             if (triggerHaptic) triggerHaptic();
@@ -435,7 +440,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── CERRAR / ABRIR CAJA ── */}
-            {isAdmin ? (
+            {(isAdmin || cajeroAbreCaja) ? (
                 !activeCashSession ? (
                     <button onClick={() => setIsAperturaOpen(true)}
                         className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
@@ -449,6 +454,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </div>
                     </button>
                 ) : (
+                    (isAdmin || cajeroCierraCaja) ? (
                     <button onClick={handleDailyClose}
                         className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
                         style={{ background: 'linear-gradient(135deg, #F97316, #EF4444)', boxShadow: '0 6px 20px rgba(239,68,68,0.25)' }}>
@@ -463,6 +469,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </div>
                         <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:translate-x-0.5 transition-transform"><ArrowUpRight size={18} className="text-white" /></div>
                     </button>
+                    ) : null
                 )
             ) : (!activeCashSession) && (
                 <div className="w-full bg-amber-50 rounded-2xl p-4 border border-amber-200 shadow-sm flex items-center gap-3 mt-4">
@@ -472,6 +479,25 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         <p className="text-[11px] font-semibold text-slate-500">Espera que un Administrador abra el turno para operar</p>
                     </div>
                 </div>
+            )}
+
+            {/* ── REPORTE DE TURNO (cajero) ── */}
+            {!isAdmin && activeCashSession && (
+                <button
+                    onClick={() => setIsReporteTurnoOpen(true)}
+                    className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center"><FileText size={20} className="text-blue-500" /></div>
+                        <div className="text-left">
+                            <p className="text-sm font-black text-slate-700 dark:text-slate-200">Reporte de Turno</p>
+                            <p className="text-[11px] text-slate-400">{todaySales.length} {todaySales.length === 1 ? 'venta' : 'ventas'} · ${todayTotalUsd.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <div className="w-9 h-9 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                        <ArrowUpRight size={16} className="text-slate-400" />
+                    </div>
+                </button>
             )}
 
             {/* Deudas Pendientes */}
@@ -775,6 +801,19 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 todayTopProducts={todayTopProducts} bcvRate={bcvRate} copEnabled={copEnabled} tasaCop={tasaCop} isAdmin={isAdmin} />
 
             <AperturaCajaModal isOpen={isAperturaOpen} onClose={() => setIsAperturaOpen(false)} onConfirm={handleSaveApertura} />
+
+            <ReporteTurnoModal
+                isOpen={isReporteTurnoOpen}
+                onClose={() => setIsReporteTurnoOpen(false)}
+                todaySales={todaySales}
+                todayTotalUsd={todayTotalUsd}
+                todayTotalBs={todayTotalBs}
+                todayItemsSold={todayItemsSold}
+                paymentBreakdown={paymentBreakdown}
+                activeCashSession={activeCashSession}
+                cajeroName={usuarioActivo?.name}
+                products={products}
+            />
         </div>
     );
 }

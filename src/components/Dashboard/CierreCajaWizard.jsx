@@ -139,7 +139,8 @@ export default function CierreCajaWizard({
                                 </div>
                             </div>
 
-                            {/* Ganancia + Egresos */}
+                            {/* Ganancia + Egresos — solo admin */}
+                            {isAdmin && (
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl p-3">
                                     <div className="flex items-center gap-1.5 mb-1">
@@ -162,9 +163,10 @@ export default function CierreCajaWizard({
                                     <p className="text-[11px] font-bold text-orange-500/70">-{formatBs(todayExpensesUsd * bcvRate)} Bs</p>
                                 </div>
                             </div>
+                            )}
 
-                            {/* Desglose por metodo de pago */}
-                            {paymentEntries.length > 0 && (
+                            {/* Desglose por metodo de pago — solo admin */}
+                            {isAdmin && paymentEntries.length > 0 && (
                                 <div>
                                     <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 pl-1">Desglose por metodo</h4>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">

@@ -16,13 +16,14 @@ export function AdminRoute({ children }) {
 export function CashierRoute({ children }) {
     const { role } = useAuthStore();
     const { activeCashSession } = useCashStore();
+    const cajeroAbreCaja = localStorage.getItem('cajero_puede_abrir_caja') === 'true';
 
     if (role !== 'CAJERO' && role !== 'ADMIN') {
         return <UnauthMessage message="Acceso restringido a Cajeros y Administradores." />;
     }
 
     // Role is CAJERO or ADMIN. Admin can always pass.
-    if (role === 'CAJERO' && !activeCashSession) {
+    if (role === 'CAJERO' && !activeCashSession && !cajeroAbreCaja) {
         return <CashClosedLockScreen />;
     }
 
@@ -32,13 +33,14 @@ export function CashierRoute({ children }) {
 export function AnyStaffRoute({ children }) {
     const { role } = useAuthStore();
     const { activeCashSession } = useCashStore();
+    const cajeroAbreCaja = localStorage.getItem('cajero_puede_abrir_caja') === 'true';
 
     if (!role) {
         return <UnauthMessage message="Debe iniciar sesión." />;
     }
 
-    // If role is CAJERO or MESERO and NO box is open: Block them.
-    if (role !== 'ADMIN' && !activeCashSession) {
+    // If role is CAJERO or MESERO and NO box is open: Block them (unless cajero has open-caja permission).
+    if (role !== 'ADMIN' && !activeCashSession && !(role === 'CAJERO' && cajeroAbreCaja)) {
          return <CashClosedLockScreen />;
     }
 
@@ -64,7 +66,7 @@ function CashClosedLockScreen() {
             <Lock className="w-16 h-16 mb-4 text-slate-300" />
             <h2 className="text-2xl font-bold text-slate-800 mb-2">Caja Cerrada</h2>
             <p className="text-slate-500 max-w-sm mb-8">
-                No hay una sesión de caja activa. El cajero o el turno no ha sido abierto por el administrador.
+                El turno aún no ha sido abierto. Espera a que un administrador o cajero con permisos inicie la caja para comenzar a operar.
             </p>
             <button 
                 onClick={() => logout()}

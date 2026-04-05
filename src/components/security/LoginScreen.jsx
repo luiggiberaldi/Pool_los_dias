@@ -119,13 +119,6 @@ export default function LoginScreen() {
                             <DownloadCloud className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
                             Refrescar
                         </button>
-                        <button
-                            onClick={handleCloudLogout}
-                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
-                        >
-                            <LogOut className="w-3 h-3" strokeWidth={2.5} />
-                            Cerrar sesión
-                        </button>
                     </div>
                 </div>
 
