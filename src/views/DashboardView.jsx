@@ -349,27 +349,26 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         return Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
     }, [sales]);
 
-    // Top Meseros/Vendedores (ranking by revenue and sales count)
+    // Top Meseros/Vendedores (ranking by revenue and sales count) — todas las ventas
     const topStaff = useMemo(() => {
         const staffMap = {};
-        todaySales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.status !== 'ANULADA').forEach(s => {
-            // Credit mesero for table sales, cajero for direct sales
+        sales.filter(s => s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'AJUSTE_ENTRADA' && s.tipo !== 'AJUSTE_SALIDA' && s.tipo !== 'APERTURA_CAJA' && s.status !== 'ANULADA').forEach(s => {
+            // Prioritize mesero attribution for table sales
             if (s.meseroId) {
                 const key = s.meseroId;
                 if (!staffMap[key]) staffMap[key] = { id: key, name: s.meseroNombre || 'Desconocido', rol: 'MESERO', ventas: 0, revenue: 0 };
                 staffMap[key].ventas += 1;
                 staffMap[key].revenue += s.totalUsd || 0;
-            }
-            // Also credit the cajero who processed the sale
-            if (s.vendedorId && s.vendedorId !== s.meseroId) {
+            } else if (s.vendedorId) {
+                // Credit the cajero who processed the sale when there's no mesero
                 const key = s.vendedorId;
-                if (!staffMap[key]) staffMap[key] = { id: key, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || '', ventas: 0, revenue: 0 };
+                if (!staffMap[key]) staffMap[key] = { id: key, name: s.vendedorNombre || 'Desconocido', rol: s.vendedorRol || 'CAJERO', ventas: 0, revenue: 0 };
                 staffMap[key].ventas += 1;
                 staffMap[key].revenue += s.totalUsd || 0;
             }
         });
         return Object.values(staffMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-    }, [todaySales]);
+    }, [sales]);
 
     // Payment method breakdown (today)
     const paymentBreakdown = useMemo(() => {
@@ -950,27 +949,44 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* Top Meseros / Vendedores */}
-            {isAdmin && topStaff.length > 0 && (
+            {isAdmin && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                    <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-1.5"><Award size={14} /> Top Vendedores del Día</h3>
-                    <div className="space-y-3">
-                        {topStaff.map((s, i) => (
-                            <div key={s.id} className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
-                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-                                    </span>
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-bold text-slate-700 truncate">{s.name}</p>
-                                        <p className="text-[10px] text-slate-400">{s.ventas} {s.ventas === 1 ? 'venta' : 'ventas'}</p>
+                    <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-1.5"><Award size={14} /> Top Meseros / Vendedores</h3>
+                    {topStaff.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-4 gap-1.5">
+                            <Users size={24} className="text-slate-200" />
+                            <p className="text-xs text-slate-400 text-center">Aún no hay ventas registradas con mesero o vendedor asignado.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {topStaff.map((s, i) => {
+                                const maxRevenue = topStaff[0]?.revenue || 1;
+                                const pct = Math.round((s.revenue / maxRevenue) * 100);
+                                return (
+                                    <div key={s.id}>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
+                                                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-slate-700 truncate">{s.name}</p>
+                                                    <p className="text-[10px] text-slate-400">{s.ventas} {s.ventas === 1 ? 'venta' : 'ventas'}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-sm font-black text-emerald-600 shrink-0 pl-2">${s.revenue.toFixed(2)}</span>
+                                        </div>
+                                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-1 rounded-full ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-300' : i === 2 ? 'bg-orange-300' : 'bg-indigo-200'}`}
+                                                style={{ width: `${pct}%` }}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex flex-col items-end shrink-0 pl-2">
-                                    <span className="text-sm font-black text-emerald-600">${s.revenue.toFixed(2)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
