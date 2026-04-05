@@ -3,7 +3,7 @@ import { Check, FileText, ChevronDown } from 'lucide-react';
 
 export default function TermsOverlay() {
     const [hasAccepted, setHasAccepted] = useState(
-        () => localStorage.getItem('pda_terms_accepted') === 'true'
+        () => localStorage.getItem('pda_terms_accepted_v1') === 'true'
     );
     const [canAccept, setCanAccept] = useState(false);
     const scrollRef = useRef(null);
@@ -16,7 +16,7 @@ export default function TermsOverlay() {
     };
 
     const handleAccept = () => {
-        localStorage.setItem('pda_terms_accepted', 'true');
+        localStorage.setItem('pda_terms_accepted_v1', 'true');
         setHasAccepted(true);
     };
 
@@ -55,7 +55,7 @@ export default function TermsOverlay() {
                     style={{ scrollbarWidth: 'thin' }}
                 >
                     <h1 className="text-2xl font-black text-slate-900 mb-4">Términos y Condiciones de Uso - Pool Los Diaz</h1>
-                    <p className="text-xs text-slate-500 font-bold mb-6">Última actualización: Febrero 2026</p>
+                    <p className="text-xs text-slate-500 font-bold mb-6">Última actualización: Abril 2026 — Versión 1.0</p>
 
                     <hr className="my-6" />
 
@@ -65,13 +65,17 @@ export default function TermsOverlay() {
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">2. Descripción del Servicio</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Pool Los Diaz es una aplicación web progresiva (PWA) diseñada para la gestión de bodegas y pequeños comercios que proporciona:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Pool Los Diaz es una aplicación web progresiva (PWA) diseñada para la gestión integral de salas de pool y billar que proporciona:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
-                        <li><strong>Gestión de inventario</strong> con precios en múltiples monedas (USD, Bolívares)</li>
-                        <li><strong>Punto de venta (POS)</strong> con carrito, checkout y recibos</li>
-                        <li><strong>Dashboard de ventas</strong> con reportes y estadísticas</li>
+                        <li><strong>Gestión de mesas de pool</strong> con control de tiempo, tarifas y sesiones activas</li>
+                        <li><strong>Punto de venta (POS)</strong> con carrito, múltiples métodos de pago y recibos térmicos</li>
+                        <li><strong>Gestión de inventario</strong> con precios en múltiples monedas (USD, Bolívares, COP)</li>
+                        <li><strong>Sistema de roles</strong> con Administrador, Cajero y Mesero</li>
+                        <li><strong>Ranking de meseros</strong> con seguimiento de ventas por empleado</li>
+                        <li><strong>Dashboard de ventas</strong> con reportes, estadísticas y gestión de caja</li>
                         <li><strong>Gestión de clientes</strong> con sistema de fiados y pagos parciales</li>
-                        <li><strong>Inventario compartible</strong> mediante código temporal de 6 dígitos</li>
+                        <li><strong>Tasa BCV automática</strong> con sincronización en tiempo real entre dispositivos</li>
+                        <li><strong>Impresión directa</strong> de tickets térmicos 58mm via ESC/POS y Web Serial</li>
                     </ul>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">3. Descargo de Responsabilidad</h2>
@@ -90,9 +94,10 @@ export default function TermsOverlay() {
                     <p className="text-sm text-slate-700 leading-relaxed mb-2"><strong>Pool Los Diaz y sus desarrolladores NO se hacen responsables por:</strong></p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
                         <li>Pérdidas económicas directas o indirectas derivadas del uso de la información</li>
-                        <li>Errores en el cálculo de precios o conversiones de moneda</li>
+                        <li>Errores en el cálculo de precios, tiempos de mesa o conversiones de moneda</li>
                         <li>Decisiones comerciales tomadas con base en la información de la Aplicación</li>
-                        <li>Pérdida de datos almacenados en el dispositivo</li>
+                        <li>Pérdida de datos almacenados en el dispositivo o en la nube</li>
+                        <li>Interrupciones del servicio por fallos de conectividad o mantenimiento</li>
                     </ul>
 
                     <h3 className="text-base font-bold text-slate-800 mt-4 mb-2">3.4 Uso Bajo Propio Riesgo</h3>
@@ -100,33 +105,46 @@ export default function TermsOverlay() {
                         Al usar Pool Los Diaz, usted acepta que lo hace <strong>bajo su propio riesgo y responsabilidad</strong>.
                     </p>
 
-                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">4. Funcionalidades Premium</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Pool Los Diaz ofrece funciones gratuitas y funciones exclusivas para usuarios con <strong>Licencia Premium</strong>:</p>
-                    <ul className="text-sm text-slate-700 space-y-1 mb-2">
-                        <li><strong>Gratuito:</strong> Dashboard básico, hasta 10 productos en inventario.</li>
-                        <li><strong>Premium:</strong> Inventario ilimitado, sistema de ventas POS, gestión de clientes, compartir inventario, reportes completos.</li>
+                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">4. Cuentas de Usuario y Acceso</h2>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">El acceso a la Aplicación se gestiona mediante cuentas de usuario con diferentes niveles de privilegio:</p>
+                    <ul className="text-sm text-slate-700 space-y-1 mb-4">
+                        <li><strong>Administrador:</strong> Acceso completo a todas las funcionalidades, configuración del sistema, gestión de usuarios y reportes.</li>
+                        <li><strong>Cajero:</strong> Gestión de ventas, cobro de mesas y operaciones de caja.</li>
+                        <li><strong>Mesero:</strong> Apertura de mesas, toma de pedidos y visualización de ranking.</li>
                     </ul>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        El acceso Premium se otorga mediante código de activación único vinculado al dispositivo. La licencia es personal, intransferible y no reembolsable. Se ofrece un periodo de demostración de 7 días por dispositivo.
+                        Cada usuario accede mediante PIN personal. El administrador es responsable de la creación, modificación y desactivación de las cuentas de su equipo.
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">5. Privacidad y Datos</h2>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">
+                        Pool Los Diaz opera con principios de <strong>privacidad por diseño</strong>:
+                    </p>
+                    <ul className="text-sm text-slate-700 space-y-1 mb-4">
+                        <li>Los datos operativos se almacenan localmente en su dispositivo y se sincronizan con la nube (Supabase) para respaldo y acceso multi-dispositivo.</li>
+                        <li>Los datos <strong>NO se venden ni comparten con terceros</strong>.</li>
+                        <li>Las tasas de cambio se obtienen de fuentes públicas (BCV, DolarAPI, ExchangeRate).</li>
+                        <li>La comunicación entre dispositivos se realiza mediante canales cifrados de Supabase.</li>
+                    </ul>
+
+                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">6. Documentos y Comprobantes</h2>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        Pool Los Diaz opera con principios de <strong>privacidad por diseño</strong>. Los datos se almacenan localmente en su dispositivo y <strong>NO se venden ni comparten con terceros</strong>.
+                        Los tickets y comprobantes generados por la Aplicación son <strong>documentos de control interno</strong> y <strong>NO constituyen factura fiscal</strong> ni tienen validez tributaria. El usuario es responsable de cumplir con las obligaciones fiscales correspondientes según la legislación vigente.
                     </p>
 
-                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">6. Legislación Aplicable</h2>
+                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">7. Legislación Aplicable</h2>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
                         Estos Términos se rigen por las leyes de la <strong>República Bolivariana de Venezuela</strong>.
                     </p>
 
-                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">7. Código de Conducta</h2>
+                    <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">8. Código de Conducta</h2>
                     <p className="text-sm text-slate-700 leading-relaxed mb-2">Al utilizar Pool Los Diaz, usted se compromete a:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
                         <li><strong>NO</strong> utilizar la Aplicación para actividades ilícitas</li>
                         <li><strong>NO</strong> intentar vulnerar la seguridad del sistema</li>
                         <li><strong>NO</strong> realizar ingeniería inversa del código</li>
-                        <li><strong>NO</strong> distribuir licencias Premium de forma no autorizada</li>
+                        <li><strong>NO</strong> compartir credenciales de acceso con personas no autorizadas</li>
+                        <li><strong>NO</strong> manipular datos de ventas, inventario o registros de auditoría</li>
                     </ul>
 
                     <hr className="my-6" />
@@ -134,15 +152,15 @@ export default function TermsOverlay() {
                     <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-xl mb-6">
                         <h3 className="text-base font-black text-slate-900 mb-2">Aceptación Final</h3>
                         <p className="text-sm text-slate-700 leading-relaxed">
-                            <strong>AL USAR PRECIOSALDÍA, USTED DECLARA HABER LEÍDO, ENTENDIDO Y ACEPTADO ESTOS TÉRMINOS Y CONDICIONES EN SU TOTALIDAD.</strong>
+                            <strong>AL USAR POOL LOS DIAZ, USTED DECLARA HABER LEÍDO, ENTENDIDO Y ACEPTADO ESTOS TÉRMINOS Y CONDICIONES EN SU TOTALIDAD.</strong>
                         </p>
                     </div>
 
                     <p className="text-center text-sm font-bold text-slate-900 mt-8 mb-4">
-                        Pool Los Diaz - Tu Bodega Inteligente 🇻🇪
+                        Pool Los Diaz v1.0 — Sistema de Gestión para Salas de Pool
                     </p>
                     <p className="text-center text-xs text-slate-500 mb-8">
-                        Gestión de inventario y ventas para el comerciante venezolano
+                        Gestión integral de mesas, ventas e inventario
                     </p>
 
                     <div id="terms-end" className="h-1"></div>
