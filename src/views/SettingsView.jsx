@@ -128,7 +128,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
             const blob = new Blob([JSON.stringify({ timestamp: new Date().toISOString(), version: '2.0', appName: 'TasasAlDia_Bodegas', data: { idb: idbData, ls: lsData } })], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `backup_tasasaldia_${new Date().toISOString().slice(0,10)}.json`;
+            a.href = url; a.download = `backup_pool_los_diaz_${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
             setImportStatus('success'); setStatusMessage('Backup descargado.');
