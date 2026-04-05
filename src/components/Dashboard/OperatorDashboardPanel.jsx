@@ -135,7 +135,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     // ── Colores por rol ──
     const accent = isMesero
         ? { from: '#F97316', to: '#EA580C', glow: 'rgba(249,115,22,0.15)', text: 'text-orange-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' }
-        : { from: '#0F766E', to: '#0D9488', glow: 'rgba(20,184,166,0.2)', text: 'text-teal-100', badge: 'bg-teal-800/60', badgeText: 'text-teal-100' };
+        : { from: '#059669', to: '#10B981', glow: 'rgba(16,185,129,0.2)', text: 'text-emerald-100', badge: 'bg-emerald-800/60', badgeText: 'text-emerald-100' };
 
     return (
         <div className="space-y-3 pt-1">
@@ -146,7 +146,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                 <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
                 <div className="absolute -left-6 -bottom-6 w-24 h-24 bg-white/5 rounded-full blur-xl" />
                 <div className="relative z-10">
-                    <p className={`text-white/60 text-[11px] font-bold uppercase tracking-widest mb-0.5`}>{getGreeting()}</p>
+                    <p className="text-white/80 text-[11px] font-bold uppercase tracking-widest mb-0.5">{getGreeting()}</p>
                     <h2 className="text-white text-2xl font-black tracking-tight mb-4">{firstName} {isMesero ? '🎱' : '👋'}</h2>
                     <div className="grid grid-cols-2 gap-3">
                         {isMesero ? (
@@ -162,15 +162,15 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                             </>
                         ) : (
                             <>
-                                <div className="bg-white/10 rounded-2xl p-3">
-                                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">En juego</p>
+                                <div className="bg-white/20 rounded-2xl p-3">
+                                    <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Mesas activas</p>
                                     <p className="text-3xl font-black text-white leading-none">{activeTables.length}</p>
                                 </div>
-                                <div className={`rounded-2xl p-3 ${checkoutTables.length > 0 ? accent.badge : 'bg-white/10'}`}>
-                                    <p className={`${accent.badgeText} text-[10px] font-bold uppercase tracking-widest mb-1`}>
+                                <div className={`rounded-2xl p-3 ${checkoutTables.length > 0 ? 'bg-white/30' : 'bg-white/20'}`}>
+                                    <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">
                                         {checkoutTables.length > 0 ? '⚡ Para cobrar' : 'Mis cobros hoy'}
                                     </p>
-                                    <p className={`text-3xl font-black leading-none ${checkoutTables.length > 0 ? 'text-white' : accent.text}`}>
+                                    <p className="text-3xl font-black leading-none text-white">
                                         {checkoutTables.length > 0 ? checkoutTables.length : myStats.cobros}
                                     </p>
                                 </div>
