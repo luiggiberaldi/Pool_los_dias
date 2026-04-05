@@ -6,6 +6,27 @@ import { ToastProvider } from './components/Toast.jsx'
 import { supabaseCloud } from './config/supabaseCloud.js'
 import './index.css'
 
+// ── Auto-actualización del Service Worker ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      // Chequear actualizaciones cada 60 segundos
+      setInterval(() => reg.update().catch(() => {}), 60 * 1000);
+      // Cuando hay un SW nuevo esperando, activarlo y recargar
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+            window.location.reload();
+          }
+        });
+      });
+    } catch (_) {}
+  });
+}
+
 /* eslint-disable react-refresh/only-export-components */
 
 // ── Evitar que la rueda del mouse cambie valores en inputs numéricos ──
