@@ -135,7 +135,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     // ── Colores por rol ──
     const accent = isMesero
         ? { from: '#F97316', to: '#EA580C', glow: 'rgba(249,115,22,0.15)', text: 'text-orange-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' }
-        : { from: '#1E293B', to: '#334155', glow: 'rgba(20,184,166,0.1)', text: 'text-teal-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' };
+        : { from: '#0F766E', to: '#0D9488', glow: 'rgba(20,184,166,0.2)', text: 'text-teal-100', badge: 'bg-teal-800/60', badgeText: 'text-teal-100' };
 
     return (
         <div className="space-y-3 pt-1">

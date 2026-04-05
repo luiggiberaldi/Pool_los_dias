@@ -2,6 +2,7 @@ import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
 import { logEvent } from '../services/auditService';
 import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore as useNewAuthStore } from '../hooks/store/authStore';
 import { round2, subR, sumR } from './dinero';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
@@ -126,7 +127,9 @@ export async function processSaleTransaction({
     }
 
     // ── GESTIÓN DE CACHÉ LOCAL (Para no bloquear al usuario) ──
-    const currentUser = useAuthStore.getState().usuarioActivo;
+    const legacyUser = useAuthStore.getState().usuarioActivo;
+    const newUser = useNewAuthStore.getState().currentUser;
+    const currentUser = newUser || legacyUser;
     const sale = {
         id: finalSaleId || crypto.randomUUID(),
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',

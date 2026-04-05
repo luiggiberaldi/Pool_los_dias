@@ -390,6 +390,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── ACCIONES RÁPIDAS ── */}
+            {role !== 'MESERO' && (
             <div className={`bg-white rounded-2xl p-3 border border-slate-100 shadow-sm ${!isAdmin ? 'mt-3' : ''}`}>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Acciones Rápidas</p>
                 <div className="flex gap-2">
@@ -419,8 +420,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     )}
                 </div>
             </div>
-
-            {/* Egresos del día */}
+            )}
             {todayExpensesUsd > 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-orange-100 shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
