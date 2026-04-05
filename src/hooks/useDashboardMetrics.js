@@ -128,7 +128,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             map[s.meseroId].ventas += 1;
             map[s.meseroId].revenue += s.totalUsd || 0;
         });
-        return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+        return Object.values(map).sort((a, b) => b.revenue - a.revenue || b.ventas - a.ventas).slice(0, 5);
     }, [sales]);
 
     const paymentBreakdown = useMemo(() =>

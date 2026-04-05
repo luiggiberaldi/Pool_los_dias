@@ -74,7 +74,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                     meseroMap[s.meseroId].ventas += 1;
                     meseroMap[s.meseroId].revenue += s.totalUsd || 0;
                 });
-                const ranked = Object.values(meseroMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+                const ranked = Object.values(meseroMap).sort((a, b) => b.revenue - a.revenue || b.ventas - a.ventas).slice(0, 5);
                 setTopMeseros(ranked);
             }
         };
