@@ -360,7 +360,6 @@ export default function App() {
         <div
           className="absolute top-0 left-0 w-20 h-20 z-50 cursor-pointer opacity-0"
           onClick={handleLogoClick}
-          title="Ssshh..."
         ></div>
 
         {/* Eager views — always mounted, visibility toggled via CSS */}
