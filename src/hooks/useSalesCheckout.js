@@ -4,6 +4,7 @@ import { showToast } from '../components/Toast';
 import { round2, divR } from '../utils/dinero';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
+import { useAuthStore } from './store/authStore';
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -97,6 +98,23 @@ export function useSalesCheckout({
             discountData: { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },
             useAutoRate
         };
+
+        // Atribuir venta al mesero que abrió la mesa (solo si tiene rol MESERO)
+        if (tableCheckoutData.session?.opened_by) {
+            const cachedUsers = useAuthStore.getState().cachedUsers || [];
+            let openerUser = cachedUsers.find(u => u.id === tableCheckoutData.session.opened_by) || null;
+            if (!openerUser) {
+                try {
+                    const { supabaseCloud } = await import('../config/supabaseCloud');
+                    const { data } = await supabaseCloud.from('staff_users').select('id, name, role').eq('id', tableCheckoutData.session.opened_by).single();
+                    if (data) openerUser = data;
+                } catch (_) {}
+            }
+            if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') {
+                opts.meseroId = openerUser.id;
+                opts.meseroNombre = openerUser.name || openerUser.nombre || null;
+            }
+        }
 
         const result = await processSaleTransaction(opts);
         if (!result.success) {
