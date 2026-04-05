@@ -5,11 +5,11 @@ import { storageService } from '../utils/storageService';
 const SYNC_KEYS = [
     'bodega_products_v1',
     'bodega_customers_v1',
-    'bodega_sales_v1',
+    // 'bodega_sales_v1',      // Excluido: crece mucho, genera alto egress
     'bodega_payment_methods_v1',
     'monitor_rates_v12',
     'bodega_accounts_v2',
-    'abasto_audit_log_v1',
+    // 'abasto_audit_log_v1',  // Excluido: log local, no necesita sync cross-device
     'bodega_custom_rate',
     'bodega_use_auto_rate',
     'tasa_cop',
@@ -17,6 +17,9 @@ const SYNC_KEYS = [
     'auto_cop_enabled',
     'poolbar_categories_v1'
 ];
+
+// Clave para rastrear el último pull exitoso (evita re-descargar datos sin cambios)
+const LAST_PULL_KEY = '_cloud_last_pull_at';
 
 const LOCAL_KEYS = [
     'abasto-auth-storage',
@@ -298,21 +301,32 @@ export const pullLatestFromCloud = async () => {
     try {
         const { data: { session } } = await supabaseCloud.auth.getSession();
         if (!session?.user?.id) return;
-        
+
         const queue = getSyncQueue();
-        const { data: docs } = await supabaseCloud
+        const lastPullAt = localStorage.getItem(LAST_PULL_KEY);
+
+        let query = supabaseCloud
             .from('sync_documents')
-            .select('collection, doc_id, data')
+            .select('collection, doc_id, data, updated_at')
             .eq('user_id', session.user.id)
-            .in('doc_id', SYNC_KEYS); // Sync everything, not just products/categories
+            .in('doc_id', SYNC_KEYS);
+
+        // Solo descargar documentos que cambiaron desde el último pull
+        if (lastPullAt) {
+            query = query.gt('updated_at', lastPullAt);
+        }
+
+        const { data: docs } = await query;
 
         if (docs?.length > 0) {
             for (const doc of docs) {
-                // SALT ARRANQUE: No bajamos si hay algo pendiente de subir localmente
                 if (queue.includes(doc.doc_id)) continue;
                 await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
             }
         }
+
+        // Guardar timestamp del pull para el próximo ciclo
+        localStorage.setItem(LAST_PULL_KEY, new Date().toISOString());
     } catch (e) {
         console.warn('[CloudSync] pullLatest falló silenciosamente:', e.message);
     }
@@ -375,13 +389,22 @@ export function useCloudSync() {
                 if (hasImportGuard()) {
                     console.log('[CloudSync] Guard activo — pull inicial omitido.');
                     clearImportGuard();
-                    isInitialSyncCompleted = true; // El import ya es la verdad
+                    isInitialSyncCompleted = true;
                 } else {
-                    const { data: docs } = await supabaseCloud
+                    const lastPullAt = localStorage.getItem(LAST_PULL_KEY);
+                    let initQuery = supabaseCloud
                         .from('sync_documents')
-                        .select('collection, doc_id, data')
+                        .select('collection, doc_id, data, updated_at')
                         .eq('user_id', userId)
-                        .in('collection', ['store', 'local']);
+                        .in('collection', ['store', 'local'])
+                        .in('doc_id', SYNC_KEYS);
+
+                    // En recargas posteriores, solo traer lo que cambió desde la última vez
+                    if (lastPullAt) {
+                        initQuery = initQuery.gt('updated_at', lastPullAt);
+                    }
+
+                    const { data: docs } = await initQuery;
 
                     if (docs?.length > 0) {
                         for (const doc of docs) {
@@ -395,6 +418,7 @@ export function useCloudSync() {
                             }
                         }
                         isInitialSyncCompleted = true;
+                        localStorage.setItem(LAST_PULL_KEY, new Date().toISOString());
                     }
                 }
 
