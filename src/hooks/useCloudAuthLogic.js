@@ -255,18 +255,8 @@ export function useCloudAuthLogic() {
                     throw new Error('Licencia vencida. Contacta a soporte para renovar tu acceso.');
                 }
                 if (rpcResult === 'limit_reached') {
-                    const { data: licenseData } = await supabaseCloud
-                        .from('cloud_licenses').select('max_devices').eq('email', emailToUse).maybeSingle();
-                    const DEVICE_LIMIT = licenseData?.max_devices || 1;
-
-                    const { data: existingDevices } = await supabaseCloud
-                        .from('account_devices').select('*').eq('email', emailToUse).order('created_at', { ascending: true });
-                    
-                    setDeviceLimitError({ devices: existingDevices, limit: DEVICE_LIMIT, currentId: deviceId || 'UNKNOWN' });
-                    setBlockedDevices(existingDevices || []);
-                    setImportStatus('error');
-                    setStatusMessage(`Límite de ${DEVICE_LIMIT} equipo(s) excedido.`);
-                    return;
+                    // Limite de dispositivos desactivado — dejar pasar
+                    console.warn('Device limit reached but bypassed (limit disabled)');
                 }
             } catch (rpcErr) {
                // Silenciar error si RPC aun no existe (fallback)

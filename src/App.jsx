@@ -126,7 +126,7 @@ export default function App() {
         });
 
         if (!error) {
-          if (result === 'license_inactive' || result === 'limit_reached' || result === 'license_expired') {
+          if (result === 'license_inactive' || result === 'license_expired') {
             await supabaseCloud.auth.signOut();
             if (mounted) { setCloudSession(null); setCheckingSession(false); }
             return;
