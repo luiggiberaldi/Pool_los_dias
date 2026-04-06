@@ -64,6 +64,7 @@ export default function App() {
   // Cloud Auth Session State
   const [cloudSession, setCloudSession] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
 
   // ── Suscripción Realtime Global (activa en TODAS las pantallas) ──────────
   const subscribeToTablesRealtime = useTablesStore(s => s.subscribeToRealtime);
@@ -154,7 +155,10 @@ export default function App() {
 
     const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN') applySession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowPasswordRecovery(true);
+        setCheckingSession(false);
+      } else if (event === 'SIGNED_IN') applySession(session);
       else if (event === 'SIGNED_OUT') { setCloudSession(null); setCheckingSession(false); }
     });
 
@@ -304,6 +308,16 @@ export default function App() {
       <div className="h-[100dvh] w-full bg-[#F8FAFC] flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-4 border-[#0EA5E9] border-t-transparent animate-spin" />
       </div>
+    );
+  }
+
+  // Password Recovery Flow — triggered by clicking the reset link in the email
+  if (showPasswordRecovery) {
+    return (
+      <ResetPasswordView onDone={() => {
+        setShowPasswordRecovery(false);
+        setCloudSession(null);
+      }} />
     );
   }
 
