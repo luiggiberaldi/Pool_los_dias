@@ -79,7 +79,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [deleteInput, setDeleteInput] = useState('');
 
     const [dangerZoneClicks, setDangerZoneClicks] = useState(0);
-    const dangerZoneUnlocked = dangerZoneClicks >= 5;
+    const dangerZoneUnlocked = true;
 
     const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || 'Pool los diaz');
     const [businessRif, setBusinessRif] = useState(localStorage.getItem('business_rif') || '');
