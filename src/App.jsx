@@ -89,6 +89,19 @@ export default function App() {
       if (!mounted) return;
 
       if (!session?.user?.email) {
+        // Offline: si hay usuarios cacheados, ir directo al PIN screen.
+        // Los cachedUsers solo existen si alguien hizo login cloud antes.
+        if (!navigator.onLine) {
+          try {
+            const { default: lf } = await import('localforage');
+            const users = await lf.getItem('poolbar_users_cache');
+            if (Array.isArray(users) && users.length > 0) {
+              setCloudSession({ offline: true });
+              setCheckingSession(false);
+              return;
+            }
+          } catch { /* sin caché → pide login */ }
+        }
         setCloudSession(null);
         setCheckingSession(false);
         return;
@@ -144,6 +157,7 @@ export default function App() {
       }
 
       if (mounted) {
+        localStorage.setItem('pool_had_cloud_session', 'true');
         setCloudSession(session);
         setCheckingSession(false);
       }
@@ -159,7 +173,18 @@ export default function App() {
         setShowPasswordRecovery(true);
         setCheckingSession(false);
       } else if (event === 'SIGNED_IN') applySession(session);
-      else if (event === 'SIGNED_OUT') { setCloudSession(null); setCheckingSession(false); }
+      else if (event === 'SIGNED_OUT') {
+        // Pasar por applySession para que el fallback offline funcione también acá.
+        // Si estamos online y fue un logout explícito → applySession(null) mostrará CloudAuthModal.
+        // Si estamos offline y fue un fallo de refresh → applySession(null) mostrará el PIN screen.
+        if (navigator.onLine) {
+          localStorage.removeItem('pool_had_cloud_session');
+          setCloudSession(null);
+          setCheckingSession(false);
+        } else {
+          applySession(null);
+        }
+      }
     });
 
     return () => {

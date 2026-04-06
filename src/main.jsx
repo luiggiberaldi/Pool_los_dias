@@ -13,16 +13,8 @@ if ('serviceWorker' in navigator) {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       // Chequear actualizaciones cada 60 segundos
       setInterval(() => reg.update().catch(() => {}), 60 * 1000);
-      // Cuando hay un SW nuevo esperando, activarlo y recargar
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        if (!newSW) return;
-        newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
-            window.location.reload();
-          }
-        });
-      });
+      // El SW usa skipWaiting() + clientsClaim() para activarse automáticamente.
+      // No se necesita reload manual — el nuevo SW toma control en el próximo fetch.
     } catch (_) {}
   });
 }

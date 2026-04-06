@@ -1,16 +1,25 @@
 import { formatBs, capitalizeName } from './calculatorUtils';
-import { printReceiptEscPos } from '../services/webSerialPrinter';
+import { printReceiptEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
 
 /**
  * Imprime un ticket de venta.
- * 1. Intenta ESC/POS directo via Web Serial (sin diálogo)
- * 2. Fallback: window.print() con HTML formateado
+ * - Impresora del sistema (inkjet/laser): va directo a window.print()
+ * - Impresora térmica configurada: ESC/POS directo, sin diálogo
+ * - Sin configuración: intenta ESC/POS y si falla usa window.print()
  */
 export async function printThermalTicket(sale, bcvRate) {
-    // Intentar impresión directa ESC/POS
+    const cfg = getWebSerialConfig();
+
+    // Impresora del sistema → ir directo a window.print()
+    if (cfg.printerType === 'system') {
+        _printThermalHTML(sale, bcvRate);
+        return;
+    }
+
+    // Impresora térmica → intentar ESC/POS
     try {
         const printed = await printReceiptEscPos(sale, bcvRate);
-        if (printed) return; // Éxito — sin diálogo
+        if (printed) return;
     } catch (err) {
         console.warn('[Ticket] ESC/POS falló, usando fallback HTML:', err.message);
     }

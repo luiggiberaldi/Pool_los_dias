@@ -1,6 +1,7 @@
 /**
  * webSerialPrinter.js
  * Servicio de integración nativa con impresoras térmicas USB/Serial mediante Web Serial API.
+ * Incluye auto-detección de modelo por VID/PID.
  *
  * ESC/POS Comandos Básicos
  * Init: [27, 64]
@@ -8,33 +9,53 @@
  */
 
 import { capitalizeName } from '../utils/calculatorUtils';
+import { lookupPrinter } from './printerDatabase';
 
 let activePort = null;
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+export function getWebSerialConfig() {
+    try {
+        const saved = localStorage.getItem('web_serial_config');
+        const defaults = { autoOpenDrawer: false, baudRate: 9600, printerType: null, printerBrand: null, printerModel: null, paperWidth: 58 };
+        return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+        return { autoOpenDrawer: false, baudRate: 9600, printerType: null, printerBrand: null, printerModel: null, paperWidth: 58 };
+    }
+}
+
+export function saveWebSerialConfig(cfg) {
+    localStorage.setItem('web_serial_config', JSON.stringify(cfg));
+}
+
+export function clearPrinterConfig() {
+    const cfg = getWebSerialConfig();
+    saveWebSerialConfig({ ...cfg, printerType: null, printerBrand: null, printerModel: null });
+    activePort = null;
+}
+
+// ── Port management ───────────────────────────────────────────────────────────
+
 export async function requestPrinterPort() {
     if (!('serial' in navigator)) {
-        throw new Error('Web Serial API NO soportada en este navegador. Usa Chrome o Edge.');
+        throw new Error('Web Serial API NO soportada. Usa Chrome o Edge.');
     }
-
     try {
         const port = await navigator.serial.requestPort();
         activePort = port;
-        return true;
+        return port;
     } catch (err) {
-        if (err.name === 'NotFoundError') {
-            throw new Error('Cancelaste la selección del puerto.');
-        }
+        if (err.name === 'NotFoundError') throw new Error('Cancelaste la selección del puerto.');
         throw err;
     }
 }
 
 export async function getConnectedPrinter() {
     if (!('serial' in navigator)) return null;
-
     try {
         const ports = await navigator.serial.getPorts();
         if (ports.length > 0) {
-            // Usamos el primer puerto aprobado previamente
             activePort = ports[0];
             return activePort;
         }
@@ -45,6 +66,76 @@ export async function getConnectedPrinter() {
     }
 }
 
+// ── Auto-detección ────────────────────────────────────────────────────────────
+
+/**
+ * Detecta la impresora conectada leyendo el VID/PID del puerto USB.
+ * Si ya hay puertos autorizados, los usa directamente.
+ * Si no, abre el picker del navegador para que el usuario elija.
+ *
+ * Retorna el objeto de config detectado y lo guarda automáticamente.
+ */
+export async function detectAndAutoConfig() {
+    if (!('serial' in navigator)) {
+        throw new Error('Web Serial API no soportada. Usa Chrome o Edge.');
+    }
+
+    // 1. Ver si ya hay puertos autorizados
+    let port = null;
+    const existingPorts = await navigator.serial.getPorts();
+    if (existingPorts.length > 0) {
+        port = existingPorts[0];
+    } else {
+        // 2. Pedir al usuario que elija un puerto
+        port = await navigator.serial.requestPort();
+    }
+
+    if (!port) throw new Error('No se seleccionó ningún puerto.');
+    activePort = port;
+
+    // 3. Leer VID/PID
+    const info = port.getInfo();
+    const { usbVendorId, usbProductId } = info;
+
+    // 4. Buscar en la base de datos
+    const match = lookupPrinter(usbVendorId, usbProductId);
+
+    // 5. Construir config
+    const currentCfg = getWebSerialConfig();
+    let detected;
+
+    if (match) {
+        detected = {
+            ...currentCfg,
+            baudRate:     match.baudRate  || currentCfg.baudRate,
+            paperWidth:   match.paperWidth || currentCfg.paperWidth,
+            printerType:  match.type,
+            printerBrand: match.brand,
+            printerModel: match.model,
+            printerNote:  match.note || null,
+            usbVendorId:  usbVendorId ? `0x${usbVendorId.toString(16).toUpperCase().padStart(4,'0')}` : null,
+            usbProductId: usbProductId ? `0x${usbProductId.toString(16).toUpperCase().padStart(4,'0')}` : null,
+        };
+    } else {
+        // Desconocida → asumir térmica serial con defaults
+        detected = {
+            ...currentCfg,
+            printerType:  'thermal_serial',
+            printerBrand: 'Desconocida',
+            printerModel: usbVendorId
+                ? `VID:0x${usbVendorId.toString(16).toUpperCase()} PID:${usbProductId ? '0x' + usbProductId.toString(16).toUpperCase() : 'N/A'}`
+                : 'Sin datos USB',
+            usbVendorId:  usbVendorId ? `0x${usbVendorId.toString(16).toUpperCase().padStart(4,'0')}` : null,
+            usbProductId: usbProductId ? `0x${usbProductId.toString(16).toUpperCase().padStart(4,'0')}` : null,
+        };
+    }
+
+    saveWebSerialConfig(detected);
+    return detected;
+}
+
+// ── ESC/POS commands ──────────────────────────────────────────────────────────
+
 export async function sendEscPosCommand(commandArray) {
     if (!activePort) {
         const port = await getConnectedPrinter();
@@ -52,85 +143,89 @@ export async function sendEscPosCommand(commandArray) {
     }
 
     try {
-        if (!activePort.readable || !activePort.writable) {
-            await activePort.open({ baudRate: 9600 }); // 9600 es estándar para impresoras seriales
+        if (!activePort.writable) {
+            const cfg = getWebSerialConfig();
+            await activePort.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
         }
 
         const writer = activePort.writable.getWriter();
         const data = new Uint8Array(commandArray);
         await writer.write(data);
         writer.releaseLock();
-        
+
         return true;
     } catch (err) {
+        if (activePort && err.message?.includes('already')) {
+            try { await activePort.close(); } catch (_) {}
+        }
         console.error('Web Serial Error:', err);
         throw new Error('Error al enviar el comando a la impresora: ' + err.message);
     }
 }
 
 export async function openCashDrawerWebSerial() {
-    // ESC p m t1 t2
-    // 27 = ESC, 112 = p, 0 = drawer 1, 50 = 50ms pulse, 250 = 250ms interval
-    const ESC_POS_DRAWER = [27, 112, 0, 50, 250]; 
-    return await sendEscPosCommand(ESC_POS_DRAWER);
+    // ESC p m t1 t2 — 27=ESC 112=p 0=drawer1 50=50ms 250=250ms
+    return await sendEscPosCommand([27, 112, 0, 50, 250]);
 }
 
 export async function printTestWebSerial() {
-    const text = '==== IMPRESORA CONECTADA ====\n\nImpresion de prueba via\nWeb Serial API (Chrome)\n\n\n\n\n\n============\n';
-    const InitCmd = [27, 64]; 
-    const CutCmd = [29, 86, 66, 0]; // GS V B 0
-    
-    // String to ArrayBuffer
+    const lines = [
+        '================================',
+        '     IMPRESORA CONECTADA        ',
+        '================================',
+        ' COL-POS / Termica 58mm        ',
+        ' ESC/POS via Web Serial API    ',
+        ' Baud: 9600  Papel: 58mm       ',
+        '--------------------------------',
+        ' 1234567890123456789012345678901',
+        ' ^-- 32 caracteres por linea  --',
+        '================================',
+        '',
+        '',
+        '',
+    ];
     const encoder = new TextEncoder();
-    const textBytes = Array.from(encoder.encode(text));
-
-    const finalPayload = [...InitCmd, ...textBytes, ...CutCmd];
-    
-    return await sendEscPosCommand(finalPayload);
-}
-
-// Configuración local en storage (por si desactivan la apertura automática)
-export function getWebSerialConfig() {
-    try {
-        const saved = localStorage.getItem('web_serial_config');
-        return saved ? JSON.parse(saved) : { autoOpenDrawer: false };
-    } catch {
-        return { autoOpenDrawer: false };
+    const payload = [27, 64]; // ESC @ init
+    for (const line of lines) {
+        payload.push(...Array.from(encoder.encode(line + '\n')));
     }
+    payload.push(29, 86, 66, 0); // cut
+    return await sendEscPosCommand(payload);
 }
 
-export function saveWebSerialConfig(cfg) {
-    localStorage.setItem('web_serial_config', JSON.stringify(cfg));
-}
-
-// ── ESC/POS Ticket Printing ──────────────────────────────────────────────────
+// ── ESC/POS Ticket Printing ───────────────────────────────────────────────────
 
 const ESC = 0x1B;
-const GS = 0x1D;
-const LF = 0x0A;
+const GS  = 0x1D;
+const LF  = 0x0A;
 
 function escposEncoder() {
     const chunks = [];
     const encoder = new TextEncoder();
-
     const api = {
-        init() { chunks.push(new Uint8Array([ESC, 0x40])); return api; },
-        align(a) { // 0=left, 1=center, 2=right
-            chunks.push(new Uint8Array([ESC, 0x61, a])); return api;
-        },
-        bold(on) { chunks.push(new Uint8Array([ESC, 0x45, on ? 1 : 0])); return api; },
-        doubleHeight(on) { chunks.push(new Uint8Array([GS, 0x21, on ? 0x10 : 0x00])); return api; },
-        bigText(on) { chunks.push(new Uint8Array([GS, 0x21, on ? 0x11 : 0x00])); return api; },
-        text(str) { chunks.push(encoder.encode(str)); return api; },
-        newline(n = 1) { for (let i = 0; i < n; i++) chunks.push(new Uint8Array([LF])); return api; },
-        line(char = '-', len = 32) { chunks.push(encoder.encode(char.repeat(len))); chunks.push(new Uint8Array([LF])); return api; },
-        row(left, right, width = 32) {
-            const space = Math.max(1, width - left.length - right.length);
-            chunks.push(encoder.encode(left + ' '.repeat(space) + right));
+        init()           { chunks.push(new Uint8Array([ESC, 0x40])); return api; },
+        align(a)         { chunks.push(new Uint8Array([ESC, 0x61, a])); return api; },
+        bold(on)         { chunks.push(new Uint8Array([ESC, 0x45, on ? 1 : 0])); return api; },
+        smallFont(on)    { chunks.push(new Uint8Array([ESC, 0x4D, on ? 1 : 0])); return api; }, // ESC M — Font B (9x17): 42 chars/línea en 58mm
+        doubleHeight(on) { chunks.push(new Uint8Array([GS,  0x21, on ? 0x10 : 0x00])); return api; },
+        bigText(on)      { chunks.push(new Uint8Array([GS,  0x21, on ? 0x11 : 0x00])); return api; },
+        text(str)        { chunks.push(encoder.encode(str)); return api; },
+        newline(n = 1)   { for (let i = 0; i < n; i++) chunks.push(new Uint8Array([LF])); return api; },
+        line(char = '-', len = 32) {
+            chunks.push(encoder.encode(char.repeat(len)));
             chunks.push(new Uint8Array([LF]));
             return api;
         },
-        cut() { chunks.push(new Uint8Array([GS, 0x56, 0x42, 0x00])); return api; },
+        row(left, right, width = 32) {
+            // Si el contenido total desborda, recortar 'left' para preservar 'right'
+            const maxLeft = width - right.length - 1;
+            const safeLeft = left.length > maxLeft ? left.substring(0, maxLeft - 1) + '…' : left;
+            const space = Math.max(1, width - safeLeft.length - right.length);
+            chunks.push(encoder.encode(safeLeft + ' '.repeat(space) + right));
+            chunks.push(new Uint8Array([LF]));
+            return api;
+        },
+        cut()  { chunks.push(new Uint8Array([GS, 0x56, 0x42, 0x00])); return api; },
         feed(n = 4) { chunks.push(new Uint8Array([ESC, 0x64, n])); return api; },
         build() {
             const total = chunks.reduce((s, c) => s + c.length, 0);
@@ -156,21 +251,23 @@ export async function printReceiptEscPos(sale, bcvRate) {
     if (!port) return false;
 
     const settings = {
-        name: localStorage.getItem('business_name') || 'Pool Los Diaz',
-        rif: localStorage.getItem('business_rif') || '',
+        name:  localStorage.getItem('business_name')  || 'Pool Los Diaz',
+        rif:   localStorage.getItem('business_rif')   || '',
         phone: localStorage.getItem('business_phone') || '',
     };
 
-    const rate = sale.rate || bcvRate || 1;
+    const rate    = sale.rate || bcvRate || 1;
     const saleNum = String(sale.saleNumber || 0).padStart(7, '0');
-    const W = 32; // chars por línea en 58mm
+    const cfg     = getWebSerialConfig();
+    const W       = cfg.paperWidth >= 80 ? 42 : 32; // chars por línea (font normal)
+    const WS      = cfg.paperWidth >= 80 ? 56 : 42; // chars por línea (font pequeña)
 
     const p = escposEncoder().init();
 
     // Header
     p.align(1).bold(true).doubleHeight(true).text(settings.name).newline();
     p.doubleHeight(false);
-    if (settings.rif) p.bold(false).text('RIF: ' + settings.rif).newline();
+    if (settings.rif)   p.bold(false).text('RIF: ' + settings.rif).newline();
     if (settings.phone) p.text('Tel: ' + settings.phone).newline();
     p.newline();
 
@@ -178,24 +275,27 @@ export async function printReceiptEscPos(sale, bcvRate) {
     p.bold(true).text('Venta #' + saleNum).newline();
     p.bold(false).text(new Date(sale.timestamp).toLocaleString('es-VE')).newline();
 
-    // Mesa
     if (sale.tableName) {
         p.bold(true).text('Mesa: ' + sale.tableName).newline();
         p.bold(false);
     }
-
-    // Cliente
     p.text('Cliente: ' + (capitalizeName(sale.customerName) || 'Consumidor Final')).newline();
     if (sale.meseroNombre) p.text('Atendido: ' + capitalizeName(sale.meseroNombre)).newline();
 
     p.align(0).line('=', W);
 
-    // Items
+    // Items — font pequeña (42 chars/línea en 58mm) para aprovechar mejor el espacio
     (sale.items || []).forEach(item => {
-        const qty = item.isWeight ? item.qty.toFixed(3) + 'Kg' : item.qty + 'u';
+        const qty      = item.isWeight ? item.qty.toFixed(3) + 'Kg' : item.qty + 'u';
+        const unitStr  = '$' + item.priceUsd.toFixed(2);
         const subtotal = '$' + (item.priceUsd * item.qty).toFixed(2);
-        p.bold(true).text(item.name).newline();
-        p.bold(false).row('  ' + qty + ' x $' + item.priceUsd.toFixed(2), subtotal, W);
+        const detail   = '  ' + qty + ' x ' + unitStr;
+        // Nombre: font normal, negrita, truncado a W chars
+        const name = item.name.length > W ? item.name.substring(0, W - 1) + '…' : item.name;
+        p.bold(true).text(name).newline();
+        // Detalle: font pequeña para aprovechar los 42 chars
+        p.bold(false).smallFont(true).row(detail, subtotal, WS);
+        p.smallFont(false);
     });
 
     p.line('=', W);
@@ -216,9 +316,9 @@ export async function printReceiptEscPos(sale, bcvRate) {
     if (sale.payments?.length > 0) {
         sale.payments.forEach(pm => {
             const label = pm.methodLabel || pm.methodId || 'Pago';
-            const amt = pm.amountInputCurrency === 'USD' ? '$' + pm.amountInput :
-                        pm.amountInputCurrency === 'COP' ? 'COP ' + pm.amountInput :
-                        'Bs ' + pm.amountInput;
+            const amt   = pm.amountInputCurrency === 'USD' ? '$' + pm.amountInput :
+                          pm.amountInputCurrency === 'COP' ? 'COP ' + pm.amountInput :
+                          'Bs ' + pm.amountInput;
             p.row(label, amt, W);
         });
     }
@@ -228,7 +328,6 @@ export async function printReceiptEscPos(sale, bcvRate) {
         p.bold(true).row('Vuelto:', '$' + sale.changeUsd.toFixed(2) + ' / ' + formatBsSimple(sale.changeBs) + ' Bs', W);
         p.bold(false);
     }
-
     if (sale.fiadoUsd > 0) {
         p.line('-', W);
         p.bold(true).row('Fiado:', '$' + sale.fiadoUsd.toFixed(2), W);
@@ -237,15 +336,12 @@ export async function printReceiptEscPos(sale, bcvRate) {
 
     p.line('-', W);
     p.align(0).text('Tasa BCV: ' + formatBsSimple(rate) + ' Bs/$').newline();
-
-    // Pie
     p.newline();
     p.align(1).bold(true).text('Gracias por tu compra!').newline();
     p.bold(false).text('Comprobante de control interno').newline();
 
     p.feed(4).cut();
 
-    const data = p.build();
-    await sendEscPosCommand(Array.from(data));
+    await sendEscPosCommand(Array.from(p.build()));
     return true;
 }

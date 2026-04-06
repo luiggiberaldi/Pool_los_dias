@@ -62,7 +62,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     // ── Form hook ──
-    const form = useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog });
+    const form = useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog, onClose: () => setIsModalOpen(false) });
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleEdit = async (product) => {

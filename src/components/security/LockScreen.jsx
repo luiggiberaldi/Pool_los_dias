@@ -5,7 +5,7 @@ import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 
 export default function LockScreen() {
-  const { usuarios, login } = useAuthStore();
+  const { usuarios, login, loginWithBiometric } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState(null);
   const confirm = useConfirm();
 
@@ -15,6 +15,11 @@ export default function LockScreen() {
       setSelectedUser(null);
     }
     return success;
+  };
+
+  const handleBiometricLogin = async (userId) => {
+    await loginWithBiometric(userId);
+    setSelectedUser(null);
   };
 
   const handleCloudLogout = async () => {
@@ -27,6 +32,7 @@ export default function LockScreen() {
     });
     if (!ok) return;
     const { supabaseCloud } = await import('../../config/supabaseCloud');
+    localStorage.removeItem('pool_had_cloud_session');
     await supabaseCloud.auth.signOut();
     window.location.reload();
   };
@@ -83,6 +89,7 @@ export default function LockScreen() {
         onClose={() => setSelectedUser(null)}
         user={selectedUser}
         onSubmit={handlePinSubmit}
+        onBiometricLogin={handleBiometricLogin}
       />
     </div>
   );

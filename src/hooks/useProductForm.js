@@ -3,7 +3,7 @@ import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { buildProductPayload } from '../utils/productProcessor';
 
-export function useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog }) {
+export function useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog, onClose }) {
     const [editingId, setEditingId] = useState(null);
     const [name, setName] = useState('');
     const [barcode, setBarcode] = useState('');
@@ -110,6 +110,7 @@ export function useProductForm({ products, effectiveRate, setProducts, triggerHa
             auditLog('INVENTARIO', 'PRODUCTO_CREADO', `Producto "${name}" creado - $${priceUsd || '0'}`);
         }
         handleClose();
+        onClose && onClose();
     };
 
     const handleEdit = async (product) => {

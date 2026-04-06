@@ -191,6 +191,19 @@ export const useAuthStore = create(
                 }
             },
 
+            /**
+             * Login directo sin PIN — solo llamar después de verificación biométrica exitosa.
+             */
+            loginWithBiometric: async (userId) => {
+                const { usuarios } = get();
+                const user = usuarios.find(u => u.id === userId);
+                if (!user) return false;
+                set({ usuarioActivo: user, failedAttempts: 0, lockoutUntil: null });
+                localStorage.setItem('abasto-device-session', JSON.stringify(user));
+                logEvent('AUTH', 'LOGIN_BIOMETRIC', `${user.nombre} inicio sesion con huella`, user);
+                return true;
+            },
+
             setRequireLogin: (val) => {
                 set({ requireLogin: val });
                 logEvent('CONFIG', 'LOGIN_REQUERIDO_MODIFICADO', `Login requerido establecido a ${val ? 'SI' : 'NO'}`);
