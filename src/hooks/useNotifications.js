@@ -75,6 +75,24 @@ export function useNotifications() {
         );
     }, [send]);
 
+    /** Mesa enviada a cobrar */
+    const notifyMesaCobrar = useCallback((tableName, totalUsd) => {
+        send(
+            '💳 Mesa lista para cobrar',
+            `${tableName} — Total: $${totalUsd.toFixed(2)}`,
+            `cobrar-${tableName}`
+        );
+    }, [send]);
+
+    /** Tiempo prepagado excedido en una mesa */
+    const notifyTiempoExcedido = useCallback((tableName) => {
+        send(
+            '⏰ Tiempo excedido',
+            `${tableName} superó el tiempo prepagado`,
+            `excedido-${tableName}`
+        );
+    }, [send]);
+
     /** Cierre de caja pendiente: se chequea al montar el Dashboard */
     const notifyCierrePendiente = useCallback((todaySalesCount) => {
         if (todaySalesCount === 0) return;
@@ -109,5 +127,7 @@ export function useNotifications() {
         notifyLowStock,
         notifySaleComplete,
         notifyCierrePendiente,
+        notifyMesaCobrar,
+        notifyTiempoExcedido,
     };
 }

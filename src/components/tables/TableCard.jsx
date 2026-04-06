@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
+import { useNotifications } from '../../hooks/useNotifications';
 import { OrderPanel } from './OrderPanel';
 
 import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
@@ -32,6 +33,7 @@ export default function TableCard({ table, session }) {
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
+    const { notifyMesaCobrar, notifyTiempoExcedido } = useNotifications();
 
     const isAvailable = !session || session.status === 'CLOSED';
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
@@ -100,6 +102,18 @@ export default function TableCard({ table, session }) {
         }
     }, [isPlaying, session?.started_at]);
 
+    // Notification when prepaid time is exceeded (fires once per session)
+    const exceededNotifiedRef = useRef(false);
+    useEffect(() => {
+        if (isExceeded && !exceededNotifiedRef.current) {
+            exceededNotifiedRef.current = true;
+            notifyTiempoExcedido(table.name);
+        }
+        if (!isExceeded) {
+            exceededNotifiedRef.current = false;
+        }
+    }, [isExceeded, table.name, notifyTiempoExcedido]);
+
     const handleStartNormal = async (hours = 0) => {
         if (!currentUser) return;
         await openSession(table.id, currentUser.id, 'NORMAL', hours);
@@ -161,40 +175,42 @@ export default function TableCard({ table, session }) {
         }`}>
             {/* Header: Title / Flow Actions */}
             <div className="flex flex-wrap items-start justify-between mb-2 gap-2 border-b border-white/5 pb-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                    <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight whitespace-nowrap shrink-0 ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
-                        {table.name}
-                    </h3>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                        <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight whitespace-nowrap shrink-0 ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
+                            {table.name}
+                        </h3>
+                        {isPlaying && (
+                            <>
+                                <button
+                                    onClick={handlePrintPartial}
+                                    className="w-6 h-6 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/40 text-white transition-all active:scale-95 shrink-0"
+                                    title="Imprimir Pre-Cuenta"
+                                >
+                                    <Printer size={12} />
+                                </button>
+                                {(currentUser?.role === 'ADMIN') && (
+                                    <button
+                                        onClick={() => setShowCancelModal(true)}
+                                        className="w-6 h-6 rounded-full flex items-center justify-center bg-rose-500/80 hover:bg-rose-500 text-white transition-all active:scale-95 shrink-0 shadow-sm"
+                                        title="Anular Mesa"
+                                    >
+                                        <X size={14} strokeWidth={2.5} />
+                                    </button>
+                                )}
+                            </>
+                        )}
+                    </div>
                     {isPlaying && staffName && (
-                        <span className="text-[9px] sm:text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md truncate max-w-[70px] sm:max-w-[100px]">
+                        <span className="text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md self-start whitespace-nowrap">
                             {staffName}
                         </span>
-                    )}
-                    {isPlaying && (
-                        <>
-                            <button
-                                onClick={handlePrintPartial}
-                                className="w-6 h-6 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/40 text-white transition-all active:scale-95 shrink-0"
-                                title="Imprimir Pre-Cuenta"
-                            >
-                                <Printer size={12} />
-                            </button>
-                            {(currentUser?.role === 'ADMIN') && (
-                                <button
-                                    onClick={() => setShowCancelModal(true)}
-                                    className="w-6 h-6 rounded-full flex items-center justify-center bg-rose-500/80 hover:bg-rose-500 text-white transition-all active:scale-95 shrink-0 ml-1 shadow-sm"
-                                    title="Anular Mesa"
-                                >
-                                    <X size={14} strokeWidth={2.5} />
-                                </button>
-                            )}
-                        </>
                     )}
                 </div>
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
                     isAvailable ? 'bg-emerald-100 text-emerald-700' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? `PREPAGO ${Number(session.hours_paid)}h` : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : 'JUG.'}
                 </div>
             </div>
 
@@ -364,8 +380,8 @@ export default function TableCard({ table, session }) {
                                     <ShoppingBag size={13} fill="currentColor" />
                                     <span>Consumo</span>
                                 </button>
-                                <button 
-                                    onClick={() => requestCheckout(session.id)}
+                                <button
+                                    onClick={() => { requestCheckout(session.id); notifyMesaCobrar(table.name, grandTotal); }}
                                     className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                                 >
                                     <CreditCard size={13} />
@@ -404,7 +420,7 @@ export default function TableCard({ table, session }) {
         {/* Modal de Elegir Tiempo Prepago */}
         <Modal isOpen={showModeModal} onClose={() => setShowModeModal(false)} title="Modo de Juego">
             <div className="flex flex-col gap-3 py-2">
-                <button 
+                <button
                     onClick={() => handleStartNormal(0)}
                     className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 group transition-all"
                 >
@@ -412,6 +428,10 @@ export default function TableCard({ table, session }) {
                     <div className="text-sm text-slate-500">Mesa por tiempo ilimitado, cobro al final.</div>
                 </button>
                 <div className="grid grid-cols-2 gap-3 mt-2">
+                    <button onClick={() => handleStartNormal(0.5)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                        <span className="text-xl">30 Min</span>
+                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
+                    </button>
                     <button onClick={() => handleStartNormal(1)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">1 Hrs</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
@@ -450,12 +470,25 @@ export default function TableCard({ table, session }) {
                 ) : hasLimit ? (
                     <>
                         <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                            Esta mesa tiene un prepago. Puede extender las horas de la mesa:
+                            Esta mesa tiene un prepago. Puede ajustar el tiempo:
                         </p>
-                        <div className="grid grid-cols-3 gap-2">
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 1); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 1 Hora</button>
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
+                        <div className="flex flex-col gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar</span>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 0.5); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 30 Min</button>
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 1); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 1 Hora</button>
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
+                            </div>
+                            {currentUser?.role === 'ADMIN' && (
+                                <>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
+                                        <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </>
                 ) : (

@@ -308,7 +308,7 @@ export const useTablesStore = create((set, get) => ({
     addHoursToSession: async (sessionId, additionalHours) => {
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
-        const newHours = (Number(session.hours_paid) || 0) + additionalHours;
+        const newHours = Math.max(0, (Number(session.hours_paid) || 0) + additionalHours);
         
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, hours_paid: newHours } : s);
         set({ activeSessions: newSessions });
@@ -416,17 +416,12 @@ export const useTablesStore = create((set, get) => ({
         set(state => ({ tables: state.tables.filter(t => t.id !== id) }));
         await tablesCache.setItem('tables', get().tables);
         logEvent('MESAS', 'MESA_ELIMINADA', `Mesa "${tableName}" eliminada`, getUser(), { tableId: id });
-        try {
-            // Borrar en orden correcto para respetar FK: orders → table_sessions → tables
-            const { data: sessions } = await supabaseCloud.from('table_sessions').select('id').eq('table_id', id);
-            if (sessions?.length) {
-                const sessionIds = sessions.map(s => s.id);
-                await supabaseCloud.from('orders').delete().in('table_session_id', sessionIds);
-                await supabaseCloud.from('table_sessions').delete().in('id', sessionIds);
-            }
-            const { error } = await supabaseCloud.from('tables').delete().eq('id', id);
-            if (error) throw error;
-        } catch (e) { console.error('Delete table cloud fail:', e); }
+        const { error } = await supabaseCloud.from('tables').update({ active: false }).eq('id', id);
+        if (error) {
+            // Revert optimistic update on failure
+            await get().syncTablesAndSessions();
+            throw error;
+        }
     }
 }));
 

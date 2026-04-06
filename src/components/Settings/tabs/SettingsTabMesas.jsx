@@ -127,8 +127,12 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const handleDelete = async () => {
         if (!deleteTargetId) return;
         const { activeSessions } = useTablesStore.getState();
-        if (activeSessions.some(s => s.table_id === deleteTargetId)) {
-            showToast('No puedes borrar una mesa que está abierta', 'error');
+        const session = activeSessions.find(s => s.table_id === deleteTargetId);
+        if (session) {
+            const msg = session.status === 'CHECKOUT'
+                ? 'No puedes borrar una mesa que está en cobro'
+                : 'No puedes borrar una mesa que está abierta';
+            showToast(msg, 'error');
             setDeleteTargetId(null);
             return;
         }

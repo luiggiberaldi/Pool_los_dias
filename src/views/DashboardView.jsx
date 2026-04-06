@@ -463,7 +463,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             <div className="text-left">
                                 <p className="text-sm font-black text-white">Cerrar Caja</p>
                                 <p className="text-[11px] text-white/70 font-medium">
-                                    {todaySales.length === 0 && todayCashFlow.length === 0 ? 'Caja sin movimientos' : `$${todayTotalUsd.toFixed(2)} · ${todaySales.length} ${todaySales.length === 1 ? 'venta' : 'ventas'}`}
+                                    {activeCashSession?.opened_by ? `${activeCashSession.opened_by} · ` : ''}{todaySales.length === 0 && todayCashFlow.length === 0 ? 'Sin movimientos' : `$${todayTotalUsd.toFixed(2)} · ${todaySales.length} ${todaySales.length === 1 ? 'venta' : 'ventas'}`}
                                 </p>
                             </div>
                         </div>
