@@ -102,18 +102,6 @@ export default function TableCard({ table, session }) {
         }
     }, [isPlaying, session?.started_at]);
 
-    // Notification when prepaid time is exceeded (fires once per session)
-    const exceededNotifiedRef = useRef(false);
-    useEffect(() => {
-        if (isExceeded && !exceededNotifiedRef.current) {
-            exceededNotifiedRef.current = true;
-            notifyTiempoExcedido(table.name);
-        }
-        if (!isExceeded) {
-            exceededNotifiedRef.current = false;
-        }
-    }, [isExceeded, table.name, notifyTiempoExcedido]);
-
     const handleStartNormal = async (hours = 0) => {
         if (!currentUser) return;
         await openSession(table.id, currentUser.id, 'NORMAL', hours);
@@ -163,6 +151,18 @@ export default function TableCard({ table, session }) {
     const hasLimit = session?.hours_paid && session.hours_paid > 0;
     const remainingMins = hasLimit ? (session.hours_paid * 60) - elapsed : 0;
     const isExceeded = hasLimit && remainingMins < 0;
+
+    // Notification when prepaid time is exceeded (fires once per session)
+    const exceededNotifiedRef = useRef(false);
+    useEffect(() => {
+        if (isExceeded && !exceededNotifiedRef.current) {
+            exceededNotifiedRef.current = true;
+            notifyTiempoExcedido(table.name);
+        }
+        if (!isExceeded) {
+            exceededNotifiedRef.current = false;
+        }
+    }, [isExceeded, table.name, notifyTiempoExcedido]);
 
     return (
         <>
