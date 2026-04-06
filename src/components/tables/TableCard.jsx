@@ -60,18 +60,15 @@ export default function TableCard({ table, session }) {
     const totalConsumption = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
     
     const handleCancelTable = async () => {
-        setShowCancelModal(false); // Feeds instant UX feedback
+        setShowCancelModal(false);
         try {
-            // Run both optimistic operations concurrently so the UI updates instantly
-            // They will do their network synchronization in the background
-            Promise.all([
+            await Promise.all([
                 cancelOrderBySessionId(session.id).catch(e => console.warn("cancelOrder offline", e)),
                 closeSession(session.id, currentUser?.id || "SYSTEM", 0).catch(e => console.warn("closeSession offline", e))
             ]);
-            
             logEvent('MESAS', 'ANULACION', `Mesa ${table.name} anulada manualmente. ${currentItems.length} items descartados.`, currentUser);
         } catch (error) {
-            console.error("Error anlando mesa", error);
+            console.error("Error anulando mesa", error);
             alert("Ocurrió un error local al preparar la anulación.");
         }
     };

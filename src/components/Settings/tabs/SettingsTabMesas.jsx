@@ -97,6 +97,8 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
 
     const handleAddOrUpdateTable = async () => {
         if (!tableName.trim()) return;
+        const duplicate = tables.some(t => t.name.trim().toLowerCase() === tableName.trim().toLowerCase() && t.id !== isEditing);
+        if (duplicate) { showToast('Ya existe una mesa con ese nombre', 'error'); return; }
         setIsSaving(true);
         try {
             if (isEditing) {

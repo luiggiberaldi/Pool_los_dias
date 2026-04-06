@@ -46,12 +46,16 @@ function CloudLicenseViewer({ adminEmail, showToast }) {
 
     const loadData = async () => {
         setLoading(true);
-        const [devRes, licRes] = await Promise.all([
-            supabaseCloud.from('account_devices').select('*').eq('email', adminEmail).order('created_at', { ascending: true }),
-            supabaseCloud.from('cloud_licenses').select('*').eq('email', adminEmail).maybeSingle()
-        ]);
-        if (!devRes.error && devRes.data) setDevices(devRes.data);
-        if (!licRes.error && licRes.data) setLicense(licRes.data);
+        try {
+            const [devRes, licRes] = await Promise.all([
+                supabaseCloud.from('account_devices').select('*').eq('email', adminEmail).order('created_at', { ascending: true }),
+                supabaseCloud.from('cloud_licenses').select('*').eq('email', adminEmail).maybeSingle()
+            ]);
+            if (!devRes.error && devRes.data) setDevices(devRes.data);
+            if (!licRes.error && licRes.data) setLicense(licRes.data);
+        } catch {
+            // Sin conexión — no bloquear UI
+        }
         setLoading(false);
     }
 
