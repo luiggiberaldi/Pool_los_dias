@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Users, Lock, Rocket, Clock
+    Users, Lock, Rocket, Clock, KeyRound, Eye, EyeOff, CheckCircle2
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import UsersManager from '../UsersManager';
@@ -172,6 +172,34 @@ export default function SettingsTabUsuarios({
     autoLockOnMinimize, setAutoLockOnMinimize,
     showToast, triggerHaptic,
 }) {
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [changingPw, setChangingPw] = useState(false);
+    const [pwSuccess, setPwSuccess] = useState(false);
+
+    const handleChangePassword = async () => {
+        if (!newPassword || newPassword.length < 6) {
+            showToast('La contraseña debe tener al menos 6 caracteres', 'error'); return;
+        }
+        if (newPassword !== confirmPassword) {
+            showToast('Las contraseñas no coinciden', 'error'); return;
+        }
+        setChangingPw(true);
+        const { error } = await supabaseCloud.auth.updateUser({ password: newPassword });
+        setChangingPw(false);
+        if (error) {
+            showToast('Error al cambiar contraseña: ' + error.message, 'error');
+        } else {
+            setPwSuccess(true);
+            setNewPassword('');
+            setConfirmPassword('');
+            showToast('Contraseña actualizada correctamente', 'success');
+            setTimeout(() => setPwSuccess(false), 3000);
+        }
+    };
+
     return (
         <div className="relative">
             {SHOW_COMING_SOON && <ComingSoonOverlay />}
@@ -225,6 +253,55 @@ export default function SettingsTabUsuarios({
                         ))}
                     </div>
                 </div>
+            </SectionCard>
+
+            <SectionCard icon={KeyRound} title="Cambiar Contraseña" subtitle="Actualiza tu contraseña de acceso" iconColor="text-amber-500">
+                {pwSuccess ? (
+                    <div className="flex flex-col items-center gap-2 py-4">
+                        <CheckCircle2 size={32} className="text-green-500" />
+                        <p className="text-sm font-bold text-green-600 dark:text-green-400">Contraseña actualizada</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Nueva Contraseña</label>
+                            <div className="relative">
+                                <input
+                                    type={showNew ? 'text' : 'password'}
+                                    value={newPassword}
+                                    onChange={e => setNewPassword(e.target.value)}
+                                    placeholder="Mínimo 6 caracteres"
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 pr-10 text-sm text-slate-800 dark:text-slate-200 outline-none focus:border-amber-400"
+                                />
+                                <button onClick={() => setShowNew(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                    {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Confirmar Contraseña</label>
+                            <div className="relative">
+                                <input
+                                    type={showConfirm ? 'text' : 'password'}
+                                    value={confirmPassword}
+                                    onChange={e => setConfirmPassword(e.target.value)}
+                                    placeholder="Repite la contraseña"
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 pr-10 text-sm text-slate-800 dark:text-slate-200 outline-none focus:border-amber-400"
+                                />
+                                <button onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                    {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleChangePassword}
+                            disabled={changingPw || !newPassword || !confirmPassword}
+                            className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold rounded-xl text-sm transition-colors"
+                        >
+                            {changingPw ? 'Actualizando...' : 'Actualizar Contraseña'}
+                        </button>
+                    </div>
+                )}
             </SectionCard>
         </div>
     );
