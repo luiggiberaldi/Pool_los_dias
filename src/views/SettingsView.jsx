@@ -79,7 +79,18 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [deleteInput, setDeleteInput] = useState('');
 
     const [dangerZoneClicks, setDangerZoneClicks] = useState(0);
-    const dangerZoneUnlocked = true;
+    const [lastDangerClick, setLastDangerClick] = useState(0);
+    const dangerZoneUnlocked = dangerZoneClicks >= 5;
+
+    const handleDangerZoneClick = () => {
+        const now = Date.now();
+        if (now - lastDangerClick > 2000) {
+            setDangerZoneClicks(1);
+        } else {
+            setDangerZoneClicks(c => c + 1);
+        }
+        setLastDangerClick(now);
+    };
 
     const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || 'Pool los diaz');
     const [businessRif, setBusinessRif] = useState(localStorage.getItem('business_rif') || '');
@@ -302,7 +313,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                                     onClick={() => {
                                         setActiveTab(tab.id);
                                         triggerHaptic?.();
-                                        if (tab.id === 'sistema') setDangerZoneClicks(c => c >= 5 ? c : c + 1);
+                                        if (tab.id === 'sistema') handleDangerZoneClick();
                                     }}
                                     className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 ${
                                         isActive
@@ -391,7 +402,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                             setShowDeleteConfirm={setShowDeleteConfirm}
                             onFactoryReset={handleFactoryReset}
                             dangerZoneUnlocked={dangerZoneUnlocked}
-                            onDangerZoneClick={() => setDangerZoneClicks(c => c >= 5 ? c : c + 1)}
+                            onDangerZoneClick={handleDangerZoneClick}
                             triggerHaptic={triggerHaptic}
                         />
                     )}
