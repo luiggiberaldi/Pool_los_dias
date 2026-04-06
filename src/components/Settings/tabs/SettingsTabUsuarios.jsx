@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Users, Lock, Rocket, Clock, KeyRound, Eye, EyeOff, CheckCircle2
+    Users, Lock, Rocket, Clock, KeyRound, Eye, EyeOff, CheckCircle2, Fingerprint, ShieldCheck, Trash2
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import UsersManager from '../UsersManager';
 import CloudAuthModal from '../../security/CloudAuthModal';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { supabaseCloud } from '../../../config/supabaseCloud';
+import {
+    isMobileDevice, isBiometricSupported, hasBiometricRegistered,
+    getBiometricEmail, registerBiometric, clearBiometric
+} from '../../../utils/biometricAuth';
 
 // ─── CONTROL DE PRÓXIMAMENTE ────────────────────────────────────────────────
 const SHOW_COMING_SOON = false;
@@ -181,6 +185,50 @@ export default function SettingsTabUsuarios({
     const [changingPw, setChangingPw] = useState(false);
     const [pwSuccess, setPwSuccess] = useState(false);
 
+    // ── Biometría ────────────────────────────────────────────────────
+    const [isMobile, setIsMobile] = useState(false);
+    const [bioSupported, setBioSupported] = useState(false);
+    const [bioRegistered, setBioRegistered] = useState(false);
+    const [bioEmail, setBioEmail] = useState('');
+    const [bioLoading, setBioLoading] = useState(false);
+    const [bioMsg, setBioMsg] = useState('');
+
+    useEffect(() => {
+        const mobile = isMobileDevice();
+        setIsMobile(mobile);
+        if (!mobile) return;
+        isBiometricSupported().then(ok => {
+            setBioSupported(ok);
+            setBioRegistered(hasBiometricRegistered());
+            setBioEmail(getBiometricEmail());
+        });
+    }, []);
+
+    const handleRegisterBiometric = async () => {
+        setBioMsg('');
+        setBioLoading(true);
+        try {
+            const { data: { session } } = await supabaseCloud.auth.getSession();
+            if (!session?.refresh_token) { setBioMsg('No hay sesión activa'); setBioLoading(false); return; }
+            await registerBiometric(session.user.email, session.refresh_token);
+            setBioRegistered(true);
+            setBioEmail(session.user.email);
+            setBioMsg('¡Biometría activada!');
+            showToast('Acceso biométrico activado', 'success');
+        } catch (e) {
+            setBioMsg('No se pudo registrar. Intenta de nuevo.');
+        }
+        setBioLoading(false);
+    };
+
+    const handleClearBiometric = () => {
+        clearBiometric();
+        setBioRegistered(false);
+        setBioEmail('');
+        setBioMsg('Biometría desactivada');
+        showToast('Acceso biométrico desactivado', 'success');
+    };
+
     const handleChangePassword = async () => {
         if (!currentPassword) {
             showToast('Ingresa tu contraseña actual', 'error'); return;
@@ -335,6 +383,52 @@ export default function SettingsTabUsuarios({
                     </div>
                 )}
             </SectionCard>
+
+            {/* Sección biometría — solo aparece en móviles con soporte */}
+            {isMobile && bioSupported && (
+                <SectionCard icon={Fingerprint} title="Acceso Biométrico" subtitle="Huella dactilar o Face ID — solo para este dispositivo" iconColor="text-violet-500">
+                    {bioRegistered ? (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl">
+                                <ShieldCheck size={20} className="text-violet-500 shrink-0" />
+                                <div>
+                                    <p className="text-sm font-bold text-violet-700 dark:text-violet-300">Biometría activada</p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">{bioEmail}</p>
+                                </div>
+                            </div>
+                            {bioMsg && <p className="text-[11px] text-center font-bold text-slate-500">{bioMsg}</p>}
+                            <button
+                                onClick={handleClearBiometric}
+                                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                            >
+                                <Trash2 size={15} />
+                                Desactivar biometría en este dispositivo
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Activa el acceso con huella o Face ID para entrar sin contraseña desde este teléfono. El registro es exclusivo para este dispositivo.
+                            </p>
+                            {bioMsg && <p className="text-[11px] text-center font-bold text-violet-600">{bioMsg}</p>}
+                            <button
+                                onClick={handleRegisterBiometric}
+                                disabled={bioLoading}
+                                className="w-full py-2.5 bg-violet-500 hover:bg-violet-600 disabled:opacity-40 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
+                            >
+                                {bioLoading ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Fingerprint size={16} />
+                                        Activar huella / Face ID
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
+                </SectionCard>
+            )}
         </div>
     );
 }

@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
-import { 
-    Mail, Key, Phone, ArrowRight, ShieldCheck, 
-    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw
+import React, { useState, useEffect } from 'react';
+import {
+    Mail, Key, Phone, ArrowRight, ShieldCheck,
+    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw, Fingerprint
 } from 'lucide-react';
 import { useCloudAuthLogic } from '../../hooks/useCloudAuthLogic';
 import { useCloudSync } from '../../hooks/useCloudSync';
 import { useConfirm } from '../../hooks/useConfirm';
+import {
+    isMobileDevice, isBiometricSupported, hasBiometricRegistered,
+    getBiometricEmail, authenticateWithBiometric
+} from '../../utils/biometricAuth';
+import { supabaseCloud } from '../../config/supabaseCloud';
 
 // ─── Constantes de color del brand ──────────────────────────────────
 const C = {
@@ -45,6 +50,40 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
 
     const [showPassword, setShowPassword] = useState(false);
     const confirm = useConfirm();
+
+    // ── Biometría (solo móvil) ───────────────────────────────────────
+    const [bioAvailable, setBioAvailable] = useState(false);
+    const [bioRegistered, setBioRegistered] = useState(false);
+    const [bioLoading, setBioLoading] = useState(false);
+    const [bioError, setBioError] = useState('');
+
+    useEffect(() => {
+        if (!isMobileDevice()) return;
+        isBiometricSupported().then(ok => {
+            setBioAvailable(ok);
+            setBioRegistered(hasBiometricRegistered());
+        });
+    }, []);
+
+    const handleBiometricLogin = async () => {
+        setBioError('');
+        setBioLoading(true);
+        try {
+            const refreshToken = await authenticateWithBiometric();
+            if (!refreshToken) { setBioError('Biometría cancelada'); setBioLoading(false); return; }
+            const { error } = await supabaseCloud.auth.refreshSession({ refresh_token: refreshToken });
+            if (error) {
+                setBioError('Sesión expirada. Inicia con correo.');
+                setBioRegistered(false);
+                setBioLoading(false);
+                return;
+            }
+            window.location.reload();
+        } catch (e) {
+            setBioError('Error biométrico. Usa correo y contraseña.');
+            setBioLoading(false);
+        }
+    };
 
     const handleForceRestore = async () => {
         const ok = await confirm({
@@ -404,6 +443,32 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                         </>
                                     )}
                                 </button>
+
+                                {/* Botón biométrico — solo móvil con huella registrada */}
+                                {bioAvailable && bioRegistered && (
+                                    <div className="pt-1">
+                                        <div className="flex items-center gap-2 my-2">
+                                            <div className="flex-1 h-px bg-slate-200" />
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">o</span>
+                                            <div className="flex-1 h-px bg-slate-200" />
+                                        </div>
+                                        <button
+                                            onClick={handleBiometricLogin}
+                                            disabled={bioLoading}
+                                            className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60"
+                                        >
+                                            {bioLoading ? (
+                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Fingerprint size={18} />
+                                                    Entrar con huella / Face ID
+                                                </>
+                                            )}
+                                        </button>
+                                        {bioError && <p className="text-[11px] text-red-500 font-bold mt-1.5 text-center">{bioError}</p>}
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
