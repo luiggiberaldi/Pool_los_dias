@@ -551,7 +551,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 const vueltoBs     = paymentBreakdown['_vuelto_bs'];
                 const vueltoUsd    = paymentBreakdown['_vuelto_usd'];
                 const subtotalBs   = bsMethods.reduce((s, [, d]) => s + d.total, 0)  + (vueltoBs?.total  || 0);
-                const subtotalUsd  = usdMethods.reduce((s, [, d]) => s + d.total, 0) + (vueltoUsd?.total || 0);
+                const subtotalUsd  = usdMethods.reduce((s, [, d]) => s + d.total, 0) + (vueltoUsd?.total || 0)
+                    + (bsMethods.length === 0 && vueltoBs ? vueltoBs.total / (bcvRate || 1) : 0);
                 const subtotalCop  = copMethods.reduce((s, [, d]) => s + d.total, 0);
                 const renderMethod = ([method, data]) => {
                     const label = toTitleCase(getPaymentLabel(method, data.label));
@@ -603,7 +604,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Medios de Pago</h3>
                         {fiadoMethods.length > 0 && <div className="mb-4"><div className="flex justify-between items-end mb-2 pb-1 border-b border-rose-50"><span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Por Cobrar</span><span className="text-xs font-black text-amber-600">${fiadoMethods.reduce((s, [,d]) => s + d.total, 0).toFixed(2)}</span></div><div className="pl-2 border-l-2 border-amber-200">{fiadoMethods.map(renderMethod)}</div></div>}
                         {bsMethods.length > 0 && <div className="mb-4"><div className="flex justify-between items-end mb-2 pb-1 border-b border-sky-50"><span className="text-[10px] font-bold text-sky-500 uppercase tracking-wider">Bolívares</span><span className="text-xs font-black text-sky-600">{formatBs(subtotalBs)} Bs neto</span></div><div className="pl-2 border-l-2 border-sky-200">{bsMethods.map(renderMethod)}{renderVuelto(vueltoBs, 'BS')}</div></div>}
-                        {usdMethods.length > 0 && <div className="mb-4"><div className="flex justify-between items-end mb-2 pb-1 border-b border-emerald-50"><span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span><span className="text-xs font-black text-emerald-600">${subtotalUsd.toFixed(2)} neto</span></div><div className="pl-2 border-l-2 border-emerald-200">{usdMethods.map(renderMethod)}{renderVuelto(vueltoUsd, 'USD')}</div></div>}
+                        {usdMethods.length > 0 && <div className="mb-4"><div className="flex justify-between items-end mb-2 pb-1 border-b border-emerald-50"><span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Dólares</span><span className="text-xs font-black text-emerald-600">${subtotalUsd.toFixed(2)} neto</span></div><div className="pl-2 border-l-2 border-emerald-200">{usdMethods.map(renderMethod)}{renderVuelto(vueltoUsd, 'USD')}{bsMethods.length === 0 && renderVuelto(vueltoBs, 'BS')}</div></div>}
                         {copEnabled && copMethods.length > 0 && <div><div className="flex justify-between items-end mb-2 pb-1 border-b border-amber-50"><span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pesos</span><span className="text-xs font-black text-amber-600">{fmtCop(subtotalCop)} COP</span></div><div className="pl-2 border-l-2 border-amber-200">{copMethods.map(renderMethod)}</div></div>}
                     </div>
                 );
