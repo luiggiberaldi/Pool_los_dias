@@ -70,6 +70,9 @@ export async function savePaymentMethods(methods) {
 /** Agregar un método custom */
 export async function addPaymentMethod({ label, currency, icon }) {
     const methods = await getAllPaymentMethods();
+    const normalizedNew = label.trim().toLowerCase();
+    const isDuplicate = methods.some(m => m.label.toLowerCase() === normalizedNew);
+    if (isDuplicate) throw new Error(`Ya existe un método de pago con el nombre "${label}".`);
     const newMethod = {
         id: 'custom_' + Date.now(),
         label,

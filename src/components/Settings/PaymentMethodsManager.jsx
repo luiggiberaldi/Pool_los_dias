@@ -36,6 +36,12 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             showToast('Escribe un nombre para el método', 'error');
             return;
         }
+        const normalizedNew = newLabel.trim().toLowerCase();
+        const isDuplicate = methods.some(m => m.label.toLowerCase() === normalizedNew);
+        if (isDuplicate) {
+            showToast('Ya existe un método con ese nombre', 'warning');
+            return;
+        }
         triggerHaptic && triggerHaptic();
         const updated = [...methods, {
             id: 'custom_' + Date.now(),
