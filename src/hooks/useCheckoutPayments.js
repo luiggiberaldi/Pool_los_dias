@@ -2,14 +2,66 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { round2, mulR, divR, subR, sumR } from '../utils/dinero';
 
 const EPSILON = 0.01;
-const OVERPAY_MULTIPLIER = 5; // Alerta si paga más de 5× el total
+
+/**
+ * Detecta errores de pago en 3 capas (en orden de prioridad):
+ *  1. Confusión Bs→USD: el cajero ingresó bolívares en el campo de dólares
+ *  2. Umbral proporcional por tamaño de venta
+ *  3. Número redondo sospechoso (termina en 000 o 500 y supera 3× el total)
+ *
+ * Retorna null si no hay anomalía, o un objeto { type, ... } con los datos
+ * necesarios para el mensaje de alerta.
+ */
+function detectPaymentAnomaly({ barValues, paymentMethods, effectiveRate, cartTotalUsd, totalPaidUsd }) {
+    if (cartTotalUsd <= EPSILON) return null;
+
+    // ── Capa 1: confusión de moneda Bs → USD ─────────────────────────────────
+    for (const m of paymentMethods) {
+        if (m.currency !== 'USD') continue;
+        const val = parseFloat(barValues[m.id]) || 0;
+        if (val <= 0 || effectiveRate <= 0) continue;
+        const asUsdIfItWereBs = divR(val, effectiveRate);
+        const pct = Math.abs(asUsdIfItWereBs - cartTotalUsd) / cartTotalUsd;
+        if (pct <= 0.10) {
+            return {
+                type: 'currency',
+                methodLabel: m.label,
+                enteredAmount: val,
+                expectedBs: round2(mulR(cartTotalUsd, effectiveRate)),
+            };
+        }
+    }
+
+    const ratio = round2(totalPaidUsd / cartTotalUsd);
+    const diff  = round2(totalPaidUsd - cartTotalUsd);
+
+    // ── Capa 2: umbral proporcional por tamaño de venta ──────────────────────
+    const overpay =
+        (cartTotalUsd <= 10  && ratio > 4   && diff > 15)  ||
+        (cartTotalUsd <= 50  && ratio > 3   && diff > 30)  ||
+        (cartTotalUsd <= 200 && ratio > 2   && diff > 50)  ||
+        (cartTotalUsd >  200 && ratio > 1.5 && diff > 100);
+    if (overpay) return { type: 'overpay', ratio };
+
+    // ── Capa 3: número redondo sospechoso ────────────────────────────────────
+    if (ratio > 3) {
+        for (const m of paymentMethods) {
+            const val = parseFloat(barValues[m.id]) || 0;
+            if (val > 0 && (val % 1000 === 0 || val % 500 === 0)) {
+                return { type: 'round', enteredAmount: val, ratio };
+            }
+        }
+    }
+
+    return null;
+}
 
 export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic }) {
     const [barValues, setBarValues] = useState({});
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
     const [confirmFiar, setConfirmFiar] = useState(false);
-    const [showOverpayAlert, setShowOverpayAlert] = useState(false);
+    const [overpayAlertData, setOverpayAlertData] = useState(null); // null = sin alerta
     const submittingRef = useRef(false);
 
     const totalPaidUsd = useMemo(() => {
@@ -93,15 +145,16 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
     }, [barValues, paymentMethods, effectiveRate, tasaCop, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
 
     const handleConfirm = useCallback(async () => {
-        if (cartTotalUsd > EPSILON && totalPaidUsd > cartTotalUsd * OVERPAY_MULTIPLIER) {
-            setShowOverpayAlert(true);
+        const anomaly = detectPaymentAnomaly({ barValues, paymentMethods, effectiveRate, cartTotalUsd, totalPaidUsd });
+        if (anomaly) {
+            setOverpayAlertData(anomaly);
             return;
         }
         await _doConfirm();
-    }, [cartTotalUsd, totalPaidUsd, _doConfirm]);
+    }, [barValues, paymentMethods, effectiveRate, cartTotalUsd, totalPaidUsd, _doConfirm]);
 
     const confirmOverpay = useCallback(async () => {
-        setShowOverpayAlert(false);
+        setOverpayAlertData(null);
         await _doConfirm();
     }, [_doConfirm]);
 
@@ -112,7 +165,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         changeUsdGiven, setChangeUsdGiven,
         changeBsGiven, setChangeBsGiven,
         confirmFiar, setConfirmFiar,
-        showOverpayAlert, setShowOverpayAlert, confirmOverpay,
+        overpayAlertData, setOverpayAlertData, confirmOverpay,
     };
 }
 
