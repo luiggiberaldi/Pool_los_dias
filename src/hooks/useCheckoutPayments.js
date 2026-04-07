@@ -133,8 +133,20 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
                         amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? (tasaCop ? mulR(divR(amount, tasaCop), effectiveRate) : 0) : mulR(amount, effectiveRate),
                     };
                 });
-            const defaultUsdChange = (!changeUsdGiven && !changeBsGiven) ? changeUsd : round2(parseFloat(changeUsdGiven) || 0);
-            const defaultBsChange = (!changeUsdGiven && !changeBsGiven) ? 0 : round2(parseFloat(changeBsGiven) || 0);
+            // Detect which currencies were actually used for payment
+            const hasUsdPayment = payments.some(p => p.currency === 'USD');
+            const hasBsPayment = payments.some(p => p.currency === 'BS');
+            const onlyBs = hasBsPayment && !hasUsdPayment;
+
+            let defaultUsdChange, defaultBsChange;
+            if (!changeUsdGiven && !changeBsGiven) {
+                // No manual split — default change to the currency that was used
+                defaultUsdChange = onlyBs ? 0 : changeUsd;
+                defaultBsChange = onlyBs ? changeBs : 0;
+            } else {
+                defaultUsdChange = round2(parseFloat(changeUsdGiven) || 0);
+                defaultBsChange = round2(parseFloat(changeBsGiven) || 0);
+            }
             await onConfirmSale(payments, {
                 changeUsdGiven: round2(Math.min(defaultUsdChange, changeUsd)),
                 changeBsGiven: round2(Math.min(defaultBsChange, mulR(changeUsd, effectiveRate))),

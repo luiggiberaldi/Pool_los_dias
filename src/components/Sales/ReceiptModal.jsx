@@ -81,10 +81,10 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
                                 {(receipt.changeUsd > 0 || receipt.changeBs > 0) && (
                                     <div className="mt-2 pt-2 border-t border-slate-200">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vuelto Entregado</p>
-                                        {receipt.changeUsd > 0 && (
+                                        {(receipt.changeUsd > 0 || receipt.changeBs > 0) && (
                                             <div className="flex justify-between text-emerald-600 font-bold">
                                                 <span>En Dólares:</span>
-                                                <span>${receipt.changeUsd.toFixed(2)}</span>
+                                                <span>${receipt.changeUsd > 0 ? receipt.changeUsd.toFixed(2) : (receipt.changeBs / (receipt.rate || 1)).toFixed(2)}</span>
                                             </div>
                                         )}
                                         {(receipt.changeBs > 0 || receipt.changeUsd > 0) && (

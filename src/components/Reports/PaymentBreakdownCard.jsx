@@ -16,7 +16,9 @@ export default function PaymentBreakdownCard({ paymentBreakdown, totalBs, bcvRat
 
     // Section net totals (gross methods + negative vuelto)
     const subtotalBs  = bsMethods.reduce((s, [, d]) => s + d.total, 0)  + (vueltoBs?.total  || 0);
-    const subtotalUsd = usdMethods.reduce((s, [, d]) => s + d.total, 0) + (vueltoUsd?.total || 0);
+    // When there are no Bs payments, Bs change must be converted to USD and subtracted here
+    const subtotalUsd = usdMethods.reduce((s, [, d]) => s + d.total, 0) + (vueltoUsd?.total || 0)
+        + (bsMethods.length === 0 && vueltoBs ? vueltoBs.total / (bcvRate || 1) : 0);
 
     const renderMethod = ([method, data]) => {
         const label = toTitleCase(getPaymentLabel(method, data.label));
@@ -128,6 +130,7 @@ export default function PaymentBreakdownCard({ paymentBreakdown, totalBs, bcvRat
                         <div className="pl-3 space-y-3">
                             {usdMethods.map(renderMethod)}
                             {renderVuelto(vueltoUsd, 'USD')}
+                            {bsMethods.length === 0 && renderVuelto(vueltoBs, 'BS')}
                         </div>
                     </div>
                 </div>
