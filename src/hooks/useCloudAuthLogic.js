@@ -265,8 +265,22 @@ export function useCloudAuthLogic() {
                     throw new Error('Licencia vencida. Contacta a soporte para renovar tu acceso.');
                 }
                 if (rpcResult === 'limit_reached') {
-                    // Limite de dispositivos desactivado — dejar pasar
-                    console.warn('Device limit reached but bypassed (limit disabled)');
+                    // Obtener lista de dispositivos activos y mostrar pantalla de bloqueo
+                    const { data: activeDevices } = await supabaseCloud
+                        .from('account_devices')
+                        .select('device_id, device_alias, last_seen')
+                        .eq('email', emailToUse)
+                        .order('last_seen', { ascending: false });
+                    const { data: licRow } = await supabaseCloud
+                        .from('cloud_licenses')
+                        .select('max_devices')
+                        .eq('email', emailToUse)
+                        .maybeSingle();
+                    setBlockedDevices(activeDevices || []);
+                    setDeviceLimitError({ limit: licRow?.max_devices ?? 6, currentId: deviceId });
+                    setImportStatus(null);
+                    setStatusMessage('');
+                    return;
                 }
             } catch (rpcErr) {
                // Silenciar error si RPC aun no existe (fallback)
@@ -308,7 +322,7 @@ export function useCloudAuthLogic() {
                 await uploadLocalBackup(emailToUse, localBackup);
                 if (!isCloudLogin) {
                     try {
-                        // Licencia de fábrica: 7 días, máximo 1 equipo vinculado
+                        // Licencia de fábrica: 7 días, máximo 6 equipos vinculados
                         const trialExpiry = new Date();
                         trialExpiry.setDate(trialExpiry.getDate() + 7);
                         const { error: licErr } = await supabaseCloud.from('cloud_licenses').upsert({
@@ -316,7 +330,7 @@ export function useCloudAuthLogic() {
                             device_id: deviceId || 'UNKNOWN',
                             license_type: 'trial',
                             days_remaining: 7,
-                            max_devices: 10,
+                            max_devices: 6,
                             valid_until: trialExpiry.toISOString(),
                             business_name: businessName || 'Pool Los Diaz',
                             phone: inputPhone || '',
