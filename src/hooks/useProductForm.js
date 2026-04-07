@@ -91,6 +91,10 @@ export function useProductForm({ products, effectiveRate, setProducts, triggerHa
             setTimeout(() => setIsFormShaking(false), 500);
             return showToast('Nombre y precio requeridos', 'warning');
         }
+        const hasCost = (parseFloat(costUsd) > 0) || (parseFloat(costBs) > 0);
+        if (!hasCost) {
+            showToast('Sin costo registrado — la ganancia no se calculará correctamente', 'warning');
+        }
         const productData = buildProductPayload({
             name, barcode, priceUsd, priceBs, costUsd, costBs, stock, stockInLotes,
             packagingType, unitsPerPackage, granelUnit, sellByUnit, unitPriceUsd,
