@@ -98,6 +98,13 @@ export function useCloudAuthLogic() {
     };
 
     const uploadLocalBackup = async (email, backupData) => {
+        // Ensure we have an active session before upserting (RLS requires auth.jwt()->>'email')
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.id) {
+            console.warn('[CloudAuth] No active session — skipping cloud_backups upsert');
+            return;
+        }
+
         const { error } = await supabaseCloud
             .from('cloud_backups')
             .upsert({
@@ -105,7 +112,10 @@ export function useCloudAuthLogic() {
                 backup_data: backupData,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'email' });
-        if (error) throw error;
+        if (error) {
+            console.warn('[CloudAuth] cloud_backups upsert failed:', error.message);
+            // Don't throw — this is non-critical and should not block login
+        }
 
         try {
             const { data: { session } } = await supabaseCloud.auth.getSession();

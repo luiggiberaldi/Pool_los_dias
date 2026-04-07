@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, ChevronRight, DollarSign, Wallet, CheckCircle2, AlertTriangle, TrendingUp, ShoppingBag, Package, ArrowRight, Coins } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase } from '../../config/paymentMethods';
+import { round2 } from '../../utils/dinero';
 
 export default function CierreCajaWizard({
     isOpen,
