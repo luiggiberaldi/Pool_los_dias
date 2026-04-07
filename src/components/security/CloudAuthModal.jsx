@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Mail, Key, Phone, ArrowRight, ShieldCheck,
-    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw, Fingerprint
+    Smartphone, Database, AlertCircle, X, Download, Eye, EyeOff, RefreshCw, Fingerprint, Share
 } from 'lucide-react';
 import { useCloudAuthLogic } from '../../hooks/useCloudAuthLogic';
 import { useCloudSync } from '../../hooks/useCloudSync';
@@ -50,6 +50,37 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
 
     const [showPassword, setShowPassword] = useState(false);
     const confirm = useConfirm();
+
+    // ── PWA Install Prompt ────────────────────────────────────────────
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [isInstalled, setIsInstalled] = useState(false);
+    const [showIosHint, setShowIosHint] = useState(false);
+
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isInStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    useEffect(() => {
+        if (isInStandalone) { setIsInstalled(true); return; }
+        const handler = (e) => { e.preventDefault(); setDeferredPrompt(e); };
+        window.addEventListener('beforeinstallprompt', handler);
+        window.addEventListener('appinstalled', () => setIsInstalled(true));
+        return () => window.removeEventListener('beforeinstallprompt', handler);
+    }, []);
+
+    const handleInstallPWA = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') setIsInstalled(true);
+            setDeferredPrompt(null);
+        } else if (isIos) {
+            setShowIosHint(v => !v);
+        } else {
+            setShowIosHint(v => !v);
+        }
+    };
+
+    const showInstallButton = !isInstalled;
 
     // ── Biometría (solo móvil) ───────────────────────────────────────
     const [bioAvailable, setBioAvailable] = useState(false);
@@ -467,6 +498,44 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                                             )}
                                         </button>
                                         {bioError && <p className="text-[11px] text-red-500 font-bold mt-1.5 text-center">{bioError}</p>}
+                                    </div>
+                                )}
+
+                                {/* Botón Instalar PWA */}
+                                {showInstallButton && (
+                                    <div className="pt-2">
+                                        <div className="flex items-center gap-2 my-2">
+                                            <div className="flex-1 h-px bg-slate-200" />
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">instalar app</span>
+                                            <div className="flex-1 h-px bg-slate-200" />
+                                        </div>
+                                        <button
+                                            onClick={handleInstallPWA}
+                                            className="w-full py-3 bg-white border-2 border-dashed border-sky-300 hover:border-sky-400 hover:bg-sky-50 text-sky-600 text-sm font-black rounded-xl transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+                                        >
+                                            {deferredPrompt ? <Download size={16} /> : isIos ? <Share size={16} /> : <Download size={16} />}
+                                            Instalar App en este dispositivo
+                                        </button>
+
+                                        {/* Instrucciones para iOS */}
+                                        {showIosHint && (
+                                            <div className="mt-2 p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-700 font-medium space-y-1.5">
+                                                {isIos ? (
+                                                    <>
+                                                        <p className="font-black text-sky-800">Cómo instalar en iPhone / iPad:</p>
+                                                        <p>1. Toca el botón <span className="inline-flex items-center gap-1 font-black"><Share size={12} /> Compartir</span> en Safari</p>
+                                                        <p>2. Selecciona <strong>"Agregar a pantalla de inicio"</strong></p>
+                                                        <p>3. Toca <strong>"Agregar"</strong> para confirmar</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="font-black text-sky-800">Cómo instalar en tu PC o Android:</p>
+                                                        <p>1. Abre el menú del navegador <strong>( ⋮ )</strong></p>
+                                                        <p>2. Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a pantalla de inicio"</strong></p>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </>
