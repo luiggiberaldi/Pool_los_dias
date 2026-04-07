@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
-const BACKUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
+const BACKUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutos
 const BACKUP_KEY = 'bodega_autobackup_v1';
+const BACKUP_HASH_KEY = 'bodega_autobackup_hash_v1';
 
 // Claves criticas que se respaldan
 const CRITICAL_KEYS = [
@@ -18,6 +19,14 @@ export function useAutoBackup(isPremium, isDemo, deviceId) {
     const intervalRef = useRef(null);
 
     useEffect(() => {
+        const computeHash = (snapshot) => {
+            // Hash liviano: cantidad total de ventas + timestamp del ultimo producto
+            const salesLen = Array.isArray(snapshot['bodega_sales_v1']) ? snapshot['bodega_sales_v1'].length : 0;
+            const prods = snapshot['bodega_products_v1'];
+            const lastProdTs = Array.isArray(prods) && prods.length > 0 ? (prods[prods.length - 1].updatedAt || prods[prods.length - 1].createdAt || '') : '';
+            return `${salesLen}|${lastProdTs}|${Object.keys(snapshot).length}`;
+        };
+
         const performBackup = async () => {
             try {
                 const snapshot = {};
@@ -39,14 +48,18 @@ export function useAutoBackup(isPremium, isDemo, deviceId) {
                     device: navigator.userAgent?.substring(0, 80),
                 });
 
-                // Si es usuario premium permanente y tiene deviceId, subir el backup a la nube silenciosamente
+                // Si es usuario premium permanente y tiene deviceId, subir a la nube solo si los datos cambiaron
                 if (isPremium && !isDemo && deviceId) {
+                    const currentHash = computeHash(snapshot);
+                    const lastHash = localStorage.getItem(BACKUP_HASH_KEY);
+                    if (currentHash === lastHash) return; // Sin cambios, no subir
                     await supabase.from('device_backups').upsert({
                         device_id: deviceId,
                         product_id: 'bodega',
                         backup_data: snapshot,
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'device_id' });
+                    localStorage.setItem(BACKUP_HASH_KEY, currentHash);
                 }
 
             } catch (e) {
@@ -54,10 +67,10 @@ export function useAutoBackup(isPremium, isDemo, deviceId) {
             }
         };
 
-        // Primer backup 15s despues del arranque
-        const initialTimer = setTimeout(performBackup, 15000);
+        // Primer backup 2 minutos despues del arranque (no inmediato)
+        const initialTimer = setTimeout(performBackup, 2 * 60 * 1000);
 
-        // Backup cada 5 minutos
+        // Backup cada 30 minutos
         intervalRef.current = setInterval(performBackup, BACKUP_INTERVAL_MS);
 
         return () => {

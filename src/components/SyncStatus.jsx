@@ -95,8 +95,8 @@ export default function SyncStatus() {
         checkHealth();
         checkQueue();
 
-        const healthInterval = setInterval(checkHealth, 60000);
-        const queueInterval = setInterval(checkQueue, 4000);
+        const healthInterval = setInterval(checkHealth, 5 * 60 * 1000); // 5 min (era 60s)
+        const queueInterval = setInterval(checkQueue, 30 * 1000); // 30s (era 4s, es local)
 
         return () => {
             window.removeEventListener('online', goOnline);

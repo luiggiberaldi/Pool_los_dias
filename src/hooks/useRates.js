@@ -9,7 +9,7 @@ const DEFAULT_RATES = {
 
 const EXCHANGERATE_KEY = import.meta.env.VITE_EXCHANGERATE_KEY || '';
 const DEFAULT_EUR_USD_RATIO = 1.18;
-const UPDATE_INTERVAL = 30000;
+const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutos (era 30s)
 
 const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 
