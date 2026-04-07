@@ -20,8 +20,10 @@ export async function generateTicketPDF(sale, bcvRate) {
     const paymentCount = sale.payments?.length || 0;
     const hasFiado = sale.fiadoUsd > 0;
 
+    const hasChange = (sale.changeUsd > 0 || sale.changeBs > 0);
+
     // Altura MUY generosa para que nunca se corte
-    const H = 160 + (itemCount * 14) + (paymentCount * 7) + (hasFiado ? 18 : 0);
+    const H = 160 + (itemCount * 14) + (paymentCount * 7) + (hasFiado ? 18 : 0) + (hasChange ? 25 : 0);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
 
@@ -268,6 +270,41 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.setFontSize(6.5);
             doc.text('Bs ' + formatBs(sale.fiadoUsd * fiadoRate) + ' (tasa actual)', RIGHT, y, { align: 'right' });
             y += 6;
+        }
+
+        y += 2;
+        dash(y); y += 7;
+    }
+
+    // ════════════════════════════════════
+    //  VUELTO ENTREGADO
+    // ════════════════════════════════════
+    if ((sale.changeUsd > 0 || sale.changeBs > 0)) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(...MUTED);
+        doc.text('VUELTO ENTREGADO', M, y);
+        y += 5;
+
+        if (sale.changeUsd > 0) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(...BODY);
+            doc.text('En Dólares', M, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...GREEN);
+            doc.text('$' + sale.changeUsd.toFixed(2), RIGHT, y, { align: 'right' });
+            y += 5;
+        }
+        if (sale.changeBs > 0) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(...BODY);
+            doc.text('En Bolívares', M, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...GREEN);
+            doc.text('Bs ' + formatBs(sale.changeBs), RIGHT, y, { align: 'right' });
+            y += 5;
         }
 
         y += 2;
