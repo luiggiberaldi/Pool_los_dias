@@ -2,12 +2,14 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 import { round2, mulR, divR, subR, sumR } from '../utils/dinero';
 
 const EPSILON = 0.01;
+const OVERPAY_MULTIPLIER = 5; // Alerta si paga más de 5× el total
 
 export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic }) {
     const [barValues, setBarValues] = useState({});
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
     const [confirmFiar, setConfirmFiar] = useState(false);
+    const [showOverpayAlert, setShowOverpayAlert] = useState(false);
     const submittingRef = useRef(false);
 
     const totalPaidUsd = useMemo(() => {
@@ -59,7 +61,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         if (val) setBarValues(prev => ({ ...prev, [methodId]: val }));
     }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
 
-    const handleConfirm = useCallback(async () => {
+    const _doConfirm = useCallback(async () => {
         if (submittingRef.current) return;
         submittingRef.current = true;
         try {
@@ -90,6 +92,19 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         }
     }, [barValues, paymentMethods, effectiveRate, tasaCop, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
 
+    const handleConfirm = useCallback(async () => {
+        if (cartTotalUsd > EPSILON && totalPaidUsd > cartTotalUsd * OVERPAY_MULTIPLIER) {
+            setShowOverpayAlert(true);
+            return;
+        }
+        await _doConfirm();
+    }, [cartTotalUsd, totalPaidUsd, _doConfirm]);
+
+    const confirmOverpay = useCallback(async () => {
+        setShowOverpayAlert(false);
+        await _doConfirm();
+    }, [_doConfirm]);
+
     return {
         barValues, totalPaidUsd, totalPaidBs,
         remainingUsd, remainingBs, changeUsd, changeBs,
@@ -97,6 +112,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         changeUsdGiven, setChangeUsdGiven,
         changeBsGiven, setChangeBsGiven,
         confirmFiar, setConfirmFiar,
+        showOverpayAlert, setShowOverpayAlert, confirmOverpay,
     };
 }
 
