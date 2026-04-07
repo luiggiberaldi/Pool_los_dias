@@ -8,13 +8,21 @@ import './index.css'
 
 // ── Auto-actualización del Service Worker ──
 if ('serviceWorker' in navigator) {
+  // Cuando el nuevo SW toma control, recargar para cargar los assets nuevos.
+  // Esto garantiza que el usuario siempre ejecuta la versión más reciente.
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!reloading) {
+      reloading = true;
+      window.location.reload();
+    }
+  });
+
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       // Chequear actualizaciones cada 60 segundos
       setInterval(() => reg.update().catch(() => {}), 60 * 1000);
-      // El SW usa skipWaiting() + clientsClaim() para activarse automáticamente.
-      // No se necesita reload manual — el nuevo SW toma control en el próximo fetch.
     } catch (_) {}
   });
 }
