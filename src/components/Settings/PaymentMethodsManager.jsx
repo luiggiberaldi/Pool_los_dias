@@ -36,8 +36,9 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             showToast('Escribe un nombre para el método', 'error');
             return;
         }
-        const normalizedNew = newLabel.trim().toLowerCase();
-        const isDuplicate = methods.some(m => m.label.toLowerCase() === normalizedNew);
+        const normalize = s => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const normalizedNew = normalize(newLabel);
+        const isDuplicate = methods.some(m => normalize(m.label) === normalizedNew);
         if (isDuplicate) {
             showToast('Ya existe un método con ese nombre', 'warning');
             return;
