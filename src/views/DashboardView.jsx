@@ -557,10 +557,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     const label = toTitleCase(getPaymentLabel(method, data.label));
                     const PayIcon = getPaymentIcon(method) || PAYMENT_ICONS[method];
                     let totalBsEquiv = data.total, pct = 0, displayAmount = `${formatBs(data.total)} Bs`;
-                    if (data.currency === 'FIADO') { totalBsEquiv = data.total * bcvRate; pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `$ ${data.total.toFixed(2)}`; }
-                    else if (data.currency === 'USD') { totalBsEquiv = data.total * bcvRate; pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `$ ${data.total.toFixed(2)}`; }
-                    else if (data.currency === 'COP') { totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate; pct = todayTotalBs > 0 ? (totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `${fmtCop(data.total)} COP`; }
-                    else { pct = todayTotalBs > 0 ? (data.total / todayTotalBs * 100) : 0; }
+                    if (data.currency === 'FIADO') { totalBsEquiv = data.total * bcvRate; pct = todayTotalBs > 0 ? Math.min(100, totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `$ ${data.total.toFixed(2)}`; }
+                    else if (data.currency === 'USD') { totalBsEquiv = data.total * bcvRate; pct = todayTotalBs > 0 ? Math.min(100, totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `$ ${data.total.toFixed(2)}`; }
+                    else if (data.currency === 'COP') { totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate; pct = todayTotalBs > 0 ? Math.min(100, totalBsEquiv / todayTotalBs * 100) : 0; displayAmount = `${fmtCop(data.total)} COP`; }
+                    else { pct = todayTotalBs > 0 ? Math.min(100, data.total / todayTotalBs * 100) : 0; }
                     return (
                         <div key={method} className="mb-3">
                             <div className="flex justify-between items-center mb-1.5">
@@ -581,7 +581,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     if (!entry || entry.total === 0) return null;
                     const abs = Math.abs(entry.total);
                     const display = currency === 'USD' ? `- $${abs.toFixed(2)}` : `- ${formatBs(abs)} Bs`;
-                    const pct = todayTotalBs > 0 ? (abs * (currency === 'USD' ? bcvRate : 1) / todayTotalBs * 100) : 0;
+                    const pct = todayTotalBs > 0 ? Math.min(100, abs * (currency === 'USD' ? bcvRate : 1) / todayTotalBs * 100) : 0;
                     return (
                         <div className="mb-3">
                             <div className="flex justify-between items-center mb-1.5">

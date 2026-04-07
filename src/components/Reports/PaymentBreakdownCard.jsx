@@ -27,18 +27,18 @@ export default function PaymentBreakdownCard({ paymentBreakdown, totalBs, bcvRat
 
         if (data.currency === 'FIADO') {
             totalBsEquiv = data.total * bcvRate;
-            pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
+            pct = totalBs > 0 ? Math.min(100, totalBsEquiv / totalBs * 100) : 0;
             displayAmount = `$ ${data.total.toFixed(2)}`;
         } else if (data.currency === 'USD') {
             totalBsEquiv = data.total * bcvRate;
-            pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
+            pct = totalBs > 0 ? Math.min(100, totalBsEquiv / totalBs * 100) : 0;
             displayAmount = `$ ${data.total.toFixed(2)}`;
         } else if (data.currency === 'COP') {
             totalBsEquiv = (data.total / (tasaCop || 1)) * bcvRate;
-            pct = totalBs > 0 ? (totalBsEquiv / totalBs * 100) : 0;
+            pct = totalBs > 0 ? Math.min(100, totalBsEquiv / totalBs * 100) : 0;
             displayAmount = `${fmtCop(data.total)} COP`;
         } else {
-            pct = totalBs > 0 ? (data.total / totalBs * 100) : 0;
+            pct = totalBs > 0 ? Math.min(100, data.total / totalBs * 100) : 0;
         }
 
         return (
@@ -68,7 +68,7 @@ export default function PaymentBreakdownCard({ paymentBreakdown, totalBs, bcvRat
         if (!entry || entry.total === 0) return null;
         const abs = Math.abs(entry.total);
         const display = currency === 'USD' ? `- $${abs.toFixed(2)}` : `- ${formatBs(abs)} Bs`;
-        const pct = totalBs > 0 ? (abs * (currency === 'USD' ? bcvRate : 1) / totalBs * 100) : 0;
+        const pct = totalBs > 0 ? Math.min(100, abs * (currency === 'USD' ? bcvRate : 1) / totalBs * 100) : 0;
         return (
             <div key={`vuelto_${currency}`}>
                 <div className="flex justify-between text-sm mb-1">
