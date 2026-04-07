@@ -73,7 +73,8 @@ export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle,
                         {s.tipo === 'VENTA_FIADA' && <span className="text-[9px] bg-amber-100 text-amber-600 px-1 rounded uppercase">Fiado</span>}
                         {isCanceled && <span className="text-[9px] bg-red-100 text-red-500 px-1 rounded uppercase">Anulada</span>}
                     </p>
-                    <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1 flex-wrap">
+                        {(() => { const n = Number(s.saleNumber); return (Number.isInteger(n) && n > 0 && n < 90000) ? <><span className="text-[#0EA5E9] font-black">{`#${String(n).padStart(7, '0')}`}</span><span>·</span></> : null; })()}
                         <span>{dateLabel}</span> · <span>{d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span> · <span>{methodLabel}</span>
                     </p>
                 </div>

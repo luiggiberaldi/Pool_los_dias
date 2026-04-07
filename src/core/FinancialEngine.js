@@ -230,17 +230,21 @@ export class FinancialEngine {
                 safeChangeBs = 0;
             }
 
+            // Accumulate change in dedicated vuelto buckets (negative totals)
+            // so they display as a separate row in the UI instead of silently
+            // reducing the efectivo totals.
             if (safeChangeUsd > 0) {
-                if (!breakdown['efectivo_usd']) breakdown['efectivo_usd'] = { total: 0, currency: 'USD', label: 'Efectivo $' };
-                breakdown['efectivo_usd'].total = round2(breakdown['efectivo_usd'].total - safeChangeUsd);
+                if (!breakdown['_vuelto_usd']) breakdown['_vuelto_usd'] = { total: 0, currency: 'VUELTO_USD', label: 'Vuelto Entregado' };
+                breakdown['_vuelto_usd'].total = round2(breakdown['_vuelto_usd'].total - safeChangeUsd);
             }
             if (safeChangeBs > 0) {
-                if (!breakdown['efectivo_bs']) breakdown['efectivo_bs'] = { total: 0, currency: 'BS', label: 'Efectivo Bs' };
-                breakdown['efectivo_bs'].total = round2(breakdown['efectivo_bs'].total - safeChangeBs);
+                if (!breakdown['_vuelto_bs']) breakdown['_vuelto_bs'] = { total: 0, currency: 'VUELTO_BS', label: 'Vuelto Entregado' };
+                breakdown['_vuelto_bs'].total = round2(breakdown['_vuelto_bs'].total - safeChangeBs);
             }
         });
 
-        // Final pass: round all totals strictly and filter out zeroes
+        // Final pass: round all totals strictly and filter out zeroes.
+        // Vuelto entries (_vuelto_bs, _vuelto_usd) have negative totals — keep them.
         const finalBreakdown = {};
         Object.keys(breakdown).forEach(k => {
             const roundedTotal = round2(breakdown[k].total);
