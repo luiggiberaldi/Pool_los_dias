@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Delete, Loader2, Fingerprint, Check, ChevronRight } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 import {
-    isMobileDevice, isBiometricAvailable,
+    isBiometricAvailable,
     isRegistered, registerBiometric, authenticateWithBiometric
 } from '../../services/biometricPinService';
 
@@ -37,7 +37,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
         setKeepOpen(false);
 
         const check = async () => {
-            if (!isMobileDevice()) return;
             const available = await isBiometricAvailable();
             setBioAvailable(available);
             if (available) setBioRegistered(isRegistered(userId));
@@ -60,8 +59,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
             return;
         }
 
-        // PIN correcto en móvil sin huella registrada → ofrecer activarla
-        if (isMobileDevice() && bioAvailable && !bioRegistered) {
+        // PIN correcto, sin huella registrada → ofrecer activarla
+        if (bioAvailable && !bioRegistered) {
             setKeepOpen(true);
             setShowSetupPrompt(true);
             setProcessing(false);
