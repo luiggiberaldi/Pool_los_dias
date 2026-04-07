@@ -2,9 +2,12 @@ import { useMemo } from 'react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import { generateTicketPDF } from '../../utils/ticketGenerator';
-import { ChevronDown, ChevronUp, Send, Ban, Shuffle, Clock, Recycle, LockIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, Send, Ban, Shuffle, Clock, Recycle, LockIcon, Printer } from 'lucide-react';
 
-export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale }) {
+export default function TransactionRow({
+    sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale,
+    onShareWhatsApp, onDownloadPDF, onRequestClientForTicket, onPrintTicket, isAdmin
+}) {
     const d = new Date(s.timestamp);
 
     const { methodLabel, PayMethodIcon } = useMemo(() => {
@@ -34,9 +37,17 @@ export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle,
 
     const isCanceled = s.status === 'ANULADA';
     const dateLabel = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+    const saleRate = s.rate || bcvRate;
 
     const handleShare = (e) => {
         e.stopPropagation();
+        if (onShareWhatsApp) {
+            if (!s.customerName || s.customerName === 'Consumidor Final') {
+                if (onRequestClientForTicket) { onRequestClientForTicket(s); return; }
+            }
+            onShareWhatsApp(s);
+            return;
+        }
         let text = `*COMPROBANTE | PRECIOS AL DIA*\n`;
         text += `Orden: #${s.id.substring(0, 6).toUpperCase()}\n`;
         text += `Fecha: ${d.toLocaleString('es-VE')}\n`;
@@ -49,17 +60,18 @@ export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle,
         }
         text += `\n*TOTAL: $${(s.totalUsd || 0).toFixed(2)}*\n`;
         text += `Ref: ${formatBs(s.totalBs || 0)} Bs\n`;
-        const encoded = encodeURIComponent(text);
-        window.open(`https://wa.me/?text=${encoded}`, '_blank');
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
     const handlePDF = (e) => {
         e.stopPropagation();
+        if (onDownloadPDF) { onDownloadPDF(s); return; }
         generateTicketPDF(s, bcvRate);
     };
 
     return (
         <div className={`rounded-xl border transition-all ${isCanceled ? 'bg-red-50/50 border-red-100/50 dark:bg-red-900/10 dark:border-red-900/20' : 'bg-white dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-700/60'} overflow-hidden`}>
+            {/* Collapsed row */}
             <div
                 className="flex items-center gap-3 p-3 cursor-pointer select-none active:bg-slate-100 dark:active:bg-slate-800"
                 onClick={onToggle}
@@ -80,36 +92,95 @@ export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle,
                 </div>
                 <div className="text-right shrink-0">
                     <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
+                    <p className="text-[11px] text-slate-400 font-medium">{formatBs(s.totalBs || 0)} Bs</p>
                     <div className="flex justify-end mt-0.5">
                         {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                     </div>
                 </div>
             </div>
 
+            {/* Expanded detail */}
             {isExpanded && (
                 <div className="px-3 pb-3 pt-1 border-t border-slate-200 dark:border-slate-700/50 text-sm animate-in fade-in slide-in-from-top-1">
+
+                    {/* PRODUCTOS */}
                     {s.items && s.items.length > 0 ? (
-                        <div className="space-y-1 mb-3 pt-2">
-                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">Productos ({s.items.length})</p>
-                            {s.items.map((item, i) => (
-                                <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
-                                    <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
-                                    <span className="font-medium">${(item.priceUsd * item.qty).toFixed(2)}</span>
-                                </div>
-                            ))}
+                        <div className="mb-3 pt-2">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">Productos ({s.items.length})</p>
+                            <div className="space-y-1">
+                                {s.items.map((item, i) => (
+                                    <div key={i} className={`flex justify-between items-center text-xs ${isCanceled ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-slate-300'}`}>
+                                        <span className="truncate pr-2">{item.isWeight ? `${item.qty.toFixed(3)}kg` : `${item.qty}u`} {item.name}</span>
+                                        <span className="font-medium shrink-0">${(item.priceUsd * item.qty).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ) : (
                         <p className="text-xs text-slate-400 mb-3 pt-2">Pago de Deudas (Sin productos)</p>
                     )}
 
-                    <div className="flex justify-between text-[10px] font-medium text-slate-400 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2 mb-3">
-                        <div className="flex flex-col gap-0.5">
-                            <span>Ref: {formatBs(s.totalBs)} Bs @ {formatBs(s.rate || bcvRate)}</span>
-                            {s.tasaCop > 0 && <span>COP: {(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ {s.tasaCop}</span>}
+                    {/* RESUMEN DE COBRO */}
+                    <div className="mb-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2.5">
+                        <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">Resumen de Cobro</p>
+                        <div className="space-y-1 text-xs">
+                            <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                                <span>Total en Bs</span>
+                                <span className="font-bold">{formatBs(s.totalBs || 0)} Bs</span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                                <span>Tasa BCV aplicada</span>
+                                <span className="font-medium">{formatBs(saleRate)} Bs/$</span>
+                            </div>
+                            {s.tasaCop > 0 && (
+                                <div className="flex justify-between text-slate-400">
+                                    <span>Total en COP</span>
+                                    <span className="font-medium">{(s.totalCop || (s.totalUsd * s.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COP</span>
+                                </div>
+                            )}
+                            {s.discountAmountUsd > 0 && (
+                                <div className="flex justify-between text-amber-500">
+                                    <span>Descuento</span>
+                                    <span className="font-bold">-${s.discountAmountUsd.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {(s.changeUsd > 0 || s.changeBs > 0) && (
+                                <div className="flex justify-between text-emerald-500">
+                                    <span>Vuelto entregado</span>
+                                    <span className="font-bold">
+                                        {s.changeUsd > 0 && `$${s.changeUsd.toFixed(2)}`}
+                                        {s.changeUsd > 0 && s.changeBs > 0 && ' + '}
+                                        {s.changeBs > 0 && `${formatBs(s.changeBs)} Bs`}
+                                    </span>
+                                </div>
+                            )}
                         </div>
-                        {s.changeUsd > 0 && <div className="text-emerald-500 font-bold self-start mt-0.5">Vuelto: ${s.changeUsd.toFixed(2)}</div>}
                     </div>
 
+                    {/* PAGOS RECIBIDOS */}
+                    {s.payments && s.payments.length > 0 && (
+                        <div className="mb-3">
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1.5">Pagos Recibidos</p>
+                            <div className="space-y-1 text-xs">
+                                {s.payments.map((p, i) => {
+                                    const label = toTitleCase(p.methodLabel || p.methodId);
+                                    const isBs = p.currency === 'BS';
+                                    const isCop = p.currency === 'COP';
+                                    const amount = p.amountInput || p.amount || (isBs ? p.amountBs : isCop ? (p.amountInput || p.amountUsd * (s.tasaCop || 1)) : p.amountUsd);
+                                    const suffix = isBs ? ' Bs' : isCop ? ' COP' : '';
+                                    const prefix = (!isBs && !isCop) ? '$' : '';
+                                    return (
+                                        <div key={i} className="flex justify-between text-slate-600 dark:text-slate-300">
+                                            <span>{label}</span>
+                                            <span className="font-bold">{prefix}{isBs ? formatBs(amount) : isCop ? amount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (amount || 0).toFixed(2)}{suffix}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ACTION BUTTONS */}
                     <div className="flex flex-wrap items-center gap-2 mt-2">
                         <button
                             onClick={handleShare}
@@ -123,7 +194,16 @@ export default function TransactionRow({ sale: s, bcvRate, isExpanded, onToggle,
                         >
                             PDF
                         </button>
-                        {!isCanceled && onVoidSale && !s.cajaCerrada && (
+                        {onPrintTicket && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onPrintTicket(s); }}
+                                className="py-2 px-3 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 hover:bg-violet-200 hover:dark:bg-violet-900/50 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs shadow-sm active:scale-95"
+                                title="Imprimir ticket"
+                            >
+                                <Printer size={14} />
+                            </button>
+                        )}
+                        {!isCanceled && onVoidSale && !s.cajaCerrada && (isAdmin !== false) && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); onVoidSale(s); }}
                                 className="py-2 px-3 bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 hover:bg-red-50 hover:dark:bg-red-900/30 font-bold rounded-lg transition-colors flex justify-center items-center gap-1.5 text-xs border border-slate-200 dark:border-slate-800 shadow-sm active:scale-95"
