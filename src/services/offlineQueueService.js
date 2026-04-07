@@ -70,7 +70,7 @@ export const offlineQueueService = {
     return newEntry;
   },
 
-  async syncPendingSales() {
+  async syncPendingSales(force = false) {
     // Lock multi-tab: solo un tab sincroniza a la vez
     if (!acquireSyncLock()) {
         console.log('[Offline Sync] Otra pestaña está sincronizando. Saltando.');
@@ -80,11 +80,21 @@ export const offlineQueueService = {
     let synced = 0, failed = 0;
 
     try {
+        // Verify active session before attempting RPC calls
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            console.warn('[Offline Sync] No hay sesión activa — no se puede sincronizar.');
+            const queue = await localforage.getItem(QUEUE_KEY) || [];
+            const totalPending = queue.filter(q => q.sync_status === 'pending').length;
+            return { synced: 0, failed: 0, pending: totalPending };
+        }
+
         const queue = await localforage.getItem(QUEUE_KEY) || [];
         const now = Date.now();
+        const totalPending = queue.filter(q => q.sync_status === 'pending').length;
         const pending = queue.filter(q =>
           q.sync_status === 'pending' &&
-          !(q.next_retry_at && now < q.next_retry_at)
+          (force || !(q.next_retry_at && now < q.next_retry_at))
         );
 
         if (pending.length === 0) {
@@ -97,7 +107,7 @@ export const offlineQueueService = {
           if (purged.length !== queue.length) {
             await localforage.setItem(QUEUE_KEY, purged);
           }
-          return { synced: 0, failed: 0, pending: 0 };
+          return { synced: 0, failed: 0, pending: totalPending };
         }
 
         let updatedQueue = [...queue];
@@ -168,6 +178,6 @@ window.addEventListener('online', () => {
     setTimeout(() => {
         syncScheduled = false;
         console.log("[Offline Sync] Internet restaurado. Sincronizando ventas pendientes...");
-        offlineQueueService.syncPendingSales();
+        offlineQueueService.syncPendingSales(true);
     }, 2000);
 });

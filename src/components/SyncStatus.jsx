@@ -50,8 +50,8 @@ export default function SyncStatus() {
             await checkHealth();
             if (!navigator.onLine) return;
 
-            // 1. Subir ventas offline pendientes
-            const result = await offlineQueueService.syncPendingSales();
+            // 1. Subir ventas offline pendientes (force=true bypasses backoff timers)
+            const result = await offlineQueueService.syncPendingSales(true);
 
             // 2. Jalar el inventario más reciente de la nube
             await pullLatestFromCloud();
