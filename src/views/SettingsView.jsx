@@ -3,7 +3,7 @@ import {
     Store, CreditCard, Database, Users, FileText,
     AlertTriangle, Download, Upload, Share2,
     Sun, Moon, LogOut, Trash2, Copy, Check,
-    ChevronRight, ShieldCheck, Package, Printer, Layers
+    ChevronRight, ShieldCheck, Package, Printer, Layers, Settings
 } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
@@ -354,9 +354,14 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                     {/* Title row */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Configuración</h1>
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center shrink-0">
+                                    <Settings size={18} className="text-slate-600 dark:text-slate-300" />
+                                </div>
+                                <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Configuración</h1>
+                            </div>
                             <p
-                                className="text-[11px] text-slate-400 font-medium mt-0.5 select-none cursor-default"
+                                className="text-[11px] text-slate-400 font-medium mt-0.5 select-none cursor-default ml-10 sm:ml-11"
                                 onClick={() => setDangerZoneClicks(c => c >= 5 ? c : c + 1)}
                             >
                                 {businessName || 'Pool los diaz'}
