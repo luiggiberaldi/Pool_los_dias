@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Delete, Loader2, Fingerprint, Check, ChevronRight } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 import {
-    isBiometricAvailable,
+    isBiometricAvailable, isMobileDevice,
     isRegistered, registerBiometric, authenticateWithBiometric
 } from '../../services/biometricPinService';
 
@@ -61,8 +61,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
             return;
         }
 
-        // PIN correcto, sin huella registrada → ofrecer activarla ANTES de loguearse
-        if (onVerifyPin && bioAvailable && !bioRegistered) {
+        // PIN correcto, sin huella registrada → ofrecer activarla (solo móvil)
+        if (onVerifyPin && bioAvailable && !bioRegistered && isMobileDevice()) {
             setPin('');
             setKeepOpen(true);
             setShowSetupPrompt(true);
@@ -225,20 +225,6 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                             <p className="text-xs text-slate-500 mt-1">Ingresa tu PIN de {targetPinLength} dígitos</p>
                         </div>
 
-                        {/* ── Huella (si disponible y registrada) ── */}
-                        {bioAvailable && bioRegistered && (
-                            <button
-                                onClick={handleBiometricLogin}
-                                disabled={bioLoading}
-                                className="w-full mb-5 py-3 rounded-2xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-600 font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
-                            >
-                                {bioLoading
-                                    ? <Loader2 size={16} className="animate-spin" />
-                                    : <><Fingerprint size={16} /> Entrar con huella</>
-                                }
-                            </button>
-                        )}
-
                         {/* ── PIN Dots ── */}
                         <div className={`flex justify-center gap-3 mb-6 ${error ? 'animate-shake' : ''}`}>
                             {Array.from({ length: targetPinLength }).map((_, i) => (
@@ -266,7 +252,20 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                                     {n}
                                 </button>
                             ))}
-                            <div />
+                            {bioAvailable && bioRegistered && isMobileDevice() ? (
+                                <button
+                                    onClick={handleBiometricLogin}
+                                    disabled={bioLoading}
+                                    className="h-14 rounded-xl bg-sky-50 text-sky-500 flex items-center justify-center hover:bg-sky-100 active:scale-95 transition-all duration-150 border border-sky-200 shadow-sm disabled:opacity-60"
+                                >
+                                    {bioLoading
+                                        ? <Loader2 size={22} className="animate-spin" />
+                                        : <Fingerprint size={22} />
+                                    }
+                                </button>
+                            ) : (
+                                <div />
+                            )}
                             <button
                                 onClick={() => handlePadPress('0')}
                                 className="h-14 rounded-xl bg-slate-50 text-slate-800 text-xl font-bold hover:bg-slate-100 active:scale-95 active:bg-sky-50 transition-all duration-150 border border-slate-200 shadow-sm"
