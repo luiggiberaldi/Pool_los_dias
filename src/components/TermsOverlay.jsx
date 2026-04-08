@@ -55,8 +55,8 @@ export default function TermsOverlay({ onAccept }) {
                     className="flex-1 overflow-y-auto px-6 py-6 prose prose-sm max-w-none"
                     style={{ scrollbarWidth: 'thin' }}
                 >
-                    <h1 className="text-2xl font-black text-slate-900 mb-4">Términos y Condiciones de Uso - Pool Los Diaz</h1>
-                    <p className="text-xs text-slate-500 font-bold mb-6">Última actualización: Abril 2026 — Versión 1.0</p>
+                    <h1 className="text-2xl font-black text-slate-900 mb-4">Términos y Condiciones de Uso — Pool Los Diaz</h1>
+                    <p className="text-xs text-slate-500 font-bold mb-6">Última actualización: Abril 2026 — Versión 2.0</p>
 
                     <hr className="my-6" />
 
@@ -66,17 +66,20 @@ export default function TermsOverlay({ onAccept }) {
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">2. Descripción del Servicio</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">Pool Los Diaz es una aplicación web progresiva (PWA) diseñada para la gestión integral de salas de pool y billar que proporciona:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">
+                        Pool Los Diaz es una aplicación web progresiva (PWA) diseñada para la gestión integral de salas de pool y billar. Proporciona:
+                    </p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
-                        <li><strong>Gestión de mesas de pool</strong> con control de tiempo, tarifas y sesiones activas</li>
-                        <li><strong>Punto de venta (POS)</strong> con carrito, múltiples métodos de pago y recibos térmicos</li>
-                        <li><strong>Gestión de inventario</strong> con precios en múltiples monedas (USD, Bolívares, COP)</li>
-                        <li><strong>Sistema de roles</strong> con Administrador, Cajero y Mesero</li>
-                        <li><strong>Ranking de meseros</strong> con seguimiento de ventas por empleado</li>
-                        <li><strong>Dashboard de ventas</strong> con reportes, estadísticas y gestión de caja</li>
-                        <li><strong>Gestión de clientes</strong> con sistema de fiados y pagos parciales</li>
+                        <li><strong>Gestión de mesas de pool</strong> con control de tiempo, sesiones activas, modo Normal y modo Piña (precio por partida)</li>
+                        <li><strong>Punto de venta (POS)</strong> con carrito, múltiples métodos de pago (USD, Bolívares, Pago Móvil, Fiado) y recibos térmicos</li>
+                        <li><strong>Gestión de inventario</strong> con precios en USD y Bolívares, control de stock y alertas de bajo inventario</li>
+                        <li><strong>Sistema de roles</strong> con Administrador, Cajero y Mesero, cada uno con permisos específicos</li>
+                        <li><strong>Dashboard de ventas</strong> con reportes, estadísticas en tiempo real y gestión de caja</li>
+                        <li><strong>Gestión de clientes</strong> con sistema de fiados y control de deudas</li>
                         <li><strong>Tasa BCV automática</strong> con sincronización en tiempo real entre dispositivos</li>
-                        <li><strong>Impresión directa</strong> de tickets térmicos 58mm via ESC/POS y Web Serial</li>
+                        <li><strong>Impresión directa</strong> de tickets térmicos 58mm vía ESC/POS y Web Serial</li>
+                        <li><strong>Onboarding guiado</strong> con tours interactivos por rol y por sección al iniciar por primera vez</li>
+                        <li><strong>Bitácora de auditoría</strong> con registro de eventos del sistema por usuario</li>
                     </ul>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">3. Descargo de Responsabilidad</h2>
@@ -107,14 +110,14 @@ export default function TermsOverlay({ onAccept }) {
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">4. Cuentas de Usuario y Acceso</h2>
-                    <p className="text-sm text-slate-700 leading-relaxed mb-2">El acceso a la Aplicación se gestiona mediante cuentas de usuario con diferentes niveles de privilegio:</p>
+                    <p className="text-sm text-slate-700 leading-relaxed mb-2">El acceso a la Aplicación se gestiona mediante cuentas con tres niveles de privilegio:</p>
                     <ul className="text-sm text-slate-700 space-y-1 mb-4">
-                        <li><strong>Administrador:</strong> Acceso completo a todas las funcionalidades, configuración del sistema, gestión de usuarios y reportes.</li>
-                        <li><strong>Cajero:</strong> Gestión de ventas, cobro de mesas y operaciones de caja.</li>
-                        <li><strong>Mesero:</strong> Apertura de mesas, toma de pedidos y visualización de ranking.</li>
+                        <li><strong>Administrador:</strong> Acceso completo — configuración del sistema, gestión de usuarios (crear, editar, activar/desactivar, eliminar), reportes, apertura y cierre de caja, y anulación de sesiones.</li>
+                        <li><strong>Cajero:</strong> Gestión de ventas, cobro de mesas, operaciones de caja. Puede tener permisos de apertura/cierre delegados por el administrador.</li>
+                        <li><strong>Mesero:</strong> Apertura de mesas y toma de pedidos. No puede anular sesiones activas. Requiere confirmación al abrir mesa en modo Piña.</li>
                     </ul>
                     <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        Cada usuario accede mediante PIN personal. El administrador es responsable de la creación, modificación y desactivación de las cuentas de su equipo.
+                        Cada usuario accede mediante PIN personal hasheado (SHA-256). El administrador es el único responsable de la gestión de las cuentas de su equipo. Las cuentas desactivadas no pueden iniciar sesión pero conservan su historial.
                     </p>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">5. Privacidad y Datos</h2>
@@ -125,7 +128,8 @@ export default function TermsOverlay({ onAccept }) {
                         <li>Los datos operativos se almacenan localmente en su dispositivo y se sincronizan con la nube (Supabase) para respaldo y acceso multi-dispositivo.</li>
                         <li>Los datos <strong>NO se venden ni comparten con terceros</strong>.</li>
                         <li>Las tasas de cambio se obtienen de fuentes públicas (BCV, DolarAPI, ExchangeRate).</li>
-                        <li>La comunicación entre dispositivos se realiza mediante canales cifrados de Supabase.</li>
+                        <li>La comunicación entre dispositivos se realiza mediante canales cifrados de Supabase Realtime.</li>
+                        <li>Los PINs de usuario <strong>nunca se almacenan en texto plano</strong> — se guarda únicamente su hash SHA-256.</li>
                     </ul>
 
                     <h2 className="text-lg font-bold text-slate-900 mt-6 mb-3">6. Documentos y Comprobantes</h2>
@@ -146,6 +150,7 @@ export default function TermsOverlay({ onAccept }) {
                         <li><strong>NO</strong> realizar ingeniería inversa del código</li>
                         <li><strong>NO</strong> compartir credenciales de acceso con personas no autorizadas</li>
                         <li><strong>NO</strong> manipular datos de ventas, inventario o registros de auditoría</li>
+                        <li><strong>NO</strong> usar cuentas de otros usuarios para acceder a funciones fuera de su rol</li>
                     </ul>
 
                     <hr className="my-6" />
@@ -158,10 +163,10 @@ export default function TermsOverlay({ onAccept }) {
                     </div>
 
                     <p className="text-center text-sm font-bold text-slate-900 mt-8 mb-4">
-                        Pool Los Diaz v1.0 — Sistema de Gestión para Salas de Pool
+                        Pool Los Diaz v2.0 — Sistema de Gestión para Salas de Pool
                     </p>
                     <p className="text-center text-xs text-slate-500 mb-8">
-                        Gestión integral de mesas, ventas e inventario
+                        Gestión integral de mesas, ventas, inventario y personal
                     </p>
 
                     <div id="terms-end" className="h-1"></div>
