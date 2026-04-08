@@ -4,7 +4,7 @@ import { useAudit } from '../../hooks/useAudit';
 import { showToast } from '../Toast';
 import {
     UserPlus, Trash2, KeyRound, Shield, ShoppingCart,
-    Crown, X, Check, Eye, EyeOff, AlertTriangle, Edit2, Coffee
+    Crown, X, Check, Eye, EyeOff, AlertTriangle, Edit2, Coffee, ToggleLeft, ToggleRight
 } from 'lucide-react';
 
 const ROLE_CONFIG = {
@@ -79,22 +79,29 @@ function PinInput({ value, onChange, label, length = 4 }) {
 
 
 // ─── User Row ──────────────────────────────────────
-function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, triggerHaptic }) {
+function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, onToggleActive, triggerHaptic }) {
     const roleString = user.role || user.rol || 'CAJERO';
     const rawName = user.name || user.nombre || 'Desconocido';
     const nameString = rawName.charAt(0).toUpperCase() + rawName.slice(1);
-    
+    const isActive = user.active !== false;
+
     const roleConf = ROLE_CONFIG[roleString] || ROLE_CONFIG.CAJERO;
     const RoleIcon = roleConf.icon;
     const isCurrentUser = user.id === currentUserId;
     const isAdmin = roleString === 'ADMIN';
 
     return (
-        <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isCurrentUser ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-800/30' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+        <div className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+            !isActive
+                ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 opacity-60'
+                : isCurrentUser
+                    ? 'bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200/50 dark:border-indigo-800/30'
+                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'
+        }`}>
             {/* Avatar */}
-            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${roleConf.gradient} flex items-center justify-center shrink-0 shadow-sm relative`}>
+            <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${isActive ? roleConf.gradient : 'from-slate-400 to-slate-500'} flex items-center justify-center shrink-0 shadow-sm relative`}>
                 <span className="text-white font-black text-lg">{(nameString)[0].toUpperCase()}</span>
-                {isAdmin && (
+                {isAdmin && isActive && (
                     <div className="absolute -top-2 left-1/2 -translate-x-1/2">
                         <Crown size={12} className="text-yellow-400 fill-yellow-400 drop-shadow-sm" />
                     </div>
@@ -108,10 +115,13 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, trigg
                     {isCurrentUser && (
                         <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-500 px-1.5 py-0.5 rounded-full">Tu</span>
                     )}
+                    {!isActive && (
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded-full">Inactivo</span>
+                    )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                    <RoleIcon size={10} className={roleConf.text} />
-                    <span className={`text-[9px] font-black uppercase tracking-wider ${roleConf.text}`}>
+                    <RoleIcon size={10} className={isActive ? roleConf.text : 'text-slate-400'} />
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? roleConf.text : 'text-slate-400'}`}>
                         {roleConf.label}
                     </span>
                 </div>
@@ -119,21 +129,38 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, trigg
 
             {/* Actions */}
             <div className="flex items-center gap-1 shrink-0">
-                <button
-                    onClick={() => { triggerHaptic?.(); onChangePin(user); }}
-                    className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all active:scale-90"
-                    title="Cambiar PIN"
-                >
-                    <KeyRound size={16} />
-                </button>
-                <button
-                    onClick={() => { triggerHaptic?.(); onEditName(user); }}
-                    className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-90"
-                    title="Editar Nombre"
-                >
-                    <Edit2 size={16} />
-                </button>
+                {isActive && (
+                    <>
+                        <button
+                            onClick={() => { triggerHaptic?.(); onChangePin(user); }}
+                            className="p-2 rounded-lg text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all active:scale-90"
+                            title="Cambiar PIN"
+                        >
+                            <KeyRound size={16} />
+                        </button>
+                        <button
+                            onClick={() => { triggerHaptic?.(); onEditName(user); }}
+                            className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-90"
+                            title="Editar Nombre"
+                        >
+                            <Edit2 size={16} />
+                        </button>
+                    </>
+                )}
                 {!isCurrentUser && (
+                    <button
+                        onClick={() => { triggerHaptic?.(); onToggleActive(user); }}
+                        className={`p-2 rounded-lg transition-all active:scale-90 ${
+                            isActive
+                                ? 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                                : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
+                        }`}
+                        title={isActive ? 'Desactivar usuario' : 'Activar usuario'}
+                    >
+                        {isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    </button>
+                )}
+                {!isCurrentUser && isActive && (
                     <button
                         onClick={() => { triggerHaptic?.(); onDelete(user); }}
                         className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-90"
@@ -155,9 +182,24 @@ export default function UsersManager({ triggerHaptic }) {
     const { cachedUsers: usuarios, currentUser: usuarioActivo, syncUsers } = useAuthStore();
     const { log } = useAudit();
 
+    // Also load inactive users to allow re-activation
+    const [inactiveUsers, setInactiveUsers] = useState([]);
+
+    const loadInactiveUsers = async () => {
+        try {
+            const { data } = await supabaseCloud
+                .from('staff_users')
+                .select('*')
+                .eq('active', false)
+                .order('name');
+            setInactiveUsers(data || []);
+        } catch { /* ignore */ }
+    };
+
     // Siempre sincronizar al montar para tener UUIDs frescos de Supabase
     useEffect(() => {
         syncUsers();
+        loadInactiveUsers();
     }, []);
 
     // States
@@ -278,11 +320,35 @@ export default function UsersManager({ triggerHaptic }) {
             showToast(`"${deleteUser.nombre || deleteUser.name}" eliminado`, 'success');
             triggerHaptic?.();
             setDeleteUser(null);
-            
+
             await syncUsers();
+            await loadInactiveUsers();
         } catch (err) {
             console.error('Error al eliminar usuario:', err);
             showToast('No se puede eliminar este usuario', 'error');
+        }
+    };
+
+    const handleToggleActive = async (user) => {
+        const newActive = user.active === false;
+        try {
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .update({ active: newActive })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            const name = user.name || user.nombre;
+            showToast(newActive ? `"${name}" activado` : `"${name}" desactivado`, 'success');
+            triggerHaptic?.();
+            log('USUARIO', 'ROL_CAMBIADO', `Usuario "${name}" ${newActive ? 'activado' : 'desactivado'}`, { activo: newActive });
+
+            await syncUsers();
+            await loadInactiveUsers();
+        } catch (err) {
+            console.error('Error al cambiar estado del usuario:', err);
+            showToast('Error al cambiar estado del usuario', 'error');
         }
     };
 
@@ -313,7 +379,7 @@ export default function UsersManager({ triggerHaptic }) {
         <div className="space-y-4">
             {/* User List */}
             <div className="space-y-2">
-                {usuarios.map(user => (
+                {[...usuarios, ...inactiveUsers].map(user => (
                     <UserRow
                         key={user.id}
                         user={user}
@@ -321,6 +387,7 @@ export default function UsersManager({ triggerHaptic }) {
                         onChangePin={u => { setChangePinUser(u); setCurrentPinValue(''); setPinValue(''); setConfirmPinValue(''); setShowPin(false); }}
                         onEditName={u => { setEditNameUser(u); setEditNameValue(u.name || u.nombre || ''); }}
                         onDelete={u => setDeleteUser(u)}
+                        onToggleActive={handleToggleActive}
                         triggerHaptic={triggerHaptic}
                     />
                 ))}
