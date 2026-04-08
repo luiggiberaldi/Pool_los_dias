@@ -297,10 +297,15 @@ export default function App() {
   // === Auth Local via PIN ===
   const { isAuthenticated, role } = useAuthStore();
 
+  // ── T&C — el tour no debe dispararse hasta que el usuario acepte ───────────
+  const [termsAccepted, setTermsAccepted] = useState(
+      () => localStorage.getItem('pda_terms_accepted_v1') === 'true'
+  );
+
   // ── Tour de Onboarding — debe ir DESPUÉS de useAuthStore ───────
   const { activeTour, onTabChange, skipTour } = useOnboardingTour(
       role || null,
-      isAuthenticated
+      isAuthenticated && termsAccepted
   );
 
   const confirm = useConfirm();
@@ -356,7 +361,7 @@ export default function App() {
     <div className="font-sans antialiased bg-[#F8FAFC] h-[100dvh] flex flex-col overflow-clip">
 
       {/* Terms and Conditions Overlay (First Use) */}
-      <TermsOverlay />
+      <TermsOverlay onAccept={() => setTermsAccepted(true)} />
 
 
 

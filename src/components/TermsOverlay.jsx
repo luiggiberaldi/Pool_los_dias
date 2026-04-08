@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Check, FileText, ChevronDown } from 'lucide-react';
 
-export default function TermsOverlay() {
+export default function TermsOverlay({ onAccept }) {
     const [hasAccepted, setHasAccepted] = useState(
         () => localStorage.getItem('pda_terms_accepted_v1') === 'true'
     );
@@ -18,6 +18,7 @@ export default function TermsOverlay() {
     const handleAccept = () => {
         localStorage.setItem('pda_terms_accepted_v1', 'true');
         setHasAccepted(true);
+        onAccept?.();
     };
 
     if (hasAccepted) return null;
