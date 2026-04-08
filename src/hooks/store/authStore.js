@@ -36,8 +36,19 @@ async function getLocalForage() {
     return lf.default;
 }
 
-const SESSION_KEY = 'poolbar_active_session';
-const USERS_CACHE_KEY = 'poolbar_users_cache';
+const SESSION_KEY_BASE = 'poolbar_active_session';
+const USERS_CACHE_KEY_BASE = 'poolbar_users_cache';
+const ACCOUNT_KEY = 'poolbar_cloud_email';
+
+// Claves vinculadas al email de la cuenta cloud para aislar datos entre cuentas
+function getSessionKey() {
+    const email = localStorage.getItem(ACCOUNT_KEY) || '';
+    return email ? `${SESSION_KEY_BASE}_${email}` : SESSION_KEY_BASE;
+}
+function getUsersCacheKey() {
+    const email = localStorage.getItem(ACCOUNT_KEY) || '';
+    return email ? `${USERS_CACHE_KEY_BASE}_${email}` : USERS_CACHE_KEY_BASE;
+}
 
 // ── Rate limiting ────────────────────────────────────────────────────────────
 const MAX_FAILED_ATTEMPTS = 5;
@@ -48,7 +59,7 @@ const LOCKOUT_DURATION_MS = 30_000; // 30 seconds
 async function loadPersistedSession() {
     try {
         const lf = await getLocalForage();
-        const session = await lf.getItem(SESSION_KEY);
+        const session = await lf.getItem(getSessionKey());
         return session || null;
     } catch {
         return null;
@@ -58,7 +69,7 @@ async function loadPersistedSession() {
 async function loadCachedUsers() {
     try {
         const lf = await getLocalForage();
-        const users = await lf.getItem(USERS_CACHE_KEY);
+        const users = await lf.getItem(getUsersCacheKey());
         return Array.isArray(users) ? users : [];
     } catch {
         return [];
@@ -110,7 +121,7 @@ export const useAuthStore = create((set, get) => ({
 
             const users = (data || []).map(u => ({ ...u, name: capitalizeName(u.name) }));
             const lf = await getLocalForage();
-            await lf.setItem(USERS_CACHE_KEY, users);
+            await lf.setItem(getUsersCacheKey(), users);
             set({ cachedUsers: users });
             return users;
         } catch (err) {
@@ -186,7 +197,7 @@ export const useAuthStore = create((set, get) => ({
 
         try {
             const lf = await getLocalForage();
-            await lf.setItem(SESSION_KEY, session);
+            await lf.setItem(getSessionKey(), session);
         } catch { /* continúa aunque falle la persistencia */ }
 
         set({
@@ -204,7 +215,7 @@ export const useAuthStore = create((set, get) => ({
     logout: async () => {
         try {
             const lf = await getLocalForage();
-            await lf.removeItem(SESSION_KEY);
+            await lf.removeItem(getSessionKey());
         } catch { /* ignorar */ }
 
         set({
@@ -212,6 +223,21 @@ export const useAuthStore = create((set, get) => ({
             currentUser:     null,
             role:            null,
         });
+    },
+
+    // ── Limpiar caché de usuarios (al cerrar sesión cloud) ──────────────────
+    clearUsersCache: async () => {
+        try {
+            const lf = await getLocalForage();
+            await lf.removeItem(getUsersCacheKey());
+        } catch { /* ignorar */ }
+        set({ cachedUsers: [] });
+    },
+
+    // ── Registrar email de cuenta cloud (para aislar caché) ─────────────────
+    setCloudEmail: (email) => {
+        if (email) localStorage.setItem(ACCOUNT_KEY, email.toLowerCase());
+        else localStorage.removeItem(ACCOUNT_KEY);
     },
 
     // ── Login biométrico (sin PIN — solo tras verificación WebAuthn exitosa) ──
@@ -224,7 +250,7 @@ export const useAuthStore = create((set, get) => ({
 
         try {
             const lf = await getLocalForage();
-            await lf.setItem(SESSION_KEY, session);
+            await lf.setItem(getSessionKey(), session);
         } catch { /* continúa aunque falle la persistencia */ }
 
         set({
@@ -253,7 +279,7 @@ export const useAuthStore = create((set, get) => ({
     lockSession: async () => {
         try {
             const lf = await getLocalForage();
-            await lf.removeItem(SESSION_KEY);
+            await lf.removeItem(getSessionKey());
         } catch { /* ignorar */ }
 
         set({

@@ -94,12 +94,16 @@ export default function App() {
       if (!mounted) return;
 
       if (!session?.user?.email) {
+        // Sin sesión cloud → limpiar email de cuenta
+        setCloudEmail(null);
         // Offline: si hay usuarios cacheados, ir directo al PIN screen.
         // Los cachedUsers solo existen si alguien hizo login cloud antes.
         if (!navigator.onLine) {
           try {
             const { default: lf } = await import('localforage');
-            const users = await lf.getItem('poolbar_users_cache');
+            const email = localStorage.getItem('poolbar_cloud_email') || '';
+            const cacheKey = email ? `poolbar_users_cache_${email}` : 'poolbar_users_cache';
+            const users = await lf.getItem(cacheKey);
             if (Array.isArray(users) && users.length > 0) {
               setCloudSession({ offline: true });
               setCheckingSession(false);
@@ -113,6 +117,7 @@ export default function App() {
       }
 
       const email = session.user.email.toLowerCase();
+      setCloudEmail(email);
       const deviceId = localStorage.getItem('pda_device_id') || 'UNKNOWN';
 
       try {
@@ -179,6 +184,8 @@ export default function App() {
         setCheckingSession(false);
       } else if (event === 'SIGNED_IN') applySession(session);
       else if (event === 'SIGNED_OUT') {
+        // Limpiar caché de usuarios para evitar cruce entre cuentas
+        clearUsersCache();
         // Pasar por applySession para que el fallback offline funcione también acá.
         // Si estamos online y fue un logout explícito → applySession(null) mostrará CloudAuthModal.
         // Si estamos offline y fue un fallo de refresh → applySession(null) mostrará el PIN screen.
@@ -300,6 +307,8 @@ export default function App() {
 
   // === Auth Local via PIN ===
   const { isAuthenticated, role } = useAuthStore();
+  const clearUsersCache = useAuthStore(s => s.clearUsersCache);
+  const setCloudEmail = useAuthStore(s => s.setCloudEmail);
 
   // ── T&C — el tour no debe dispararse hasta que el usuario acepte ───────────
   const [termsAccepted, setTermsAccepted] = useState(
