@@ -148,14 +148,44 @@ export const TAB_STEPS = {
             {
                 target: null,
                 title: 'Control de Mesas',
-                text: 'Vista en tiempo real de todas las mesas. Verde = libre, Azul = ocupada con tiempo corriendo.'
+                text: 'Vista en tiempo real de todas las mesas. Verde = libre, Azul = ocupada con el tiempo corriendo.'
+            },
+            {
+                target: '[data-tour="mesa-btn-normal"]',
+                title: 'Modo Normal',
+                text: 'Abre la mesa por tiempo libre. El sistema mide cuánto juegan y calcula el costo automáticamente al cobrar.'
+            },
+            {
+                target: '[data-tour="mesa-btn-pina"]',
+                title: 'La Piña',
+                text: 'Cobra por partida a precio fijo. Cada vez que terminen una partida, toca "+ Nueva Piña" para sumar otra. Ideal para grupos que juegan varias rondas.'
+            },
+            {
+                target: null,
+                title: 'Consumo y Cobrar',
+                text: 'Con la mesa abierta aparecen dos botones: "Consumo" para agregar bebidas o snacks al pedido, y "Cobrar" para enviar el ticket a caja y cerrar la mesa.'
             },
         ],
         MESERO: [
             {
                 target: null,
                 title: 'Tus Mesas',
-                text: 'Toca una mesa LIBRE para abrirla a nombre tuyo. El temporizador arranca automáticamente.'
+                text: 'Toca una mesa LIBRE para abrirla. El temporizador arranca automáticamente.'
+            },
+            {
+                target: '[data-tour="mesa-btn-normal"]',
+                title: 'Modo Normal',
+                text: 'Abre la mesa por tiempo. Al final, el sistema calcula el total según las horas jugadas.'
+            },
+            {
+                target: '[data-tour="mesa-btn-pina"]',
+                title: 'La Piña',
+                text: 'Precio fijo por partida. Cada vez que el grupo quiera otra ronda, toca "+ Nueva Piña" para agregarla.'
+            },
+            {
+                target: null,
+                title: 'Consumo y Cobrar',
+                text: 'Con la mesa abierta usa "Consumo" para añadir productos al pedido. Cuando terminen, toca "Cobrar" para enviar el ticket al cajero.'
             },
         ],
     },

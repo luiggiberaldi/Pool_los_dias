@@ -314,13 +314,15 @@ export default function TableCard({ table, session }) {
                         </button>
                     ) : (
                         <div className="grid grid-cols-2 gap-2">
-                            <button 
+                            <button
+                                data-tour="mesa-btn-normal"
                                 onClick={() => setShowModeModal(true)}
                                 className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                             >
                                 <Play size={12} fill="currentColor" /> Normal
                             </button>
-                            <button 
+                            <button
+                                data-tour="mesa-btn-pina"
                                 onClick={handleStartPina}
                                 className="bg-amber-500 hover:bg-amber-400 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                             >
