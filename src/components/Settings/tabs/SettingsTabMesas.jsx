@@ -153,6 +153,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     return (
         <div className="space-y-6">
             {/* Tarifas */}
+            <div data-tour="settings-mesas-rates">
             <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Aplica globalmente para Mesas de Pool" iconColor="text-emerald-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -193,8 +194,10 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                     <Check size={16} /> Guardar Tarifas
                 </button>
             </SectionCard>
+            </div>
 
             {/* Administracion de Mesas */}
+            <div data-tour="settings-mesas-add">
             <SectionCard icon={Layers} title="Infraestructura de Mesas" subtitle="Crea y gestiona las áreas del bar" iconColor="text-sky-500">
                 {/* Form */}
                 <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 mb-6">
@@ -276,6 +279,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                     )}
                 </div>
             </SectionCard>
+            </div>
 
             <ConfirmModal
                 isOpen={!!deleteTargetId}

@@ -31,9 +31,9 @@ const SETTINGS_TAB_TOURS = {
     mesas: {
         key: 'pda_settings_tour_mesas',
         steps: [
-            { target: null, title: 'Configuración de Mesas', text: 'Aquí defines las tarifas de las mesas de pool: precio por minuto, por hora o por "piña". También puedes configurar los modos de juego disponibles.', emoji: '🎱' },
-            { target: '[data-tour="settings-mesas-rates"]', title: 'Tarifas de Juego', text: 'Establece el costo por minuto o por hora para cada mesa. El sistema calcula el cobro automáticamente al cerrar la sesión.' },
-            { target: '[data-tour="settings-mesas-modes"]', title: 'Modos de Juego', text: 'Puedes habilitar el modo "Piña" (cobro por partida fija) además del modo por tiempo. El mesero elige al abrir la mesa.' },
+            { target: null, title: 'Configuración de Mesas', text: 'Aquí configuras las tarifas y creas las mesas físicas de tu local.', emoji: '🎱' },
+            { target: '[data-tour="settings-mesas-rates"]', title: 'Tarifas de Juego', text: 'Define el precio por hora de juego libre ("Hora Libre") y el precio fijo por partida ("La Piña"). Toca "Guardar Tarifas" cuando termines.' },
+            { target: '[data-tour="settings-mesas-add"]', title: 'Crear Mesas', text: 'Escribe el nombre de la mesa (ej. "Mesa 1"), elige si es Pool con tiempo o una mesa de Bar normal, y toca "+ Agregar". Repite para cada mesa de tu local.' },
         ],
     },
     ventas: {
