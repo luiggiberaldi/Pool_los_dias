@@ -62,7 +62,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
         }
 
         // PIN correcto, sin huella registrada → ofrecer activarla (solo móvil)
-        if (onVerifyPin && bioAvailable && !bioRegistered && isMobileDevice()) {
+        const bioDismissed = localStorage.getItem(`bio_dismiss_${userId}`);
+        if (onVerifyPin && bioAvailable && !bioRegistered && isMobileDevice() && !bioDismissed) {
             setPin('');
             setKeepOpen(true);
             setShowSetupPrompt(true);
@@ -140,7 +141,10 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
         }
     };
 
+    const [dontAskAgain, setDontAskAgain] = useState(false);
+
     const handleSkipSetup = async () => {
+        if (dontAskAgain) localStorage.setItem(`bio_dismiss_${userId}`, '1');
         if (onLoginComplete) await onLoginComplete(userId);
         setKeepOpen(false);
         setShowSetupPrompt(false);
@@ -199,6 +203,15 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                                         : <><Fingerprint size={16} /> Activar huella</>
                                     }
                                 </button>
+                                <label className="flex items-center justify-center gap-2 mb-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={dontAskAgain}
+                                        onChange={e => setDontAskAgain(e.target.checked)}
+                                        className="w-4 h-4 rounded border-slate-300 text-sky-500 focus:ring-sky-500/30"
+                                    />
+                                    <span className="text-xs text-slate-400">No volver a mostrar</span>
+                                </label>
                                 <button
                                     onClick={handleSkipSetup}
                                     className="text-xs text-slate-400 hover:text-slate-600 py-2 transition-colors"

@@ -301,6 +301,8 @@ export default function UsersManager({ triggerHaptic }) {
 
             showToast(`PIN de ${changePinUser.nombre || changePinUser.name} actualizado`, 'success');
             triggerHaptic?.();
+            // Reset biometric dismiss flag so the prompt reappears with new PIN
+            localStorage.removeItem(`bio_dismiss_${changePinUser.id}`);
             setChangePinUser(null);
             setCurrentPinValue('');
             setPinValue('');
