@@ -39,6 +39,10 @@ async function getLocalForage() {
 const SESSION_KEY = 'poolbar_active_session';
 const USERS_CACHE_KEY = 'poolbar_users_cache';
 
+// ── Rate limiting ────────────────────────────────────────────────────────────
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 30_000; // 30 seconds
+
 // ── Cargar sesión persistida al iniciar ──────────────────────────────────────
 
 async function loadPersistedSession() {
@@ -70,6 +74,8 @@ export const useAuthStore = create((set, get) => ({
     role: null,
     cachedUsers: [],
     _hydrated: false,
+    failedAttempts: 0,
+    lockoutUntil: null,
 
     // ── Aliases legados (compatibilidad con componentes no migrados) ──────────
     get usuarioActivo() { return get().currentUser; },
@@ -116,15 +122,47 @@ export const useAuthStore = create((set, get) => ({
 
     // ── Verificar PIN sin activar sesión (para flujo biométrico) ───────────────
     verifyPin: async (userId, pin) => {
+        // Check lockout
+        const { lockoutUntil } = get();
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            return { locked: true, remainingSec };
+        }
+        if (lockoutUntil && Date.now() >= lockoutUntil) {
+            set({ lockoutUntil: null, failedAttempts: 0 });
+        }
+
         const { cachedUsers } = get();
         const user = cachedUsers.find(u => u.id === userId);
         if (!user) return false;
         const hashedPin = await sha256(pin);
-        return hashedPin === user.pin_hash;
+        if (hashedPin === user.pin_hash) {
+            set({ failedAttempts: 0, lockoutUntil: null });
+            return true;
+        }
+        // Failed
+        const newFailed = get().failedAttempts + 1;
+        if (newFailed >= MAX_FAILED_ATTEMPTS) {
+            set({ failedAttempts: newFailed, lockoutUntil: Date.now() + LOCKOUT_DURATION_MS });
+            return { locked: true, remainingSec: Math.ceil(LOCKOUT_DURATION_MS / 1000) };
+        }
+        set({ failedAttempts: newFailed });
+        return false;
     },
 
-    // ── Login: verifica SHA-256 ────────────────────────────────────────────────
+    // ── Login: verifica SHA-256 con rate limiting ─────────────────────────────
     login: async (userId, pin) => {
+        // Check lockout
+        const { lockoutUntil } = get();
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+            return { locked: true, remainingSec };
+        }
+        // Clear expired lockout
+        if (lockoutUntil && Date.now() >= lockoutUntil) {
+            set({ lockoutUntil: null, failedAttempts: 0 });
+        }
+
         await new Promise(r => setTimeout(r, 350)); // feedback visual mínimo
 
         const { cachedUsers } = get();
@@ -132,8 +170,18 @@ export const useAuthStore = create((set, get) => ({
         if (!user) return false;
 
         const hashedPin = await sha256(pin);
-        if (hashedPin !== user.pin_hash) return false;
+        if (hashedPin !== user.pin_hash) {
+            // Failed attempt
+            const newFailed = get().failedAttempts + 1;
+            if (newFailed >= MAX_FAILED_ATTEMPTS) {
+                set({ failedAttempts: newFailed, lockoutUntil: Date.now() + LOCKOUT_DURATION_MS });
+                return { locked: true, remainingSec: Math.ceil(LOCKOUT_DURATION_MS / 1000) };
+            }
+            set({ failedAttempts: newFailed });
+            return false;
+        }
 
+        // Success — reset attempts
         const session = { ...user, name: capitalizeName(user.name) };
 
         try {
@@ -145,6 +193,8 @@ export const useAuthStore = create((set, get) => ({
             isAuthenticated: true,
             currentUser:     session,
             role:            session.role,
+            failedAttempts:  0,
+            lockoutUntil:    null,
         });
 
         return true;

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Delete, Loader2, Fingerprint, Check, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Delete, Loader2, Fingerprint, Check, ChevronRight, ShieldOff } from 'lucide-react';
 import LoginAvatar from './LoginAvatar';
 import {
     isBiometricAvailable, isMobileDevice,
@@ -11,6 +11,29 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
     const [pin, setPin]               = useState('');
     const [error, setError]           = useState(false);
     const [processing, setProcessing] = useState(false);
+
+    // ── Lockout ────────────────────────────────────────────────────────────
+    const [lockoutSec, setLockoutSec] = useState(0);
+    const lockoutTimer = useRef(null);
+
+    const startLockoutCountdown = useCallback((seconds) => {
+        setLockoutSec(seconds);
+        if (lockoutTimer.current) clearInterval(lockoutTimer.current);
+        lockoutTimer.current = setInterval(() => {
+            setLockoutSec(prev => {
+                if (prev <= 1) {
+                    clearInterval(lockoutTimer.current);
+                    lockoutTimer.current = null;
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    }, []);
+
+    useEffect(() => {
+        return () => { if (lockoutTimer.current) clearInterval(lockoutTimer.current); };
+    }, []);
 
     // ── Biometría ────────────────────────────────────────────────────────────
     const [bioAvailable, setBioAvailable]     = useState(false);
@@ -46,14 +69,24 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
 
     // ── PIN submit ────────────────────────────────────────────────────────────
     const handleSubmit = useCallback(async () => {
-        if (pin.length !== targetPinLength || processing || showSetupPrompt) return;
+        if (pin.length !== targetPinLength || processing || showSetupPrompt || lockoutSec > 0) return;
         setProcessing(true);
 
         // Si hay verificación separada (flujo biométrico), usarla
         const verify = onVerifyPin || onSubmit;
-        const success = await verify(pin, userId);
+        const result = await verify(pin, userId);
 
-        if (!success) {
+        // Handle lockout response
+        if (result && typeof result === 'object' && result.locked) {
+            startLockoutCountdown(result.remainingSec || 30);
+            setError(true);
+            setPin('');
+            setProcessing(false);
+            setTimeout(() => setError(false), 600);
+            return;
+        }
+
+        if (!result) {
             setError(true);
             setPin('');
             setProcessing(false);
@@ -78,7 +111,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
             setProcessing(false);
             onClose();
         }
-    }, [pin, processing, showSetupPrompt, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose]);
+    }, [pin, processing, showSetupPrompt, lockoutSec, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose, startLockoutCountdown]);
 
     // Auto-submit al completar dígitos
     useEffect(() => {
@@ -299,6 +332,18 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                 {processing && (
                     <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-3xl flex items-center justify-center">
                         <Loader2 className="animate-spin text-sky-500" size={32} />
+                    </div>
+                )}
+
+                {/* ── Lockout overlay ── */}
+                {lockoutSec > 0 && !processing && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center gap-3 z-10">
+                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                            <ShieldOff size={32} className="text-red-500" />
+                        </div>
+                        <p className="text-lg font-bold text-slate-800">Acceso bloqueado</p>
+                        <p className="text-sm text-slate-500 text-center px-6">Demasiados intentos fallidos.<br/>Intente de nuevo en:</p>
+                        <div className="text-3xl font-black text-red-500">{lockoutSec}s</div>
                     </div>
                 )}
             </div>
