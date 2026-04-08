@@ -442,7 +442,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* ── CERRAR / ABRIR CAJA ── */}
             {(isAdmin || cajeroAbreCaja) ? (
                 !activeCashSession ? (
-                    <button onClick={() => setIsAperturaOpen(true)}
+                    <button data-tour="apertura-caja" onClick={() => setIsAperturaOpen(true)}
                         className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
                         style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 6px 20px rgba(5,150,105,0.25)' }}>
                         <div className="flex items-center gap-3">
@@ -455,7 +455,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     </button>
                 ) : (
                     (isAdmin || cajeroCierraCaja) ? (
-                    <button onClick={handleDailyClose}
+                    <button data-tour="cierre-turno" onClick={handleDailyClose}
                         className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2"
                         style={{ background: 'linear-gradient(135deg, #F97316, #EF4444)', boxShadow: '0 6px 20px rgba(239,68,68,0.25)' }}>
                         <div className="flex items-center gap-3">
@@ -484,6 +484,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {/* ── REPORTE DE TURNO (cajero) ── */}
             {!isAdmin && activeCashSession && (
                 <button
+                    data-tour="cierre-turno"
                     onClick={() => setIsReporteTurnoOpen(true)}
                     className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group mt-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >

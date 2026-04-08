@@ -184,7 +184,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             </>
                         )}
                         {!isCajero && (
-                            <button onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
+                            <button data-tour="add-product" onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
                                 className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm">
                                 <Plus size={16} strokeWidth={2.5} />
                                 <span className="hidden sm:inline">Nuevo</span>

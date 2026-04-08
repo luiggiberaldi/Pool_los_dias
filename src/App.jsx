@@ -26,6 +26,7 @@ import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import CommandPalette from './components/CommandPalette';
 import SpotlightTour from './components/SpotlightTour';
+import { useOnboardingTour } from './hooks/useOnboardingTour';
 import LoginScreen from './components/security/LoginScreen';
 import CloudAuthModal from './components/security/CloudAuthModal';
 import { useAuthStore } from './hooks/store/authStore';
@@ -220,14 +221,11 @@ export default function App() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  const [tourDone, setTourDone] = useState(true); // TODO: re-habilitar cuando el tour esté listo
-  // const [tourDone, setTourDone] = useState(() => localStorage.getItem('pda_spotlight_done') === 'true');
-  
-  const SPOTLIGHT_STEPS = [
-    { target: '[data-tour="tab-ventas"]', title: 'Empieza a vender', text: 'Toca aquí para ir al Punto de Venta. Podrás cobrar en Bolívares o Dólares fácilmente.' },
-    { target: '[data-tour="tab-catalogo"]', title: 'Tu Inventario', text: 'Aquí podrás agregar y gestionar todos tus productos. Configura precios y cantidades.' },
-    { target: null, title: 'Búsqueda Global', text: 'Usa el atajo (Ctrl + K) o presiona ESC en cualquier momento para abrir el buscador rápido.' }
-  ];
+  // ── Tour de Onboarding ─────────────────────────────────────────
+  const { activeTour, onTabChange, skipTour } = useOnboardingTour(
+      role || null,
+      isAuthenticated   // ready cuando el usuario ha hecho login con PIN
+  );
 
   // Theme
   const [theme, setTheme] = useState(() => {
@@ -375,14 +373,12 @@ export default function App() {
 
 
 
-      {/* Tour Spotlight */}
-      {!tourDone && (
-         <SpotlightTour 
-            steps={SPOTLIGHT_STEPS} 
-            onComplete={() => {
-                localStorage.setItem('pda_spotlight_done', 'true');
-                setTourDone(true);
-            }} 
+      {/* Tour Spotlight — Onboarding por rol y por pestaña */}
+      {activeTour && (
+         <SpotlightTour
+            steps={activeTour.steps}
+            onComplete={activeTour.onComplete}
+            onSkip={skipTour}
          />
       )}
 
@@ -498,7 +494,7 @@ export default function App() {
                 icon={<tab.icon size={18} strokeWidth={effectiveTab === tab.id ? 3 : 2} />}
                 label={tab.label}
                 isActive={effectiveTab === tab.id}
-                onClick={() => { triggerHaptic(); setActiveTab(tab.id); }}
+                onClick={() => { triggerHaptic(); setActiveTab(tab.id); onTabChange(tab.id); }}
                 data-tour={`tab-${tab.id}`}
               />
             ))}

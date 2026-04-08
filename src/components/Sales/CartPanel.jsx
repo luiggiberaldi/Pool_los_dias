@@ -202,6 +202,7 @@ export default function CartPanel({
                 )}
 
                 <button
+                    data-tour="checkout-btn"
                     disabled={cart.length === 0}
                     onClick={onCheckout}
                     className="w-full relative group disabled:opacity-50 disabled:cursor-not-allowed">
