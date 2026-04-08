@@ -114,6 +114,15 @@ export const useAuthStore = create((set, get) => ({
         }
     },
 
+    // ── Verificar PIN sin activar sesión (para flujo biométrico) ───────────────
+    verifyPin: async (userId, pin) => {
+        const { cachedUsers } = get();
+        const user = cachedUsers.find(u => u.id === userId);
+        if (!user) return false;
+        const hashedPin = await sha256(pin);
+        return hashedPin === user.pin_hash;
+    },
+
     // ── Login: verifica SHA-256 ────────────────────────────────────────────────
     login: async (userId, pin) => {
         await new Promise(r => setTimeout(r, 350)); // feedback visual mínimo

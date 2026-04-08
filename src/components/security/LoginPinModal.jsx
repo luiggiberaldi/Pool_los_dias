@@ -6,7 +6,7 @@ import {
     isRegistered, registerBiometric, authenticateWithBiometric
 } from '../../services/biometricPinService';
 
-export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiometricLogin }) {
+export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerifyPin, onLoginComplete, onBiometricLogin }) {
     const targetPinLength = (user?.role === 'ADMIN' || user?.rol === 'ADMIN') ? 6 : 4;
     const [pin, setPin]               = useState('');
     const [error, setError]           = useState(false);
@@ -49,7 +49,9 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
         if (pin.length !== targetPinLength || processing) return;
         setProcessing(true);
 
-        const success = await onSubmit(pin, userId);
+        // Si hay verificación separada (flujo biométrico), usarla
+        const verify = onVerifyPin || onSubmit;
+        const success = await verify(pin, userId);
 
         if (!success) {
             setError(true);
@@ -59,18 +61,22 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
             return;
         }
 
-        // PIN correcto, sin huella registrada → ofrecer activarla
-        if (bioAvailable && !bioRegistered) {
+        // PIN correcto, sin huella registrada → ofrecer activarla ANTES de loguearse
+        if (onVerifyPin && bioAvailable && !bioRegistered) {
             setKeepOpen(true);
             setShowSetupPrompt(true);
             setProcessing(false);
         } else {
-            // Sin prompt biométrico → cerrar modal
+            // Activar sesión y cerrar
+            if (onLoginComplete) {
+                await onLoginComplete(userId);
+            } else if (onSubmit && !onVerifyPin) {
+                // Fallback: onSubmit ya hizo el login
+            }
             setProcessing(false);
             onClose();
         }
-        // si ya tiene huella o no es móvil, el modal se cierra arriba
-    }, [pin, processing, onSubmit, userId, targetPinLength, bioAvailable, bioRegistered]);
+    }, [pin, processing, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose]);
 
     // Auto-submit al completar dígitos
     useEffect(() => {
@@ -114,13 +120,16 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
             await registerBiometric(userId, userName);
             setSetupDone(true);
             setBioRegistered(true);
-            setTimeout(() => {
+            setTimeout(async () => {
+                if (onLoginComplete) await onLoginComplete(userId);
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
                 onClose();
             }, 1400);
         } catch (err) {
             if (!err.message?.includes('cancel') && !err.message?.toLowerCase().includes('abort')) {
+                // Error real → activar sesión y cerrar
+                if (onLoginComplete) await onLoginComplete(userId);
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
                 onClose();
@@ -130,7 +139,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
         }
     };
 
-    const handleSkipSetup = () => {
+    const handleSkipSetup = async () => {
+        if (onLoginComplete) await onLoginComplete(userId);
         setKeepOpen(false);
         setShowSetupPrompt(false);
         onClose();

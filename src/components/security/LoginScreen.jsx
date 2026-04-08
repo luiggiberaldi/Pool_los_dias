@@ -8,7 +8,7 @@ import { supabaseCloud } from '../../config/supabaseCloud';
 import { useConfirm } from '../../hooks/useConfirm.jsx';
 
 export default function LoginScreen() {
-    const { cachedUsers, login, loginWithBiometric, syncUsers, logout } = useAuthStore();
+    const { cachedUsers, login, loginWithBiometric, verifyPin, syncUsers, logout } = useAuthStore();
     const { activeCashSession } = useCashStore();
     const confirm = useConfirm();
     
@@ -27,11 +27,16 @@ export default function LoginScreen() {
         handleForceSync();
     }, []);
 
-    const handlePinSubmit = async (pin, userId) => {
-        const success = await login(userId, pin);
-        // NO cerrar el modal aquí — el modal maneja su propio cierre
-        // para poder mostrar el prompt de activación biométrica.
-        return success;
+    // Verificar PIN sin activar sesión (para dar chance al prompt biométrico)
+    const handlePinVerify = async (pin, userId) => {
+        await new Promise(r => setTimeout(r, 350)); // feedback visual
+        return await verifyPin(userId, pin);
+    };
+
+    // Activar sesión real (llamado por el modal después del prompt biométrico)
+    const handleLoginComplete = async (userId) => {
+        await loginWithBiometric(userId);
+        setSelectedUser(null);
     };
 
     const handleBiometricLogin = async (userId) => {
@@ -136,7 +141,8 @@ export default function LoginScreen() {
                 isOpen={!!selectedUser}
                 onClose={() => setSelectedUser(null)}
                 user={selectedUser}
-                onSubmit={handlePinSubmit}
+                onVerifyPin={handlePinVerify}
+                onLoginComplete={handleLoginComplete}
                 onBiometricLogin={handleBiometricLogin}
             />
         </div>

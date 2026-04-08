@@ -5,14 +5,20 @@ import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 
 export default function LockScreen() {
-  const { usuarios, login, loginWithBiometric } = useAuthStore();
+  const { usuarios, login, loginWithBiometric, verifyPin } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState(null);
   const confirm = useConfirm();
 
-  const handlePinSubmit = async (pin, userId) => {
-    const success = await login(userId, pin);
-    // NO cerrar aquí — el modal maneja su cierre para el prompt biométrico
-    return success;
+  // Verificar PIN sin activar sesión
+  const handlePinVerify = async (pin, userId) => {
+    await new Promise(r => setTimeout(r, 350));
+    return await verifyPin(userId, pin);
+  };
+
+  // Activar sesión real (después del prompt biométrico)
+  const handleLoginComplete = async (userId) => {
+    await loginWithBiometric(userId);
+    setSelectedUser(null);
   };
 
   const handleBiometricLogin = async (userId) => {
@@ -86,7 +92,8 @@ export default function LockScreen() {
         isOpen={!!selectedUser}
         onClose={() => setSelectedUser(null)}
         user={selectedUser}
-        onSubmit={handlePinSubmit}
+        onVerifyPin={handlePinVerify}
+        onLoginComplete={handleLoginComplete}
         onBiometricLogin={handleBiometricLogin}
       />
     </div>
