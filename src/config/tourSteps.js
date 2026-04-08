@@ -61,7 +61,7 @@ export const ROLE_WELCOME_STEPS = {
         {
             target: '[data-tour="tab-inicio"]',
             title: 'Tu Dashboard',
-            text: 'Al comenzar el turno, abre la caja aquí. Al final, encontrarás el botón de cierre de turno.'
+            text: 'Al comenzar el turno, abre la caja aquí. Al final, encontrarás el botón de cierre de turno. Si tienes permisos de administrador, también puedes abrir y cerrar caja.'
         },
         {
             target: '[data-tour="tab-ventas"]',
@@ -131,7 +131,7 @@ export const TAB_STEPS = {
             {
                 target: '[data-tour="apertura-caja"]',
                 title: 'Apertura de Caja',
-                text: 'Registra el efectivo inicial antes de empezar a cobrar.'
+                text: 'Registra el efectivo inicial antes de empezar a cobrar. Si tienes permisos de administrador, también puedes cerrar caja desde aquí.'
             },
         ],
         MESERO: [

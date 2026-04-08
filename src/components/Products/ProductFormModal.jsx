@@ -2,6 +2,42 @@ import React, { useRef, useState } from 'react';
 import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, Banknote, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus } from 'lucide-react';
 import { Modal } from '../Modal';
 import { useProductContext } from '../../context/ProductContext';
+import SpotlightTour from '../SpotlightTour';
+
+const PRODUCT_FORM_TOUR_KEY = 'pda_product_form_tour_done';
+
+const PRODUCT_FORM_STEPS = [
+    {
+        target: '[data-tour="pf-name"]',
+        title: 'Nombre del Producto',
+        text: 'Escribe el nombre tal como aparecerá en el punto de venta y en los tickets.'
+    },
+    {
+        target: '[data-tour="pf-cost"]',
+        title: 'Costo ($)',
+        text: 'El precio al que compraste el producto. Úsalo para calcular tu margen de ganancia.'
+    },
+    {
+        target: '[data-tour="pf-lote"]',
+        title: 'Calculadora de Lote',
+        text: 'Si compras por bulto (ej: caja de 24), toca aquí para calcular el costo por unidad automáticamente.'
+    },
+    {
+        target: '[data-tour="pf-price"]',
+        title: 'Precio de Venta ($)',
+        text: 'El precio al que le vendes al cliente. El equivalente en Bs se calcula solo con la tasa del día.'
+    },
+    {
+        target: '[data-tour="pf-margin"]',
+        title: 'Margen de Ganancia',
+        text: 'Calculado automáticamente. En rojo = vendes a pérdida. Apunta a un margen positivo.'
+    },
+    {
+        target: '[data-tour="pf-stock"]',
+        title: 'Stock y Alerta Mínima',
+        text: 'Ingresa cuántas unidades tienes disponibles. La alerta mínima te avisa cuando el stock esté bajo.'
+    },
+];
 
 // PACKAGING_TYPES removed for Pool Bar mode
 
@@ -46,6 +82,11 @@ export default function ProductFormModal({
     const fileInputRef = useRef(null);
     const [showSummary, setShowSummary] = useState(false);
     const [showMovements, setShowMovements] = useState(false);
+
+    // Tour: solo en nuevo producto, solo la primera vez
+    const [showFormTour, setShowFormTour] = useState(
+        () => !isEditing && localStorage.getItem(PRODUCT_FORM_TOUR_KEY) !== 'true'
+    );
     
     // Calculadora de Lote States
     const [showLoteCalc, setShowLoteCalc] = useState(false);
@@ -129,6 +170,20 @@ export default function ProductFormModal({
     const priceSuffix = isLote ? ' / Lote' : isGranel ? ` / ${granelLabel}` : '';
 
     return (
+        <>
+        {showFormTour && (
+            <SpotlightTour
+                steps={PRODUCT_FORM_STEPS}
+                onComplete={() => {
+                    localStorage.setItem(PRODUCT_FORM_TOUR_KEY, 'true');
+                    setShowFormTour(false);
+                }}
+                onSkip={() => {
+                    localStorage.setItem(PRODUCT_FORM_TOUR_KEY, 'true');
+                    setShowFormTour(false);
+                }}
+            />
+        )}
         <Modal
             isOpen={isOpen}
             onClose={onClose}
@@ -151,7 +206,7 @@ export default function ProductFormModal({
 
                 <div className="space-y-3">
                     {/* Name */}
-                    <div className="relative">
+                    <div className="relative" data-tour="pf-name">
                         <label className="text-xs font-bold text-slate-400 ml-1 mb-1 block uppercase">Nombre</label>
                         <input value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Ej: Harina PAN 1kg"
                             className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 pr-10 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 capitalize" />
@@ -213,7 +268,7 @@ export default function ProductFormModal({
                     {/* Removed Packaging Type, Granel, and Lote UI blocks */}
 
                     {/* ─── COST SECTION (first) ─── */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3" data-tour="pf-cost">
                         <div>
                             <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Costo ($){priceSuffix}
@@ -228,6 +283,7 @@ export default function ProductFormModal({
                                 </label>
                                 {!isCombo && (
                                 <button
+                                    data-tour="pf-lote"
                                     onClick={() => setShowLoteCalc(!showLoteCalc)}
                                     className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md transition-all active:scale-95 ${
                                         showLoteCalc
@@ -319,7 +375,7 @@ export default function ProductFormModal({
 
                     {/* LOTE: Auto unit cost removed */}
                     {/* ─── PRICE SECTION ─── */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3" data-tour="pf-price">
                         <div className="relative">
                             <label className="text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Precio de Venta ($){priceSuffix}
@@ -359,7 +415,7 @@ export default function ProductFormModal({
 
                     {/* LOTE: Unit Price removed */}
                     {/* ─── MARGIN PANEL ─── */}
-                    <div className={`p-3 rounded-xl border space-y-1.5 min-h-[60px] ${mainMarginPct !== null && mainMarginPct < 0
+                    <div data-tour="pf-margin" className={`p-3 rounded-xl border space-y-1.5 min-h-[60px] ${mainMarginPct !== null && mainMarginPct < 0
                         ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30'
                         : mainMarginPct !== null && mainMarginPct === 0
                             ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30'
@@ -406,7 +462,7 @@ export default function ProductFormModal({
                     </div>
 
                     {/* ─── STOCK / COMBO SECTION ─── */}
-                    <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
+                    <div data-tour="pf-stock" className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
                         <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
                             <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2">
                                 <Droplets size={14} className="text-brand" />
@@ -555,5 +611,6 @@ export default function ProductFormModal({
                 </button>
             </div>
         </Modal>
+        </>
     );
 }
