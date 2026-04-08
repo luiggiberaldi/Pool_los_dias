@@ -58,8 +58,9 @@ export default function SalesHeader({
                     </button>
 
                     <Tooltip text={isLocked ? "Solo los administradores pueden fijar la tasa" : (useAutoRate ? "Tasa oficial sincronizada (BCV)" : "Usando tasa manual fijada por ti")} position="bottom">
-                        <button 
-                            onClick={handleRateToggle} 
+                        <button
+                            data-tour="bcv-rate-btn"
+                            onClick={handleRateToggle}
                             disabled={isLocked}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all group ${isLocked ? 'bg-slate-100 border-slate-200 dark:bg-slate-800/80 dark:border-slate-800 cursor-not-allowed opacity-80' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:shadow-sm'}`}
                         >
@@ -76,7 +77,7 @@ export default function SalesHeader({
 
             {/* Rate Config Panel */}
             {showRateConfig && !isLocked && (
-                <div className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
+                <div data-tour="bcv-rate-config" className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500">Tasa de Cambio</span>
                         <div className="flex items-center gap-2">

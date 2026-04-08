@@ -12,6 +12,7 @@ export default function SettingsTabVentas({
 }) {
     return (
         <>
+            <div data-tour="settings-stock">
             <SectionCard icon={Package} title="Inventario" subtitle="Reglas de ventas" iconColor="text-emerald-500">
                 <div className="flex items-center justify-between">
                     <div>
@@ -31,7 +32,9 @@ export default function SettingsTabVentas({
                     />
                 </div>
             </SectionCard>
+            </div>
 
+            <div data-tour="settings-cajero-perms">
             <SectionCard icon={KeyRound} title="Permisos de Cajero" subtitle="Acciones permitidas al cajero" iconColor="text-amber-500">
                 <div className="flex items-center justify-between">
                     <div>
@@ -75,6 +78,7 @@ export default function SettingsTabVentas({
                     />
                 </div>
             </SectionCard>
+            </div>
 
             <SectionCard icon={ShieldCheck} title="Seguridad de Descuentos" subtitle="Control de descuentos por rol" iconColor="text-violet-500">
                 <div className="flex items-center justify-between gap-4">
@@ -111,9 +115,11 @@ export default function SettingsTabVentas({
                 </div>
             </SectionCard>
 
+            <div data-tour="settings-payment-methods">
             <SectionCard icon={CreditCard} title="Metodos de Pago" subtitle="Configura como te pagan" iconColor="text-blue-500">
                 <PaymentMethodsManager triggerHaptic={triggerHaptic} />
             </SectionCard>
+            </div>
         </>
     );
 }

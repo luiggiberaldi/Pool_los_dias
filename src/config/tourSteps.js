@@ -168,6 +168,16 @@ export const TAB_STEPS = {
                 text: 'Busca productos o tócalos para agregarlos al carrito. Puedes buscar por nombre o código.'
             },
             {
+                target: '[data-tour="bcv-rate-btn"]',
+                title: 'Tasa BCV',
+                text: 'Aquí ves la tasa del día en Bs. Tócalo para abrirlo y cambiar la configuración de la tasa.'
+            },
+            {
+                target: '[data-tour="bcv-rate-config"]',
+                title: 'Auto o Manual',
+                text: 'Con "Auto Dólar BCV" activado el sistema usa siempre la tasa oficial actualizada. Si lo apgas, puedes escribir tu propia tasa manual y tocar "Aceptar" para guardarla.'
+            },
+            {
                 target: '[data-tour="checkout-btn"]',
                 title: 'Cobrar',
                 text: 'Cuando el carrito esté listo, toca "Cobrar" para seleccionar los métodos de pago.'

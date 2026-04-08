@@ -294,9 +294,7 @@ export default function SettingsTabBitacora({ triggerHaptic }) {
     const activeFiltersCount = [catFilter, userFilter, search.trim()].filter(Boolean).length;
 
     return (
-        <div className="space-y-4">
-
-            {/* ── Buscador + acciones ── */}
+        <div className="space-y-4" data-tour="settings-audit-log">
             <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />

@@ -272,10 +272,13 @@ export default function SettingsTabUsuarios({
         <div className="relative">
             {SHOW_COMING_SOON && <ComingSoonOverlay />}
             
+            <div data-tour="settings-user-list">
             <SectionCard icon={Users} title="Usuarios y Roles" subtitle="Gestiona quien opera la app" iconColor="text-indigo-500">
                 <UsersManager triggerHaptic={triggerHaptic} />
             </SectionCard>
+            </div>
 
+            <div data-tour="settings-auto-lock">
             <SectionCard icon={Lock} title="Seguridad Local" subtitle="Protección física del dispositivo" iconColor="text-rose-500">
                 <div className="mb-4 pb-4 border-b border-rose-100 dark:border-rose-900/30">
                     <div className="flex items-center justify-between mb-1.5">
@@ -322,6 +325,7 @@ export default function SettingsTabUsuarios({
                     </div>
                 </div>
             </SectionCard>
+            </div>
 
             <SectionCard icon={KeyRound} title="Cambiar Contraseña de Acceso" subtitle="Contraseña del login con correo electrónico (no el PIN)" iconColor="text-amber-500">
                 {pwSuccess ? (

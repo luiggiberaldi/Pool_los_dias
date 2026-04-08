@@ -52,6 +52,7 @@ export default function SettingsTabSistema({
     return (
         <>
             {/* Datos y Respaldo */}
+            <div data-tour="settings-backup">
             <SectionCard icon={Database} title="Datos y Respaldo" subtitle="Exportar, importar y compartir" iconColor="text-cyan-500">
                 <div className="p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30 rounded-xl flex gap-2.5">
                     <AlertTriangle size={18} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
@@ -87,6 +88,7 @@ export default function SettingsTabSistema({
                     </div>
                 )}
             </SectionCard>
+            </div>
 
 
 
