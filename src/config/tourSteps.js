@@ -27,7 +27,7 @@ export const ROLE_WELCOME_STEPS = {
         {
             target: '[data-tour="tab-ventas"]',
             title: 'Punto de Venta',
-            text: 'Cobra productos en Bs, USD o COP con múltiples métodos de pago. Soporta descuentos y fiados.'
+            text: 'Cobra productos en Bs o USD con múltiples métodos de pago. Soporta descuentos y fiados.'
         },
         {
             target: '[data-tour="tab-catalogo"]',
