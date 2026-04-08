@@ -221,12 +221,6 @@ export default function App() {
     if (outcome === 'accepted') setInstallPrompt(null);
   };
 
-  // ── Tour de Onboarding ─────────────────────────────────────────
-  const { activeTour, onTabChange, skipTour } = useOnboardingTour(
-      role || null,
-      isAuthenticated   // ready cuando el usuario ha hecho login con PIN
-  );
-
   // Theme
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -302,6 +296,12 @@ export default function App() {
 
   // === Auth Local via PIN ===
   const { isAuthenticated, role } = useAuthStore();
+
+  // ── Tour de Onboarding — debe ir DESPUÉS de useAuthStore ───────
+  const { activeTour, onTabChange, skipTour } = useOnboardingTour(
+      role || null,
+      isAuthenticated
+  );
 
   const confirm = useConfirm();
 
