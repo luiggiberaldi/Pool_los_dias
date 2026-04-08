@@ -70,13 +70,17 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     );
 
     const recentSales = useMemo(() => {
+        const validTypes = ['VENTA', 'VENTA_FIADA'];
         if (selectedChartDate) {
             return sales.filter(s => {
+                if (!validTypes.includes(s.tipo) || s.status === 'ANULADA') return false;
                 const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
                 return saleLocalDay === selectedChartDate;
             });
         }
-        return sales.slice(0, 7);
+        return sales
+            .filter(s => validTypes.includes(s.tipo) && s.status !== 'ANULADA')
+            .slice(0, 7);
     }, [sales, selectedChartDate, today]);
 
     const weekData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
@@ -132,9 +136,16 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         return Object.values(map).sort((a, b) => b.revenue - a.revenue || b.ventas - a.ventas).slice(0, 5);
     }, [sales]);
 
+    // Para el wizard de cierre: incluye apertura para reconciliación de efectivo
     const paymentBreakdown = useMemo(() =>
         FinancialEngine.calculatePaymentBreakdown(todayCashFlow),
         [todayCashFlow]
+    );
+
+    // Para el dashboard display: solo ventas reales, sin contar el monto de apertura
+    const salesPaymentBreakdown = useMemo(() =>
+        FinancialEngine.calculatePaymentBreakdown(todaySales),
+        [todaySales]
     );
 
     const todayTopProducts = useMemo(() => {
@@ -156,6 +167,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         todayExpenses, todayExpensesUsd, todayProfit,
         recentSales, weekData, lowStockProducts,
         totalDeudas, topProducts, topStaff,
+        paymentBreakdown, salesPaymentBreakdown, todayTopProducts,
         paymentBreakdown, todayTopProducts,
     };
 }

@@ -76,7 +76,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         todayExpenses, todayExpensesUsd, todayProfit,
         recentSales, weekData, lowStockProducts,
         totalDeudas, topProducts, topStaff,
-        paymentBreakdown, todayTopProducts,
+        paymentBreakdown, salesPaymentBreakdown, todayTopProducts,
     } = useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate });
 
     // ── Carga de datos ──
@@ -542,14 +542,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* Medios de Pago */}
-            {isAdmin && Object.keys(paymentBreakdown).length > 0 && (() => {
-                const entries = Object.entries(paymentBreakdown).filter(([, d]) => d.total > 0);
+            {isAdmin && Object.keys(salesPaymentBreakdown).length > 0 && (() => {
+                const entries = Object.entries(salesPaymentBreakdown).filter(([, d]) => d.total > 0);
                 const fiadoMethods = entries.filter(([, d]) => d.currency === 'FIADO');
                 const bsMethods    = entries.filter(([, d]) => d.currency === 'BS' || (!d.currency));
                 const usdMethods   = entries.filter(([, d]) => d.currency === 'USD');
                 const copMethods   = entries.filter(([, d]) => d.currency === 'COP');
-                const vueltoBs     = paymentBreakdown['_vuelto_bs'];
-                const vueltoUsd    = paymentBreakdown['_vuelto_usd'];
+                const vueltoBs     = salesPaymentBreakdown['_vuelto_bs'];
+                const vueltoUsd    = salesPaymentBreakdown['_vuelto_usd'];
                 const subtotalBs   = bsMethods.reduce((s, [, d]) => s + d.total, 0)  + (vueltoBs?.total  || 0);
                 const subtotalUsd  = usdMethods.reduce((s, [, d]) => s + d.total, 0) + (vueltoUsd?.total || 0);
                 const subtotalCop  = copMethods.reduce((s, [, d]) => s + d.total, 0);

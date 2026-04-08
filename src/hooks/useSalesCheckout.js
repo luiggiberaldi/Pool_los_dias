@@ -113,7 +113,8 @@ export function useSalesCheckout({
                     if (data) openerUser = data;
                 } catch (_) {}
             }
-            if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') {
+            const openerRole = (openerUser?.role || openerUser?.rol || '').toUpperCase();
+            if (openerRole === 'MESERO') {
                 opts.meseroId = openerUser.id;
                 opts.meseroNombre = openerUser.name || openerUser.nombre || null;
             }
