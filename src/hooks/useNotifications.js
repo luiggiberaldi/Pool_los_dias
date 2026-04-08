@@ -95,13 +95,13 @@ export function useNotifications() {
 
     /** Cierre de caja pendiente: se chequea al montar el Dashboard */
     const notifyCierrePendiente = useCallback((todaySalesCount) => {
-        if (todaySalesCount === 0) return;
+        if (todaySalesCount < 5) return; // Mínimo 5 ventas para que tenga sentido notificar
 
         const now = new Date();
         const hour = now.getHours();
 
-        // Solo notificar a partir de las 7pm
-        if (hour < 19) return;
+        // Solo notificar a partir de las 8pm
+        if (hour < 20) return;
 
         // Evitar notificar más de una vez por día
         const lastNotified = localStorage.getItem('cierre_notified_date');

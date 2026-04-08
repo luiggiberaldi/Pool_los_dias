@@ -101,8 +101,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     // ── Notificar cierre pendiente ──
     useEffect(() => {
-        if (todayCashFlow.length > 0) notifyCierrePendiente(todayCashFlow.length);
-    }, [todayCashFlow.length, notifyCierrePendiente]);
+        if (todaySales.length > 0) notifyCierrePendiente(todaySales.length);
+    }, [todaySales.length, notifyCierrePendiente]);
 
     // ── Escuchar actualizaciones de la nube ──
     useEffect(() => {

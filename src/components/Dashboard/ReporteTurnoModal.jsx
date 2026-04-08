@@ -25,26 +25,37 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
     const fecha = formatFecha(activeCashSession?.opened_at || new Date().toISOString());
     const horaApertura = formatHora(activeCashSession?.opened_at);
 
-    // Desglose por método de pago
+    // Desglose por método de pago — usa paymentBreakdown del FinancialEngine (neto de vuelto)
     const breakdown = useMemo(() => {
-        const map = {};
+        if (!paymentBreakdown || Object.keys(paymentBreakdown).length === 0) return [];
+
+        // Contar transacciones por methodId desde todaySales
+        const countMap = {};
         todaySales.forEach(s => {
-            if (s.payments && s.payments.length > 0) {
+            if (s.payments?.length > 0) {
                 s.payments.forEach(p => {
-                    const label = getPaymentLabel(p.methodId, p.methodLabel);
-                    if (!map[label]) map[label] = { usd: 0, count: 0 };
-                    map[label].usd += p.amountUsd || 0;
-                    map[label].count += 1;
+                    countMap[p.methodId] = (countMap[p.methodId] || 0) + 1;
                 });
             } else if (s.paymentMethod) {
-                const label = getPaymentLabel(s.paymentMethod);
-                if (!map[label]) map[label] = { usd: 0, count: 0 };
-                map[label].usd += s.totalUsd || 0;
-                map[label].count += 1;
+                countMap[s.paymentMethod] = (countMap[s.paymentMethod] || 0) + 1;
             }
         });
-        return Object.entries(map).sort((a, b) => b[1].usd - a[1].usd);
-    }, [todaySales]);
+
+        return Object.entries(paymentBreakdown)
+            .filter(([key]) => !key.startsWith('_vuelto') && key !== 'fiado')
+            .map(([methodId, data]) => ({
+                label: data.label || getPaymentLabel(methodId),
+                total: data.total,
+                currency: data.currency || 'BS',
+                count: countMap[methodId] || 0,
+            }))
+            .filter(d => d.total > 0)
+            .sort((a, b) => {
+                const aUsd = a.currency === 'USD' ? a.total : a.total / 1;
+                const bUsd = b.currency === 'USD' ? b.total : b.total / 1;
+                return bUsd - aUsd;
+            });
+    }, [paymentBreakdown, todaySales]);
 
     const handleDownloadCSV = () => {
         const rows = [];
@@ -65,9 +76,9 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
 
         // Desglose por método de pago
         rows.push(['=== MÉTODOS DE PAGO ===']);
-        rows.push(['Método', 'Total USD', 'Nº Transacciones']);
-        breakdown.forEach(([label, data]) => {
-            rows.push([label, `$${data.usd.toFixed(2)}`, data.count]);
+        rows.push(['Método', 'Total', 'Moneda', 'Nº Transacciones']);
+        breakdown.forEach(d => {
+            rows.push([d.label, d.total.toFixed(2), d.currency, d.count]);
         });
         rows.push([]);
 
@@ -225,12 +236,14 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Métodos de Pago</p>
                             </div>
                             <div className="space-y-2">
-                                {breakdown.map(([label, data]) => (
-                                    <div key={label} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-xl px-3.5 py-2.5">
-                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{label}</p>
+                                {breakdown.map((d) => (
+                                    <div key={d.label} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-xl px-3.5 py-2.5">
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{d.label}</p>
                                         <div className="text-right">
-                                            <p className="text-sm font-black text-slate-800 dark:text-white">${data.usd.toFixed(2)}</p>
-                                            <p className="text-[9px] text-slate-400">{data.count} {data.count === 1 ? 'transacción' : 'transacciones'}</p>
+                                            <p className="text-sm font-black text-slate-800 dark:text-white">
+                                                {d.currency === 'USD' ? `$${d.total.toFixed(2)}` : `Bs ${d.total.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                            </p>
+                                            {d.count > 0 && <p className="text-[9px] text-slate-400">{d.count} {d.count === 1 ? 'transacción' : 'transacciones'}</p>}
                                         </div>
                                     </div>
                                 ))}
