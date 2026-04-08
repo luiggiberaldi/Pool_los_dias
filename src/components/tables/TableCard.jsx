@@ -48,6 +48,7 @@ export default function TableCard({ table, session }) {
     const [showAdjustModal, setShowAdjustModal] = useState(false);
     const [showModeModal, setShowModeModal] = useState(false);
     const [showTotalDetails, setShowTotalDetails] = useState(false);
+    const [showPinaConfirm, setShowPinaConfirm] = useState(false);
     const [adjustMins, setAdjustMins] = useState('');
 
     // Always call hooks unconditionally — React rules of hooks
@@ -323,7 +324,7 @@ export default function TableCard({ table, session }) {
                             </button>
                             <button
                                 data-tour="mesa-btn-pina"
-                                onClick={handleStartPina}
+                                onClick={currentUser?.role === 'MESERO' ? () => setShowPinaConfirm(true) : handleStartPina}
                                 className="bg-amber-500 hover:bg-amber-400 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                             >
                                 <TargetIcon size={12} /> Piña
@@ -597,6 +598,34 @@ export default function TableCard({ table, session }) {
                 >
                     Cerrar Detalle
                 </button>
+            </div>
+        </Modal>
+
+        {/* Confirmación Piña — solo para MESERO */}
+        <Modal isOpen={showPinaConfirm} onClose={() => setShowPinaConfirm(false)} title="Confirmar Piña">
+            <div className="flex flex-col gap-4 py-2">
+                <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <span className="text-3xl">🎱</span>
+                    <div>
+                        <p className="font-black text-slate-800 text-sm">{table.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Se abrirá en modo <strong>Piña</strong> (precio fijo por partida).</p>
+                    </div>
+                </div>
+                <p className="text-xs text-slate-500 text-center">¿Confirmas que quieres abrir esta mesa en modo Piña?</p>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setShowPinaConfirm(false)}
+                        className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 active:scale-95 transition-all"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={() => { setShowPinaConfirm(false); handleStartPina(); }}
+                        className="flex-1 py-3 text-sm font-bold text-white bg-amber-500 rounded-xl hover:bg-amber-400 active:scale-95 transition-all shadow-md shadow-amber-500/20"
+                    >
+                        Sí, abrir Piña
+                    </button>
+                </div>
             </div>
         </Modal>
 
