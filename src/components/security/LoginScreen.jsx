@@ -8,7 +8,7 @@ import { supabaseCloud } from '../../config/supabaseCloud';
 import { useConfirm } from '../../hooks/useConfirm.jsx';
 
 export default function LoginScreen() {
-    const { cachedUsers, login, syncUsers, logout } = useAuthStore();
+    const { cachedUsers, login, loginWithBiometric, syncUsers, logout } = useAuthStore();
     const { activeCashSession } = useCashStore();
     const confirm = useConfirm();
     
@@ -29,6 +29,12 @@ export default function LoginScreen() {
 
     const handlePinSubmit = async (pin, userId) => {
         const success = await login(userId, pin);
+        if (success) setSelectedUser(null);
+        return success;
+    };
+
+    const handleBiometricLogin = async (userId) => {
+        const success = await loginWithBiometric(userId);
         if (success) setSelectedUser(null);
         return success;
     };
@@ -130,6 +136,7 @@ export default function LoginScreen() {
                 onClose={() => setSelectedUser(null)}
                 user={selectedUser}
                 onSubmit={handlePinSubmit}
+                onBiometricLogin={handleBiometricLogin}
             />
         </div>
     );

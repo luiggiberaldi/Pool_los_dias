@@ -14,6 +14,7 @@ let cashRealtimeChannel = null;
 let cashPollingInterval = null;
 let cashVisibilityBound = false;
 let cashVisibilityTimer = null;
+let cashVisibilityHandler = null;
 let lastSyncTime = 0;
 const SYNC_DEBOUNCE = 3000; // No sincronizar más de una vez cada 3s
 
@@ -154,7 +155,7 @@ export const useCashStore = create((set, get) => ({
     _subscribeVisibility: () => {
         if (typeof document === 'undefined' || cashVisibilityBound) return;
         cashVisibilityBound = true;
-        document.addEventListener('visibilitychange', () => {
+        cashVisibilityHandler = () => {
             if (document.visibilityState === 'visible') {
                 // Sincronizar inmediatamente al volver al primer plano (force=true)
                 if (cashVisibilityTimer) clearTimeout(cashVisibilityTimer);
@@ -162,7 +163,8 @@ export const useCashStore = create((set, get) => ({
                     get().syncCashSession(true);
                 }, 500);
             }
-        });
+        };
+        document.addEventListener('visibilitychange', cashVisibilityHandler);
     },
 
     openCashSession: async (baseUsd, baseBs, openedBy, openedByRole) => {
@@ -236,6 +238,26 @@ export const useCashStore = create((set, get) => ({
         }
 
         logEvent('VENTA', 'CIERRE_CAJA_SESION', `Caja cerrada por ${closedBy}`, { nombre: closedBy }, { sessionId: active.id, stats });
+    },
+
+    destroy: () => {
+        if (cashPollingInterval) {
+            clearInterval(cashPollingInterval);
+            cashPollingInterval = null;
+        }
+        if (cashRealtimeChannel) {
+            cashRealtimeChannel.unsubscribe();
+            cashRealtimeChannel = null;
+        }
+        if (cashVisibilityTimer) {
+            clearTimeout(cashVisibilityTimer);
+            cashVisibilityTimer = null;
+        }
+        if (cashVisibilityHandler && typeof document !== 'undefined') {
+            document.removeEventListener('visibilitychange', cashVisibilityHandler);
+            cashVisibilityHandler = null;
+            cashVisibilityBound = false;
+        }
     }
 }));
 

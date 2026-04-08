@@ -30,8 +30,16 @@ function generateCode() {
 export default async function handler(req, res) {
     // CORS — permitir dominio de producción + localhost dev
     const origin = req.headers?.origin || '';
-    const allowed = origin.includes('localhost') || origin.includes('vercel.app') || origin.includes('tasasaldia');
-    res.setHeader('Access-Control-Allow-Origin', allowed ? origin : '');
+    const ALLOWED_ORIGINS = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.endsWith('.tasasaldia.com') ||
+      origin.endsWith('.camelai.app') ||
+      origin.endsWith('.camelai.dev');
+    res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : '');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -45,14 +53,30 @@ export default async function handler(req, res) {
     try {
         // POST — Compartir inventario
         if (req.method === 'POST') {
-            const { products, categories } = req.body;
+            // Simple rate limiting: max 10 shares per IP per hour
+            const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+            const rateLimitKey = `rl:${clientIp}`;
+            const currentCount = parseInt(await redis('GET', rateLimitKey) || '0', 10);
+            if (currentCount >= 10) {
+                return res.status(429).json({ error: 'Demasiadas solicitudes. Intenta en una hora.' });
+            }
+            await redis('INCR', rateLimitKey);
+            if (currentCount === 0) {
+                await redis('EXPIRE', rateLimitKey, 3600);
+            }
 
-            if (!products || !Array.isArray(products) || products.length === 0) {
-                return res.status(400).json({ error: 'No hay productos para compartir.' });
+            const { products, categories, customers, sales } = req.body;
+
+            // At least one data type must be present
+            if ((!products || !Array.isArray(products) || products.length === 0) &&
+                (!customers || !Array.isArray(customers) || customers.length === 0) &&
+                (!sales || !Array.isArray(sales) || sales.length === 0)) {
+                return res.status(400).json({ error: 'No hay datos para compartir.' });
             }
 
             // Validar tamaño del payload
-            const payloadSize = JSON.stringify({ products, categories }).length;
+            const payloadStr = JSON.stringify({ products, categories, customers, sales });
+            const payloadSize = Buffer.byteLength(payloadStr, 'utf8');
             if (payloadSize > MAX_PAYLOAD_BYTES) {
                 return res.status(413).json({ error: `Payload demasiado grande (${(payloadSize / 1024 / 1024).toFixed(1)}MB). Máximo: 5MB.` });
             }
@@ -67,12 +91,20 @@ export default async function handler(req, res) {
                 attempts++;
             } while (attempts < 5);
 
+            // After the loop, verify we got a unique code
+            const finalExists = await redis('EXISTS', `inv:${code}`);
+            if (finalExists) {
+                return res.status(503).json({ error: 'No se pudo generar un código único. Intenta de nuevo.' });
+            }
+
             // Guardar en Redis con TTL de 24h
             const payload = JSON.stringify({
-                products,
+                products: products || [],
                 categories: categories || null,
+                customers: customers || [],
+                sales: sales || [],
                 createdAt: new Date().toISOString(),
-                count: products.length,
+                count: (products?.length || 0) + (customers?.length || 0) + (sales?.length || 0),
             });
 
             await redis('SET', `inv:${code}`, payload, 'EX', TTL_SECONDS);
@@ -80,7 +112,9 @@ export default async function handler(req, res) {
             return res.status(200).json({
                 code: `${code.slice(0, 3)}-${code.slice(3)}`,
                 expiresIn: '24 horas',
-                productCount: products.length,
+                productCount: products?.length || 0,
+                customerCount: customers?.length || 0,
+                salesCount: sales?.length || 0,
             });
         }
 

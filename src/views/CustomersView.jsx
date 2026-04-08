@@ -10,8 +10,7 @@ import EmptyState from '../components/EmptyState';
 import SwipeableItem from '../components/SwipeableItem';
 import { useProductContext } from '../context/ProductContext';
 import { useAudit } from '../hooks/useAudit';
-import { useAuthStore } from '../hooks/store/useAuthStore';
-import { useAuthStore as useNewAuthStore } from '../hooks/store/authStore';
+import { useAuthStore } from '../hooks/store/authStore';
 
 // Componentes de Clientes
 import CustomerCard from '../components/Customers/CustomerCard';
@@ -28,9 +27,8 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [filterType, setFilterType] = useState('all'); // 'all' | 'deuda' | 'favor'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    const usuarioActivo = useAuthStore(state => state.usuarioActivo);
-    const { role } = useNewAuthStore();
-    const isAdmin = role === 'ADMIN' || (!role && usuarioActivo?.rol === 'ADMIN');
+    const { role } = useAuthStore();
+    const isAdmin = role === 'ADMIN';
 
     const [transactionModal, setTransactionModal] = useState({ isOpen: false, type: null, customer: null });
     const [transactionAmount, setTransactionAmount] = useState('');

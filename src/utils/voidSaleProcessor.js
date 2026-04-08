@@ -1,6 +1,6 @@
 import { storageService } from './storageService';
 import { logEvent } from '../services/auditService';
-import { useAuthStore } from '../hooks/store/useAuthStore';
+import { useAuthStore } from '../hooks/store/authStore';
 import { round2 } from './dinero';
 
 const SALES_KEY = 'bodega_sales_v1';

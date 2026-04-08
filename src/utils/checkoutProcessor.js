@@ -1,8 +1,7 @@
 import { storageService } from './storageService';
 import { procesarImpactoCliente } from './financialLogic';
 import { logEvent } from '../services/auditService';
-import { useAuthStore } from '../hooks/store/useAuthStore';
-import { useAuthStore as useNewAuthStore } from '../hooks/store/authStore';
+import { useAuthStore } from '../hooks/store/authStore';
 import { round2, subR, sumR } from './dinero';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
@@ -52,6 +51,14 @@ export async function processSaleTransaction({
 
     if (cartTotalUsd <= EPSILON) {
         return { success: false, error: 'No se pueden generar ventas de $0.00' };
+    }
+
+    // Validate saldo a favor BEFORE persisting anything
+    if (selectedCustomerId) {
+        const saldoFavorUsed = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
+        if (saldoFavorUsed > (selectedCustomer?.favor || 0) + EPSILON) {
+            return { success: false, error: 'Saldo a favor insuficiente' };
+        }
     }
 
     const fiadoAmountUsd = remainingUsd > EPSILON ? remainingUsd : 0;
@@ -145,9 +152,7 @@ export async function processSaleTransaction({
     }
 
     // ── GESTIÓN DE CACHÉ LOCAL (Para no bloquear al usuario) ──
-    const legacyUser = useAuthStore.getState().usuarioActivo;
-    const newUser = useNewAuthStore.getState().currentUser;
-    const currentUser = newUser || legacyUser;
+    const currentUser = useAuthStore.getState().currentUser;
     const sale = {
         id: finalSaleId || crypto.randomUUID(),
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
@@ -246,11 +251,6 @@ export async function processSaleTransaction({
 
     if (selectedCustomer) {
         const amount_favor_used = payments.filter(p => p.methodId === 'saldo_favor').reduce((sum, p) => sum + p.amountUsd, 0);
-
-        // Validate that the customer actually has enough saldo a favor
-        if (amount_favor_used > (selectedCustomer?.favor || 0) + EPSILON) {
-            return { success: false, error: 'Saldo a favor insuficiente' };
-        }
 
         const transaccionOpts = {
             usaSaldoFavor: amount_favor_used,

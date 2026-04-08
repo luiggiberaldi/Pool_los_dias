@@ -4,7 +4,7 @@
  *      log('VENTA', 'VENTA_COMPLETADA', 'Venta $25.50', { saleId: '...' });
  */
 import { useCallback } from 'react';
-import { useAuthStore } from './store/useAuthStore';
+import { useAuthStore } from './store/authStore';
 import { logEvent } from '../services/auditService';
 
 export function useAudit() {

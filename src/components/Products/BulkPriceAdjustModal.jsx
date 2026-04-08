@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, TrendingUp, TrendingDown, Percent, Check, AlertTriangle } from 'lucide-react';
 import { logEvent } from '../../services/auditService';
-import { useAuthStore } from '../../hooks/store/useAuthStore';
+import { useAuthStore } from '../../hooks/store/authStore';
 
 export default function BulkPriceAdjustModal({
     isOpen,

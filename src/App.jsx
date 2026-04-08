@@ -39,12 +39,12 @@ import { useConfirm } from './hooks/useConfirm.jsx';
 import { useTablesStore } from './hooks/store/useTablesStore';
 import { useOrdersStore } from './hooks/store/useOrdersStore';
 
-export default function App() {
-  // Nombre del negocio fijo para todos los dispositivos
-  if (!localStorage.getItem('business_name')) {
-    localStorage.setItem('business_name', 'Pool los diaz');
-  }
+// Nombre del negocio fijo para todos los dispositivos (module-level, runs once on import)
+if (!localStorage.getItem('business_name')) {
+  localStorage.setItem('business_name', 'Pool los diaz');
+}
 
+export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showIOSInstall, setShowIOSInstall] = useState(false);
@@ -71,6 +71,7 @@ export default function App() {
   const subscribeToTablesRealtime = useTablesStore(s => s.subscribeToRealtime);
   const subscribeToOrdersRealtime = useOrdersStore(s => s.subscribeToRealtime);
   const unsubscribeFromTablesRealtime = useTablesStore(s => s.unsubscribeFromRealtime);
+  const unsubscribeFromOrdersRealtime = useOrdersStore(s => s.unsubscribeFromRealtime);
   const syncTablesAndSessionsGlobal = useTablesStore(s => s.syncTablesAndSessions);
 
   useEffect(() => {
@@ -79,8 +80,11 @@ export default function App() {
     syncTablesAndSessionsGlobal();
     subscribeToTablesRealtime();
     subscribeToOrdersRealtime();
-    return () => unsubscribeFromTablesRealtime();
-  }, [cloudSession, syncTablesAndSessionsGlobal, subscribeToTablesRealtime, subscribeToOrdersRealtime, unsubscribeFromTablesRealtime]);
+    return () => {
+      unsubscribeFromTablesRealtime();
+      unsubscribeFromOrdersRealtime();
+    };
+  }, [cloudSession, syncTablesAndSessionsGlobal, subscribeToTablesRealtime, subscribeToOrdersRealtime, unsubscribeFromTablesRealtime, unsubscribeFromOrdersRealtime]);
 
   // ── Sesión Supabase + límite de dispositivos vía RPC ─────────────────────
   useEffect(() => {
@@ -391,9 +395,11 @@ export default function App() {
 
       {/* Golden Tester View Overlay */}
       {showTester && (
-        <div className="fixed inset-0 z-[150] bg-[#F8FAFC]">
-          <TesterView onBack={() => setShowTester(false)} />
-        </div>
+        <Suspense fallback={<div className="fixed inset-0 z-[150] bg-[#F8FAFC] flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-[#0EA5E9] border-t-transparent animate-spin" /></div>}>
+          <div className="fixed inset-0 z-[150] bg-[#F8FAFC]">
+            <TesterView onBack={() => setShowTester(false)} />
+          </div>
+        </Suspense>
       )}
 
 

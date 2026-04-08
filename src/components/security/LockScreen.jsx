@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuthStore } from '../../hooks/store/useAuthStore';
+import { useAuthStore } from '../../hooks/store/authStore';
 import { useConfirm } from '../../hooks/useConfirm.jsx';
 import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
@@ -10,7 +10,7 @@ export default function LockScreen() {
   const confirm = useConfirm();
 
   const handlePinSubmit = async (pin, userId) => {
-    const success = await login(pin, userId);
+    const success = await login(userId, pin);
     if (success) {
       setSelectedUser(null);
     }

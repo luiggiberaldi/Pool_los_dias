@@ -155,6 +155,28 @@ export const useAuthStore = create((set, get) => ({
         });
     },
 
+    // ── Login biométrico (sin PIN — solo tras verificación WebAuthn exitosa) ──
+    loginWithBiometric: async (userId) => {
+        const { cachedUsers } = get();
+        const user = cachedUsers.find(u => u.id === userId);
+        if (!user) return false;
+
+        const session = { ...user, name: capitalizeName(user.name) };
+
+        try {
+            const lf = await getLocalForage();
+            await lf.setItem(SESSION_KEY, session);
+        } catch { /* continúa aunque falle la persistencia */ }
+
+        set({
+            isAuthenticated: true,
+            currentUser:     session,
+            role:            session.role,
+        });
+
+        return true;
+    },
+
     // ── Métodos legados (por compatibilidad con SettingsView / DashboardView) ──
 
     setRequireLogin: () => {},

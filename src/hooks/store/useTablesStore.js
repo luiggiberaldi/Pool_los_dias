@@ -25,7 +25,8 @@ export const useTablesStore = create((set, get) => ({
     activeSessions: [],
     loading: true,
     realtimeChannel: null,
-    
+    _onlineHandler: null,
+
     config: {
         pricePerHour: 5,
         pricePina: 2
@@ -58,7 +59,9 @@ export const useTablesStore = create((set, get) => ({
 
             // 5. Escuchar internet para reintentar pendientes
             if (typeof window !== 'undefined') {
-                window.addEventListener('online', () => get().processPendingActions());
+                const handler = () => get().processPendingActions();
+                window.addEventListener('online', handler);
+                set({ _onlineHandler: handler });
             }
 
         } catch (error) {
@@ -223,6 +226,15 @@ export const useTablesStore = create((set, get) => ({
         if (get().realtimeChannel) {
             supabaseCloud.removeChannel(get().realtimeChannel);
             set({ realtimeChannel: null });
+        }
+    },
+
+    destroy: () => {
+        get().unsubscribeFromRealtime();
+        const handler = get()._onlineHandler;
+        if (handler && typeof window !== 'undefined') {
+            window.removeEventListener('online', handler);
+            set({ _onlineHandler: null });
         }
     },
 
