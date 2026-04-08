@@ -114,8 +114,27 @@ export const offlineQueueService = {
 
         for (const item of pending) {
           try {
+            // Ajustar pagos: si la suma de pagos > total, hay vuelto que no
+            // fue descontado (payloads creados antes del fix). Restar el exceso
+            // del último pago para que Débito == Crédito en doble partida.
+            let adjustedPayments = [...(item.payload.payments || [])];
+            const payTotal = adjustedPayments.reduce((s, p) => s + (p.amountUsd || 0), 0);
+            const saleTotal = item.payload.total || 0;
+            const fiado = item.payload.fiadoUsd || 0;
+            const excess = payTotal + fiado - saleTotal;
+            if (excess > 0.01 && adjustedPayments.length > 0) {
+              let rem = excess;
+              for (let i = adjustedPayments.length - 1; i >= 0 && rem > 0.01; i--) {
+                const red = Math.min(rem, adjustedPayments[i].amountUsd);
+                adjustedPayments[i] = { ...adjustedPayments[i], amountUsd: Math.round((adjustedPayments[i].amountUsd - red) * 100) / 100 };
+                rem = Math.round((rem - red) * 100) / 100;
+              }
+              adjustedPayments = adjustedPayments.filter(p => p.amountUsd > 0.01);
+            }
+
             const payloadWithOrigin = {
               ...item.payload,
+              payments: adjustedPayments,
               sync_origin: 'offline_sync',
               original_created_at: item.created_at
             };

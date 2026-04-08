@@ -29,7 +29,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const {
         products, setProducts, categories, setCategories, isLoadingProducts,
         streetRate, useAutoRate, setUseAutoRate, customRate, setCustomRate,
-        effectiveRate, copEnabled, tasaCop, adjustStock: baseAdjustStock
+        effectiveRate, copEnabled, tasaCop, adjustStock: baseAdjustStock, broadcastProductDelta
     } = useProductContext();
     const { role: newRole } = useNewAuthStore();
     const legacyRol = useAuthStore(s => s.usuarioActivo)?.rol;
@@ -62,7 +62,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     };
 
     // ── Form hook ──
-    const form = useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog, onClose: () => setIsModalOpen(false) });
+    const form = useProductForm({ products, effectiveRate, setProducts, broadcastProductDelta, triggerHaptic, auditLog, onClose: () => setIsModalOpen(false) });
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleEdit = async (product) => {

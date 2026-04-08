@@ -10,7 +10,7 @@ export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
     effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
     customers, setCustomers, products,
-    setProductsSilent, setSalesData,
+    setProductsAfterCheckout, setSalesData,
     setCart, setShowCheckout, setShowReceipt, setSelectedCustomerId, setCartSelectedIndex,
     setShowConfetti, tableCheckoutData, setTableCheckoutData,
     playCheckout, playError, triggerHaptic, notifyLowStock,
@@ -28,7 +28,7 @@ export function useSalesCheckout({
             playError();
             return;
         }
-        setProductsSilent(result.updatedProducts);
+        setProductsAfterCheckout(result.updatedProducts);
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
         setShowReceipt(result.sale);
@@ -39,7 +39,7 @@ export function useSalesCheckout({
         setShowCheckout(false);
         setSelectedCustomerId('');
         setCartSelectedIndex(-1);
-    }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsSilent, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
+    }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
 
     // Accepts selectedCustomerId as argument since it's owned by the view
     const handleCheckoutWithCustomer = useCallback(async (payments, changeBreakdown, selectedCustomerId) => {
@@ -55,7 +55,7 @@ export function useSalesCheckout({
             playError();
             return;
         }
-        setProductsSilent(result.updatedProducts);
+        setProductsAfterCheckout(result.updatedProducts);
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
         setShowReceipt(result.sale);
@@ -66,7 +66,7 @@ export function useSalesCheckout({
         setShowCheckout(false);
         setSelectedCustomerId('');
         setCartSelectedIndex(-1);
-    }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsSilent, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
+    }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
 
     const handleTableCheckout = useCallback(async (payments, changeBreakdown, selectedCustomerId) => {
         if (!tableCheckoutData) return;
@@ -126,7 +126,7 @@ export function useSalesCheckout({
             return;
         }
 
-        setProductsSilent(result.updatedProducts);
+        setProductsAfterCheckout(result.updatedProducts);
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
 
@@ -142,7 +142,7 @@ export function useSalesCheckout({
         notifyLowStock(result.updatedProducts);
         setTableCheckoutData(null);
         setSelectedCustomerId('');
-    }, [tableCheckoutData, effectiveRate, tasaCop, copEnabled, customers, products, useAutoRate, setProductsSilent, setCustomers, setSalesData, setShowReceipt, setTableCheckoutData, setSelectedCustomerId, setShowConfetti, playCheckout, playError, notifyLowStock, triggerHaptic]);
+    }, [tableCheckoutData, effectiveRate, tasaCop, copEnabled, customers, products, useAutoRate, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, setTableCheckoutData, setSelectedCustomerId, setShowConfetti, playCheckout, playError, notifyLowStock, triggerHaptic]);
 
     const handleCreateCustomer = useCallback(async (name, documentId, phone) => {
         const newCustomer = { id: crypto.randomUUID(), name, documentId: documentId || '', phone: phone || '', deuda: 0, favor: 0, createdAt: new Date().toISOString() };

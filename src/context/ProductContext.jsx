@@ -75,6 +75,60 @@ export function ProductProvider({ children, rates }) {
         return localStorage.getItem('tasa_cop') || '';
     });
 
+    // ── Sincronización de productos entre dispositivos via Supabase Broadcast ──
+    // Broadcast = 0 egress. Solo envía el delta (productos que cambiaron).
+    const productChannelRef = useRef(null);
+
+    useEffect(() => {
+        const ch = supabaseCloud.channel('product_sync_v1');
+        ch.on('broadcast', { event: 'product_delta' }, ({ payload }) => {
+            if (!payload || payload.senderId === DEVICE_ID) return;
+
+            if (payload.type === 'stock_update' && payload.changes) {
+                console.log(`[ProductSync] Stock actualizado desde otro dispositivo (${payload.changes.length} productos)`);
+                _setProducts(prev => {
+                    const map = new Map(payload.changes.map(c => [c.id, c.stock]));
+                    const next = prev.map(p => map.has(p.id) ? { ...p, stock: map.get(p.id) } : p);
+                    storageService.setItemSilent('bodega_products_v1', next);
+                    return next;
+                });
+            } else if (payload.type === 'product_update' && payload.product) {
+                console.log(`[ProductSync] Producto "${payload.product.name}" actualizado desde otro dispositivo`);
+                _setProducts(prev => {
+                    const next = prev.map(p => p.id === payload.product.id ? { ...p, ...payload.product } : p);
+                    storageService.setItemSilent('bodega_products_v1', next);
+                    return next;
+                });
+            } else if (payload.type === 'product_added' && payload.product) {
+                console.log(`[ProductSync] Nuevo producto "${payload.product.name}" desde otro dispositivo`);
+                _setProducts(prev => {
+                    if (prev.some(p => p.id === payload.product.id)) return prev;
+                    const next = [payload.product, ...prev];
+                    storageService.setItemSilent('bodega_products_v1', next);
+                    return next;
+                });
+            } else if (payload.type === 'full_sync' && payload.products) {
+                console.log(`[ProductSync] Sync completo desde otro dispositivo (${payload.products.length} productos)`);
+                _setProducts(payload.products);
+                storageService.setItemSilent('bodega_products_v1', payload.products);
+            }
+        });
+        ch.subscribe((status) => {
+            if (status === 'SUBSCRIBED') console.log('[ProductSync] Canal de sincronización de productos conectado');
+        });
+        productChannelRef.current = ch;
+        return () => { supabaseCloud.removeChannel(ch); };
+    }, []);
+
+    const broadcastProductDelta = useCallback((type, data) => {
+        if (!productChannelRef.current) return;
+        productChannelRef.current.send({
+            type: 'broadcast',
+            event: 'product_delta',
+            payload: { senderId: DEVICE_ID, type, ...data }
+        }).catch(() => {});
+    }, []);
+
     // ── Sincronización de tasa entre dispositivos via Supabase Broadcast ──
     const channelRef = useRef(null);
     const isRemoteUpdate = useRef(false);
@@ -312,15 +366,33 @@ export function ProductProvider({ children, rates }) {
     };
 
     const adjustStock = (productId, delta) => {
-        setProducts(prevProducts => prevProducts.map(p => {
-            if (p.id === productId) {
-                const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
-                const newStock = (p.stock ?? 0) + delta;
-                return { ...p, stock: allowNeg ? newStock : Math.max(0, newStock) };
-            }
-            return p;
-        }));
+        const p = products.find(p => p.id === productId);
+        const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
+        const newStock = allowNeg ? (p?.stock ?? 0) + delta : Math.max(0, (p?.stock ?? 0) + delta);
+        setProducts(prevProducts => prevProducts.map(pr =>
+            pr.id === productId ? { ...pr, stock: newStock } : pr
+        ));
+        broadcastProductDelta('stock_update', { changes: [{ id: productId, stock: newStock }] });
     };
+
+    // Actualiza productos después de checkout: guarda local + broadcast instantáneo de stock
+    // No hace full cloud push para evitar egress innecesario — el sync_documents
+    // se actualiza eventualmente cuando el usuario edita un producto.
+    const setProductsAfterCheckout = useCallback((updatedProducts) => {
+        _setProducts(updatedProducts);
+        storageService.setItem('bodega_products_v1', updatedProducts);
+        // Broadcast solo los cambios de stock (delta)
+        const changes = [];
+        for (const up of updatedProducts) {
+            const old = products.find(p => p.id === up.id);
+            if (old && old.stock !== up.stock) {
+                changes.push({ id: up.id, stock: up.stock });
+            }
+        }
+        if (changes.length > 0) {
+            broadcastProductDelta('stock_update', { changes });
+        }
+    }, [products, broadcastProductDelta]);
 
     return (
         <ProductContext.Provider value={{
@@ -329,6 +401,8 @@ export function ProductProvider({ children, rates }) {
             // setProductsSilent: updates UI ONLY, no save to storage/cloud.
             // Use this after receiving data from cloud to avoid re-upload loops.
             setProductsSilent: _setProducts,
+            setProductsAfterCheckout,
+            broadcastProductDelta,
             categories,
             setCategories,
             isLoadingProducts,

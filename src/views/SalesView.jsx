@@ -38,7 +38,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     const { playAdd, playRemove, playCheckout, playError } = useSounds();
     const { notifyLowStock } = useNotifications();
 
-    const { products, setProductsSilent, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProductsSilent, setProductsAfterCheckout, isLoadingProducts, useAutoRate, setUseAutoRate, customRate, setCustomRate, effectiveRate, copEnabled, tasaCop } = useProductContext();
     const { activeCashSession } = useCashStore();
     const { role: userRole } = useAuthStore();
     const maxDiscountPercent = parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100;
@@ -90,7 +90,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
         effectiveRate, tasaCop, copEnabled, discountData, useAutoRate,
         customers, setCustomers, products,
-        setProductsSilent, setSalesData,
+        setProductsAfterCheckout, setSalesData,
         setCart, setShowCheckout, setShowReceipt, setSelectedCustomerId, setCartSelectedIndex,
         setShowConfetti, tableCheckoutData, setTableCheckoutData,
         playCheckout, playError, triggerHaptic, notifyLowStock,

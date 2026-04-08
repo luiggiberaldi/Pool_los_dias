@@ -64,6 +64,26 @@ export async function processSaleTransaction({
     const cartForRpc = cart.filter(i => isValidUUID(i._originalId || i.id));
     const hasRpcCompatibleItems = cartForRpc.length > 0;
 
+    // Ajustar pagos para el RPC: descontar el vuelto para que Débito == Crédito
+    // El cliente puede pagar $10 por una venta de $2 y recibir $8 de vuelto.
+    // El RPC espera que la suma de pagos == total de la venta.
+    let rpcPayments = payments.map(p => ({
+      methodId: p.methodId,
+      amountUsd: p.amountUsd,
+      currency: p.currency || 'USD',
+      methodLabel: p.methodLabel || p.methodId
+    }));
+
+    if (changeUsd > EPSILON && rpcPayments.length > 0) {
+      let remaining = changeUsd;
+      for (let i = rpcPayments.length - 1; i >= 0 && remaining > EPSILON; i--) {
+        const reduction = Math.min(remaining, rpcPayments[i].amountUsd);
+        rpcPayments[i] = { ...rpcPayments[i], amountUsd: round2(rpcPayments[i].amountUsd - reduction) };
+        remaining = round2(remaining - reduction);
+      }
+      rpcPayments = rpcPayments.filter(p => p.amountUsd > EPSILON);
+    }
+
     const rpcPayload = {
       total: cartTotalUsd,
       cart: cartForRpc.map(i => ({
@@ -74,12 +94,7 @@ export async function processSaleTransaction({
           linkedProductId: i.linkedProductId || null,
           linkedQty: i.linkedQty || 1
       })),
-      payments: payments.map(p => ({
-        methodId: p.methodId,
-        amountUsd: p.amountUsd,
-        currency: p.currency || 'USD',
-        methodLabel: p.methodLabel || p.methodId
-      })),
+      payments: rpcPayments,
       fiadoUsd: fiadoAmountUsd
     };
 

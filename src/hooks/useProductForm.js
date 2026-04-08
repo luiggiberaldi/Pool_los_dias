@@ -3,7 +3,7 @@ import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { buildProductPayload } from '../utils/productProcessor';
 
-export function useProductForm({ products, effectiveRate, setProducts, triggerHaptic, auditLog, onClose }) {
+export function useProductForm({ products, effectiveRate, setProducts, broadcastProductDelta, triggerHaptic, auditLog, onClose }) {
     const [editingId, setEditingId] = useState(null);
     const [name, setName] = useState('');
     const [barcode, setBarcode] = useState('');
@@ -107,10 +107,22 @@ export function useProductForm({ products, effectiveRate, setProducts, triggerHa
             const newPrice = productData.priceUsdt ?? 0;
             const meta = { productoId: editingId, productName: name };
             if (oldPrice !== newPrice) { meta.oldPrice = oldPrice; meta.newPrice = newPrice; }
-            setProducts(products.map(p => p.id === editingId ? { ...p, ...productData, image: image || p.image } : p));
+            const updatedProduct = { ...oldProduct, ...productData, image: image || oldProduct?.image };
+            setProducts(products.map(p => p.id === editingId ? updatedProduct : p));
+            // Broadcast instantáneo (sin imagen para reducir tamaño del mensaje)
+            if (broadcastProductDelta) {
+                const { image: _img, ...productWithoutImage } = updatedProduct;
+                broadcastProductDelta('product_update', { product: productWithoutImage });
+            }
             auditLog('INVENTARIO', 'PRODUCTO_EDITADO', `Producto "${name}" editado${oldPrice !== newPrice ? ` (precio: $${oldPrice} → $${newPrice})` : ''}`, meta);
         } else {
-            setProducts([{ id: crypto.randomUUID(), ...productData, image, createdAt: new Date().toISOString() }, ...products]);
+            const newProduct = { id: crypto.randomUUID(), ...productData, image, createdAt: new Date().toISOString() };
+            setProducts([newProduct, ...products]);
+            // Broadcast instantáneo del nuevo producto
+            if (broadcastProductDelta) {
+                const { image: _img, ...productWithoutImage } = newProduct;
+                broadcastProductDelta('product_added', { product: productWithoutImage });
+            }
             auditLog('INVENTARIO', 'PRODUCTO_CREADO', `Producto "${name}" creado - $${priceUsd || '0'}`);
         }
         handleClose();
