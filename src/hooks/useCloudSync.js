@@ -337,12 +337,15 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
     isVisibilityBound = true;
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && isInitialSyncCompleted) {
-            // Debounce: evitar múltiples pulls si el usuario cambia tabs rápido
             if (visibilityDebounceTimer) clearTimeout(visibilityDebounceTimer);
-            visibilityDebounceTimer = setTimeout(() => {
-                console.log('[CloudSync] App volvió al primer plano – re-sincronizando desde la nube...');
+            visibilityDebounceTimer = setTimeout(async () => {
+                console.log('[CloudSync] App volvió al primer plano – re-sincronizando...');
                 pullLatestFromCloud();
-            }, 60_000);
+                // También pull incremental de ventas
+                const { pullNewSales } = await import('../utils/salesSyncService');
+                const { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+                if (session?.user?.id) pullNewSales(session.user.id);
+            }, 500);
         }
     });
 }
@@ -430,6 +433,10 @@ export function useCloudSync() {
                 // Procesar cualquier cambio que se haya intentado subir durante el arranque
                 processSyncQueue();
 
+                // Pull incremental de ventas (solo nuevas desde último sync)
+                const { pullNewSales, subscribeSalesRealtime, applyIncomingSale } = await import('../utils/salesSyncService');
+                await pullNewSales(userId);
+
                 // ── Suscripción Realtime ─────────────────────────
                 // Si el userId cambió (logout/login), limpiar la suscripción anterior
                 if (globalSubscription && globalSubscriptionUserId !== userId) {
@@ -448,8 +455,16 @@ export function useCloudSync() {
                             filter: `user_id=eq.${userId}`
                         }, async (payload) => {
                             const doc = payload.new;
-                            if (!doc || !['store', 'local'].includes(doc.collection)) return;
-                            
+                            if (!doc) return;
+
+                            // Ventas individuales → merge, no reemplazar
+                            if (doc.collection === 'sale') {
+                                await applyIncomingSale(doc.data?.payload);
+                                return;
+                            }
+
+                            if (!['store', 'local'].includes(doc.collection)) return;
+
                             // Ignorar si nosotros mismos estamos intentando subir cambios de esta misma llave
                             const queue = getSyncQueue();
                             if (queue.includes(doc.doc_id)) return;
@@ -463,6 +478,9 @@ export function useCloudSync() {
                             }
                         });
                 }
+
+                // Suscripción Broadcast para ventas en tiempo real (0 DB egress)
+                subscribeSalesRealtime(userId, applyIncomingSale);
 
             } catch (err) {
                 console.error('[CloudSync] Error inicialización P2P:', err);

@@ -7,6 +7,7 @@ import { round2, subR, sumR } from './dinero';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { capitalizeName } from './calculatorUtils';
+import { broadcastNewSale } from './salesSyncService';
 
 const SALES_KEY = 'bodega_sales_v1';
 const EPSILON = 0.01;
@@ -189,6 +190,13 @@ export async function processSaleTransaction({
     const finalPersistedSale = Object.freeze({ ...sale, saleNumber });
 
     await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
+
+    // Sincronizar venta a otros dispositivos (Broadcast P2P + persist individual en DB)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.id) {
+            broadcastNewSale({ ...finalPersistedSale }, session.user.id).catch(() => {});
+        }
+    }).catch(() => {});
 
     // Audit log
     const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
