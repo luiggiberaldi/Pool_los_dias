@@ -1,10 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Receipt, Zap, ArrowLeftRight, AlertTriangle, Clock, Coffee, Layers, Users } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
 import { mulR, subR, divR } from '../../utils/dinero';
 import { useCheckoutPayments, EPSILON } from '../../hooks/useCheckoutPayments';
 import CustomerPickerSection from './CustomerPickerSection';
+import SpotlightTour from '../SpotlightTour';
+
+const CHECKOUT_TOUR_KEY = 'pda_checkout_tour_done';
+
+const CHECKOUT_STEPS = [
+    {
+        target: '[data-tour="checkout-total"]',
+        title: 'Total a Pagar',
+        text: 'Este es el monto total de la venta en USD y en Bs, calculado con la tasa del día.'
+    },
+    {
+        target: '[data-tour="checkout-usd"]',
+        title: 'Pago en Dólares ($)',
+        text: 'Ingresa el monto que el cliente paga en efectivo USD. Toca "Total" para rellenar el monto exacto.'
+    },
+    {
+        target: '[data-tour="checkout-bs"]',
+        title: 'Pago en Bolívares (Bs)',
+        text: 'Puedes combinar métodos: efectivo Bs, pago móvil, punto de venta. El sistema descuenta del total automáticamente.'
+    },
+    {
+        target: '[data-tour="checkout-remaining"]',
+        title: 'Resta / Vuelto',
+        text: 'En naranja = falta por cobrar. En verde = hay vuelto. Al llenarse con exactitud, el botón se activa.'
+    },
+    {
+        target: '[data-tour="checkout-confirm"]',
+        title: 'Confirmar Venta',
+        text: 'Una vez cubierto el total, este botón se activa. Si hay vuelto, puedes desglosarlo en $ y Bs antes de confirmar.'
+    },
+];
 
 // ── Estilos de barra por moneda ──
 const sectionStyles = {
@@ -76,6 +107,10 @@ export default function CheckoutModal({
         overpayAlertData, setOverpayAlertData, confirmOverpay,
     } = useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic });
 
+    const [showCheckoutTour, setShowCheckoutTour] = useState(
+        () => localStorage.getItem(CHECKOUT_TOUR_KEY) !== 'true'
+    );
+
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
     const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
@@ -133,6 +168,14 @@ export default function CheckoutModal({
     };
 
     return (
+        <>
+        {showCheckoutTour && (
+            <SpotlightTour
+                steps={CHECKOUT_STEPS}
+                onComplete={() => { localStorage.setItem(CHECKOUT_TOUR_KEY, 'true'); setShowCheckoutTour(false); }}
+                onSkip={() => { localStorage.setItem(CHECKOUT_TOUR_KEY, 'true'); setShowCheckoutTour(false); }}
+            />
+        )}
         <div className="fixed inset-0 z-50 bg-white dark:bg-slate-950 flex flex-col overflow-hidden">
 
             {/* --- HEADER --- */}
@@ -196,7 +239,7 @@ export default function CheckoutModal({
                 )}
 
                 {/* -- TOTAL BIMONEDA -- */}
-                <div className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
+                <div data-tour="checkout-total" className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
                     {discountData?.active && (
                         <div className="flex flex-col items-center justify-center space-y-1 mb-3 pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
                             <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
@@ -231,7 +274,7 @@ export default function CheckoutModal({
 
                 {/* -- SECCIÓN DÓLARES ($) -- */}
                 {methodsUsd.length > 0 && (
-                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
+                    <div data-tour="checkout-usd" className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
                         <h3 className={`text-[11px] font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${sectionStyles.USD.title}`}>
                             <span className={`p-1 rounded-lg ${sectionStyles.USD.titleBg}`}>💲</span>
                             Dólares ($)
@@ -242,7 +285,7 @@ export default function CheckoutModal({
 
                 {/* -- SECCIÓN BOLÍVARES (Bs) -- */}
                 {methodsBs.length > 0 && (
-                    <div className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
+                    <div data-tour="checkout-bs" className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.BS.title}`}>
                                 <span className={`p-1 rounded-lg ${sectionStyles.BS.titleBg}`}>💵</span>
@@ -273,7 +316,7 @@ export default function CheckoutModal({
                 )}
 
                 {/* -- BANNER VUELTO / RESTANTE -- */}
-                <div className="px-3 py-2">
+                <div data-tour="checkout-remaining" className="px-3 py-2">
                     <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
                         ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
                         : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
@@ -379,7 +422,7 @@ export default function CheckoutModal({
             </div>
 
             {/* --- BOTÓN CTA FIJO --- */}
-            <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div data-tour="checkout-confirm" className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                     onClick={() => {
                         if (!isPaid && selectedCustomerId && remainingUsd >= EPSILON) {
@@ -539,5 +582,6 @@ export default function CheckoutModal({
                 );
             })()}
         </div>
+        </>
     );
 }
