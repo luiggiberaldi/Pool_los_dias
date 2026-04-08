@@ -64,13 +64,19 @@ function PinInput({ value, onChange, label, length = 4 }) {
                 <input
                     key={i}
                     id={`pin-${label}-${i}`}
-                    type="password"
+                    type="tel"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={1}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     value={digits[i]?.trim() || ''}
                     onChange={e => handleChange(i, e.target.value)}
                     onKeyDown={e => handleKeyDown(i, e)}
                     className={`${length > 4 ? 'w-[38px] h-12 text-lg' : 'w-11 h-14 text-xl'} text-center font-black bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 outline-none text-slate-800 dark:text-white transition-all`}
+                    style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                 />
             ))}
         </div>
