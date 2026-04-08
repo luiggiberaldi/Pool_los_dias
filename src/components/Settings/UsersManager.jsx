@@ -309,10 +309,9 @@ export default function UsersManager({ triggerHaptic }) {
 
     const handleDelete = async () => {
         try {
-            // Soft delete
             const { error } = await supabaseCloud
                 .from('staff_users')
-                .update({ active: false })
+                .delete()
                 .eq('id', deleteUser.id);
 
             if (error) throw error;
