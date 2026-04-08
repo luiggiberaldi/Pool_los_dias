@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare } from 'lucide-react';
+import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare, Warehouse } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
 import ShareInventoryModal from '../components/ShareInventoryModal';
@@ -166,6 +166,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
             <div className="shrink-0 mb-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center shrink-0">
+                            <Warehouse size={18} className="text-blue-600 dark:text-blue-400" />
+                        </div>
                         <h2 className="text-lg sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight truncate">Inventario</h2>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
