@@ -1,6 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ShoppingCart, Plus, Minus, X, CheckCircle, Package, Trash2, DollarSign, Percent } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
+import SpotlightTour from '../SpotlightTour';
+
+const CART_TOUR_KEY = 'pda_cart_tour_done';
+
+const CART_STEPS = [
+    {
+        target: '[data-tour="cart-items"]',
+        title: 'Cesta de Compra',
+        text: 'Aquí se listan los productos agregados. Toca la cantidad para editarla directamente, o usa + y − para ajustar.'
+    },
+    {
+        target: '[data-tour="cart-discount"]',
+        title: 'Añadir Descuento',
+        text: 'Aplica un descuento en porcentaje (%) o monto fijo ($) a toda la venta antes de cobrar.'
+    },
+    {
+        target: '[data-tour="cart-total"]',
+        title: 'Total de la Venta',
+        text: 'El total se muestra en USD y Bs, calculado con la tasa del día. Se actualiza en tiempo real al agregar o quitar productos.'
+    },
+    {
+        target: '[data-tour="checkout-btn"]',
+        title: 'Procesar Cobro',
+        text: 'Cuando el carrito esté listo, toca aquí para ir a la pantalla de cobro donde podrás elegir los métodos de pago.'
+    },
+];
 
 export default function CartPanel({
     cart,
@@ -24,6 +50,9 @@ export default function CartPanel({
     const [editingQtyId, setEditingQtyId] = React.useState(null);
     const [tempQty, setTempQty] = React.useState('');
     const inputRef = React.useRef(null);
+    const [showCartTour, setShowCartTour] = useState(
+        () => localStorage.getItem(CART_TOUR_KEY) !== 'true'
+    );
 
     const handleQtyClick = (item) => {
         setEditingQtyId(item.id);
@@ -44,6 +73,14 @@ export default function CartPanel({
     };
 
     return (
+        <>
+        {showCartTour && (
+            <SpotlightTour
+                steps={CART_STEPS}
+                onComplete={() => { localStorage.setItem(CART_TOUR_KEY, 'true'); setShowCartTour(false); }}
+                onSkip={() => { localStorage.setItem(CART_TOUR_KEY, 'true'); setShowCartTour(false); }}
+            />
+        )}
         <div className="lg:flex-1 lg:min-h-0 flex flex-col bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
 
             {/* Header */}
@@ -61,6 +98,7 @@ export default function CartPanel({
 
             {/* Cart Items — scrollable area with touch support */}
             <div
+                data-tour="cart-items"
                 className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto overscroll-contain p-2 sm:p-3"
                 style={{ WebkitOverflowScrolling: 'touch' }}
             >
@@ -147,6 +185,7 @@ export default function CartPanel({
                 
                 {/* Botón de Descuento */}
                 <button
+                    data-tour="cart-discount"
                     onClick={() => { triggerHaptic && triggerHaptic(); onOpenDiscount(); }}
                     disabled={cart.length === 0}
                     className={`w-full py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl flex items-center justify-between transition-all outline-none focus:ring-2 focus:ring-emerald-500/50 ${discountData?.active ? 'bg-amber-100/80 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60' : 'bg-slate-50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
@@ -167,7 +206,7 @@ export default function CartPanel({
                     )}
                 </button>
 
-                <div className="flex justify-between items-end px-1 sm:px-0 pt-1">
+                <div data-tour="cart-total" className="flex justify-between items-end px-1 sm:px-0 pt-1">
                     <div className="flex flex-col">
                         <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">Total Venta</span>
                         {discountData?.active && (
@@ -214,5 +253,6 @@ export default function CartPanel({
                 </button>
             </div>
         </div>
+        </>
     );
 }
