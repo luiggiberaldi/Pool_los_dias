@@ -46,7 +46,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
 
     // ── PIN submit ────────────────────────────────────────────────────────────
     const handleSubmit = useCallback(async () => {
-        if (pin.length !== targetPinLength || processing) return;
+        if (pin.length !== targetPinLength || processing || showSetupPrompt) return;
         setProcessing(true);
 
         // Si hay verificación separada (flujo biométrico), usarla
@@ -63,6 +63,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
 
         // PIN correcto, sin huella registrada → ofrecer activarla ANTES de loguearse
         if (onVerifyPin && bioAvailable && !bioRegistered) {
+            setPin('');
             setKeepOpen(true);
             setShowSetupPrompt(true);
             setProcessing(false);
@@ -76,7 +77,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
             setProcessing(false);
             onClose();
         }
-    }, [pin, processing, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose]);
+    }, [pin, processing, showSetupPrompt, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose]);
 
     // Auto-submit al completar dígitos
     useEffect(() => {
