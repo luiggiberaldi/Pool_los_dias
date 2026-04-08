@@ -29,7 +29,8 @@ export default function LoginScreen() {
 
     const handlePinSubmit = async (pin, userId) => {
         const success = await login(userId, pin);
-        if (success) setSelectedUser(null);
+        // NO cerrar el modal aquí — el modal maneja su propio cierre
+        // para poder mostrar el prompt de activación biométrica.
         return success;
     };
 

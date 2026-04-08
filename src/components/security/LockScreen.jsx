@@ -11,9 +11,7 @@ export default function LockScreen() {
 
   const handlePinSubmit = async (pin, userId) => {
     const success = await login(userId, pin);
-    if (success) {
-      setSelectedUser(null);
-    }
+    // NO cerrar aquí — el modal maneja su cierre para el prompt biométrico
     return success;
   };
 

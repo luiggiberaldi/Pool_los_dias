@@ -64,8 +64,12 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
             setKeepOpen(true);
             setShowSetupPrompt(true);
             setProcessing(false);
+        } else {
+            // Sin prompt biométrico → cerrar modal
+            setProcessing(false);
+            onClose();
         }
-        // si ya tiene huella o no es móvil, el padre cerrará el modal normalmente
+        // si ya tiene huella o no es móvil, el modal se cierra arriba
     }, [pin, processing, onSubmit, userId, targetPinLength, bioAvailable, bioRegistered]);
 
     // Auto-submit al completar dígitos
@@ -113,11 +117,13 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
             setTimeout(() => {
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
+                onClose();
             }, 1400);
         } catch (err) {
             if (!err.message?.includes('cancel') && !err.message?.toLowerCase().includes('abort')) {
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
+                onClose();
             } else {
                 setSetupLoading(false);
             }
@@ -127,6 +133,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onBiome
     const handleSkipSetup = () => {
         setKeepOpen(false);
         setShowSetupPrompt(false);
+        onClose();
     };
 
     const handlePadPress = (digit) => {
