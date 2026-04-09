@@ -44,7 +44,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const { log: auditLog } = useAudit();
     const confirm = useConfirm();
     const [sales, setSales] = useState([]);
-    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
+    const { products, setProducts, isLoadingProducts, effectiveRate: bcvRate, useAutoRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [customers, setCustomers] = useState([]);
     const [isLoadingLocal, setIsLoadingLocal] = useState(true);
@@ -385,7 +385,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             <div className="w-9 h-9 bg-sky-100 rounded-xl flex items-center justify-center mb-2.5"><ArrowUpRight size={18} className="text-sky-600" strokeWidth={2.5} /></div>
                             <p className="text-xl font-black text-slate-800 leading-none">{formatBs(bcvRate)}</p>
                             <p className="text-[10px] text-slate-400 mt-0.5">Bs por dólar</p>
-                            <p className="text-[10px] text-sky-500 mt-1.5 font-bold uppercase tracking-wider">Tasa BCV</p>
+                            <p className={`text-[10px] ${useAutoRate ? 'text-sky-500' : 'text-amber-500'} mt-1.5 font-bold uppercase tracking-wider`}>{useAutoRate ? 'Tasa BCV' : 'Tasa Manual'}</p>
                         </div>
                     </div>
                 </div>
