@@ -17,8 +17,8 @@ export const useOrdersStore = create((set, get) => ({
     init: async () => {
         set({ loading: true });
         try {
-            const cachedOrders = await ordersCache.getItem(scopedKey(scopedKey('active_orders'))) || [];
-            const cachedItems = await ordersCache.getItem(scopedKey(scopedKey('active_order_items'))) || [];
+            const cachedOrders = await ordersCache.getItem(scopedKey('active_orders')) || [];
+            const cachedItems = await ordersCache.getItem(scopedKey('active_order_items')) || [];
             set({ orders: cachedOrders, orderItems: cachedItems, loading: false });
             
             // Sync initial state

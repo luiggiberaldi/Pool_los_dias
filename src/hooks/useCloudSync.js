@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { storageService } from '../utils/storageService';
+import { scopedKey } from './store/accountScope';
 
 const SYNC_KEYS = [
     'bodega_products_v1',
@@ -19,7 +20,8 @@ const SYNC_KEYS = [
 ];
 
 // Clave para rastrear el último pull exitoso (evita re-descargar datos sin cambios)
-const LAST_PULL_KEY = '_cloud_last_pull_at';
+const LAST_PULL_KEY_BASE = '_cloud_last_pull_at';
+const getLastPullKey = () => scopedKey(LAST_PULL_KEY_BASE);
 
 const LOCAL_KEYS = [
     'abasto-auth-storage',
@@ -41,7 +43,8 @@ let isVisibilityBound = false;
 let visibilityDebounceTimer = null;
 
 const IMPORT_GUARD_KEY = '_poolbar_import_guard';
-const SYNC_QUEUE_KEY = '_poolbar_sync_queue'; // Cola persistente para offline
+const SYNC_QUEUE_KEY_BASE = '_poolbar_sync_queue';
+const getSyncQueueKey = () => scopedKey(SYNC_QUEUE_KEY_BASE);
 
 export const setImportGuard = () => sessionStorage.setItem(IMPORT_GUARD_KEY, '1');
 export const clearImportGuard = () => sessionStorage.removeItem(IMPORT_GUARD_KEY);
@@ -50,19 +53,19 @@ const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
 // Gestión de Cola Offline
 export const getSyncQueue = () => {
     try {
-        return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+        return JSON.parse(localStorage.getItem(getSyncQueueKey()) || '[]');
     } catch(e) { return []; }
 };
 export const addToSyncQueue = (key) => {
     const queue = getSyncQueue();
     if (!queue.includes(key)) {
         queue.push(key);
-        localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+        localStorage.setItem(getSyncQueueKey(), JSON.stringify(queue));
     }
 };
 export const removeFromSyncQueue = (key) => {
     const queue = getSyncQueue().filter(k => k !== key);
-    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+    localStorage.setItem(getSyncQueueKey(), JSON.stringify(queue));
 };
 
 /**
@@ -105,7 +108,7 @@ export const forcePullFromCloud = async () => {
         if (!session?.user?.id) throw new Error('No hay sesión activa.');
 
         console.log('[CloudSync] Iniciando RESTAURACIÓN FORZADA desde la nube...');
-        localStorage.removeItem(SYNC_QUEUE_KEY);
+        localStorage.removeItem(getSyncQueueKey());
 
         await storageService.removeItem('bodega_products_v1');
         await storageService.removeItem('poolbar_categories_v1');
@@ -303,7 +306,7 @@ export const pullLatestFromCloud = async () => {
         if (!session?.user?.id) return;
 
         const queue = getSyncQueue();
-        const lastPullAt = localStorage.getItem(LAST_PULL_KEY);
+        const lastPullAt = localStorage.getItem(getLastPullKey());
 
         let query = supabaseCloud
             .from('sync_documents')
@@ -326,7 +329,7 @@ export const pullLatestFromCloud = async () => {
         }
 
         // Guardar timestamp del pull para el próximo ciclo
-        localStorage.setItem(LAST_PULL_KEY, new Date().toISOString());
+        localStorage.setItem(getLastPullKey(), new Date().toISOString());
     } catch (e) {
         console.warn('[CloudSync] pullLatest falló silenciosamente:', e.message);
     }
@@ -394,7 +397,7 @@ export function useCloudSync() {
                     clearImportGuard();
                     isInitialSyncCompleted = true;
                 } else {
-                    const lastPullAt = localStorage.getItem(LAST_PULL_KEY);
+                    const lastPullAt = localStorage.getItem(getLastPullKey());
                     let initQuery = supabaseCloud
                         .from('sync_documents')
                         .select('collection, doc_id, data, updated_at')
@@ -421,7 +424,7 @@ export function useCloudSync() {
                             }
                         }
                         isInitialSyncCompleted = true;
-                        localStorage.setItem(LAST_PULL_KEY, new Date().toISOString());
+                        localStorage.setItem(getLastPullKey(), new Date().toISOString());
                     }
                 }
 

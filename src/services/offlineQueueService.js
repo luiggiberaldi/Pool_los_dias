@@ -1,8 +1,11 @@
 import localforage from 'localforage';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
+import { scopedKey } from '../hooks/store/accountScope';
 
-const QUEUE_KEY = 'offline_sales_queue';
-const SYNC_LOCK_KEY = '_poolbar_offline_sync_lock';
+const QUEUE_KEY_BASE = 'offline_sales_queue';
+const SYNC_LOCK_KEY_BASE = '_poolbar_offline_sync_lock';
+const getQueueKey = () => scopedKey(QUEUE_KEY_BASE);
+const getLockKey = () => scopedKey(SYNC_LOCK_KEY_BASE);
 const LOCK_TTL = 30_000; // 30s — si un tab crashea, el lock expira
 const RPC_TIMEOUT = 12_000; // 12s timeout para cada RPC
 
@@ -19,18 +22,19 @@ const UNRECOVERABLE_CODES = new Set([
 // ─── Lock Multi-Tab ────────────────────────────────────────────────────────
 function acquireSyncLock() {
     try {
-        const raw = localStorage.getItem(SYNC_LOCK_KEY);
+        const lockKey = getLockKey();
+        const raw = localStorage.getItem(lockKey);
         if (raw) {
             const existing = JSON.parse(raw);
             if (existing && Date.now() - existing.ts < LOCK_TTL) return false;
         }
-        localStorage.setItem(SYNC_LOCK_KEY, JSON.stringify({ ts: Date.now() }));
+        localStorage.setItem(lockKey, JSON.stringify({ ts: Date.now() }));
         return true;
-    } catch { return true; } // Si falla lectura, proceder
+    } catch { return true; }
 }
 
 function releaseSyncLock() {
-    try { localStorage.removeItem(SYNC_LOCK_KEY); } catch {}
+    try { localStorage.removeItem(getLockKey()); } catch {}
 }
 
 // ─── Timeout wrapper ───────────────────────────────────────────────────────
@@ -45,7 +49,7 @@ function withTimeout(promise, ms) {
 
 export const offlineQueueService = {
   async addSaleToQueue(salePayload) {
-    const queue = await localforage.getItem(QUEUE_KEY) || [];
+    const queue = await localforage.getItem(getQueueKey()) || [];
 
     // Deduplicación: si ya existe un item pending con la misma idempotency_key, no duplicar
     if (salePayload.idempotency_key) {
@@ -66,7 +70,7 @@ export const offlineQueueService = {
       sync_status: 'pending',
       attempts: 0
     };
-    await localforage.setItem(QUEUE_KEY, [...queue, newEntry]);
+    await localforage.setItem(getQueueKey(), [...queue, newEntry]);
     return newEntry;
   },
 
@@ -84,12 +88,12 @@ export const offlineQueueService = {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             console.warn('[Offline Sync] No hay sesión activa — no se puede sincronizar.');
-            const queue = await localforage.getItem(QUEUE_KEY) || [];
+            const queue = await localforage.getItem(getQueueKey()) || [];
             const totalPending = queue.filter(q => q.sync_status === 'pending').length;
             return { synced: 0, failed: 0, pending: totalPending };
         }
 
-        const queue = await localforage.getItem(QUEUE_KEY) || [];
+        const queue = await localforage.getItem(getQueueKey()) || [];
         const now = Date.now();
         const totalPending = queue.filter(q => q.sync_status === 'pending').length;
         const pending = queue.filter(q =>
@@ -105,7 +109,7 @@ export const offlineQueueService = {
             return true;
           });
           if (purged.length !== queue.length) {
-            await localforage.setItem(QUEUE_KEY, purged);
+            await localforage.setItem(getQueueKey(), purged);
           }
           return { synced: 0, failed: 0, pending: totalPending };
         }
@@ -180,7 +184,7 @@ export const offlineQueueService = {
           if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
           return true;
         });
-        await localforage.setItem(QUEUE_KEY, purgedQueue);
+        await localforage.setItem(getQueueKey(), purgedQueue);
 
         const remainingPending = purgedQueue.filter(q => q.sync_status === 'pending').length;
         return { synced, failed, pending: remainingPending };

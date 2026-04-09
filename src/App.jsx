@@ -38,6 +38,7 @@ import { supabaseCloud } from './config/supabaseCloud';
 import { useConfirm } from './hooks/useConfirm.jsx';
 import { useTablesStore } from './hooks/store/useTablesStore';
 import { useOrdersStore } from './hooks/store/useOrdersStore';
+import { useCashStore } from './hooks/store/cashStore';
 
 // Nombre del negocio fijo para todos los dispositivos (module-level, runs once on import)
 if (!localStorage.getItem('business_name')) {
@@ -118,6 +119,11 @@ export default function App() {
 
       const email = session.user.email.toLowerCase();
       setCloudEmail(email);
+
+      // Reinicializar stores con las claves scopeadas de esta cuenta
+      useCashStore.getState().init();
+      useTablesStore.getState().init();
+      useOrdersStore.getState().init();
       const deviceId = localStorage.getItem('pda_device_id') || 'UNKNOWN';
 
       try {

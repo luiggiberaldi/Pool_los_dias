@@ -12,9 +12,11 @@
 
 import { supabaseCloud } from '../config/supabaseCloud';
 import { storageService } from './storageService';
+import { scopedKey } from '../hooks/store/accountScope';
 
 const SALES_KEY = 'bodega_sales_v1';
-const LAST_SALES_PULL_KEY = '_cloud_last_sales_pull_at';
+const LAST_SALES_PULL_KEY_BASE = '_cloud_last_sales_pull_at';
+const getLastSalesPullKey = () => scopedKey(LAST_SALES_PULL_KEY_BASE);
 
 let salesBroadcastChannel = null;
 let salesBroadcastUserId = null;
@@ -108,7 +110,7 @@ export async function pullNewSales(userId) {
     if (!userId) return 0;
 
     try {
-        const sinceTimestamp = localStorage.getItem(LAST_SALES_PULL_KEY);
+        const sinceTimestamp = localStorage.getItem(getLastSalesPullKey());
 
         let query = supabaseCloud
             .from('sync_documents')
@@ -140,7 +142,7 @@ export async function pullNewSales(userId) {
             console.log(`[SalesSync] Merged ${newSales.length} venta(s) nueva(s) desde la nube`);
         }
 
-        localStorage.setItem(LAST_SALES_PULL_KEY, new Date().toISOString());
+        localStorage.setItem(getLastSalesPullKey(), new Date().toISOString());
         return newSales.length;
     } catch (e) {
         console.warn('[SalesSync] pullNewSales falló:', e?.message);
