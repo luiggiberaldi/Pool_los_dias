@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle, Search } from 'lucide-react';
 import { SectionCard } from '../../SettingsShared';
 import { useTablesStore } from '../../../hooks/store/useTablesStore';
-import ConfirmModal from '../../ConfirmModal';
+import { mulR, divR } from '../../../utils/dinero';
 
 function useBcvRate() {
     const [rate, setRate] = useState(() => {
@@ -26,26 +26,71 @@ function useBcvRate() {
 }
 
 export default function SettingsTabMesas({ showToast, triggerHaptic }) {
-    const { config, updateConfig, tables, addTable, updateTable, deleteTable } = useTablesStore();
+    const { config, updateConfig, tables, activeSessions, addTable, updateTable, deleteTable } = useTablesStore();
     const bcvRate = useBcvRate();
     
     // Config State — synced from store config
     const [pricePerHour, setPricePerHour] = useState(config?.pricePerHour || 0);
     const [pricePina, setPricePina] = useState(config?.pricePina || 0);
+    // Bs state for bidirectional inputs
+    const [pricePerHourBs, setPricePerHourBs] = useState(() =>
+        bcvRate > 0 && config?.pricePerHour ? String(mulR(config.pricePerHour, bcvRate)) : ''
+    );
+    const [pricePinaBs, setPricePinaBs] = useState(() =>
+        bcvRate > 0 && config?.pricePina ? String(mulR(config.pricePina, bcvRate)) : ''
+    );
+    // Track which field the user is actively editing to avoid overwriting
+    const editingRef = useRef(null);
+
+    // Bidirectional handlers
+    const handleHourUsdChange = (val) => {
+        editingRef.current = 'hourUsd';
+        setPricePerHour(val);
+        if (!val || parseFloat(val) <= 0) { setPricePerHourBs(''); return; }
+        if (bcvRate > 0) setPricePerHourBs(String(mulR(parseFloat(val), bcvRate)));
+    };
+    const handleHourBsChange = (val) => {
+        editingRef.current = 'hourBs';
+        setPricePerHourBs(val);
+        if (!val || parseFloat(val) <= 0) { setPricePerHour(''); return; }
+        if (bcvRate > 0) setPricePerHour(String(divR(parseFloat(val), bcvRate)));
+    };
+    const handlePinaUsdChange = (val) => {
+        editingRef.current = 'pinaUsd';
+        setPricePina(val);
+        if (!val || parseFloat(val) <= 0) { setPricePinaBs(''); return; }
+        if (bcvRate > 0) setPricePinaBs(String(mulR(parseFloat(val), bcvRate)));
+    };
+    const handlePinaBsChange = (val) => {
+        editingRef.current = 'pinaBs';
+        setPricePinaBs(val);
+        if (!val || parseFloat(val) <= 0) { setPricePina(''); return; }
+        if (bcvRate > 0) setPricePina(String(divR(parseFloat(val), bcvRate)));
+    };
 
     // Sync local state when external config changes (e.g., from another tab/device)
     const configPricePerHour = config?.pricePerHour;
     const configPricePina = config?.pricePina;
     useEffect(() => {
         const raf = requestAnimationFrame(() => {
-            if (configPricePerHour != null) setPricePerHour(configPricePerHour);
-            if (configPricePina != null) setPricePina(configPricePina);
+            if (configPricePerHour != null) {
+                setPricePerHour(configPricePerHour);
+                if (bcvRate > 0 && editingRef.current !== 'hourBs') {
+                    setPricePerHourBs(String(mulR(configPricePerHour, bcvRate)));
+                }
+            }
+            if (configPricePina != null) {
+                setPricePina(configPricePina);
+                if (bcvRate > 0 && editingRef.current !== 'pinaBs') {
+                    setPricePinaBs(String(mulR(configPricePina, bcvRate)));
+                }
+            }
+            editingRef.current = null;
         });
         return () => cancelAnimationFrame(raf);
     }, [configPricePerHour, configPricePina]);
 
-    // Form State for new/edit table
-    const [isEditing, setIsEditing] = useState(null);
+    // Form State for adding new tables
     const [tableName, setTableName] = useState(() => {
         let maxNum = 0;
         const currentTables = useTablesStore.getState().tables;
@@ -60,7 +105,18 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     });
     const [tableType, setTableType] = useState('POOL');
     const [isSaving, setIsSaving] = useState(false);
-    const [deleteTargetId, setDeleteTargetId] = useState(null);
+
+    // Inline edit state
+    const [inlineEditId, setInlineEditId] = useState(null);
+    const [inlineEditName, setInlineEditName] = useState('');
+    const [inlineEditType, setInlineEditType] = useState('POOL');
+    const [inlineEditSaving, setInlineEditSaving] = useState(false);
+
+    // Inline delete confirmation
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+
+    // Search filter
+    const [searchFilter, setSearchFilter] = useState('');
 
     const getNextTableName = () => {
         let maxNum = 0;
@@ -75,10 +131,10 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
         return `Mesa ${maxNum + 1}`;
     };
 
-    // Auto-fill next table name when tables change and we're not editing
+    // Auto-fill next table name when tables change
     const tablesLength = tables.length;
     useEffect(() => {
-        if (!isEditing) {
+        if (!inlineEditId) {
             const raf = requestAnimationFrame(() => {
                 setTableName(getNextTableName());
             });
@@ -95,59 +151,84 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
         triggerHaptic?.('light');
     };
 
-    const handleAddOrUpdateTable = async () => {
+    // Add new table
+    const handleAddTable = async () => {
         if (!tableName.trim()) return;
-        const duplicate = tables.some(t => t.name.trim().toLowerCase() === tableName.trim().toLowerCase() && t.id !== isEditing);
+        const duplicate = tables.some(t => t.name.trim().toLowerCase() === tableName.trim().toLowerCase());
         if (duplicate) { showToast('Ya existe una mesa con ese nombre', 'error'); return; }
         setIsSaving(true);
         try {
-            if (isEditing) {
-                await updateTable(isEditing, { name: tableName, type: tableType });
-                showToast('Mesa actualizada correctamente', 'success');
-            } else {
-                await addTable(tableName, tableType);
-                showToast('Mesa agregada exitosamente', 'success');
-            }
-            // Reset
-            setIsEditing(null);
-            setTableName(getNextTableName()); // Now safely uses fresh state!
+            await addTable(tableName, tableType);
+            showToast('Mesa agregada', 'success');
+            setTableName(getNextTableName());
             setTableType('POOL');
         } catch (e) {
-            showToast('Error al guardar tabla', 'error');
+            showToast('Error al agregar mesa', 'error');
         } finally {
             setIsSaving(false);
             triggerHaptic?.('light');
         }
     };
 
-    const handleEditSetup = (t) => {
-        setIsEditing(t.id);
-        setTableName(t.name);
-        setTableType(t.type || 'POOL');
+    // Inline edit handlers
+    const startInlineEdit = (t) => {
+        setInlineEditId(t.id);
+        setInlineEditName(t.name);
+        setInlineEditType(t.type || 'POOL');
+        setDeleteConfirmId(null);
+    };
+    const cancelInlineEdit = () => {
+        setInlineEditId(null);
+        setInlineEditName('');
+        setInlineEditType('POOL');
+    };
+    const saveInlineEdit = async () => {
+        if (!inlineEditName.trim()) return;
+        const duplicate = tables.some(t => t.name.trim().toLowerCase() === inlineEditName.trim().toLowerCase() && t.id !== inlineEditId);
+        if (duplicate) { showToast('Ya existe una mesa con ese nombre', 'error'); return; }
+        setInlineEditSaving(true);
+        try {
+            await updateTable(inlineEditId, { name: inlineEditName, type: inlineEditType });
+            showToast('Mesa actualizada', 'success');
+            cancelInlineEdit();
+        } catch (e) {
+            showToast('Error al actualizar', 'error');
+        } finally {
+            setInlineEditSaving(false);
+            triggerHaptic?.('light');
+        }
     };
 
-    const handleDelete = async () => {
-        if (!deleteTargetId) return;
-        const { activeSessions } = useTablesStore.getState();
-        const session = activeSessions.find(s => s.table_id === deleteTargetId);
+    // Inline delete handler
+    const handleInlineDelete = async (id) => {
+        const session = activeSessions.find(s => s.table_id === id);
         if (session) {
             const msg = session.status === 'CHECKOUT'
                 ? 'No puedes borrar una mesa que está en cobro'
                 : 'No puedes borrar una mesa que está abierta';
             showToast(msg, 'error');
-            setDeleteTargetId(null);
+            setDeleteConfirmId(null);
             return;
         }
         try {
-            await deleteTable(deleteTargetId);
+            await deleteTable(id);
             showToast('Mesa eliminada', 'success');
             triggerHaptic?.('light');
         } catch (e) {
             showToast('Error al eliminar mesa', 'error');
         } finally {
-            setDeleteTargetId(null);
+            setDeleteConfirmId(null);
         }
     };
+
+    // Filtered tables
+    const filteredTables = searchFilter
+        ? tables.filter(t => t.name.toLowerCase().includes(searchFilter.toLowerCase()))
+        : tables;
+
+    // Counters
+    const poolCount = tables.filter(t => t.type !== 'NORMAL').length;
+    const normalCount = tables.filter(t => t.type === 'NORMAL').length;
 
 
     return (
@@ -165,15 +246,28 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                             <input
                                 type="number"
                                 value={pricePerHour}
-                                onChange={e => setPricePerHour(e.target.value)}
+                                onChange={e => handleHourUsdChange(e.target.value)}
+                                onWheel={e => e.target.blur()}
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
                             />
                         </div>
                         {bcvRate > 0 && (
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Bs {(pricePerHour * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                <span className="text-[9px] text-slate-400">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
-                            </div>
+                            <>
+                                <label className="text-[10px] uppercase font-bold text-slate-400 mt-2 mb-1.5 block">
+                                    Hora Libre (Bs)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        value={pricePerHourBs}
+                                        onChange={e => handleHourBsChange(e.target.value)}
+                                        onWheel={e => e.target.blur()}
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
+                                    />
+                                </div>
+                                <span className="text-[9px] text-slate-400 mt-1 block">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
+                            </>
                         )}
                     </div>
                     <div>
@@ -185,15 +279,28 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                             <input
                                 type="number"
                                 value={pricePina}
-                                onChange={e => setPricePina(e.target.value)}
+                                onChange={e => handlePinaUsdChange(e.target.value)}
+                                onWheel={e => e.target.blur()}
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
                             />
                         </div>
                         {bcvRate > 0 && (
-                            <div className="mt-1.5 flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Bs {(pricePina * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                <span className="text-[9px] text-slate-400">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
-                            </div>
+                            <>
+                                <label className="text-[10px] uppercase font-bold text-slate-400 mt-2 mb-1.5 block">
+                                    La Piña (Bs)
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        value={pricePinaBs}
+                                        onChange={e => handlePinaBsChange(e.target.value)}
+                                        onWheel={e => e.target.blur()}
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
+                                    />
+                                </div>
+                                <span className="text-[9px] text-slate-400 mt-1 block">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
+                            </>
                         )}
                     </div>
                 </div>
@@ -209,23 +316,21 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             {/* Administracion de Mesas */}
             <div data-tour="settings-mesas-add">
             <SectionCard icon={Layers} title="Infraestructura de Mesas" subtitle="Crea y gestiona las áreas del bar" iconColor="text-sky-500">
-                {/* Form */}
+                {/* Add Form (only for new tables) */}
                 <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 mb-6">
                     <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
-                        {isEditing ? 'Editar Mesa' : 'Añadir Nueva Mesa'}
+                        Añadir Nueva Mesa
                     </h4>
                     <div className="flex flex-col gap-3">
-                        {/* Row 1: Nombre */}
                         <input
                             type="text"
                             placeholder="Nombre (ej. Mesa VIP)"
                             value={tableName}
                             onChange={(e) => setTableName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTable()}
                             className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2.5 text-sm font-medium dark:text-white focus:ring-2 focus:ring-sky-500/30 outline-none"
                         />
-                        {/* Row 2: Tipo + Acción */}
                         <div className="flex gap-2">
-                            {/* Toggle buttons instead of select to avoid overflow */}
                             <div className="flex flex-1 rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 min-w-0">
                                 <button
                                     type="button"
@@ -242,65 +347,176 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                     Normal (Bar)
                                 </button>
                             </div>
-                            <button 
-                                onClick={handleAddOrUpdateTable}
+                            <button
+                                onClick={handleAddTable}
                                 disabled={!tableName.trim() || isSaving}
                                 className="shrink-0 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-1.5"
                             >
-                                {isEditing ? <Check size={15} /> : <Plus size={15} />}
-                                {isEditing ? 'Guardar' : 'Agregar'}
+                                <Plus size={15} /> Agregar
                             </button>
-                            {isEditing && (
-                                <button 
-                                    onClick={() => { setIsEditing(null); setTableName(''); setTableType('POOL'); }}
-                                    className="shrink-0 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-lg transition-colors"
-                                >
-                                    <X size={15} />
-                                </button>
-                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* List */}
-                <div className="space-y-2">
-                    {tables.map(table => (
-                        <div key={table.id} className="flex items-center justify-between p-3 border border-slate-100 dark:border-white/5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                            <div>
-                                <h5 className="font-bold text-slate-800 dark:text-white text-sm">{table.name}</h5>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full inline-block mt-1 ${
-                                    table.type === 'NORMAL' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
-                                }`}>
-                                    {table.type === 'NORMAL' ? 'MESA NORMAL' : 'MESA POOL'}
-                                </span>
+                {/* Counter */}
+                {tables.length > 0 && (
+                    <div className="flex items-center gap-2 mb-3 px-1">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                            {tables.length} {tables.length === 1 ? 'mesa' : 'mesas'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                            ({poolCount} Pool, {normalCount} Normal)
+                        </span>
+                    </div>
+                )}
+
+                {/* Search (only if 8+ tables) */}
+                {tables.length >= 8 && (
+                    <div className="relative mb-3">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="text"
+                            value={searchFilter}
+                            onChange={e => setSearchFilter(e.target.value)}
+                            placeholder="Buscar mesa..."
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-8 py-2 text-sm font-medium dark:text-white focus:ring-2 focus:ring-sky-500/30 outline-none transition-all"
+                        />
+                        {searchFilter && (
+                            <button onClick={() => setSearchFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* List with fixed height scroll */}
+                <div className="max-h-[420px] overflow-y-auto space-y-2 pr-0.5">
+                    {filteredTables.map(table => {
+                        const isOccupied = activeSessions.some(s => s.table_id === table.id);
+                        const isEditingThis = inlineEditId === table.id;
+                        const isDeletingThis = deleteConfirmId === table.id;
+
+                        // Inline delete confirmation row
+                        if (isDeletingThis) {
+                            return (
+                                <div key={table.id} className="flex items-center justify-between p-3 border-2 border-rose-300 dark:border-rose-700 rounded-xl bg-rose-50 dark:bg-rose-900/20 animate-[fadeIn_0.15s_ease]">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <AlertTriangle size={16} className="text-rose-500 shrink-0" />
+                                        <span className="text-sm font-bold text-rose-700 dark:text-rose-300 truncate">
+                                            ¿Eliminar {table.name}?
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <button
+                                            onClick={() => handleInlineDelete(table.id)}
+                                            className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-lg transition-colors active:scale-95"
+                                        >
+                                            Eliminar
+                                        </button>
+                                        <button
+                                            onClick={() => setDeleteConfirmId(null)}
+                                            className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors"
+                                        >
+                                            No
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // Inline edit row
+                        if (isEditingThis) {
+                            return (
+                                <div key={table.id} className="p-3 border-2 border-sky-300 dark:border-sky-700 rounded-xl bg-sky-50 dark:bg-sky-900/10 animate-[fadeIn_0.15s_ease]">
+                                    <div className="flex flex-col gap-2">
+                                        <input
+                                            type="text"
+                                            value={inlineEditName}
+                                            onChange={e => setInlineEditName(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && saveInlineEdit()}
+                                            autoFocus
+                                            className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold dark:text-white focus:ring-2 focus:ring-sky-500/30 outline-none"
+                                        />
+                                        <div className="flex gap-2">
+                                            <div className="flex flex-1 rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 min-w-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setInlineEditType('POOL')}
+                                                    className={`flex-1 text-[11px] font-bold py-1.5 px-2 transition-colors ${inlineEditType === 'POOL' ? 'bg-sky-500 text-white' : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Pool
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setInlineEditType('NORMAL')}
+                                                    className={`flex-1 text-[11px] font-bold py-1.5 px-2 transition-colors border-l border-slate-300 dark:border-slate-700 ${inlineEditType === 'NORMAL' ? 'bg-amber-500 text-white' : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Normal
+                                                </button>
+                                            </div>
+                                            <button
+                                                onClick={saveInlineEdit}
+                                                disabled={!inlineEditName.trim() || inlineEditSaving}
+                                                className="shrink-0 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 active:scale-95"
+                                            >
+                                                {inlineEditSaving ? (
+                                                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <><Check size={13} /> Guardar</>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={cancelInlineEdit}
+                                                className="shrink-0 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 px-2.5 py-1.5 rounded-lg transition-colors"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // Normal display row
+                        return (
+                            <div key={table.id} className="flex items-center justify-between p-3 border border-slate-100 dark:border-white/5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                                <div className="min-w-0">
+                                    <h5 className="font-bold text-slate-800 dark:text-white text-sm truncate">{table.name}</h5>
+                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                            table.type === 'NORMAL' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+                                        }`}>
+                                            {table.type === 'NORMAL' ? 'NORMAL' : 'POOL'}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            isOccupied
+                                                ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+                                                : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                        }`}>
+                                            {isOccupied ? 'OCUPADA' : 'LIBRE'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1.5 items-center shrink-0">
+                                    <button onClick={() => startInlineEdit(table)} className="p-2 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all">
+                                        <Edit2 size={16} />
+                                    </button>
+                                    <button onClick={() => { setDeleteConfirmId(table.id); setInlineEditId(null); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all">
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-2 items-center">
-                                <button onClick={() => handleEditSetup(table)} className="p-2 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all">
-                                    <Edit2 size={16} />
-                                </button>
-                                <button onClick={() => setDeleteTargetId(table.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all">
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {tables.length === 0 && (
                         <p className="text-center text-sm text-slate-400 py-4">No hay mesas configuradas.</p>
+                    )}
+                    {tables.length > 0 && filteredTables.length === 0 && searchFilter && (
+                        <p className="text-center text-sm text-slate-400 py-4">No se encontraron mesas con "{searchFilter}"</p>
                     )}
                 </div>
             </SectionCard>
             </div>
-
-            <ConfirmModal
-                isOpen={!!deleteTargetId}
-                onClose={() => setDeleteTargetId(null)}
-                onConfirm={handleDelete}
-                variant="danger"
-                title="Eliminar Mesa"
-                message={`Esta accion eliminara la mesa permanentemente.\nLas sesiones previas se mantendran en el historial.`}
-                confirmText="Eliminar"
-                cancelText="Cancelar"
-            />
         </div>
     );
 }
