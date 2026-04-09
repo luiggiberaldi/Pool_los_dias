@@ -7,6 +7,14 @@ import { scopedKey } from './accountScope';
 
 const getUser = () => useAuthStore.getState().currentUser;
 
+// Helper: obtener user_id del usuario Supabase autenticado
+const getAuthUserId = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        return session?.user?.id || null;
+    } catch { return null; }
+};
+
 const tablesCache = localforage.createInstance({
     name: "PoolLosDiaz",
     storeName: "tables_cache"
@@ -120,7 +128,7 @@ export const useTablesStore = create((set, get) => ({
         await tablesCache.setItem(scopedKey('pool_config'), merged);
 
         try {
-            await supabaseCloud.from(scopedKey('pool_config')).update({
+            await supabaseCloud.from('pool_config').update({
                 price_per_hour: merged.pricePerHour,
                 price_pina: merged.pricePina,
                 updated_at: new Date().toISOString()
@@ -132,26 +140,36 @@ export const useTablesStore = create((set, get) => ({
 
     syncTablesAndSessions: async () => {
         try {
-            const { data: tablesData, error: tablesError } = await supabaseCloud
-                .from(scopedKey('tables'))
+            const userId = await getAuthUserId();
+
+            let tablesQuery = supabaseCloud
+                .from('tables')
                 .select('*')
                 .eq('active', true)
                 .order('name', { ascending: true });
+            if (userId) tablesQuery = tablesQuery.eq('user_id', userId);
+
+            const { data: tablesData, error: tablesError } = await tablesQuery;
 
             if (tablesError) throw tablesError;
 
-            const { data: sessionsData, error: sessionsError } = await supabaseCloud
+            let sessionsQuery = supabaseCloud
                 .from('table_sessions')
                 .select('*')
                 .in('status', ['ACTIVE', 'CHECKOUT']);
+            if (userId) sessionsQuery = sessionsQuery.eq('user_id', userId);
+
+            const { data: sessionsData, error: sessionsError } = await sessionsQuery;
 
             if (sessionsError) throw sessionsError;
 
-            const { data: configData, error: configError } = await supabaseCloud
-                .from(scopedKey('pool_config'))
+            let configQuery = supabaseCloud
+                .from('pool_config')
                 .select('*')
-                .eq('id', 1)
-                .single();
+                .eq('id', 1);
+            if (userId) configQuery = configQuery.eq('user_id', userId);
+
+            const { data: configData, error: configError } = await configQuery.maybeSingle();
 
             if (!configError && configData) {
                 const cloudConfig = {
@@ -241,6 +259,7 @@ export const useTablesStore = create((set, get) => ({
     },
 
     openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0) => {
+        const userId = await getAuthUserId();
         const sessionPayload = {
             table_id: tableId,
             opened_by: staffId,
@@ -249,6 +268,7 @@ export const useTablesStore = create((set, get) => ({
             status: 'ACTIVE',
             started_at: new Date().toISOString()
         };
+        if (userId) sessionPayload.user_id = userId;
 
         // ID temporal para UI
         const fakeId = 'temp-' + Date.now();
@@ -408,7 +428,10 @@ export const useTablesStore = create((set, get) => ({
 
     // --- ADMINISTRACIÓN DE MESAS ---
     addTable: async (name, type = 'POOL') => {
-            const { data, error } = await supabaseCloud.from(scopedKey('tables')).insert([{ name, type, status: 'libre', active: true }]).select().single();
+            const userId = await getAuthUserId();
+            const insertPayload = { name, type, status: 'libre', active: true };
+            if (userId) insertPayload.user_id = userId;
+            const { data, error } = await supabaseCloud.from('tables').insert([insertPayload]).select().single();
             if (error) throw error;
             set(state => ({ tables: sortTables([...state.tables, data]) }));
             await tablesCache.setItem(scopedKey('tables'), get().tables);
@@ -420,7 +443,7 @@ export const useTablesStore = create((set, get) => ({
         set(state => ({ tables: sortTables(state.tables.map(t => t.id === id ? { ...t, ...updates } : t)) }));
         await tablesCache.setItem(scopedKey('tables'), get().tables);
         try {
-            const { error } = await supabaseCloud.from(scopedKey('tables')).update(updates).eq('id', id);
+            const { error } = await supabaseCloud.from('tables').update(updates).eq('id', id);
             if (error) throw error;
         } catch (e) { console.error('Update table cloud fail:', e); }
     },
@@ -430,7 +453,7 @@ export const useTablesStore = create((set, get) => ({
         set(state => ({ tables: state.tables.filter(t => t.id !== id) }));
         await tablesCache.setItem(scopedKey('tables'), get().tables);
         logEvent('MESAS', 'MESA_ELIMINADA', `Mesa "${tableName}" eliminada`, getUser(), { tableId: id });
-        const { error } = await supabaseCloud.from(scopedKey('tables')).update({ active: false }).eq('id', id);
+        const { error } = await supabaseCloud.from('tables').update({ active: false }).eq('id', id);
         if (error) {
             // Revert optimistic update on failure
             await get().syncTablesAndSessions();

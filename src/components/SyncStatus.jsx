@@ -4,6 +4,7 @@ import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { pullLatestFromCloud } from '../hooks/useCloudSync';
 import { offlineQueueService } from '../services/offlineQueueService';
 import localforage from 'localforage';
+import { scopedKey } from '../hooks/store/accountScope';
 
 /**
  * SyncStatus — Indicador visual de conectividad + botón de sincronización forzada.
@@ -24,7 +25,7 @@ export default function SyncStatus() {
 
     const checkQueue = useCallback(async () => {
         try {
-            const queue = await localforage.getItem('offline_sales_queue') || [];
+            const queue = await localforage.getItem(scopedKey('offline_sales_queue')) || [];
             const pending = queue.filter(q => q.sync_status === 'pending');
             setPendingCount(pending.length);
         } catch(err) { /* silent */ }

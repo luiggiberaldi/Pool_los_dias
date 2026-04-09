@@ -28,12 +28,14 @@ export const storageService = {
                 return value;
             }
 
-            // --- Migración: intentar leer clave SIN scope (datos pre-aislamiento) ---
+            // --- Migración: mover clave SIN scope a la cuenta actual (una sola vez) ---
             if (sk !== key) {
                 const unscopedValue = await localforage.getItem(key);
                 if (unscopedValue !== null) {
                     await localforage.setItem(sk, unscopedValue);
-                    console.log(`[Migración Scope] ${key} -> ${sk}`);
+                    // Eliminar clave sin scope para que NO se copie a otra cuenta
+                    await localforage.removeItem(key);
+                    console.log(`[Migración Scope] ${key} -> ${sk} (original eliminado)`);
                     return unscopedValue;
                 }
             }

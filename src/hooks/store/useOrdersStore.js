@@ -3,6 +3,14 @@ import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { scopedKey } from './accountScope';
 
+// Helper: obtener user_id del usuario Supabase autenticado
+const getAuthUserId = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        return session?.user?.id || null;
+    } catch { return null; }
+};
+
 const ordersCache = localforage.createInstance({
     name: "PoolLosDiaz",
     storeName: "orders_cache"
@@ -84,11 +92,15 @@ export const useOrdersStore = create((set, get) => ({
 
     syncOrders: async () => {
         try {
-            // Fetch OPEN table_sessions to get active orders
-            const { data: openOrders, error: orderError } = await supabaseCloud
+            const userId = await getAuthUserId();
+            // Fetch OPEN orders, filtrado por user_id si la columna existe
+            let query = supabaseCloud
                 .from('orders')
                 .select('*')
                 .eq('status', 'OPEN');
+            if (userId) query = query.eq('user_id', userId);
+
+            const { data: openOrders, error: orderError } = await query;
             if (orderError) throw orderError;
 
             const orderIds = openOrders.map(o => o.id);
@@ -123,21 +135,25 @@ export const useOrdersStore = create((set, get) => ({
     // Añade un ítem a la sesión (crea la orden si no existe)
     addItemToSession: async (tableId, sessionId, creatorId, productInfo, exchangeRate = 1) => {
         let order = get().getOrderBySessionId(sessionId);
-        
+        const userId = await getAuthUserId();
+
         try {
             if (!order) {
                 // Crear orden
+                const orderPayload = {
+                    table_id: tableId,
+                    table_session_id: sessionId,
+                    created_by: creatorId,
+                    status: 'OPEN',
+                    total_usd: 0,
+                    total_bs: 0,
+                    exchange_rate_used: exchangeRate
+                };
+                if (userId) orderPayload.user_id = userId;
+
                 const { data: newOrder, error: orderErr } = await supabaseCloud
                     .from('orders')
-                    .insert([{
-                        table_id: tableId,
-                        table_session_id: sessionId,
-                        created_by: creatorId,
-                        status: 'OPEN',
-                        total_usd: 0,
-                        total_bs: 0,
-                        exchange_rate_used: exchangeRate
-                    }])
+                    .insert([orderPayload])
                     .select()
                     .single();
                 

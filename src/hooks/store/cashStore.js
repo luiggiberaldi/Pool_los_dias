@@ -4,6 +4,14 @@ import { supabaseCloud } from '../../config/supabaseCloud';
 import { logEvent } from '../../services/auditService';
 import { scopedKey } from './accountScope';
 
+// Helper: obtener user_id del usuario Supabase autenticado
+const getAuthUserId = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        return session?.user?.id || null;
+    } catch { return null; }
+};
+
 // Dedicated offline cache for cash session state
 const cashCache = localforage.createInstance({
     name: "PoolLosDiaz",
@@ -51,13 +59,18 @@ export const useCashStore = create((set, get) => ({
         lastSyncTime = now;
 
         try {
-            const { data, error } = await supabaseCloud
+            const userId = await getAuthUserId();
+            let query = supabaseCloud
                 .from('cash_sessions')
                 .select('*')
                 .eq('status', 'OPEN')
                 .order('opened_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+                .limit(1);
+
+            // Filtrar por user_id si la columna existe (nueva funcionalidad)
+            if (userId) query = query.eq('user_id', userId);
+
+            const { data, error } = await query.maybeSingle();
 
             // Si hay error, mantener estado local (puede ser RLS, offline, etc.)
             if (error) throw error;
@@ -168,6 +181,7 @@ export const useCashStore = create((set, get) => ({
     },
 
     openCashSession: async (baseUsd, baseBs, openedBy, openedByRole) => {
+        const userId = await getAuthUserId();
         const sessionPayload = {
             id: crypto.randomUUID(),
             opened_at: new Date().toISOString(),
@@ -191,6 +205,7 @@ export const useCashStore = create((set, get) => ({
             status: sessionPayload.status,
             notes: JSON.stringify({ base_bs: sessionPayload.base_bs }),
         };
+        if (userId) supabasePayload.user_id = userId;
 
         try {
             const { error } = await supabaseCloud.from('cash_sessions').insert(supabasePayload);
