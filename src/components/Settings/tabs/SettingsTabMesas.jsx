@@ -157,9 +157,8 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Aplica globalmente para Mesas de Pool" iconColor="text-emerald-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex justify-between items-center">
-                            <span>Hora Libre (USD)</span>
-                            <span className="text-emerald-500/80 lowercase">~ bs {(pricePerHour * bcvRate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</span>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">
+                            Hora Libre (USD)
                         </label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
@@ -170,11 +169,16 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
                             />
                         </div>
+                        {bcvRate > 0 && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Bs {(pricePerHour * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-[9px] text-slate-400">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
+                            </div>
+                        )}
                     </div>
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex justify-between items-center">
-                            <span>La Piña (USD)</span>
-                            <span className="text-emerald-500/80 lowercase">~ bs {(pricePina * bcvRate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</span>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">
+                            La Piña (USD)
                         </label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
@@ -185,6 +189,12 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
                             />
                         </div>
+                        {bcvRate > 0 && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Bs {(pricePina * bcvRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-[9px] text-slate-400">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <button
