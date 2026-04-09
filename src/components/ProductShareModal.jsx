@@ -27,7 +27,7 @@ export const ProductShareModal = ({ isOpen, onClose, product, rates, accounts, s
     if (!product) return null;
 
     // Cálculos
-    const valBs = product.priceUsdt * rates.bcv.price;
+    const valBs = product.priceBs > 0 ? product.priceBs : product.priceUsdt * rates.bcv.price;
 
     // Lógica Street Rate (Calibrada)
     // Si hay tasa calibrada (>0), el precio efectivo es Bs / TasaCalibrada

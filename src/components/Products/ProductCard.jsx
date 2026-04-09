@@ -28,7 +28,7 @@ export default function ProductCard({
     // número mostrado en el botón de confirmar mientras el usuario está editando.
     const baseStockRef = useRef(null);
 
-    const valBs = p.priceUsdt * effectiveRate;
+    const valBs = p.priceBs > 0 ? p.priceBs : p.priceUsdt * effectiveRate;
     const valCop = p.priceUsdt * tasaCop;
     // Si hay una edición en curso, usar el stock base capturado; si no, el actual del contexto
     const currentBase = baseStockRef.current !== null ? baseStockRef.current : (p.stock ?? 0);

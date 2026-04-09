@@ -229,7 +229,7 @@ export function OrderPanel({ session, table, onClose }) {
                                             <span className="text-emerald-500 font-black text-sm">${Number(p.priceUsdt || p.priceUsd || p.price || 0).toFixed(2)}</span>
                                             {effectiveRate > 0 && (
                                                 <span className="text-[10px] text-slate-500 font-medium ml-2">
-                                                    {(Number(p.priceUsdt || p.priceUsd || p.price || 0) * effectiveRate).toFixed(2)} Bs
+                                                    {(p.priceBs > 0 ? Number(p.priceBs) : Number(p.priceUsdt || p.priceUsd || p.price || 0) * effectiveRate).toFixed(2)} Bs
                                                 </span>
                                             )}
                                             {inOrder && (

@@ -122,7 +122,7 @@ const SearchBar = forwardRef(function SearchBar({
                                         ${p.priceUsdt?.toFixed(2)}
                                     </p>
                                     <p className="text-[10px] font-medium text-slate-400">
-                                        {formatBs(p.priceUsdt * effectiveRate)} Bs
+                                        {formatBs(p.priceBs > 0 ? p.priceBs : p.priceUsdt * effectiveRate)} Bs
                                     </p>
                                 </div>
                             </button>

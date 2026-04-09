@@ -332,7 +332,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                 </div>
                                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {paginatedProducts.map(p => {
-                                        const valBs = p.priceUsdt * effectiveRate;
+                                        const valBs = p.priceBs > 0 ? p.priceBs : p.priceUsdt * effectiveRate;
                                         const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5);
                                         const margin = p.costBs > 0 ? ((valBs - p.costBs) / p.costBs * 100) : null;
                                         const catInfo = categories.find(c => c.id === p.category);
