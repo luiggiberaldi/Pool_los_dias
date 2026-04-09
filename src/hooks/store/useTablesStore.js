@@ -3,6 +3,7 @@ import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { logEvent } from '../../services/auditService';
 import { useAuthStore } from './authStore';
+import { scopedKey } from './accountScope';
 
 const getUser = () => useAuthStore.getState().currentUser;
 
@@ -11,7 +12,8 @@ const tablesCache = localforage.createInstance({
     storeName: "tables_cache"
 });
 
-const PENDING_ACTIONS_KEY = 'pool_pending_table_actions';
+const PENDING_KEY_BASE = 'pool_pending_table_actions';
+const getPendingKey = () => scopedKey(PENDING_KEY_BASE);
 
 const sortTables = (tables) => {
     if (!tables) return [];
@@ -36,12 +38,12 @@ export const useTablesStore = create((set, get) => ({
         set({ loading: true });
         try {
             // 1. Cargar config
-            const cachedConfig = await tablesCache.getItem('pool_config');
+            const cachedConfig = await tablesCache.getItem(scopedKey('pool_config'));
             if (cachedConfig) set({ config: cachedConfig });
 
             // 2. Cargar cache local (Lo que quedó guardado al irse la luz)
-            const cachedTables = await tablesCache.getItem('tables') || [];
-            const cachedSessions = await tablesCache.getItem('active_sessions') || [];
+            const cachedTables = await tablesCache.getItem(scopedKey('tables')) || [];
+            const cachedSessions = await tablesCache.getItem(scopedKey('active_sessions')) || [];
             
             set({ 
                 tables: sortTables(cachedTables), 
@@ -72,13 +74,13 @@ export const useTablesStore = create((set, get) => ({
 
     // --- GESTIÓN DE COLA OFFLINE ---
     addPendingAction: async (action) => {
-        const queue = await tablesCache.getItem(PENDING_ACTIONS_KEY) || [];
+        const queue = await tablesCache.getItem(getPendingKey()) || [];
         queue.push({ ...action, id: Date.now(), timestamp: new Date().toISOString() });
-        await tablesCache.setItem(PENDING_ACTIONS_KEY, queue);
+        await tablesCache.setItem(getPendingKey(), queue);
     },
 
     processPendingActions: async () => {
-        const queue = await tablesCache.getItem(PENDING_ACTIONS_KEY) || [];
+        const queue = await tablesCache.getItem(getPendingKey()) || [];
         if (queue.length === 0) return;
 
         console.log(`[TablesSync] Procesando ${queue.length} acciones de mesa pendientes...`);
@@ -104,7 +106,7 @@ export const useTablesStore = create((set, get) => ({
             }
         }
 
-        await tablesCache.setItem(PENDING_ACTIONS_KEY, remainingQueue);
+        await tablesCache.setItem(getPendingKey(), remainingQueue);
         if (remainingQueue.length === 0) {
             get().syncTablesAndSessions(); // Refrescar IDS reales de la nube
         }
@@ -115,10 +117,10 @@ export const useTablesStore = create((set, get) => ({
     updateConfig: async (newConfig) => {
         const merged = { ...get().config, ...newConfig };
         set({ config: merged });
-        await tablesCache.setItem('pool_config', merged);
+        await tablesCache.setItem(scopedKey('pool_config'), merged);
 
         try {
-            await supabaseCloud.from('pool_config').update({
+            await supabaseCloud.from(scopedKey('pool_config')).update({
                 price_per_hour: merged.pricePerHour,
                 price_pina: merged.pricePina,
                 updated_at: new Date().toISOString()
@@ -131,7 +133,7 @@ export const useTablesStore = create((set, get) => ({
     syncTablesAndSessions: async () => {
         try {
             const { data: tablesData, error: tablesError } = await supabaseCloud
-                .from('tables')
+                .from(scopedKey('tables'))
                 .select('*')
                 .eq('active', true)
                 .order('name', { ascending: true });
@@ -146,7 +148,7 @@ export const useTablesStore = create((set, get) => ({
             if (sessionsError) throw sessionsError;
 
             const { data: configData, error: configError } = await supabaseCloud
-                .from('pool_config')
+                .from(scopedKey('pool_config'))
                 .select('*')
                 .eq('id', 1)
                 .single();
@@ -157,14 +159,14 @@ export const useTablesStore = create((set, get) => ({
                     pricePina: Number(configData.price_pina) || get().config.pricePina
                 };
                 set({ config: cloudConfig });
-                await tablesCache.setItem('pool_config', cloudConfig);
+                await tablesCache.setItem(scopedKey('pool_config'), cloudConfig);
             }
 
             const finalTables = sortTables(tablesData);
             set({ tables: finalTables, activeSessions: sessionsData });
             
-            await tablesCache.setItem('tables', finalTables);
-            await tablesCache.setItem('active_sessions', sessionsData);
+            await tablesCache.setItem(scopedKey('tables'), finalTables);
+            await tablesCache.setItem(scopedKey('active_sessions'), sessionsData);
 
         } catch (error) {
             console.warn('Sync cloud fallido (Modo Offline activo):', error.message);
@@ -193,7 +195,7 @@ export const useTablesStore = create((set, get) => ({
                 }
                 debouncedSync();
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: scopedKey('tables') }, (payload) => {
                  console.log("[REALTIME] tables change received:", payload);
                  if (payload.eventType === 'UPDATE') {
                     set(state => ({ tables: state.tables.map(t => t.id === payload.new.id ? payload.new : t) }));
@@ -204,7 +206,7 @@ export const useTablesStore = create((set, get) => ({
                 }
                 debouncedSync();
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'pool_config' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: scopedKey('pool_config') }, (payload) => {
                 console.log("[REALTIME] pool_config change received:", payload);
                 if (payload.eventType === 'UPDATE' && payload.new) {
                     set(state => ({
@@ -254,7 +256,7 @@ export const useTablesStore = create((set, get) => ({
 
         const newSessions = [...get().activeSessions, optimisticSession];
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         const tableName = get().tables.find(t => t.id === tableId)?.name ?? tableId;
         const modeLabel = gameMode === 'PINA' ? 'La Piña' : gameMode === 'PREPAGO' ? `Prepago ${hoursPaid}h` : 'Normal';
@@ -267,7 +269,7 @@ export const useTablesStore = create((set, get) => ({
             set(state => ({
                 activeSessions: state.activeSessions.map(s => s.id === fakeId ? data : s)
             }));
-            await tablesCache.setItem('active_sessions', get().activeSessions);
+            await tablesCache.setItem(scopedKey('active_sessions'), get().activeSessions);
 
         } catch (error) {
             console.warn('Guardado en nube fallido, encolado para más tarde.');
@@ -281,7 +283,7 @@ export const useTablesStore = create((set, get) => ({
 
         const updatedList = get().activeSessions.filter(s => s.id !== sessionId);
         set({ activeSessions: updatedList });
-        await tablesCache.setItem('active_sessions', updatedList);
+        await tablesCache.setItem(scopedKey('active_sessions'), updatedList);
 
         const cost = Number(totalCost);
         logEvent('MESAS', 'MESA_CERRADA', `Mesa ${tableName} cerrada${cost > 0 ? ` · $${cost.toFixed(2)}` : ''}`, getUser(), { sessionId, totalCost, paymentMethod });
@@ -307,7 +309,7 @@ export const useTablesStore = create((set, get) => ({
             s.id === sessionId ? { ...s, started_at: newStartedAt } : s
         );
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ started_at: newStartedAt }).eq('id', sessionId);
@@ -324,7 +326,7 @@ export const useTablesStore = create((set, get) => ({
         
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, hours_paid: newHours } : s);
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ hours_paid: newHours }).eq('id', sessionId);
@@ -342,7 +344,7 @@ export const useTablesStore = create((set, get) => ({
 
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, extended_times: newRounds } : s);
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Piña añadida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
 
@@ -362,7 +364,7 @@ export const useTablesStore = create((set, get) => ({
 
         const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, extended_times: newRounds } : s);
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         logEvent('MESAS', 'MESA_PIÑA_QUITADA', `Mesa ${tableName} · Piña removida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
 
@@ -379,7 +381,7 @@ export const useTablesStore = create((set, get) => ({
             s.id === sessionId ? { ...s, status: 'CHECKOUT' } : s
         );
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ status: 'CHECKOUT' }).eq('id', sessionId);
@@ -394,7 +396,7 @@ export const useTablesStore = create((set, get) => ({
             s.id === sessionId ? { ...s, status: 'ACTIVE' } : s
         );
         set({ activeSessions: newSessions });
-        await tablesCache.setItem('active_sessions', newSessions);
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ status: 'ACTIVE' }).eq('id', sessionId);
@@ -406,19 +408,19 @@ export const useTablesStore = create((set, get) => ({
 
     // --- ADMINISTRACIÓN DE MESAS ---
     addTable: async (name, type = 'POOL') => {
-            const { data, error } = await supabaseCloud.from('tables').insert([{ name, type, status: 'libre', active: true }]).select().single();
+            const { data, error } = await supabaseCloud.from(scopedKey('tables')).insert([{ name, type, status: 'libre', active: true }]).select().single();
             if (error) throw error;
             set(state => ({ tables: sortTables([...state.tables, data]) }));
-            await tablesCache.setItem('tables', get().tables);
+            await tablesCache.setItem(scopedKey('tables'), get().tables);
             logEvent('MESAS', 'MESA_CREADA', `Mesa "${name}" creada (${type})`, getUser(), { tableId: data.id, name, type });
             return data;
     },
 
     updateTable: async (id, updates) => {
         set(state => ({ tables: sortTables(state.tables.map(t => t.id === id ? { ...t, ...updates } : t)) }));
-        await tablesCache.setItem('tables', get().tables);
+        await tablesCache.setItem(scopedKey('tables'), get().tables);
         try {
-            const { error } = await supabaseCloud.from('tables').update(updates).eq('id', id);
+            const { error } = await supabaseCloud.from(scopedKey('tables')).update(updates).eq('id', id);
             if (error) throw error;
         } catch (e) { console.error('Update table cloud fail:', e); }
     },
@@ -426,9 +428,9 @@ export const useTablesStore = create((set, get) => ({
     deleteTable: async (id) => {
         const tableName = get().tables.find(t => t.id === id)?.name ?? id;
         set(state => ({ tables: state.tables.filter(t => t.id !== id) }));
-        await tablesCache.setItem('tables', get().tables);
+        await tablesCache.setItem(scopedKey('tables'), get().tables);
         logEvent('MESAS', 'MESA_ELIMINADA', `Mesa "${tableName}" eliminada`, getUser(), { tableId: id });
-        const { error } = await supabaseCloud.from('tables').update({ active: false }).eq('id', id);
+        const { error } = await supabaseCloud.from(scopedKey('tables')).update({ active: false }).eq('id', id);
         if (error) {
             // Revert optimistic update on failure
             await get().syncTablesAndSessions();

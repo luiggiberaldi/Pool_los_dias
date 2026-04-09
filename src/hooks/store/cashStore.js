@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { logEvent } from '../../services/auditService';
+import { scopedKey } from './accountScope';
 
 // Dedicated offline cache for cash session state
 const cashCache = localforage.createInstance({
@@ -26,7 +27,7 @@ export const useCashStore = create((set, get) => ({
         set({ loading: true });
         try {
             // 1. Mostrar caché local inmediatamente — UI no bloquea al usuario
-            const cachedSession = await cashCache.getItem('active_cash_session');
+            const cachedSession = await cashCache.getItem(scopedKey('active_cash_session'));
             set({ activeCashSession: cachedSession, loading: false });
 
             // 2. Sincronizar desde la nube para obtener el estado real
@@ -77,7 +78,7 @@ export const useCashStore = create((set, get) => ({
                         // notes no es JSON válido — ignorar
                     }
                 }
-                await cashCache.setItem('active_cash_session', enrichedData);
+                await cashCache.setItem(scopedKey('active_cash_session'), enrichedData);
                 set({ activeCashSession: enrichedData });
             } else {
                 // ⚠️  La nube devolvió null. Puede ser:
@@ -88,9 +89,8 @@ export const useCashStore = create((set, get) => ({
                 // con un ID conocido. Si la buscamos en la nube por su ID y tampoco
                 // la encontramos, asumimos que no existe. Si ni siquiera podemos buscar,
                 // mantenemos el estado local como verdad.
-                const cachedSession = await cashCache.getItem('active_cash_session');
+                const cachedSession = await cashCache.getItem(scopedKey('active_cash_session'));
                 if (cachedSession?.id) {
-                    // Verificar explícitamente si ESTA sesión específica está cerrada en la nube
                     const { data: specificSession, error: specificError } = await supabaseCloud
                         .from('cash_sessions')
                         .select('id, status')
@@ -99,7 +99,7 @@ export const useCashStore = create((set, get) => ({
 
                     if (!specificError && specificSession?.status === 'CLOSED') {
                         // Confirmado: la sesión específica está cerrada → limpiar local
-                        await cashCache.removeItem('active_cash_session');
+                        await cashCache.removeItem(scopedKey('active_cash_session'));
                         set({ activeCashSession: null });
                     } else if (!specificError && specificSession === null) {
                         // La sesión no existe en la nube en absoluto (fue de otro día/cuenta)
@@ -110,7 +110,7 @@ export const useCashStore = create((set, get) => ({
                         if (hoursAgo > 24 && !cachedSession.stale) {
                             console.warn('[Caja] La sesión local lleva más de 24 horas abierta y no se encontró en la nube. Marcada como stale. El usuario debe cerrarla manualmente.');
                             const staleSession = { ...cachedSession, stale: true };
-                            await cashCache.setItem('active_cash_session', staleSession);
+                            await cashCache.setItem(scopedKey('active_cash_session'), staleSession);
                             set({ activeCashSession: staleSession });
                         }
                         // Si < 24 horas y no se encuentra, puede ser un problema de RLS → mantener
@@ -123,7 +123,7 @@ export const useCashStore = create((set, get) => ({
             }
         } catch {
             // Offline o error de red: mantener caché local sin modificar
-            const cachedSession = await cashCache.getItem('active_cash_session');
+            const cachedSession = await cashCache.getItem(scopedKey('active_cash_session'));
             if (cachedSession) set({ activeCashSession: cachedSession });
         }
     },
@@ -178,7 +178,7 @@ export const useCashStore = create((set, get) => ({
         };
 
         // Actualizar UI y caché local inmediatamente
-        await cashCache.setItem('active_cash_session', sessionPayload);
+        await cashCache.setItem(scopedKey('active_cash_session'), sessionPayload);
         set({ activeCashSession: sessionPayload });
 
         // Payload para Supabase: incluye base_bs como columna directa + notes como fallback
@@ -208,7 +208,7 @@ export const useCashStore = create((set, get) => ({
         if (!active) return;
 
         // Limpiar local inmediatamente para desbloquear la UI al instante
-        await cashCache.removeItem('active_cash_session');
+        await cashCache.removeItem(scopedKey('active_cash_session'));
         set({ activeCashSession: null });
 
         // Cleanup: detener polling y realtime para no sincronizar data fantasma

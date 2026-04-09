@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { scopedKey } from './accountScope';
 
 const ordersCache = localforage.createInstance({
     name: "PoolLosDiaz",
@@ -16,8 +17,8 @@ export const useOrdersStore = create((set, get) => ({
     init: async () => {
         set({ loading: true });
         try {
-            const cachedOrders = await ordersCache.getItem('active_orders') || [];
-            const cachedItems = await ordersCache.getItem('active_order_items') || [];
+            const cachedOrders = await ordersCache.getItem(scopedKey(scopedKey('active_orders'))) || [];
+            const cachedItems = await ordersCache.getItem(scopedKey(scopedKey('active_order_items'))) || [];
             set({ orders: cachedOrders, orderItems: cachedItems, loading: false });
             
             // Sync initial state
@@ -103,8 +104,8 @@ export const useOrdersStore = create((set, get) => ({
             }
 
             set({ orders: openOrders, orderItems: items });
-            await ordersCache.setItem('active_orders', openOrders);
-            await ordersCache.setItem('active_order_items', items);
+            await ordersCache.setItem(scopedKey('active_orders'), openOrders);
+            await ordersCache.setItem(scopedKey('active_order_items'), items);
             return { orders: openOrders, orderItems: items };
         } catch (err) {
             console.error('Error syncOrders:', err);
@@ -144,7 +145,7 @@ export const useOrdersStore = create((set, get) => ({
                 order = newOrder;
                 const newOrders = [...get().orders, order];
                 set({ orders: newOrders });
-                await ordersCache.setItem('active_orders', newOrders);
+                await ordersCache.setItem(scopedKey('active_orders'), newOrders);
             }
 
             // Chequear si el producto ya existe en la orden
@@ -161,7 +162,7 @@ export const useOrdersStore = create((set, get) => ({
                 
                 const newItems = get().orderItems.map(i => i.id === updatedItem.id ? updatedItem : i);
                 set({ orderItems: newItems });
-                await ordersCache.setItem('active_order_items', newItems);
+                await ordersCache.setItem(scopedKey('active_order_items'), newItems);
             } else {
                 const { data: newItem, error: err } = await supabaseCloud
                     .from('order_items')
@@ -179,7 +180,7 @@ export const useOrdersStore = create((set, get) => ({
                 if (err) throw err;
                 const newItems = [...get().orderItems, newItem];
                 set({ orderItems: newItems });
-                await ordersCache.setItem('active_order_items', newItems);
+                await ordersCache.setItem(scopedKey('active_order_items'), newItems);
             }
 
         } catch (e) {
@@ -194,7 +195,7 @@ export const useOrdersStore = create((set, get) => ({
             if (error) throw error;
             const newItems = get().orderItems.filter(i => i.id !== itemId);
             set({ orderItems: newItems });
-            await ordersCache.setItem('active_order_items', newItems);
+            await ordersCache.setItem(scopedKey('active_order_items'), newItems);
          } catch (e) {
              console.error('Error deleting item:', e);
          }
@@ -215,7 +216,7 @@ export const useOrdersStore = create((set, get) => ({
 
             const newItems = get().orderItems.map(i => i.id === itemId ? updatedItem : i);
             set({ orderItems: newItems });
-            await ordersCache.setItem('active_order_items', newItems);
+            await ordersCache.setItem(scopedKey('active_order_items'), newItems);
         } catch (e) {
             console.error('Error updating item qty:', e);
             throw e;
@@ -235,8 +236,8 @@ export const useOrdersStore = create((set, get) => ({
         const newItems = prevItems.filter(i => i.order_id !== order.id);
 
         set({ orders: newOrders, orderItems: newItems });
-        await ordersCache.setItem('active_orders', newOrders);
-        await ordersCache.setItem('active_order_items', newItems);
+        await ordersCache.setItem(scopedKey('active_orders'), newOrders);
+        await ordersCache.setItem(scopedKey('active_order_items'), newItems);
 
         try {
             // Background network tasks
@@ -246,8 +247,8 @@ export const useOrdersStore = create((set, get) => ({
             console.error('Error canceling order (network) — rolling back:', e);
             // Rollback: restaurar estado local
             set({ orders: prevOrders, orderItems: prevItems });
-            await ordersCache.setItem('active_orders', prevOrders);
-            await ordersCache.setItem('active_order_items', prevItems);
+            await ordersCache.setItem(scopedKey('active_orders'), prevOrders);
+            await ordersCache.setItem(scopedKey('active_order_items'), prevItems);
             throw e;
         }
     }
