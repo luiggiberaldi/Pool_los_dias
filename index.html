@@ -38,6 +38,23 @@
 
   <title>Pool Los Diaz</title>
 
+  <!-- Force clear old SW cache (one-time) -->
+  <script>
+    (function(){
+      var v = 'sw_purge_v2';
+      if (!localStorage.getItem(v) && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(r) { r.unregister(); });
+        });
+        caches.keys().then(function(names) {
+          names.forEach(function(n) { caches.delete(n); });
+        });
+        localStorage.setItem(v, '1');
+        setTimeout(function() { location.reload(); }, 500);
+      }
+    })();
+  </script>
+
   <!-- Tipografía -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
