@@ -188,10 +188,7 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             {/* Sección Dólares */}
             {methodsUsd.length > 0 && (
                 <div>
-                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white text-[9px] font-black shrink-0">$</span>
-                        Dólares ($)
-                    </p>
+                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Dólares ($)</p>
                     {methodsUsd.map(renderMethod)}
                 </div>
             )}
@@ -199,10 +196,7 @@ export default function PaymentMethodsManager({ triggerHaptic }) {
             {/* Sección Bolívares */}
             {methodsBs.length > 0 && (
                 <div>
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-[8px] font-black italic shrink-0">Bs</span>
-                        Bolívares (Bs)
-                    </p>
+                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Bolívares (Bs)</p>
                     {methodsBs.map(renderMethod)}
                 </div>
             )}
