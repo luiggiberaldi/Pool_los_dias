@@ -288,7 +288,7 @@ export default function CheckoutModal({
                     <div data-tour="checkout-bs" className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.BS.bg} ${sectionStyles.BS.border} p-3`}>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${sectionStyles.BS.title}`}>
-                                <span className={`p-1 rounded-lg ${sectionStyles.BS.titleBg}`}>💵</span>
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-[10px] font-black italic shrink-0">Bs</span>
                                 Bolívares (Bs)
                             </h3>
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.BS.titleBg} ${sectionStyles.BS.title}`}>
