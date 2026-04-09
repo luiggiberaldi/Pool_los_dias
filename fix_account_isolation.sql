@@ -65,5 +65,52 @@ CREATE INDEX IF NOT EXISTS idx_table_sessions_user_status ON public.table_sessio
 CREATE INDEX IF NOT EXISTS idx_orders_user_status ON public.orders(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_tables_user_active ON public.tables(user_id, active);
 
--- ✅ Verificación
+-- 9. staff_users: agregar user_id + RLS
+ALTER TABLE public.staff_users ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+
+-- Asignar todos los staff existentes al usuario poollosdiazbar
+UPDATE public.staff_users SET user_id = '8cddd864-e673-4343-a14e-d2980b1a1eb0' WHERE user_id IS NULL;
+
+-- Eliminar políticas anteriores y crear nueva por user_id
+DROP POLICY IF EXISTS "Permitir todo a staff_users" ON public.staff_users;
+DROP POLICY IF EXISTS "Authenticated users full access" ON public.staff_users;
+DROP POLICY IF EXISTS "User can manage own staff" ON public.staff_users;
+
+-- Habilitar RLS si no está activo
+ALTER TABLE public.staff_users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "User can manage own staff"
+    ON public.staff_users FOR ALL
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+CREATE INDEX IF NOT EXISTS idx_staff_users_user_active ON public.staff_users(user_id, active);
+
+-- 10. sales: agregar user_id + RLS
+ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+
+-- Asignar ventas existentes al usuario poollosdiazbar
+UPDATE public.sales SET user_id = '8cddd864-e673-4343-a14e-d2980b1a1eb0' WHERE user_id IS NULL;
+
+DROP POLICY IF EXISTS "Auth users can manage sales" ON public.sales;
+DROP POLICY IF EXISTS "User can manage own sales" ON public.sales;
+
+ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "User can manage own sales"
+    ON public.sales FOR ALL
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
+
+CREATE INDEX IF NOT EXISTS idx_sales_user ON public.sales(user_id);
+
+-- 11. sale_items: aislamiento via sale_id (FK a sales que ya tiene user_id)
+-- No necesita user_id propio, RLS se hereda de la relación con sales
+
+-- 12. Actualizar la función process_checkout para incluir user_id
+-- NOTA: Esto requiere recrear la función. Verificar la definición actual primero.
+-- El RPC debe pasar auth.uid() al INSERT de sales:
+--   INSERT INTO sales (..., user_id) VALUES (..., auth.uid());
+
+-- ✅ Verificación final
 SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename;

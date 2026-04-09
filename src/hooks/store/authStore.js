@@ -21,6 +21,14 @@ import { create } from 'zustand';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { capitalizeName } from '../../utils/calculatorUtils';
 
+// Helper: obtener user_id del usuario Supabase autenticado
+const getAuthUserId = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        return session?.user?.id || null;
+    } catch { return null; }
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 async function sha256(text) {
@@ -111,11 +119,15 @@ export const useAuthStore = create((set, get) => ({
     // ── Sincronizar usuarios desde Supabase ───────────────────────────────────
     syncUsers: async () => {
         try {
-            const { data, error } = await supabaseCloud
+            const userId = await getAuthUserId();
+            let query = supabaseCloud
                 .from('staff_users')
                 .select('id, name, role, pin_hash, active')
                 .eq('active', true)
                 .order('role', { ascending: true });
+            if (userId) query = query.eq('user_id', userId);
+
+            const { data, error } = await query;
 
             if (error) throw error;
 

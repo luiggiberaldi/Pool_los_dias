@@ -183,6 +183,14 @@ function UserRow({ user, currentUserId, onChangePin, onDelete, onEditName, onTog
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { hashPin } from '../../utils/crypto';
 
+// Helper: obtener user_id del usuario Supabase autenticado
+const getAuthUserId = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        return session?.user?.id || null;
+    } catch { return null; }
+};
+
 // ═══════════════════════════════════════════════════ MAIN
 export default function UsersManager({ triggerHaptic }) {
     const { cachedUsers: usuarios, currentUser: usuarioActivo, syncUsers } = useAuthStore();
@@ -193,11 +201,14 @@ export default function UsersManager({ triggerHaptic }) {
 
     const loadInactiveUsers = async () => {
         try {
-            const { data } = await supabaseCloud
+            const userId = await getAuthUserId();
+            let query = supabaseCloud
                 .from('staff_users')
                 .select('*')
                 .eq('active', false)
                 .order('name');
+            if (userId) query = query.eq('user_id', userId);
+            const { data } = await query;
             setInactiveUsers(data || []);
         } catch { /* ignore */ }
     };
@@ -242,14 +253,17 @@ export default function UsersManager({ triggerHaptic }) {
             }
 
             const hashedPin = await hashPin(newPin);
-            const { error } = await supabaseCloud
-                .from('staff_users')
-                .insert({
+            const userId = await getAuthUserId();
+            const insertPayload = {
                     name: newName.trim(),
                     role: newRole,
                     pin_hash: hashedPin,
                     active: true
-                });
+            };
+            if (userId) insertPayload.user_id = userId;
+            const { error } = await supabaseCloud
+                .from('staff_users')
+                .insert(insertPayload);
 
             if (error) throw error;
 
