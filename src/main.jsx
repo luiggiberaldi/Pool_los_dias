@@ -31,9 +31,9 @@ if ('serviceWorker' in navigator) {
 
 // ── Evitar que la rueda del mouse cambie valores en inputs numéricos ──
 document.addEventListener('wheel', (e) => {
-  if (e.target?.type === 'number') {
-    e.target.blur();
-    e.preventDefault();
+  if (e.target?.type === 'number' && document.activeElement === e.target) {
+    e.preventDefault();  // Bloquear ANTES de que el browser cambie el valor
+    e.target.blur();     // Luego quitar foco para que no siga capturando scroll
   }
 }, { passive: false });
 

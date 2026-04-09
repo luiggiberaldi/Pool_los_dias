@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { buildProductPayload } from '../utils/productProcessor';
+import { round2, mulR, divR } from '../utils/dinero';
 
 export function useProductForm({ products, effectiveRate, setProducts, broadcastProductDelta, triggerHaptic, auditLog, onClose }) {
     const [editingId, setEditingId] = useState(null);
@@ -54,25 +55,25 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
     const handlePriceUsdChange = (val) => {
         setPriceUsd(val);
         if (!val || parseFloat(val) <= 0) { setPriceBs(''); return; }
-        setPriceBs((parseFloat(val) * effectiveRate).toFixed(2));
+        setPriceBs(String(mulR(parseFloat(val), effectiveRate)));
     };
 
     const handlePriceBsChange = (val) => {
         setPriceBs(val);
         if (!val || parseFloat(val) <= 0) { setPriceUsd(''); return; }
-        setPriceUsd((parseFloat(val) / effectiveRate).toFixed(2));
+        setPriceUsd(String(divR(parseFloat(val), effectiveRate)));
     };
 
     const handleCostUsdChange = (val) => {
         setCostUsd(val);
         if (!val || parseFloat(val) <= 0) { setCostBs(''); return; }
-        setCostBs((parseFloat(val) * effectiveRate).toFixed(2));
+        setCostBs(String(mulR(parseFloat(val), effectiveRate)));
     };
 
     const handleCostBsChange = (val) => {
         setCostBs(val);
         if (!val || parseFloat(val) <= 0) { setCostUsd(''); return; }
-        setCostUsd((parseFloat(val) / effectiveRate).toFixed(2));
+        setCostUsd(String(divR(parseFloat(val), effectiveRate)));
     };
 
     const handleClose = () => {
@@ -137,13 +138,13 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
 
         const currentPriceUsd = product.priceUsdt || 0;
         setPriceUsd(currentPriceUsd > 0 ? currentPriceUsd.toString() : '');
-        setPriceBs(currentPriceUsd > 0 ? (currentPriceUsd * effectiveRate).toFixed(2) : '');
+        setPriceBs(currentPriceUsd > 0 ? String(mulR(currentPriceUsd, effectiveRate)) : '');
 
-        const currentCostUsd = product.costUsd || (product.costBs ? product.costBs / effectiveRate : 0);
-        setCostUsd(currentCostUsd > 0 ? currentCostUsd.toFixed(2) : '');
+        const currentCostUsd = product.costUsd || (product.costBs ? divR(product.costBs, effectiveRate) : 0);
+        setCostUsd(currentCostUsd > 0 ? String(round2(currentCostUsd)) : '');
 
-        const currentCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
-        setCostBs(currentCostBs > 0 ? currentCostBs.toFixed(2) : '');
+        const currentCostBs = product.costBs || (product.costUsd ? mulR(product.costUsd, effectiveRate) : 0);
+        setCostBs(currentCostBs > 0 ? String(round2(currentCostBs)) : '');
 
         setStock(product.stock ?? '');
         setUnit(product.unit || 'unidad');

@@ -273,7 +273,7 @@ export default function ProductFormModal({
                             <label className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Costo ($){priceSuffix}
                             </label>
-                            <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} placeholder="1.00"
+                            <input type="number" inputMode="decimal" value={costUsd} onChange={e => handleCostUsdChange(e.target.value)} onWheel={e => e.target.blur()} placeholder="1.00"
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
                         </div>
                         <div>
@@ -295,7 +295,7 @@ export default function ProductFormModal({
                                 </button>
                                 )}
                             </div>
-                            <input type="number" inputMode="decimal" value={costBs} onChange={e => handleCostBsChange(e.target.value)} placeholder="0.00"
+                            <input type="number" inputMode="decimal" value={costBs} onChange={e => handleCostBsChange(e.target.value)} onWheel={e => e.target.blur()} placeholder="0.00"
                                 className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 sm:p-4 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-slate-500/50 transition-all text-sm sm:text-base" />
                         </div>
                     </div>
@@ -380,7 +380,7 @@ export default function ProductFormModal({
                             <label className="text-[10px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Precio de Venta ($){priceSuffix}
                             </label>
-                            <input type="number" inputMode="decimal" value={priceUsd} onChange={e => handlePriceUsdChange(e.target.value)} placeholder="1.50"
+                            <input type="number" inputMode="decimal" value={priceUsd} onChange={e => handlePriceUsdChange(e.target.value)} onWheel={e => e.target.blur()} placeholder="1.50"
                                 className="w-full bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-emerald-800 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-sm sm:text-base" />
                             {parseFloat(priceUsd) > 0 && (
                                 <CheckCircle size={18} className="absolute right-3 top-[38px] sm:top-[42px] text-emerald-500 transition-all duration-300" />
@@ -390,7 +390,7 @@ export default function ProductFormModal({
                             <label className="text-[10px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400 ml-1 mb-1 block uppercase tracking-wider">
                                 Precio de Venta (Bs){priceSuffix}
                             </label>
-                            <input type="number" inputMode="decimal" value={priceBs} onChange={e => handlePriceBsChange(e.target.value)} placeholder="0.00"
+                            <input type="number" inputMode="decimal" value={priceBs} onChange={e => handlePriceBsChange(e.target.value)} onWheel={e => e.target.blur()} placeholder="0.00"
                                 className="w-full bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/30 p-3.5 pr-10 sm:p-4 sm:pr-10 rounded-xl font-black text-indigo-800 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-sm sm:text-base" />
                             {parseFloat(priceBs) > 0 && (
                                 <CheckCircle size={18} className="absolute right-3 top-[38px] sm:top-[42px] text-indigo-500 transition-all duration-300" />
