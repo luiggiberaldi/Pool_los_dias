@@ -43,9 +43,21 @@ export async function processCustomerTransaction({
     const totalEnUsd = amountUsd;
     const totalEnCop = currencyMode === 'COP' ? rawAmount : mulR(amountUsd, tasaCop);
 
+    // Calcular correlativo secuencial
+    const numericNums = sales
+        .map(s => Number(s.saleNumber))
+        .filter(n => Number.isInteger(n) && n > 0 && n < 90000);
+    const nextSaleNumber = (numericNums.length > 0 ? Math.max(...numericNums) : 0) + 1;
+
     if (type === 'ABONO') {
+        // No crear registro si el monto es 0
+        if (totalEnUsd <= 0) {
+            await storageService.setItem('bodega_customers_v1', newCustomers);
+            return { updatedCustomer, newCustomers };
+        }
         const cobroRecord = {
             id: crypto.randomUUID(),
+            saleNumber: nextSaleNumber,
             timestamp: new Date().toISOString(),
             tipo: 'COBRO_DEUDA',
             clienteId: customer.id,
@@ -53,7 +65,7 @@ export async function processCustomerTransaction({
             totalBs: totalEnBs,
             totalUsd: totalEnUsd,
             ...(copEnabled && { totalCop: totalEnCop }),
-            paymentMethod: paymentMethod, // Legacy keep just in case
+            paymentMethod: paymentMethod,
             payments: [{
                 methodId: paymentMethod,
                 amount: currencyMode === 'USD' ? totalEnUsd : (currencyMode === 'COP' ? totalEnCop : totalEnBs),
@@ -64,10 +76,11 @@ export async function processCustomerTransaction({
             }],
             items: [{ name: `Abono de deuda: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
         };
-        sales.push(cobroRecord);
+        sales.unshift(cobroRecord);
     } else if (type === 'CREDITO') {
         const fiadoRecord = {
             id: crypto.randomUUID(),
+            saleNumber: nextSaleNumber,
             timestamp: new Date().toISOString(),
             tipo: 'VENTA_FIADA',
             clienteId: customer.id,
@@ -78,7 +91,7 @@ export async function processCustomerTransaction({
             fiadoUsd: totalEnUsd,
             items: [{ name: `Credito manual: ${customer.name}`, qty: 1, priceUsd: totalEnUsd, costBs: 0 }]
         };
-        sales.push(fiadoRecord);
+        sales.unshift(fiadoRecord);
     }
 
     await storageService.setItem('bodega_sales_v1', sales);

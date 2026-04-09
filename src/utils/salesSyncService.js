@@ -67,6 +67,40 @@ export async function broadcastNewSale(sale, userId) {
 }
 
 /**
+ * Reasigna correlativos duplicados en ventas sincronizadas.
+ * Si una venta entrante tiene un saleNumber que ya existe localmente,
+ * le asigna el siguiente número disponible.
+ */
+function fixDuplicateNumbers(sales) {
+    const usedNumbers = new Set();
+    let maxNum = 0;
+    // Primera pasada: registrar números existentes
+    for (const s of sales) {
+        const n = Number(s.saleNumber);
+        if (Number.isInteger(n) && n > 0 && n < 90000) {
+            if (!usedNumbers.has(n)) {
+                usedNumbers.add(n);
+                if (n > maxNum) maxNum = n;
+            }
+        }
+    }
+    // Segunda pasada: reasignar duplicados
+    const seen = new Set();
+    for (const s of sales) {
+        const n = Number(s.saleNumber);
+        if (Number.isInteger(n) && n > 0 && n < 90000) {
+            if (seen.has(n)) {
+                maxNum++;
+                s.saleNumber = maxNum;
+                usedNumbers.add(maxNum);
+            }
+            seen.add(n);
+        }
+    }
+    return sales;
+}
+
+/**
  * Descarga ventas nuevas desde la nube (solo las que el dispositivo no tiene).
  * Usa last_pull timestamp → egress proporcional a ventas nuevas, no al historial.
  */
@@ -98,8 +132,9 @@ export async function pullNewSales(userId) {
             .filter(sale => sale && !existingIds.has(sale.id));
 
         if (newSales.length > 0) {
-            const merged = [...newSales, ...existingSales]
+            let merged = [...newSales, ...existingSales]
                 .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            merged = fixDuplicateNumbers(merged);
             await storageService.setItem(SALES_KEY, merged);
             window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: SALES_KEY } }));
             console.log(`[SalesSync] Merged ${newSales.length} venta(s) nueva(s) desde la nube`);
@@ -122,8 +157,9 @@ export async function applyIncomingSale(sale) {
         const existingSales = await storageService.getItem(SALES_KEY, []);
         if (existingSales.some(s => s.id === sale.id)) return; // ya la tenemos
 
-        const merged = [sale, ...existingSales]
+        let merged = [sale, ...existingSales]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        merged = fixDuplicateNumbers(merged);
         await storageService.setItem(SALES_KEY, merged);
         window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: SALES_KEY } }));
         console.log(`[SalesSync] Venta recibida en tiempo real: ${sale.id}`);
