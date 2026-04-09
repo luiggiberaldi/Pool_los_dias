@@ -276,7 +276,7 @@ export default function CheckoutModal({
                 {methodsUsd.length > 0 && (
                     <div data-tour="checkout-usd" className={`mx-3 mb-3 rounded-2xl border ${sectionStyles.USD.bg} ${sectionStyles.USD.border} p-3`}>
                         <h3 className={`text-[11px] font-black uppercase tracking-widest mb-3 flex items-center gap-2 ${sectionStyles.USD.title}`}>
-                            <span className={`p-1 rounded-lg ${sectionStyles.USD.titleBg}`}>💲</span>
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-[11px] font-black shrink-0">$</span>
                             Dólares ($)
                         </h3>
                         {methodsUsd.map(m => renderPaymentBar(m, sectionStyles.USD))}
