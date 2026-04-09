@@ -138,13 +138,19 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
 
         const currentPriceUsd = product.priceUsdt || 0;
         setPriceUsd(currentPriceUsd > 0 ? currentPriceUsd.toString() : '');
-        setPriceBs(currentPriceUsd > 0 ? String(mulR(currentPriceUsd, effectiveRate)) : '');
+        // Prefer stored priceBs to avoid round-trip conversion drift
+        const storedPriceBs = product.priceBs;
+        if (storedPriceBs && storedPriceBs > 0) {
+            setPriceBs(String(round2(storedPriceBs)));
+        } else {
+            setPriceBs(currentPriceUsd > 0 ? String(mulR(currentPriceUsd, effectiveRate)) : '');
+        }
 
-        const currentCostUsd = product.costUsd || (product.costBs ? divR(product.costBs, effectiveRate) : 0);
-        setCostUsd(currentCostUsd > 0 ? String(round2(currentCostUsd)) : '');
-
-        const currentCostBs = product.costBs || (product.costUsd ? mulR(product.costUsd, effectiveRate) : 0);
-        setCostBs(currentCostBs > 0 ? String(round2(currentCostBs)) : '');
+        // Prefer stored costBs/costUsd to avoid round-trip conversion drift
+        const storedCostUsd = product.costUsd || 0;
+        const storedCostBs = product.costBs || 0;
+        setCostUsd(storedCostUsd > 0 ? String(round2(storedCostUsd)) : (storedCostBs > 0 ? String(divR(storedCostBs, effectiveRate)) : ''));
+        setCostBs(storedCostBs > 0 ? String(round2(storedCostBs)) : (storedCostUsd > 0 ? String(mulR(storedCostUsd, effectiveRate)) : ''));
 
         setStock(product.stock ?? '');
         setUnit(product.unit || 'unidad');

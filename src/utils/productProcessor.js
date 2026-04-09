@@ -24,6 +24,7 @@ export function buildProductPayload(formData, effectiveRate) {
 
     const formattedName = name.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
     const finalPriceUsd = priceUsd ? parseFloat(priceUsd) : (priceBs ? divR(parseFloat(priceBs), effectiveRate) : 0);
+    const finalPriceBs = priceBs ? parseFloat(priceBs) : (priceUsd ? mulR(parseFloat(priceUsd), effectiveRate) : 0);
     const finalCostUsd = costUsd ? parseFloat(costUsd) : (costBs ? divR(parseFloat(costBs), effectiveRate) : 0);
     const finalCostBs = costBs ? parseFloat(costBs) : (costUsd ? mulR(parseFloat(costUsd), effectiveRate) : 0);
 
@@ -47,6 +48,7 @@ export function buildProductPayload(formData, effectiveRate) {
         name: formattedName,
         barcode: barcode ? barcode.trim() : null,
         priceUsdt: finalPriceUsd,
+        priceBs: finalPriceBs,
         costUsd: finalCostUsd,
         costBs: finalCostBs,
         stock: isCombo ? 0 : finalStock, // Combos don't have their own stock
