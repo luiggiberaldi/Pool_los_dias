@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle, Search } from 'lucide-react';
+import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle, Search, Clock, Trophy, ArrowLeftRight } from 'lucide-react';
 import { SectionCard } from '../../SettingsShared';
 import { useTablesStore } from '../../../hooks/store/useTablesStore';
 import { mulR, divR } from '../../../utils/dinero';
@@ -236,74 +236,112 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             {/* Tarifas */}
             <div data-tour="settings-mesas-rates">
             <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Aplica globalmente para Mesas de Pool" iconColor="text-emerald-500">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">
-                            Hora Libre (USD)
-                        </label>
-                        <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
-                            <input
-                                type="number"
-                                value={pricePerHour}
-                                onChange={e => handleHourUsdChange(e.target.value)}
-                                onWheel={e => e.target.blur()}
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
-                            />
+                {/* BCV Rate Badge */}
+                {bcvRate > 0 && (
+                    <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <ArrowLeftRight size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Tasa BCV: <span className="text-emerald-600 dark:text-emerald-400">{bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span></span>
+                    </div>
+                )}
+
+                <div className="space-y-4">
+                    {/* Hora Libre Block */}
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
+                                <Clock size={14} className="text-sky-600 dark:text-sky-400" />
+                            </div>
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">Hora Libre</span>
                         </div>
-                        {bcvRate > 0 && (
-                            <>
-                                <label className="text-[10px] uppercase font-bold text-slate-400 mt-2 mb-1.5 block">
-                                    Hora Libre (Bs)
-                                </label>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">USD</label>
                                 <div className="relative">
-                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400 text-xs">Bs</span>
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
                                     <input
                                         type="number"
-                                        value={pricePerHourBs}
-                                        onChange={e => handleHourBsChange(e.target.value)}
+                                        value={pricePerHour}
+                                        onChange={e => handleHourUsdChange(e.target.value)}
                                         onWheel={e => e.target.blur()}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
+                                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-sky-500/30 transition-all dark:text-white"
                                     />
                                 </div>
-                                <span className="text-[9px] text-slate-400 mt-1 block">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
-                            </>
+                            </div>
+                            {bcvRate > 0 && (
+                                <>
+                                    <ArrowLeftRight size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
+                                    <div className="flex-1">
+                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Bolívares</label>
+                                        <div className="relative">
+                                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
+                                            <input
+                                                type="number"
+                                                value={pricePerHourBs}
+                                                onChange={e => handleHourBsChange(e.target.value)}
+                                                onWheel={e => e.target.blur()}
+                                                className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        {/* Price per minute preview */}
+                        {pricePerHour > 0 && (
+                            <div className="mt-2 text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
+                                <Clock size={10} />
+                                ${(parseFloat(pricePerHour) / 60).toFixed(4)}/min
+                                {bcvRate > 0 && pricePerHourBs && (
+                                    <span className="text-emerald-500">· Bs {(parseFloat(pricePerHourBs) / 60).toFixed(2)}/min</span>
+                                )}
+                            </div>
                         )}
                     </div>
-                    <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 block">
-                            La Piña (USD)
-                        </label>
-                        <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
-                            <input
-                                type="number"
-                                value={pricePina}
-                                onChange={e => handlePinaUsdChange(e.target.value)}
-                                onWheel={e => e.target.blur()}
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
-                            />
+
+                    {/* La Piña Block */}
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                <Trophy size={14} className="text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">La Piña</span>
                         </div>
-                        {bcvRate > 0 && (
-                            <>
-                                <label className="text-[10px] uppercase font-bold text-slate-400 mt-2 mb-1.5 block">
-                                    La Piña (Bs)
-                                </label>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">USD</label>
                                 <div className="relative">
-                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400 text-xs">Bs</span>
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center font-bold text-slate-400">$</span>
                                     <input
                                         type="number"
-                                        value={pricePinaBs}
-                                        onChange={e => handlePinaBsChange(e.target.value)}
+                                        value={pricePina}
+                                        onChange={e => handlePinaUsdChange(e.target.value)}
                                         onWheel={e => e.target.blur()}
-                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all dark:text-white"
+                                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-amber-500/30 transition-all dark:text-white"
                                     />
                                 </div>
-                                <span className="text-[9px] text-slate-400 mt-1 block">@ {bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span>
-                            </>
-                        )}
+                            </div>
+                            {bcvRate > 0 && (
+                                <>
+                                    <ArrowLeftRight size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
+                                    <div className="flex-1">
+                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Bolívares</label>
+                                        <div className="relative">
+                                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
+                                            <input
+                                                type="number"
+                                                value={pricePinaBs}
+                                                onChange={e => handlePinaBsChange(e.target.value)}
+                                                onWheel={e => e.target.blur()}
+                                                className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
+
                 <button
                     onClick={handleSaveConfig}
                     className="w-full flex items-center justify-center gap-2 py-3 mt-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-emerald-100 transition-colors active:scale-[0.98]"
