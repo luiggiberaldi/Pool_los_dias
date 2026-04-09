@@ -6,28 +6,44 @@ import {
     isRegistered, registerBiometric, authenticateWithBiometric
 } from '../../services/biometricPinService';
 
+// Cache biometric availability globally (doesn't change during session)
+let _bioAvailableCache = null;
+const getBioAvailable = async () => {
+    if (_bioAvailableCache !== null) return _bioAvailableCache;
+    _bioAvailableCache = await isBiometricAvailable();
+    return _bioAvailableCache;
+};
+
+// Cache mobile detection (doesn't change)
+const _isMobile = isMobileDevice();
+
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerifyPin, onLoginComplete, onBiometricLogin }) {
     const targetPinLength = (user?.role === 'ADMIN' || user?.rol === 'ADMIN') ? 6 : 4;
-    const [pin, setPin]               = useState('');
+    const [pinDisplay, setPinDisplay] = useState(0); // just the length, for rendering dots
     const [error, setError]           = useState(false);
     const [processing, setProcessing] = useState(false);
+
+    // Use ref for actual pin value to avoid re-renders/re-creating callbacks
+    const pinRef = useRef('');
+    const processingRef = useRef(false);
 
     // ── Lockout ────────────────────────────────────────────────────────────
     const [lockoutSec, setLockoutSec] = useState(0);
     const lockoutTimer = useRef(null);
+    const lockoutSecRef = useRef(0);
 
     const startLockoutCountdown = useCallback((seconds) => {
         setLockoutSec(seconds);
+        lockoutSecRef.current = seconds;
         if (lockoutTimer.current) clearInterval(lockoutTimer.current);
         lockoutTimer.current = setInterval(() => {
-            setLockoutSec(prev => {
-                if (prev <= 1) {
-                    clearInterval(lockoutTimer.current);
-                    lockoutTimer.current = null;
-                    return 0;
-                }
-                return prev - 1;
-            });
+            lockoutSecRef.current -= 1;
+            if (lockoutSecRef.current <= 0) {
+                clearInterval(lockoutTimer.current);
+                lockoutTimer.current = null;
+                lockoutSecRef.current = 0;
+            }
+            setLockoutSec(lockoutSecRef.current);
         }, 1000);
     }, []);
 
@@ -36,13 +52,14 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
     }, []);
 
     // ── Biometría ────────────────────────────────────────────────────────────
-    const [bioAvailable, setBioAvailable]     = useState(false);
+    const [bioAvailable, setBioAvailable]     = useState(_bioAvailableCache ?? false);
     const [bioRegistered, setBioRegistered]   = useState(false);
     const [bioLoading, setBioLoading]         = useState(false);
 
-    // Setup prompt: aparece después de PIN exitoso en móvil si no hay huella registrada
+    // Setup prompt
     const [keepOpen, setKeepOpen]             = useState(false);
     const [showSetupPrompt, setShowSetupPrompt] = useState(false);
+    const showSetupRef = useRef(false);
     const [setupLoading, setSetupLoading]     = useState(false);
     const [setupDone, setSetupDone]           = useState(false);
 
@@ -50,37 +67,51 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
     const userName = (user?.name || user?.nombre || 'Usuario')
         .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 
-    // Chequear disponibilidad biométrica al seleccionar un usuario
+    // Refs for stable submit callback
+    const bioAvailableRef = useRef(false);
+    const bioRegisteredRef = useRef(false);
+    bioAvailableRef.current = bioAvailable;
+    bioRegisteredRef.current = bioRegistered;
+
+    // Check biometric availability (cached, instant after first call)
     useEffect(() => {
         if (!isOpen || !userId) return;
-        setPin('');
+        pinRef.current = '';
+        setPinDisplay(0);
         setError(false);
         setShowSetupPrompt(false);
+        showSetupRef.current = false;
         setSetupDone(false);
         setKeepOpen(false);
 
-        const check = async () => {
-            const available = await isBiometricAvailable();
+        getBioAvailable().then(available => {
             setBioAvailable(available);
-            if (available) setBioRegistered(isRegistered(userId));
-        };
-        check();
+            bioAvailableRef.current = available;
+            if (available) {
+                const reg = isRegistered(userId);
+                setBioRegistered(reg);
+                bioRegisteredRef.current = reg;
+            }
+        });
     }, [isOpen, userId]);
 
-    // ── PIN submit ────────────────────────────────────────────────────────────
+    // ── PIN submit (stable — no pin in deps) ────────────────────────────────
     const handleSubmit = useCallback(async () => {
-        if (pin.length !== targetPinLength || processing || showSetupPrompt || lockoutSec > 0) return;
+        const currentPin = pinRef.current;
+        if (currentPin.length !== targetPinLength || processingRef.current || showSetupRef.current || lockoutSecRef.current > 0) return;
+        processingRef.current = true;
         setProcessing(true);
 
-        // Si hay verificación separada (flujo biométrico), usarla
         const verify = onVerifyPin || onSubmit;
-        const result = await verify(pin, userId);
+        const result = await verify(currentPin, userId);
 
-        // Handle lockout response
+        // Handle lockout
         if (result && typeof result === 'object' && result.locked) {
             startLockoutCountdown(result.remainingSec || 30);
             setError(true);
-            setPin('');
+            pinRef.current = '';
+            setPinDisplay(0);
+            processingRef.current = false;
             setProcessing(false);
             setTimeout(() => setError(false), 600);
             return;
@@ -88,37 +119,52 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
 
         if (!result) {
             setError(true);
-            setPin('');
+            pinRef.current = '';
+            setPinDisplay(0);
+            processingRef.current = false;
             setProcessing(false);
             setTimeout(() => setError(false), 600);
             return;
         }
 
-        // PIN correcto, sin huella registrada → ofrecer activarla (solo móvil)
+        // PIN correcto
         const bioDismissed = localStorage.getItem(`bio_dismiss_${userId}`);
-        if (onVerifyPin && bioAvailable && !bioRegistered && isMobileDevice() && !bioDismissed) {
-            setPin('');
+        if (onVerifyPin && bioAvailableRef.current && !bioRegisteredRef.current && _isMobile && !bioDismissed) {
+            pinRef.current = '';
+            setPinDisplay(0);
             setKeepOpen(true);
             setShowSetupPrompt(true);
+            showSetupRef.current = true;
+            processingRef.current = false;
             setProcessing(false);
         } else {
-            // Activar sesión y cerrar
-            if (onLoginComplete) {
-                await onLoginComplete(userId);
-            } else if (onSubmit && !onVerifyPin) {
-                // Fallback: onSubmit ya hizo el login
-            }
+            if (onLoginComplete) await onLoginComplete(userId);
+            processingRef.current = false;
             setProcessing(false);
             onClose();
         }
-    }, [pin, processing, showSetupPrompt, lockoutSec, onSubmit, onVerifyPin, onLoginComplete, userId, targetPinLength, bioAvailable, bioRegistered, onClose, startLockoutCountdown]);
+    }, [targetPinLength, onSubmit, onVerifyPin, onLoginComplete, userId, onClose, startLockoutCountdown]);
 
-    // Auto-submit al completar dígitos
-    useEffect(() => {
-        if (pin.length === targetPinLength && !processing) handleSubmit();
-    }, [pin, processing, targetPinLength, handleSubmit]);
+    // ── Pad press (stable) ──────────────────────────────────────────────────
+    const handlePadPress = useCallback((digit) => {
+        if (pinRef.current.length >= targetPinLength || processingRef.current) return;
+        pinRef.current += digit;
+        const newLen = pinRef.current.length;
+        setPinDisplay(newLen);
 
-    // Teclado físico (desktop)
+        // Auto-submit when complete
+        if (newLen === targetPinLength) {
+            handleSubmit();
+        }
+    }, [targetPinLength, handleSubmit]);
+
+    const handleDelete = useCallback(() => {
+        if (processingRef.current) return;
+        pinRef.current = pinRef.current.slice(0, -1);
+        setPinDisplay(pinRef.current.length);
+    }, []);
+
+    // Keyboard handler (stable — no pin in deps)
     useEffect(() => {
         if (!isOpen && !keepOpen) return;
         const isTouchDevice = 'ontouchstart' in window && window.innerWidth < 1024;
@@ -129,9 +175,9 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
-    }, [isOpen, keepOpen, pin, processing]);
+    }, [isOpen, keepOpen, handlePadPress, handleDelete]);
 
-    // ── Login con huella ──────────────────────────────────────────────────────
+    // ── Biometric login ─────────────────────────────────────────────────────
     const handleBiometricLogin = async () => {
         if (bioLoading) return;
         setBioLoading(true);
@@ -148,25 +194,27 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
         }
     };
 
-    // ── Registro de huella (después de PIN) ───────────────────────────────────
+    // ── Biometric registration (post PIN) ───────────────────────────────────
     const handleRegister = async () => {
         setSetupLoading(true);
         try {
             await registerBiometric(userId, userName);
             setSetupDone(true);
             setBioRegistered(true);
+            bioRegisteredRef.current = true;
             setTimeout(async () => {
                 if (onLoginComplete) await onLoginComplete(userId);
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
+                showSetupRef.current = false;
                 onClose();
             }, 1400);
         } catch (err) {
             if (!err.message?.includes('cancel') && !err.message?.toLowerCase().includes('abort')) {
-                // Error real → activar sesión y cerrar
                 if (onLoginComplete) await onLoginComplete(userId);
                 setKeepOpen(false);
                 setShowSetupPrompt(false);
+                showSetupRef.current = false;
                 onClose();
             } else {
                 setSetupLoading(false);
@@ -181,17 +229,8 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
         if (onLoginComplete) await onLoginComplete(userId);
         setKeepOpen(false);
         setShowSetupPrompt(false);
+        showSetupRef.current = false;
         onClose();
-    };
-
-    const handlePadPress = (digit) => {
-        if (pin.length >= targetPinLength || processing) return;
-        setPin(prev => prev + digit);
-    };
-
-    const handleDelete = () => {
-        if (processing) return;
-        setPin(prev => prev.slice(0, -1));
     };
 
     const visible = (isOpen || keepOpen) && !!user;
@@ -279,7 +318,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                                     className={`w-4 h-4 rounded-full border-2 transition-all duration-200 ${
                                         error
                                             ? 'bg-red-500 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                                            : i < pin.length
+                                            : i < pinDisplay
                                                 ? 'bg-sky-500 border-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.4)] scale-110'
                                                 : 'bg-transparent border-slate-300'
                                     }`}
@@ -298,7 +337,7 @@ export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerif
                                     {n}
                                 </button>
                             ))}
-                            {bioAvailable && bioRegistered && isMobileDevice() ? (
+                            {bioAvailable && bioRegistered && _isMobile ? (
                                 <button
                                     onClick={handleBiometricLogin}
                                     disabled={bioLoading}
