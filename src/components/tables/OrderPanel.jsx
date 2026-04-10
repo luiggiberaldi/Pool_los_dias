@@ -154,6 +154,13 @@ export function OrderPanel({ session, table, onClose }) {
                                         className="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40">
                                         <Plus size={14} />
                                     </button>
+                                    <button onClick={async () => {
+                                            if (item.qty <= 1) { handleRemoveItem(item.id); }
+                                            else { await updateItemQty(item.id, item.qty - 1); }
+                                        }}
+                                        className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-all active:scale-90">
+                                        <Minus size={14} />
+                                    </button>
                                     <button onClick={() => handleRemoveItem(item.id)}
                                         className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center transition-all active:scale-90">
                                         <Trash2 size={13} />
