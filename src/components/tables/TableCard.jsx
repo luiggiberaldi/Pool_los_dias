@@ -9,6 +9,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { OrderPanel } from './OrderPanel';
 
 import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
+import { showToast } from '../Toast';
 import { logEvent } from '../../services/auditService';
 import { Modal } from '../Modal';
 
@@ -136,9 +137,13 @@ export default function TableCard({ table, session }) {
 
     const handlePrintPartial = async () => {
         if (!session) return;
-        await generatePartialSessionTicketPDF({
-            table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD
-        });
+        try {
+            await generatePartialSessionTicketPDF({
+                table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD
+            });
+        } catch (err) {
+            showToast(err.message || 'Error al imprimir pre-cuenta', 'error');
+        }
     };
 
     const isTimeFree = table.type === 'NORMAL';

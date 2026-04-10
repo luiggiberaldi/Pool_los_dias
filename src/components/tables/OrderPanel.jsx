@@ -223,10 +223,8 @@ export function OrderPanel({ session, table, onClose }) {
                                 const inOrder = currentItems.find(i => i.product_id === p.id);
                                 const isAdding = addingItem === p.id;
                                 return (
-                                    <button key={p.id}
-                                        onClick={() => handleAddProduct(p)}
-                                        disabled={isAdding}
-                                        className={`relative text-left rounded-2xl p-3.5 border transition-all active:scale-95 group overflow-hidden ${
+                                    <div key={p.id}
+                                        className={`relative text-left rounded-2xl p-3.5 border transition-all group overflow-hidden ${
                                             inOrder
                                                 ? 'bg-indigo-50 border-indigo-200 shadow-sm shadow-indigo-100'
                                                 : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm'
@@ -239,27 +237,50 @@ export function OrderPanel({ session, table, onClose }) {
                                         )}
                                         <div className="flex items-center justify-between mt-auto">
                                             <span className="text-emerald-500 font-black text-sm">${Number(p.priceUsdt || p.priceUsd || p.price || 0).toFixed(2)}</span>
-                                            {effectiveRate > 0 && (
+                                            {effectiveRate > 0 && !inOrder && (
                                                 <span className="text-[10px] text-slate-500 font-medium ml-2">
                                                     {(p.priceBs > 0 ? Number(p.priceBs) : Number(p.priceUsdt || p.priceUsd || p.price || 0) * effectiveRate).toFixed(2)} Bs
                                                 </span>
                                             )}
                                             {inOrder && (
-                                                <span className="text-[10px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded-full">
-                                                    x{inOrder.qty}
-                                                </span>
+                                                <div className="flex items-center gap-1 ml-auto">
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); if (inOrder.qty <= 1) handleRemoveItem(inOrder.id); else updateItemQty(inOrder.id, inOrder.qty - 1); }}
+                                                        className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center active:scale-90 transition-all">
+                                                        <Minus size={10} />
+                                                    </button>
+                                                    <span className="text-[10px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded-full min-w-[22px] text-center">
+                                                        {inOrder.qty}
+                                                    </span>
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); handleAddProduct(p); }}
+                                                        disabled={isAdding}
+                                                        className="w-6 h-6 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-600 flex items-center justify-center active:scale-90 transition-all">
+                                                        {isAdding ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />}
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
-                                        {/* Add indicator */}
-                                        <div className={`absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                                            isAdding ? 'bg-indigo-500' : 'bg-transparent group-hover:bg-slate-100'
-                                        }`}>
-                                            {isAdding
-                                                ? <Loader2 size={10} className="animate-spin text-white" />
-                                                : <Plus size={10} className="text-slate-300 group-hover:text-slate-600" />
-                                            }
-                                        </div>
-                                    </button>
+                                        {/* Add button (only when not in order) */}
+                                        {!inOrder && (
+                                            <button
+                                                onClick={() => handleAddProduct(p)}
+                                                disabled={isAdding}
+                                                className="absolute inset-0 w-full h-full"
+                                                aria-label={`Agregar ${p.name}`}
+                                            />
+                                        )}
+                                        {!inOrder && (
+                                            <div className={`absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center transition-all pointer-events-none ${
+                                                isAdding ? 'bg-indigo-500' : 'bg-transparent group-hover:bg-slate-100'
+                                            }`}>
+                                                {isAdding
+                                                    ? <Loader2 size={10} className="animate-spin text-white" />
+                                                    : <Plus size={10} className="text-slate-300 group-hover:text-slate-600" />
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
                                 );
                             })}
                         </div>

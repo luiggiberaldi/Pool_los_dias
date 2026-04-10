@@ -11,7 +11,21 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     // Intentar ESC/POS directo si hay impresora configurada o puerto disponible.
     // Esto evita pasar por el driver de Windows que abre el cajón automáticamente.
     const cfg = getWebSerialConfig();
-    const tryEscPos = (cfg.printerType && cfg.printerType !== 'system') || ('serial' in navigator);
+    const hasWebSerialConfigured = cfg.printerType && cfg.printerType !== 'system';
+    if (hasWebSerialConfigured) {
+        // Impresora térmica configurada: SIEMPRE usar ESC/POS directo.
+        // NO hacer fallback a PDF — el driver de Windows abre el cajón en cada trabajo de impresión.
+        try {
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
+            if (printed) return;
+            // Si returned false (sin puerto), mostrar instrucción al usuario
+            throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
+        } catch (err) {
+            throw err; // Propagar el error para que el llamador muestre toast
+        }
+    }
+    // Sin impresora térmica configurada: usar PDF del sistema
+    const tryEscPos = 'serial' in navigator;
     if (tryEscPos) {
         try {
             const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
