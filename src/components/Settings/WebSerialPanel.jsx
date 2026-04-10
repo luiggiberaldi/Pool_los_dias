@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Printer, Usb, AlertTriangle, CheckCircle, RefreshCw,
-    SmartphoneNfc, Scan, RotateCcw, Wifi
+    SmartphoneNfc, Scan, RotateCcw, Wifi, Monitor
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../SettingsShared';
 import {
@@ -151,6 +151,21 @@ export default function WebSerialPanel() {
         saveWebSerialConfig(newCfg);
     };
 
+    // ── Usar impresora del sistema (para FC-58S y similares por USB) ───────
+    const handleUseSystem = () => {
+        const newCfg = {
+            ...getWebSerialConfig(),
+            printerType:  'system',
+            printerBrand: 'Impresora del Sistema',
+            printerModel: 'Driver de Windows/Mac',
+            noVidPid: false,
+        };
+        saveWebSerialConfig(newCfg);
+        setConfig(newCfg);
+        setConnected(false);
+        showToast('Configurado como impresora del sistema', 'success');
+    };
+
     // ── Render ─────────────────────────────────────────────────────────────
     if (!isSupported) {
         return (
@@ -191,9 +206,12 @@ export default function WebSerialPanel() {
                 {isSystem && (
                     <div className="flex items-start gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800/40">
                         <Wifi size={14} className="text-indigo-500 mt-0.5 shrink-0" />
-                        <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                            Esta impresora usa el diálogo estándar del sistema. Funciona con cualquier impresora instalada en Windows/Mac.
-                        </p>
+                        <div>
+                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed font-bold mb-0.5">Impresora del Sistema (Windows/Mac)</p>
+                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                                La pre-cuenta se imprime via diálogo del sistema. Si el cajón se abre al imprimir, desactivarlo en: <strong>Panel de Control → Dispositivos → FC-58S → Propiedades → Cajón</strong>
+                            </p>
+                        </div>
                     </div>
                 )}
 
@@ -216,6 +234,17 @@ export default function WebSerialPanel() {
                         : <><Scan size={15} /> {isConfigured ? 'Volver a detectar' : 'Detectar impresora'}</>
                     }
                 </button>
+
+                {/* ── Botón secundario: Usar impresora del sistema ── */}
+                {(!isConfigured || (isConfigured && !isSystem)) && (
+                    <button
+                        onClick={handleUseSystem}
+                        className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95
+                            bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    >
+                        <Monitor size={15} /> Usar impresora del sistema (FC-58S / USB)
+                    </button>
+                )}
 
                 {/* ── Acciones (solo si está configurada) ── */}
                 {isConfigured && (

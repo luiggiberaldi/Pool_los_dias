@@ -116,16 +116,27 @@ export async function detectAndAutoConfig() {
             usbVendorId:  usbVendorId ? `0x${usbVendorId.toString(16).toUpperCase().padStart(4,'0')}` : null,
             usbProductId: usbProductId ? `0x${usbProductId.toString(16).toUpperCase().padStart(4,'0')}` : null,
         };
+    } else if (!usbVendorId) {
+        // Sin datos USB → puerto COM físico o Bluetooth virtual.
+        // Impresoras como FC-58S conectadas por USB NO aparecen aquí (usan clase USB Printer, no serial).
+        // Si el usuario llegó acá con una FC-58S, debe usar modo "Impresora del Sistema".
+        detected = {
+            ...currentCfg,
+            printerType:  'system',
+            printerBrand: 'Impresora del Sistema',
+            printerModel: 'Sin datos USB — usar driver de Windows',
+            noVidPid: true,
+            usbVendorId:  null,
+            usbProductId: null,
+        };
     } else {
-        // Desconocida → asumir térmica serial con defaults
+        // Tiene VID/PID pero no está en la base de datos → asumir térmica serial
         detected = {
             ...currentCfg,
             printerType:  'thermal_serial',
             printerBrand: 'Desconocida',
-            printerModel: usbVendorId
-                ? `VID:0x${usbVendorId.toString(16).toUpperCase()} PID:${usbProductId ? '0x' + usbProductId.toString(16).toUpperCase() : 'N/A'}`
-                : 'Sin datos USB',
-            usbVendorId:  usbVendorId ? `0x${usbVendorId.toString(16).toUpperCase().padStart(4,'0')}` : null,
+            printerModel: `VID:0x${usbVendorId.toString(16).toUpperCase()} PID:${usbProductId ? '0x' + usbProductId.toString(16).toUpperCase() : 'N/A'}`,
+            usbVendorId:  `0x${usbVendorId.toString(16).toUpperCase().padStart(4,'0')}`,
             usbProductId: usbProductId ? `0x${usbProductId.toString(16).toUpperCase().padStart(4,'0')}` : null,
         };
     }
