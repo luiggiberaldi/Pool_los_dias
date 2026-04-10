@@ -8,9 +8,11 @@ import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialP
  * - Sin impresora térmica: genera PDF via jsPDF + iframe.
  */
 export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD }) {
-    // Intentar ESC/POS directo si hay impresora térmica configurada
+    // Intentar ESC/POS directo si hay impresora configurada o puerto disponible.
+    // Esto evita pasar por el driver de Windows que abre el cajón automáticamente.
     const cfg = getWebSerialConfig();
-    if (cfg.printerType && cfg.printerType !== 'system') {
+    const tryEscPos = (cfg.printerType && cfg.printerType !== 'system') || ('serial' in navigator);
+    if (tryEscPos) {
         try {
             const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
             if (printed) return;
