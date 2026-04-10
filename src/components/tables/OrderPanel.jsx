@@ -283,12 +283,14 @@ export function OrderPanel({ session, table, onClose }) {
                                 -
                             </button>
                             <input
-                                type="number"
-                                min="1"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 className="w-24 bg-slate-50 border-2 border-slate-200 rounded-2xl text-center text-3xl font-black text-indigo-600 focus:border-indigo-500 focus:ring-0 py-2.5 transition-all shadow-inner"
                                 value={qtyInputValue}
-                                onChange={e => setQtyInputValue(parseInt(e.target.value) || 1)}
-                                onFocus={e => e.target.select()}
+                                onChange={e => { const v = parseInt(e.target.value); setQtyInputValue(isNaN(v) ? '' : v); }}
+                                onBlur={e => { if (!qtyInputValue || qtyInputValue < 1) setQtyInputValue(1); }}
+                                onFocus={e => { setTimeout(() => e.target.select(), 0); }}
                                 autoFocus
                             />
                             <button onClick={() => setQtyInputValue(qtyInputValue + 1)} className="w-12 h-12 rounded-2xl bg-indigo-100 hover:bg-indigo-200 text-indigo-600 font-black text-2xl flex items-center justify-center transition-all active:scale-95">
