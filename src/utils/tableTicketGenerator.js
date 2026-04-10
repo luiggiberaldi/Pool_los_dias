@@ -19,7 +19,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         }
     }
     const WIDTH = 58;
-    const M = 3;
+    const M = 5;
     const CX = WIDTH / 2;
     const RIGHT = WIDTH - M;
 
@@ -119,6 +119,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     document.body.appendChild(iframe);
     iframe.onload = () => {
         try {
+            // Eliminar márgenes del browser para evitar recorte en impresión
+            const style = iframe.contentDocument.createElement('style');
+            style.textContent = '@page { margin: 0; } body { margin: 0; }';
+            iframe.contentDocument.head.appendChild(style);
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
         } catch (e) {
