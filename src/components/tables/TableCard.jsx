@@ -12,6 +12,7 @@ import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
 import { showToast } from '../Toast';
 import { logEvent } from '../../services/auditService';
 import { Modal } from '../Modal';
+import { useConfirm } from '../../hooks/useConfirm';
 
 // Resolve staff ID to name from cached users
 function useStaffName(staffId) {
@@ -39,6 +40,7 @@ export default function TableCard({ table, session }) {
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
+    const confirm = useConfirm();
     const { notifyMesaCobrar, notifyTiempoExcedido } = useNotifications();
 
     const isAvailable = !session || session.status === 'CLOSED';
@@ -114,17 +116,24 @@ export default function TableCard({ table, session }) {
 
     const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0) => {
         if (!currentUser) return;
+        const modeLabel = hours === 0 ? 'Libre' : hours === 0.5 ? 'Prepago 30 min' : `Prepago ${hours} hr${hours !== 1 ? 's' : ''}`;
+        const ok = await confirm({ title: `Abrir ${table.name}`, message: `¿Confirmar apertura en modo ${modeLabel}?`, confirmText: 'Abrir Mesa', cancelText: 'Cancelar', variant: 'warning' });
+        if (!ok) return;
         await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount);
         setShowModeModal(false);
     };
 
     const handleStartPina = async (clientName = '', guestCount = 0) => {
         if (!currentUser) return;
+        const ok = await confirm({ title: `Abrir ${table.name}`, message: '¿Confirmar apertura en modo La Piña?', confirmText: 'Abrir Mesa', cancelText: 'Cancelar', variant: 'warning' });
+        if (!ok) return;
         await openSession(table.id, currentUser.id, 'PINA', 0, clientName, guestCount);
     };
 
     const handleStartConsumption = async (clientName = '', guestCount = 0) => {
         if (!currentUser) return;
+        const ok = await confirm({ title: `Ocupar ${table.name}`, message: '¿Confirmar apertura de mesa?', confirmText: 'Ocupar Mesa', cancelText: 'Cancelar', variant: 'warning' });
+        if (!ok) return;
         await openSession(table.id, currentUser.id, 'NORMAL', 0, clientName, guestCount);
     };
 
