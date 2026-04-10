@@ -223,9 +223,10 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     }
     p.newline();
     p.align(1).text('*** NO ES RECIBO DE PAGO ***').newline();
-    p.feed(4).cut();
+    // ⚠️ feed sin cut — el corte de papel dispara el cajón en muchas impresoras.
+    // Para la pre-cuenta usamos solo avance; el cliente rasga el papel manualmente.
+    p.feed(6);
 
-    // ⚠️ NO se llama openCashDrawerWebSerial — la pre-cuenta NO debe abrir el cajón
     await sendEscPosCommand(Array.from(p.build()));
     return true;
 }
