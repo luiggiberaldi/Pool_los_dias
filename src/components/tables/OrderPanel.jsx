@@ -72,7 +72,8 @@ export function OrderPanel({ session, table, onClose }) {
             await addItemToSession(table.id, session.id, currentUser.id, productForOrder, effectiveRate);
         } catch (e) {
             console.error(e);
-            showToast('Error', 'No se pudo agregar el producto. Verifica tu conexión.', 'error');
+            const msg = e?.message || e?.details || e?.hint || JSON.stringify(e) || 'Error desconocido';
+            showToast(`Error al agregar: ${msg}`, 'error', 8000);
         } finally {
             setTimeout(() => setAddingItem(null), 300);
         }
