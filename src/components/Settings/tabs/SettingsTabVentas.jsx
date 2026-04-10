@@ -8,6 +8,7 @@ export default function SettingsTabVentas({
     maxDiscountCajero, setMaxDiscountCajero,
     cajeroAbreCaja, setCajeroAbreCaja,
     cajeroCierraCaja, setCajeroCierraCaja,
+    cajeroVeMesas, setCajeroVeMesas,
     forceHeartbeat, showToast, triggerHaptic
 }) {
     return (
@@ -73,6 +74,23 @@ export default function SettingsTabVentas({
                             setCajeroCierraCaja(newVal);
                             localStorage.setItem('cajero_puede_cerrar_caja', newVal.toString());
                             showToast(newVal ? 'Cajero puede cerrar caja' : 'Solo el admin puede cerrar caja', 'success');
+                            triggerHaptic?.();
+                        }}
+                    />
+                </div>
+
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Acceso a Mesas</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">El cajero puede ver y gestionar la zona de mesas</p>
+                    </div>
+                    <Toggle
+                        enabled={cajeroVeMesas}
+                        onChange={() => {
+                            const newVal = !cajeroVeMesas;
+                            setCajeroVeMesas(newVal);
+                            localStorage.setItem('cajero_puede_ver_mesas', newVal.toString());
+                            showToast(newVal ? 'Cajero tiene acceso a mesas' : 'Cajero sin acceso a mesas', 'success');
                             triggerHaptic?.();
                         }}
                     />

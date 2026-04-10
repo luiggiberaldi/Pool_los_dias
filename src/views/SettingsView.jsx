@@ -172,6 +172,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [maxDiscountCajero, setMaxDiscountCajero] = useState(parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100);
     const [cajeroAbreCaja, setCajeroAbreCaja] = useState(localStorage.getItem('cajero_puede_abrir_caja') === 'true');
     const [cajeroCierraCaja, setCajeroCierraCaja] = useState(localStorage.getItem('cajero_puede_cerrar_caja') === 'true');
+    const [cajeroVeMesas, setCajeroVeMesas] = useState(localStorage.getItem('cajero_puede_ver_mesas') === 'true');
     const [autoLockMinutes, setAutoLockMinutes] = useState(localStorage.getItem('admin_auto_lock_minutes') || '5');
     const [autoLockOnMinimize, setAutoLockOnMinimize] = useState(localStorage.getItem('admin_auto_lock_on_minimize') !== 'false');
 
@@ -451,6 +452,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                             maxDiscountCajero={maxDiscountCajero} setMaxDiscountCajero={setMaxDiscountCajero}
                             cajeroAbreCaja={cajeroAbreCaja} setCajeroAbreCaja={setCajeroAbreCaja}
                             cajeroCierraCaja={cajeroCierraCaja} setCajeroCierraCaja={setCajeroCierraCaja}
+                            cajeroVeMesas={cajeroVeMesas} setCajeroVeMesas={setCajeroVeMesas}
                             forceHeartbeat={forceHeartbeat}
                             showToast={showToast}
                             triggerHaptic={triggerHaptic}

@@ -258,7 +258,7 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0) => {
+    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0) => {
         const userId = await getAuthUserId();
         const sessionPayload = {
             table_id: tableId,
@@ -266,7 +266,9 @@ export const useTablesStore = create((set, get) => ({
             game_mode: gameMode,
             hours_paid: hoursPaid,
             status: 'ACTIVE',
-            started_at: new Date().toISOString()
+            started_at: new Date().toISOString(),
+            ...(clientName ? { client_name: clientName } : {}),
+            ...(guestCount > 0 ? { guest_count: guestCount } : {}),
         };
         if (userId) sessionPayload.user_id = userId;
 

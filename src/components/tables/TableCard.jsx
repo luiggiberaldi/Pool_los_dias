@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye } from 'lucide-react';
+import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -57,6 +57,12 @@ export default function TableCard({ table, session }) {
     const [showPinaConfirm, setShowPinaConfirm] = useState(false);
     const [adjustMins, setAdjustMins] = useState('');
 
+    // Modal de nombre + personas al abrir mesa
+    const [showOpenModal, setShowOpenModal] = useState(false);
+    const [pendingOpen, setPendingOpen] = useState(null); // { mode: 'NORMAL'|'PINA'|'CONSUMPTION', hours: number }
+    const [sessionClientName, setSessionClientName] = useState('');
+    const [sessionGuestCount, setSessionGuestCount] = useState('');
+
     // Always call hooks unconditionally — React rules of hooks
     const allOrders = useOrdersStore(state => state.orders);
     const allItems = useOrdersStore(state => state.orderItems);
@@ -106,21 +112,40 @@ export default function TableCard({ table, session }) {
         }
     }, [isPlaying, session?.started_at]);
 
-    const handleStartNormal = async (hours = 0) => {
+    const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0) => {
         if (!currentUser) return;
-        await openSession(table.id, currentUser.id, 'NORMAL', hours);
+        await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount);
         setShowModeModal(false);
     };
 
-    const handleStartPina = async () => {
+    const handleStartPina = async (clientName = '', guestCount = 0) => {
         if (!currentUser) return;
-        await openSession(table.id, currentUser.id, 'PINA');
+        await openSession(table.id, currentUser.id, 'PINA', 0, clientName, guestCount);
     };
 
-    const handleStartConsumption = async () => {
+    const handleStartConsumption = async (clientName = '', guestCount = 0) => {
         if (!currentUser) return;
-        // Mesas tipo NORMAL no cobran tiempo — se detecta por table.type, no por game_mode
-        await openSession(table.id, currentUser.id, 'NORMAL');
+        await openSession(table.id, currentUser.id, 'NORMAL', 0, clientName, guestCount);
+    };
+
+    // Abre el modal de nombre/personas y guarda la acción pendiente
+    const handleRequestOpen = (mode, hours = 0) => {
+        setSessionClientName('');
+        setSessionGuestCount('');
+        setPendingOpen({ mode, hours });
+        setShowOpenModal(true);
+    };
+
+    const handleConfirmOpen = async () => {
+        if (!pendingOpen) return;
+        setShowOpenModal(false);
+        const name = sessionClientName.trim();
+        const guests = parseInt(sessionGuestCount) || 0;
+        const { mode, hours } = pendingOpen;
+        if (mode === 'PINA') await handleStartPina(name, guests);
+        else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests);
+        else await handleStartNormal(hours, name, guests);
+        setPendingOpen(null);
     };
 
     const handleAdjustTime = () => {
@@ -212,6 +237,16 @@ export default function TableCard({ table, session }) {
                     {isPlaying && staffName && (
                         <span className="text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md self-start whitespace-nowrap">
                             {staffName}
+                        </span>
+                    )}
+                    {isPlaying && session?.client_name && (
+                        <span className="text-[10px] font-bold opacity-80 bg-white/15 px-1.5 py-0.5 rounded-md self-start whitespace-nowrap">
+                            {session.client_name}
+                        </span>
+                    )}
+                    {isPlaying && session?.guest_count > 0 && (
+                        <span className="text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md self-start flex items-center gap-1">
+                            <Users size={9} /> {session.guest_count}
                         </span>
                     )}
                 </div>
@@ -317,8 +352,8 @@ export default function TableCard({ table, session }) {
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/10 flex flex-col gap-2">
                 {isAvailable ? (
                     table.type === 'NORMAL' ? (
-                        <button 
-                            onClick={handleStartConsumption}
+                        <button
+                            onClick={() => handleRequestOpen('CONSUMPTION')}
                             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm py-2.5 px-3 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2"
                         >
                             <Play size={14} fill="currentColor" /> Ocupar
@@ -327,14 +362,14 @@ export default function TableCard({ table, session }) {
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 data-tour="mesa-btn-normal"
-                                onClick={() => setShowModeModal(true)}
+                                onClick={() => handleRequestOpen('SHOW_MODE')}
                                 className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                             >
                                 <Play size={12} fill="currentColor" /> Normal
                             </button>
                             <button
                                 data-tour="mesa-btn-pina"
-                                onClick={currentUser?.role === 'MESERO' ? () => setShowPinaConfirm(true) : handleStartPina}
+                                onClick={currentUser?.role === 'MESERO' ? () => setShowPinaConfirm(true) : () => handleRequestOpen('PINA')}
                                 className="bg-amber-500 hover:bg-amber-400 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                             >
                                 <TargetIcon size={12} /> Piña
@@ -431,34 +466,75 @@ export default function TableCard({ table, session }) {
         <Modal isOpen={showModeModal} onClose={() => setShowModeModal(false)} title="Modo de Juego">
             <div className="flex flex-col gap-3 py-2">
                 <button
-                    onClick={() => handleStartNormal(0)}
+                    onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(0, n, g); }}
                     className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 group transition-all"
                 >
                     <div className="font-black text-slate-800 group-hover:text-sky-700">Abierta (Libre)</div>
                     <div className="text-sm text-slate-500">Mesa por tiempo ilimitado, cobro al final.</div>
                 </button>
                 <div className="grid grid-cols-2 gap-3 mt-2">
-                    <button onClick={() => handleStartNormal(0.5)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                    <button onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(0.5, n, g); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">30 Min</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
                     </button>
-                    <button onClick={() => handleStartNormal(1)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                    <button onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(1, n, g); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">1 Hrs</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
                     </button>
-                    <button onClick={() => handleStartNormal(2)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                    <button onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(2, n, g); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">2 Hrs</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
                     </button>
-                    <button onClick={() => handleStartNormal(3)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                    <button onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(3, n, g); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">3 Hrs</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
                     </button>
-                    <button onClick={() => handleStartNormal(4)} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
+                    <button onClick={() => { const n=sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(4, n, g); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
                         <span className="text-xl">4 Hrs</span>
                         <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
                     </button>
                 </div>
+            </div>
+        </Modal>
+
+        {/* Modal de Nombre + Personas al abrir mesa */}
+        <Modal isOpen={showOpenModal} onClose={() => setShowOpenModal(false)} title="Abrir Mesa">
+            <div className="flex flex-col gap-4 py-2">
+                <div>
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Nombre del cliente (opcional)</label>
+                    <input
+                        type="text"
+                        placeholder="Ej: Juan, Mesa VIP..."
+                        value={sessionClientName}
+                        onChange={e => setSessionClientName(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                        autoFocus
+                    />
+                </div>
+                <div>
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Número de personas (opcional)</label>
+                    <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={sessionGuestCount}
+                        onChange={e => setSessionGuestCount(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    />
+                </div>
+                <button
+                    onClick={() => {
+                        if (pendingOpen?.mode === 'SHOW_MODE') {
+                            setShowOpenModal(false);
+                            setShowModeModal(true);
+                        } else {
+                            handleConfirmOpen();
+                        }
+                    }}
+                    className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
+                >
+                    Continuar
+                </button>
             </div>
         </Modal>
 

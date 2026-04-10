@@ -338,16 +338,18 @@ export default function App() {
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
     { id: 'ajustes', label: 'Config.', icon: Settings, adminOnly: true },
   ];
-  
-  const TABS = role === 'ADMIN' ? ALL_TABS : 
-               role === 'CAJERO' ? ALL_TABS.filter(t => !t.adminOnly && !t.hiddenForCajero) : 
+
+  const cajeroVeMesas = localStorage.getItem('cajero_puede_ver_mesas') === 'true';
+
+  const TABS = role === 'ADMIN' ? ALL_TABS :
+               role === 'CAJERO' ? ALL_TABS.filter(t => !t.adminOnly && (!t.hiddenForCajero || (t.id === 'mesas' && cajeroVeMesas))) :
                ALL_TABS.filter(t => !t.adminOnly && !t.adminOrCashier && !t.hiddenForMesero);
 
-  // Auto-redirect CAJERO away from mesas (derive effective tab instead of setState in effect)
+  // Auto-redirect CAJERO away from mesas unless they have permission
   const effectiveTab = useMemo(() => {
-    if (role === 'CAJERO' && activeTab === 'mesas') return 'ventas';
+    if (role === 'CAJERO' && activeTab === 'mesas' && !cajeroVeMesas) return 'ventas';
     return activeTab;
-  }, [role, activeTab]);
+  }, [role, activeTab, cajeroVeMesas]);
 
   // Global Hard Gate: Loading State
   if (checkingSession) {
