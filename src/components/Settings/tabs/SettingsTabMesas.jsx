@@ -539,7 +539,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                     <button onClick={() => startInlineEdit(table)} className="p-2 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-lg transition-all">
                                         <Edit2 size={16} />
                                     </button>
-                                    <button onClick={() => { setDeleteConfirmId(table.id); setInlineEditId(null); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all">
+                                    <button onClick={() => { setDeleteConfirmId(table.id); setInlineEditId(null); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-all" disabled={isOccupied} title={isOccupied ? 'No se puede eliminar una mesa ocupada' : 'Eliminar mesa'} style={isOccupied ? { opacity: 0.3, cursor: 'not-allowed' } : {}}>
                                         <Trash2 size={16} />
                                     </button>
                                 </div>
