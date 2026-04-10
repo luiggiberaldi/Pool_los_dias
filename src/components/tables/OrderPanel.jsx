@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, X, Plus, Minus, Trash2, Loader2, Search, ChevronDown, UtensilsCrossed } from 'lucide-react';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
-
 import { useAuthStore } from '../../hooks/store/authStore';
-
 import { useProductContext } from '../../context/ProductContext';
+import { showToast } from '../Toast';
 
 // Category color mapping for visual variety
 const CAT_COLORS = {
@@ -58,7 +57,11 @@ export function OrderPanel({ session, table, onClose }) {
     }, []);
 
     const handleAddProduct = async (product) => {
-        if (!currentUser || addingItem) return;
+        if (!currentUser) {
+            showToast('Sin sesión', 'No hay usuario activo. Vuelve a iniciar sesión.', 'error');
+            return;
+        }
+        if (addingItem) return;
         setAddingItem(product.id);
         const productForOrder = {
             id: product.id,
@@ -69,6 +72,7 @@ export function OrderPanel({ session, table, onClose }) {
             await addItemToSession(table.id, session.id, currentUser.id, productForOrder, effectiveRate);
         } catch (e) {
             console.error(e);
+            showToast('Error', 'No se pudo agregar el producto. Verifica tu conexión.', 'error');
         } finally {
             setTimeout(() => setAddingItem(null), 300);
         }

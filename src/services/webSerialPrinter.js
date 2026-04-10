@@ -168,6 +168,68 @@ export async function openCashDrawerWebSerial() {
     return await sendEscPosCommand([27, 112, 0, 50, 250]);
 }
 
+/**
+ * Imprime la pre-cuenta de mesa via ESC/POS directo (SIN abrir cajón).
+ * Se usa en lugar del PDF+iframe para evitar que la impresora térmica
+ * abra el cajón al recibir un trabajo de impresión del sistema.
+ */
+export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD }) {
+    const port = await getConnectedPrinter();
+    if (!port) return false;
+
+    const cfg = getWebSerialConfig();
+    const W = cfg.paperWidth >= 80 ? 42 : 32;
+
+    const p = escposEncoder().init();
+
+    p.align(1).bold(true).doubleHeight(true).text('PRE-CUENTA MESA').newline();
+    p.doubleHeight(false).text(table.name.toUpperCase()).newline();
+    p.newline();
+
+    const d = new Date();
+    p.bold(false).align(0).text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`).newline();
+    p.line('-', W);
+
+    if (timeCost > 0) {
+        const isPina = session.game_mode === 'PINA';
+        p.bold(true).text(isPina ? 'Partidas (La Pina)' : 'Tiempo de Mesa').newline().bold(false);
+        if (isPina) {
+            const partidas = 1 + (Number(session.extended_times) || 0);
+            p.row(`${partidas} pina${partidas !== 1 ? 's' : ''} x $${(timeCost / partidas).toFixed(2)}`, `$${timeCost.toFixed(2)}`, W);
+        } else {
+            const horas = elapsed / 60;
+            const timeStr = horas < 1 ? Math.ceil(horas * 60) + ' min' : horas.toFixed(1) + 'h';
+            p.row(timeStr, `$${timeCost.toFixed(2)}`, W);
+        }
+        p.newline();
+    }
+
+    if (currentItems && currentItems.length > 0) {
+        p.bold(true).text('Consumo Bar').newline().bold(false);
+        currentItems.forEach(i => {
+            const t = i.qty * i.unit_price_usd;
+            const name = (i.product_name || '').substring(0, Math.floor(W * 0.55));
+            p.row(`${i.qty}x ${name}`, `$${t.toFixed(2)}`, W);
+        });
+        p.newline();
+    }
+
+    p.line('=', W);
+    p.align(1).bold(true).text('TOTAL ESTIMADO:').newline();
+    p.text(`$${grandTotal.toFixed(2)}`).newline();
+    p.bold(false);
+    if (tasaUSD && tasaUSD > 1) {
+        p.text(`Ref: Bs. ${(grandTotal * tasaUSD).toFixed(2)}`).newline();
+    }
+    p.newline();
+    p.align(1).text('*** NO ES RECIBO DE PAGO ***').newline();
+    p.feed(4).cut();
+
+    // ⚠️ NO se llama openCashDrawerWebSerial — la pre-cuenta NO debe abrir el cajón
+    await sendEscPosCommand(Array.from(p.build()));
+    return true;
+}
+
 export async function printTestWebSerial() {
     const lines = [
         '================================',

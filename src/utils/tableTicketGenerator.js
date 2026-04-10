@@ -1,9 +1,23 @@
 import { jsPDF } from 'jspdf';
+import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
 
 /**
- * Genera e imprime una pre-cuenta PDF para mesa de pool.
+ * Genera e imprime una pre-cuenta para mesa de pool.
+ * - Si hay impresora térmica ESC/POS configurada: imprime directo via WebSerial
+ *   SIN abrir el cajón de dinero (el cajón solo debe abrirse en ventas exitosas).
+ * - Sin impresora térmica: genera PDF via jsPDF + iframe.
  */
 export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD }) {
+    // Intentar ESC/POS directo si hay impresora térmica configurada
+    const cfg = getWebSerialConfig();
+    if (cfg.printerType && cfg.printerType !== 'system') {
+        try {
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
+            if (printed) return;
+        } catch (err) {
+            console.warn('[PreCuenta] ESC/POS falló, usando fallback PDF:', err.message);
+        }
+    }
     const WIDTH = 58;
     const M = 3;
     const CX = WIDTH / 2;
