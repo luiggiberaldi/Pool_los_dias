@@ -36,7 +36,7 @@ function useBcvRate() {
 }
 
 export default function TableCard({ table, session }) {
-    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest } = useTablesStore();
+    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata } = useTablesStore();
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
@@ -61,9 +61,14 @@ export default function TableCard({ table, session }) {
 
     // Modal de nombre + personas al abrir mesa
     const [showOpenModal, setShowOpenModal] = useState(false);
-    const [pendingOpen, setPendingOpen] = useState(null); // { mode: 'NORMAL'|'PINA'|'CONSUMPTION', hours: number }
+    const [pendingOpen, setPendingOpen] = useState(null);
     const [sessionClientName, setSessionClientName] = useState('');
     const [sessionGuestCount, setSessionGuestCount] = useState('');
+
+    // Modal de edición de nombre + personas en sesión activa
+    const [showEditMetaModal, setShowEditMetaModal] = useState(false);
+    const [editClientName, setEditClientName] = useState('');
+    const [editGuestCount, setEditGuestCount] = useState('');
 
     // Always call hooks unconditionally — React rules of hooks
     const allOrders = useOrdersStore(state => state.orders);
@@ -248,15 +253,25 @@ export default function TableCard({ table, session }) {
                             {staffName}
                         </span>
                     )}
-                    {isPlaying && session?.client_name && (
-                        <span className="text-[10px] font-bold opacity-80 bg-white/15 px-1.5 py-0.5 rounded-md self-start whitespace-nowrap">
-                            {session.client_name}
-                        </span>
+                    {isPlaying && (session?.client_name || session?.guest_count > 0) && (
+                        <button
+                            onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setShowEditMetaModal(true); }}
+                            className="flex items-center gap-1 text-[10px] font-bold opacity-80 bg-white/15 hover:bg-white/30 px-1.5 py-0.5 rounded-md self-start transition-colors"
+                            title="Editar nombre y personas"
+                        >
+                            {session.client_name && <span className="whitespace-nowrap">{session.client_name}</span>}
+                            {session.guest_count > 0 && <span className="flex items-center gap-0.5"><Users size={9} />{session.guest_count}</span>}
+                            <Edit2 size={8} className="opacity-60" />
+                        </button>
                     )}
-                    {isPlaying && session?.guest_count > 0 && (
-                        <span className="text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md self-start flex items-center gap-1">
-                            <Users size={9} /> {session.guest_count}
-                        </span>
+                    {isPlaying && !session?.client_name && !(session?.guest_count > 0) && (
+                        <button
+                            onClick={() => { setEditClientName(''); setEditGuestCount(''); setShowEditMetaModal(true); }}
+                            className="text-[10px] font-bold opacity-50 hover:opacity-80 bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded-md self-start transition-colors flex items-center gap-1"
+                            title="Añadir nombre y personas"
+                        >
+                            <Edit2 size={8} /> Añadir info
+                        </button>
                     )}
                 </div>
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
@@ -507,8 +522,7 @@ export default function TableCard({ table, session }) {
         </Modal>
 
         {/* Modal de Nombre + Personas al abrir mesa */}
-        <Modal isOpen={showOpenModal} onClose={() => setShowOpenModal(false)} title="Abrir Mesa">
-            <div className="flex flex-col gap-4 py-2">
+        <Modal isOpen={showOpenModal} onClose={() => setShowOpenModal(false)} title="Abrir Mesa">            <div className="flex flex-col gap-4 py-2">
                 <div>
                     <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Nombre del cliente (opcional)</label>
                     <input
@@ -543,6 +557,44 @@ export default function TableCard({ table, session }) {
                     className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
                 >
                     Continuar
+                </button>
+            </div>
+        </Modal>
+
+        {/* Modal Editar nombre y personas de sesión activa */}
+        <Modal isOpen={showEditMetaModal} onClose={() => setShowEditMetaModal(false)} title="Editar Información de Mesa">
+            <div className="flex flex-col gap-4 py-2">
+                <div>
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Nombre del cliente</label>
+                    <input
+                        type="text"
+                        placeholder="Ej: Juan, Mesa VIP..."
+                        value={editClientName}
+                        onChange={e => setEditClientName(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                        autoFocus
+                    />
+                </div>
+                <div>
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Número de personas</label>
+                    <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={editGuestCount}
+                        onChange={e => setEditGuestCount(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    />
+                </div>
+                <button
+                    onClick={async () => {
+                        await updateSessionMetadata(session.id, editClientName.trim(), parseInt(editGuestCount) || 0);
+                        setShowEditMetaModal(false);
+                        showToast('Información actualizada', 'success');
+                    }}
+                    className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
+                >
+                    Guardar
                 </button>
             </div>
         </Modal>

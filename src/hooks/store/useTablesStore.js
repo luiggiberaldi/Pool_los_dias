@@ -326,6 +326,21 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
+    updateSessionMetadata: async (sessionId, clientName, guestCount) => {
+        const payload = { client_name: clientName || null, guest_count: guestCount || 0 };
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, ...payload } : s
+        );
+        set({ activeSessions: newSessions });
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+        try {
+            const { error } = await supabaseCloud.from('table_sessions').update(payload).eq('id', sessionId);
+            if (error) throw error;
+        } catch (e) {
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
+        }
+    },
+
     updateSessionTime: async (sessionId, newStartedAt) => {
         const newSessions = get().activeSessions.map(s =>
             s.id === sessionId ? { ...s, started_at: newStartedAt } : s
