@@ -13,6 +13,11 @@ import { round2 } from '../utils/dinero';
 import { openCashDrawerWebSerial, getWebSerialConfig } from '../services/webSerialPrinter';
 function useBcvRate() {
     try {
+        const useAuto = JSON.parse(localStorage.getItem('bodega_use_auto_rate') ?? 'true');
+        if (!useAuto) {
+            const manual = parseFloat(localStorage.getItem('bodega_custom_rate'));
+            if (manual > 0) return manual;
+        }
         const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
         return saved?.bcv?.price || 1;
     } catch { return 1; }

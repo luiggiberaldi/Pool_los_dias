@@ -5,20 +5,20 @@ import { useTablesStore } from '../../../hooks/store/useTablesStore';
 import { mulR, divR } from '../../../utils/dinero';
 
 function useBcvRate() {
-    const [rate, setRate] = useState(() => {
+    const getEffectiveRate = () => {
         try {
+            const useAuto = JSON.parse(localStorage.getItem('bodega_use_auto_rate') ?? 'true');
+            if (!useAuto) {
+                const manual = parseFloat(localStorage.getItem('bodega_custom_rate'));
+                if (manual > 0) return manual;
+            }
             const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-            if (saved?.bcv?.price) return saved.bcv.price;
-        } catch { /* ignore parse errors */ }
-        return 1;
-    });
+            return saved?.bcv?.price || 1;
+        } catch { return 1; }
+    };
+    const [rate, setRate] = useState(getEffectiveRate);
     useEffect(() => {
-        const handleStorage = () => {
-             try {
-                const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-                if (saved?.bcv?.price) setRate(saved.bcv.price);
-            } catch { /* ignore parse errors */ }
-        };
+        const handleStorage = () => setRate(getEffectiveRate());
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);
     }, []);
