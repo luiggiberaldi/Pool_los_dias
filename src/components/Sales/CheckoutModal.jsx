@@ -115,6 +115,7 @@ export default function CheckoutModal({
     const [splitPeople, setSplitPeople] = useState(null);
     const [splitCustomInput, setSplitCustomInput] = useState('');
     const [splitPaid, setSplitPaid] = useState(0);
+    const [activeMethodId, setActiveMethodId] = useState(null);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -145,6 +146,7 @@ export default function CheckoutModal({
                             inputMode="decimal"
                             value={val}
                             onChange={e => handleBarChange(method.id, e.target.value)}
+                            onFocus={() => setActiveMethodId(method.id)}
                             placeholder="0.00"
                             className={`w-full py-3 px-4 pr-14 rounded-xl border-2 text-lg font-bold outline-none transition-all ${hasValue
                                 ? styles.inputActive
@@ -358,28 +360,7 @@ export default function CheckoutModal({
                                             <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(cartTotalBs / splitPeople)}</p>
                                         </div>
                                     </div>
-                                    {/* Botones auto-rellenar */}
-                                    <div className="flex gap-1.5 p-2 bg-violet-400/20 dark:bg-violet-900/30 rounded-b-xl border-x border-b border-violet-200 dark:border-violet-700/40 flex-wrap">
-                                        <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest self-center mr-1 shrink-0">Llenar:</p>
-                                        {methodsUsd.map(m => (
-                                            <button key={m.id} onClick={() => {
-                                                const prev = parseFloat(barValues[m.id] || '0') || 0;
-                                                handleBarChange(m.id, (prev + cartTotalUsd / splitPeople).toFixed(2));
-                                            }}
-                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-500 text-white hover:bg-violet-600 active:scale-95 transition-all shadow-sm min-w-[80px]">
-                                                $ {m.label}
-                                            </button>
-                                        ))}
-                                        {methodsBs.map(m => (
-                                            <button key={m.id} onClick={() => {
-                                                const prev = parseFloat(barValues[m.id] || '0') || 0;
-                                                handleBarChange(m.id, (prev + cartTotalBs / splitPeople).toFixed(2));
-                                            }}
-                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-400 text-white hover:bg-violet-500 active:scale-95 transition-all shadow-sm min-w-[80px]">
-                                                Bs {m.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    {/* Botones auto-rellenar eliminados — flujo por método activo */}
                                 </div>
                             ) : (
                                 <div className="mb-3 p-3 bg-emerald-500 rounded-xl text-white flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30">
@@ -432,10 +413,26 @@ export default function CheckoutModal({
                                     </button>
                                     <button
                                         disabled={splitPaid >= splitPeople}
-                                        onClick={() => setSplitPaid(p => Math.min(splitPeople, p + 1))}
+                                        onClick={() => {
+                                            if (splitPaid >= splitPeople) return;
+                                            // Sumar monto de esta persona al método activo
+                                            if (activeMethodId) {
+                                                const method = paymentMethods.find(m => m.id === activeMethodId);
+                                                if (method) {
+                                                    const prev = parseFloat(barValues[activeMethodId] || '0') || 0;
+                                                    const perPerson = method.currency === 'BS'
+                                                        ? cartTotalBs / splitPeople
+                                                        : cartTotalUsd / splitPeople;
+                                                    handleBarChange(activeMethodId, (prev + perPerson).toFixed(2));
+                                                }
+                                            }
+                                            setSplitPaid(p => Math.min(splitPeople, p + 1));
+                                        }}
                                         className="flex-1 py-1.5 rounded-xl text-xs font-black bg-violet-500 text-white disabled:opacity-30 hover:bg-violet-600 transition-all shadow-sm shadow-violet-500/30"
                                     >
-                                        + Cobrado
+                                        {activeMethodId
+                                            ? `+ Cobrado · ${paymentMethods.find(m => m.id === activeMethodId)?.label || ''}`
+                                            : '+ Cobrado'}
                                     </button>
                                 </div>
                             </div>
