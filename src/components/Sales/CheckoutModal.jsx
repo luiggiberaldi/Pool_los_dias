@@ -379,11 +379,16 @@ export default function CheckoutModal({
                                             </div>
                                         </div>
                                         {personDone ? (
-                                            <p className="text-[11px] font-black text-white shrink-0">¡Listo! Pulsa + Cobrado</p>
+                                            <p className="text-xs font-black text-white shrink-0">¡Listo! Pulsa + Cobrado</p>
                                         ) : collectedForCurrent > 0 ? (
-                                            <p className="text-[11px] font-black text-white shrink-0">
-                                                Cobrado ${collectedForCurrent.toFixed(2)} · Falta ${stillNeedsUsd.toFixed(2)}
-                                            </p>
+                                            <div className="text-right shrink-0">
+                                                <p className="text-xs font-black text-white leading-tight">
+                                                    Cobrado ${collectedForCurrent.toFixed(2)} · Falta ${stillNeedsUsd.toFixed(2)}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-white/80 leading-tight">
+                                                    Bs {formatBs(collectedForCurrent * effectiveRate)} · Bs {formatBs(stillNeedsUsd * effectiveRate)}
+                                                </p>
+                                            </div>
                                         ) : (
                                             <p className="text-[11px] font-black text-white/70 shrink-0">Toca un campo de pago</p>
                                         )}
