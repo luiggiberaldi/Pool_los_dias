@@ -670,9 +670,16 @@ export default function TableCard({ table, session }) {
                         )}
                         {/* Total + Eye — visible for ALL occupied sessions */}
                         <div className="flex items-center justify-center gap-1.5 mt-3">
-                            <div className="bg-white/10 px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 backdrop-blur-sm shadow-inner overflow-hidden max-w-full">
-                                <DollarSign size={14} className="text-emerald-300 shrink-0" />
-                                <span className="text-lg sm:text-xl font-bold text-emerald-300 truncate">{grandTotal.toFixed(2)}</span>
+                            <div className="bg-white/10 px-3 py-1.5 rounded-xl flex flex-col items-center justify-center backdrop-blur-sm shadow-inner overflow-hidden max-w-full">
+                                <div className="flex items-center gap-1.5">
+                                    <DollarSign size={14} className="text-emerald-300 shrink-0" />
+                                    <span className="text-lg sm:text-xl font-bold text-emerald-300 truncate">{grandTotal.toFixed(2)}</span>
+                                </div>
+                                {tasaUSD > 0 && (
+                                    <span className="text-[10px] font-semibold text-emerald-200/70 leading-tight">
+                                        Bs. {(grandTotal * tasaUSD).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                )}
                             </div>
                             <button 
                                 onClick={() => setShowTotalDetails(true)}
