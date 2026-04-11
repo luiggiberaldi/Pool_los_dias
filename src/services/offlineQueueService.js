@@ -2,6 +2,8 @@ import localforage from 'localforage';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { scopedKey } from '../hooks/store/accountScope';
 
+const SALES_KEY_BASE = 'bodega_sales_v1';
+
 const QUEUE_KEY_BASE = 'offline_sales_queue';
 const SYNC_LOCK_KEY_BASE = '_poolbar_offline_sync_lock';
 const getQueueKey = () => scopedKey(QUEUE_KEY_BASE);
@@ -102,10 +104,10 @@ export const offlineQueueService = {
         );
 
         if (pending.length === 0) {
-          // Purgar items viejos synced/failed (> 24h)
+          // Purgar items viejos: synced > 24h, failed > 7 días
           const purged = queue.filter(q => {
             if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
-            if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
+            if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 7 * 24 * 60 * 60 * 1000) return false;
             return true;
           });
           if (purged.length !== queue.length) {
@@ -153,6 +155,22 @@ export const offlineQueueService = {
 
             updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'synced', synced_at: Date.now() } : q);
             synced++;
+
+            // Actualizar status en bodega_sales_v1 de PENDIENTE_SYNC → COMPLETADA
+            try {
+                const salesKey = scopedKey(SALES_KEY_BASE);
+                const localSales = await localforage.getItem(salesKey) || [];
+                const idToMatch = item.payload?.idempotency_key || item.payload?.localId;
+                if (idToMatch) {
+                    const updated = localSales.map(s => {
+                        if ((s.idempotency_key === idToMatch || s.id === idToMatch) && s.status === 'PENDIENTE_SYNC') {
+                            return { ...s, status: 'COMPLETADA', synced_at: new Date().toISOString() };
+                        }
+                        return s;
+                    });
+                    await localforage.setItem(salesKey, updated);
+                }
+            } catch (e) { /* no bloquear el sync si esto falla */ }
           } catch (err) {
             console.error('[Offline Sync] Fallo al sincronizar venta offline:', err);
             const attempts = item.attempts + 1;
@@ -178,10 +196,10 @@ export const offlineQueueService = {
           }
         }
 
-        // Purgar items viejos synced/failed (> 24h)
+        // Purgar items viejos: synced > 24h, failed > 7 días
         const purgedQueue = updatedQueue.filter(q => {
           if (q.sync_status === 'synced' && q.synced_at && now - q.synced_at > 24 * 60 * 60 * 1000) return false;
-          if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 24 * 60 * 60 * 1000) return false;
+          if (q.sync_status === 'failed' && q.failed_at && now - q.failed_at > 7 * 24 * 60 * 60 * 1000) return false;
           return true;
         });
         await localforage.setItem(getQueueKey(), purgedQueue);
