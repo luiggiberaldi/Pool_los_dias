@@ -329,6 +329,20 @@ export default function App() {
 
   const confirm = useConfirm();
 
+  // ── Permisos de cajero (reactivo a cambios del cloud sync) ──
+  const [cajeroVeMesas, setCajeroVeMesas] = useState(
+    () => localStorage.getItem('cajero_puede_ver_mesas') === 'true'
+  );
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'cajero_puede_ver_mesas') {
+        setCajeroVeMesas(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
   const ALL_TABS = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'mesas', label: 'Mesas', icon: Layers, hiddenForCajero: true },
@@ -338,8 +352,6 @@ export default function App() {
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
     { id: 'ajustes', label: 'Config.', icon: Settings, adminOnly: true },
   ];
-
-  const cajeroVeMesas = localStorage.getItem('cajero_puede_ver_mesas') === 'true';
 
   const TABS = role === 'ADMIN' ? ALL_TABS :
                role === 'CAJERO' ? ALL_TABS.filter(t => !t.adminOnly && (!t.hiddenForCajero || (t.id === 'mesas' && cajeroVeMesas))) :

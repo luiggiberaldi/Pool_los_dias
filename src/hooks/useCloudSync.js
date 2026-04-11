@@ -16,7 +16,12 @@ const SYNC_KEYS = [
     'tasa_cop',
     'cop_enabled',
     'auto_cop_enabled',
-    'poolbar_categories_v1'
+    'poolbar_categories_v1',
+    // ── Permisos de cajero (sincronizar entre dispositivos) ──
+    'cajero_puede_ver_mesas',
+    'cajero_puede_abrir_caja',
+    'cajero_puede_cerrar_caja',
+    'max_discount_cajero',
 ];
 
 // Clave para rastrear el último pull exitoso (evita re-descargar datos sin cambios)
@@ -29,7 +34,12 @@ const LOCAL_KEYS = [
     'bodega_use_auto_rate',
     'tasa_cop',
     'cop_enabled',
-    'auto_cop_enabled'
+    'auto_cop_enabled',
+    // ── Permisos de cajero ──
+    'cajero_puede_ver_mesas',
+    'cajero_puede_abrir_caja',
+    'cajero_puede_cerrar_caja',
+    'max_discount_cajero',
 ];
 
 // ─── Estado Global del Motor ───────────────────────────────────────────────

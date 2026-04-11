@@ -175,8 +175,14 @@ export async function sendEscPosCommand(commandArray) {
 }
 
 export async function openCashDrawerWebSerial() {
-    // ESC p m t1 t2 — 27=ESC 112=p 0=drawer1 50=50ms 250=250ms
-    return await sendEscPosCommand([27, 112, 0, 50, 250]);
+    // ESC p m t1 t2 — 27=ESC 112=p m=drawer t1=on t2=off
+    // Enviar pulso a AMBOS pines del cajón por compatibilidad:
+    //   Pin 0 (drawer 1): usado por la mayoría de impresoras
+    //   Pin 1 (drawer 2): usado por algunas cajas registradoras / FC-588
+    return await sendEscPosCommand([
+        27, 112, 0, 50, 250,   // drawer pin 0
+        27, 112, 1, 50, 250,   // drawer pin 1
+    ]);
 }
 
 /**

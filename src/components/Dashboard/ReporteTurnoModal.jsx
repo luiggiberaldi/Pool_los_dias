@@ -19,8 +19,10 @@ function getSalePaymentLabel(s) {
     return '—';
 }
 
-export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTotalUsd, todayTotalBs, todayItemsSold, paymentBreakdown, activeCashSession, cajeroName, products = [] }) {
+export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTotalUsd, todayTotalBs, todayItemsSold, paymentBreakdown, activeCashSession, cajeroName, products = [], role = 'ADMIN' }) {
     if (!isOpen) return null;
+
+    const isAdmin = role === 'ADMIN';
 
     const fecha = formatFecha(activeCashSession?.opened_at || new Date().toISOString());
     const horaApertura = formatHora(activeCashSession?.opened_at);
@@ -196,8 +198,9 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                 {/* Body scrollable */}
                 <div className="overflow-y-auto flex-1 px-5 pb-2 space-y-4">
 
-                    {/* Tarjetas de resumen */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Tarjetas de resumen — cajero solo ve conteos, no montos */}
+                    <div className={`grid ${isAdmin ? 'grid-cols-2' : 'grid-cols-2'} gap-3`}>
+                        {isAdmin && (
                         <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-3.5">
                             <div className="flex items-center gap-1.5 mb-1">
                                 <TrendingUp size={12} className="text-emerald-500" />
@@ -205,6 +208,8 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                             </div>
                             <p className="text-xl font-black text-emerald-700 dark:text-emerald-300">${todayTotalUsd.toFixed(2)}</p>
                         </div>
+                        )}
+                        {isAdmin && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-3.5">
                             <div className="flex items-center gap-1.5 mb-1">
                                 <TrendingUp size={12} className="text-blue-500" />
@@ -212,6 +217,7 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                             </div>
                             <p className="text-xl font-black text-blue-700 dark:text-blue-300">Bs {todayTotalBs.toFixed(2)}</p>
                         </div>
+                        )}
                         <div className="bg-violet-50 dark:bg-violet-900/20 rounded-2xl p-3.5">
                             <div className="flex items-center gap-1.5 mb-1">
                                 <ShoppingBag size={12} className="text-violet-500" />
@@ -228,8 +234,8 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                         </div>
                     </div>
 
-                    {/* Desglose por método de pago */}
-                    {breakdown.length > 0 && (
+                    {/* Desglose por método de pago — solo admin */}
+                    {isAdmin && breakdown.length > 0 && (
                         <div>
                             <div className="flex items-center gap-2 mb-2">
                                 <CreditCard size={13} className="text-slate-400" />
@@ -251,8 +257,8 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                         </div>
                     )}
 
-                    {/* Listado de ventas del turno */}
-                    {todaySales.length > 0 && (
+                    {/* Listado de ventas del turno — solo admin */}
+                    {isAdmin && todaySales.length > 0 && (
                         <div>
                             <div className="flex items-center gap-2 mb-2">
                                 <Clock size={13} className="text-slate-400" />
@@ -278,7 +284,7 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                         </div>
                     )}
 
-                    {todaySales.length === 0 && (
+                    {isAdmin && todaySales.length === 0 && (
                         <div className="text-center py-8">
                             <p className="text-slate-400 text-sm font-bold">Sin ventas en este turno</p>
                         </div>

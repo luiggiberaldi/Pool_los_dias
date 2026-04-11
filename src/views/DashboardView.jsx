@@ -837,6 +837,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 activeCashSession={activeCashSession}
                 cajeroName={usuarioActivo?.name}
                 products={products}
+                role={role}
             />
         </div>
     );

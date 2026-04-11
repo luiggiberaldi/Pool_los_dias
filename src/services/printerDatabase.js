@@ -62,6 +62,14 @@ export const PRINTER_DB = [
     { vid: 0x10C4, pid: 0xEA60, brand: 'COL-POS / Genérica',  model: 'Térmica 58mm (CP2102)', type: 'thermal_serial', baudRate: 9600, paperWidth: 58 },
     { vid: 0x067B, pid: 0x2303, brand: 'COL-POS / Genérica',  model: 'Térmica 58mm (PL2303)', type: 'thermal_serial', baudRate: 9600, paperWidth: 58 },
 
+    // ── FC-588 / Impresoras genéricas 58mm (USB/Bluetooth) ────────────────────
+    // La FC-588 usa distintos chips USB según el lote de fabricación.
+    // STM32 CDC (común en FC-588, FC-58H, FC-58L):
+    { vid: 0x0483, pid: 0x5740, brand: 'FC-588 / Genérica', model: 'Térmica 58mm (STM32)', type: 'thermal', baudRate: 9600, paperWidth: 58 },
+    // NXP LPC (variantes FC-588):
+    { vid: 0x1FC9, pid: 0x2016, brand: 'FC-588 / Genérica', model: 'Térmica 58mm (NXP)',   type: 'thermal', baudRate: 9600, paperWidth: 58 },
+    // QinHeng (algunas FC-588 usan CH340 igual que COL-POS, ya cubierto arriba)
+
     // ── ZJIANG (impresoras chinas genéricas) ─────────────────────────────────
     { vid: 0x0416, pid: 0x5011, brand: 'Zjiang', model: 'ZJ-5804 / ZJ-5808', type: 'thermal', baudRate: 9600, paperWidth: 58 },
 
