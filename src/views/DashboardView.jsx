@@ -482,7 +482,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── REPORTE DE TURNO (cajero) ── */}
-            {!isAdmin && activeCashSession && (
+            {!isAdmin && role !== 'MESERO' && activeCashSession && (
                 <button
                     data-tour="cierre-turno"
                     onClick={() => setIsReporteTurnoOpen(true)}
