@@ -113,6 +113,8 @@ export default function CheckoutModal({
         () => localStorage.getItem(CHECKOUT_TOUR_KEY) !== 'true'
     );
     const [splitPeople, setSplitPeople] = useState(null);
+    const [splitCustomInput, setSplitCustomInput] = useState('');
+    const [splitPaid, setSplitPaid] = useState(0);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -297,33 +299,118 @@ export default function CheckoutModal({
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
                         <Users size={11} /> Dividir cuenta
                     </p>
-                    <div className="flex gap-2 flex-wrap">
-                        {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                    {/* Botones rápidos + campo libre */}
+                    <div className="flex gap-1.5 flex-wrap items-center">
+                        {[2, 3, 4, 5, 6, 8].map(n => (
                             <button
                                 key={n}
-                                onClick={() => setSplitPeople(splitPeople === n ? null : n)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                                onClick={() => { setSplitPeople(n); setSplitCustomInput(''); setSplitPaid(0); }}
+                                className={`w-9 h-9 rounded-xl text-xs font-black transition-all border ${
                                     splitPeople === n
                                         ? 'bg-violet-500 text-white border-violet-500 shadow-md shadow-violet-500/30'
                                         : 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
                                 }`}
                             >
-                                {n} pers.
+                                {n}
                             </button>
                         ))}
+                        {/* Campo personalizado */}
+                        <div className="flex items-center gap-1 ml-1">
+                            <input
+                                type="number"
+                                min="2"
+                                max="99"
+                                placeholder="?"
+                                value={splitCustomInput}
+                                onChange={e => {
+                                    const v = e.target.value;
+                                    setSplitCustomInput(v);
+                                    const n = parseInt(v);
+                                    if (n >= 2) { setSplitPeople(n); setSplitPaid(0); }
+                                }}
+                                className="w-12 h-9 rounded-xl text-xs font-black text-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-violet-400"
+                            />
+                        </div>
+                        {splitPeople && (
+                            <button
+                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); }}
+                                className="ml-auto text-[10px] text-slate-400 hover:text-red-400 transition-colors font-bold"
+                            >
+                                Quitar
+                            </button>
+                        )}
                     </div>
+
+                    {/* Resultado + tracker */}
                     {splitPeople && cartTotalUsd > 0 && (
-                        <div className="mt-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
-                            <p className="text-xs font-bold text-violet-700 dark:text-violet-400">
-                                Por persona ({splitPeople})
-                            </p>
-                            <div className="text-right">
-                                <p className="text-lg font-black text-violet-700 dark:text-violet-300 leading-none">
-                                    ${(cartTotalUsd / splitPeople).toFixed(2)}
-                                </p>
-                                <p className="text-[11px] font-bold text-violet-500/80 mt-0.5">
-                                    Bs {formatBs(cartTotalBs / splitPeople)}
-                                </p>
+                        <div className="mt-2.5 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl">
+                            {/* Monto por persona */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Por persona</p>
+                                    <p className="text-2xl font-black text-violet-700 dark:text-violet-300 leading-none mt-0.5">
+                                        ${(cartTotalUsd / splitPeople).toFixed(2)}
+                                    </p>
+                                    <p className="text-xs font-bold text-violet-500/80 mt-0.5">
+                                        Bs {formatBs(cartTotalBs / splitPeople)}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Total</p>
+                                    <p className="text-sm font-black text-violet-600 dark:text-violet-400">{splitPeople} personas</p>
+                                </div>
+                            </div>
+
+                            {/* Tracker de cobro */}
+                            <div className="border-t border-violet-200 dark:border-violet-700/40 pt-2.5">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Cobradas</p>
+                                    <p className="text-[10px] font-bold text-violet-500">
+                                        {splitPaid < splitPeople
+                                            ? `Falta: $${((splitPeople - splitPaid) * (cartTotalUsd / splitPeople)).toFixed(2)}`
+                                            : '¡Cuenta completa!'}
+                                    </p>
+                                </div>
+                                {/* Barra de progreso */}
+                                <div className="w-full h-2 bg-violet-200 dark:bg-violet-800/40 rounded-full mb-2.5 overflow-hidden">
+                                    <div
+                                        className="h-full bg-violet-500 rounded-full transition-all duration-300"
+                                        style={{ width: `${(splitPaid / splitPeople) * 100}%` }}
+                                    />
+                                </div>
+                                {/* Círculos por persona */}
+                                <div className="flex gap-1.5 flex-wrap mb-2.5">
+                                    {Array.from({ length: splitPeople }).map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setSplitPaid(i < splitPaid ? i : i + 1)}
+                                            className={`w-7 h-7 rounded-full text-[10px] font-black border-2 transition-all ${
+                                                i < splitPaid
+                                                    ? 'bg-violet-500 border-violet-500 text-white'
+                                                    : 'bg-white dark:bg-slate-800 border-violet-300 dark:border-violet-600 text-violet-400'
+                                            }`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                                {/* Botones + / - */}
+                                <div className="flex gap-2">
+                                    <button
+                                        disabled={splitPaid <= 0}
+                                        onClick={() => setSplitPaid(p => Math.max(0, p - 1))}
+                                        className="flex-1 py-1.5 rounded-xl text-xs font-black border border-violet-300 dark:border-violet-600 text-violet-500 disabled:opacity-30 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all"
+                                    >
+                                        − Quitar
+                                    </button>
+                                    <button
+                                        disabled={splitPaid >= splitPeople}
+                                        onClick={() => setSplitPaid(p => Math.min(splitPeople, p + 1))}
+                                        className="flex-1 py-1.5 rounded-xl text-xs font-black bg-violet-500 text-white disabled:opacity-30 hover:bg-violet-600 transition-all shadow-sm shadow-violet-500/30"
+                                    >
+                                        + Cobrado
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
