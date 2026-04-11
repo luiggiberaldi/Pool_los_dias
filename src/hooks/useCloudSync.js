@@ -172,6 +172,71 @@ export const forcePushToCloud = async () => {
     }
 };
 
+/**
+ * Sube un backup completo de todos los datos del usuario a cloud_backups.
+ * Usado cuando el admin solicita un backup inmediato desde el panel de administración.
+ */
+export const pushFullBackupToCloud = async () => {
+    try {
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.email) return;
+
+        const idbKeys = [
+            'bodega_products_v1', 'poolbar_categories_v1',
+            'bodega_sales_v1', 'bodega_customers_v1',
+            'bodega_accounts_v2', 'bodega_payment_methods_v1',
+            'bodega_suppliers_v1', 'bodega_supplier_invoices_v1',
+            'abasto_audit_log_v1', 'bodega_pending_cart_v1',
+            'active_sessions', 'tables', 'pool_config',
+            'active_orders', 'active_order_items', 'active_cash_session',
+            'offline_sales_queue',
+        ];
+        const idbData = {};
+        for (const key of idbKeys) {
+            const data = await storageService.getItem(key, null);
+            if (data !== null) idbData[key] = data;
+        }
+
+        const lsKeys = [
+            'business_name', 'business_rif', 'bodega_use_auto_rate',
+            'bodega_custom_rate', 'monitor_rates_v12', 'cop_enabled',
+            'auto_cop_enabled', 'tasa_cop', 'premium_token',
+            'allow_negative_stock', 'printer_paper_width',
+            'street_rate_bs', 'catalog_use_auto_usdt',
+            'catalog_custom_usdt_price', 'catalog_show_cash_price',
+            'bodega_inventory_view', 'theme',
+            'cajero_puede_ver_mesas', 'cajero_puede_abrir_caja',
+            'cajero_puede_cerrar_caja', 'max_discount_cajero',
+            'admin_auto_lock_on_minimize', 'admin_auto_lock_minutes',
+            'pda_device_alias',
+        ];
+        const lsData = {};
+        for (const key of lsKeys) {
+            const val = localStorage.getItem(key);
+            if (val !== null) lsData[key] = val;
+        }
+
+        const backupData = {
+            timestamp: new Date().toISOString(),
+            version: '2.0',
+            data: { idb: idbData, ls: lsData }
+        };
+
+        const { error } = await supabaseCloud.from('cloud_backups').upsert({
+            email: session.user.email,
+            backup_data: backupData,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'email' });
+
+        if (error) throw error;
+        console.log('[CloudSync] Backup completo subido por solicitud del admin.');
+        return true;
+    } catch (e) {
+        console.error('[CloudSync] Error en backup completo:', e);
+        throw e;
+    }
+};
+
 // Escuchar retorno de internet
 if (typeof window !== 'undefined') {
     window.addEventListener('online', processSyncQueue);
@@ -484,6 +549,17 @@ export function useCloudSync() {
 
                 // Suscripción Broadcast para ventas en tiempo real (0 DB egress)
                 subscribeSalesRealtime(userId, applyIncomingSale);
+
+                // Suscripción a solicitudes de backup del admin
+                supabaseCloud
+                    .channel('backup-requests')
+                    .on('broadcast', { event: 'request' }, async ({ payload }) => {
+                        if (payload?.email?.toLowerCase() === session.user.email?.toLowerCase()) {
+                            console.log('[CloudSync] Backup solicitado por admin — subiendo...');
+                            await pushFullBackupToCloud();
+                        }
+                    })
+                    .subscribe();
 
             } catch (err) {
                 console.error('[CloudSync] Error inicialización P2P:', err);

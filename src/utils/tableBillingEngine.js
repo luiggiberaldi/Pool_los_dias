@@ -17,14 +17,15 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
     }
 
     if (gameMode === 'NORMAL') {
+        // Modo normal: solo se registra el tiempo, no se cobra por hora.
+        // El cobro es únicamente por consumos.
+        return 0;
+    }
+
+    if (gameMode === 'PREPAGO') {
         const pricePerHour = config.pricePerHour || 0;
-
-        if (elapsedMinutes <= 0 && hoursPaid <= 0) return 0;
-
-        // Pro-rata billing: charge exact fractional hours instead of rounding up
-        const billedHours = Math.max(elapsedMinutes / 60, hoursPaid);
-
-        return round2(billedHours * pricePerHour);
+        if (hoursPaid <= 0) return 0;
+        return round2(hoursPaid * pricePerHour);
     }
 
     return 0;

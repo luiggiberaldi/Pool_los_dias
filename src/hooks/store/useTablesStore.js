@@ -260,6 +260,25 @@ export const useTablesStore = create((set, get) => ({
 
     openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null) => {
         const userId = await getAuthUserId();
+
+        // Cerrar sesiones huérfanas (ACTIVE/CHECKOUT) para la misma mesa
+        // Previene que un mismo table_id tenga múltiples sesiones abiertas a la vez
+        const orphans = get().activeSessions.filter(
+            s => s.table_id === tableId && (s.status === 'ACTIVE' || s.status === 'CHECKOUT')
+        );
+        if (orphans.length > 0) {
+            const cleanedSessions = get().activeSessions.filter(s => s.table_id !== tableId);
+            set({ activeSessions: cleanedSessions });
+            await tablesCache.setItem(scopedKey('active_sessions'), cleanedSessions);
+            for (const orphan of orphans) {
+                try {
+                    await supabaseCloud.from('table_sessions')
+                        .update({ status: 'CLOSED', closed_at: new Date().toISOString(), total_cost_usd: 0 })
+                        .eq('id', orphan.id);
+                } catch { /* ignorar */ }
+            }
+        }
+
         const sessionPayload = {
             table_id: tableId,
             opened_by: staffId,
@@ -419,11 +438,30 @@ export const useTablesStore = create((set, get) => ({
     },
 
     requestCheckout: async (sessionId) => {
-        const newSessions = get().activeSessions.map(s =>
-            s.id === sessionId ? { ...s, status: 'CHECKOUT' } : s
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // Cancelar cualquier otra sesión de la misma mesa que esté en CHECKOUT
+        // (previene duplicados en la cola de caja)
+        const tableId = session.table_id;
+        const otherCheckouts = get().activeSessions.filter(
+            s => s.id !== sessionId && s.table_id === tableId && s.status === 'CHECKOUT'
         );
+
+        const newSessions = get().activeSessions.map(s => {
+            if (s.id === sessionId) return { ...s, status: 'CHECKOUT' };
+            if (s.table_id === tableId && s.status === 'CHECKOUT') return { ...s, status: 'ACTIVE' };
+            return s;
+        });
         set({ activeSessions: newSessions });
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+
+        // Revertir otras sesiones CHECKOUT de la misma mesa en Supabase
+        for (const other of otherCheckouts) {
+            try {
+                await supabaseCloud.from('table_sessions').update({ status: 'ACTIVE' }).eq('id', other.id);
+            } catch { /* ignorar, se intentará después */ }
+        }
 
         try {
             const { error } = await supabaseCloud.from('table_sessions').update({ status: 'CHECKOUT' }).eq('id', sessionId);

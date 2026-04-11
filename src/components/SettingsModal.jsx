@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Download, AlertTriangle, Check, X, Database, Share2, Fingerprint, Copy, Store } from 'lucide-react';
 import { storageService } from '../utils/storageService';
-import localforage from 'localforage';
+import { setImportGuard } from '../hooks/useCloudSync';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from './Settings/PaymentMethodsManager';
 
@@ -114,15 +114,14 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                     throw new Error('Formato de archivo inválido.');
                 }
 
-                // Bypass storageService completely to prevent app_storage_update events from firing.
-                // If events fire, ProductContext updates state and triggers its auto-save, which might overwrite our imported data before reload finishes.
-                const lf = localforage.createInstance({ name: 'BodegaApp', storeName: 'bodega_app_data' });
-
+                // Use setItemSilent: scoped key (aísla por cuenta), sin eventos ni cloud push durante restauración
                 if (json.data.bodega_products_v1) {
-                    await lf.setItem('bodega_products_v1', typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1);
+                    const val = typeof json.data.bodega_products_v1 === 'string' ? JSON.parse(json.data.bodega_products_v1) : json.data.bodega_products_v1;
+                    await storageService.setItemSilent('bodega_products_v1', val);
                 }
                 if (json.data.bodega_accounts_v2) {
-                    await lf.setItem('bodega_accounts_v2', typeof json.data.bodega_accounts_v2 === 'string' ? JSON.parse(json.data.bodega_accounts_v2) : json.data.bodega_accounts_v2);
+                    const val = typeof json.data.bodega_accounts_v2 === 'string' ? JSON.parse(json.data.bodega_accounts_v2) : json.data.bodega_accounts_v2;
+                    await storageService.setItemSilent('bodega_accounts_v2', val);
                 }
 
                 if (json.data.street_rate_bs) localStorage.setItem('street_rate_bs', json.data.street_rate_bs);
@@ -135,9 +134,10 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
 
                 if (json.data.poolbar_categories_v1) {
                     const cats = typeof json.data.poolbar_categories_v1 === 'string' ? JSON.parse(json.data.poolbar_categories_v1) : json.data.poolbar_categories_v1;
-                    await lf.setItem('poolbar_categories_v1', cats);
+                    await storageService.setItemSilent('poolbar_categories_v1', cats);
                 }
 
+                setImportGuard();
                 setImportStatus('success');
                 setStatusMessage('Datos restaurados. Recargando...');
                 setTimeout(() => window.location.reload(), 1200);

@@ -17,17 +17,22 @@ export default function SyncStatus() {
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [pendingCount, setPendingCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [isRequeuing, setIsRequeuing] = useState(false);
     const [lastSyncedAt, setLastSyncedAt] = useState(() => {
         const saved = localStorage.getItem('_poolbar_last_synced');
         return saved ? parseInt(saved, 10) : null;
     });
     const [justSynced, setJustSynced] = useState(false);
 
+    const [failedCount, setFailedCount] = useState(0);
+
     const checkQueue = useCallback(async () => {
         try {
             const queue = await localforage.getItem(scopedKey('offline_sales_queue')) || [];
             const pending = queue.filter(q => q.sync_status === 'pending');
+            const failed  = queue.filter(q => q.sync_status === 'failed');
             setPendingCount(pending.length);
+            setFailedCount(failed.length);
         } catch(err) { /* silent */ }
     }, []);
 
@@ -40,6 +45,31 @@ export default function SyncStatus() {
             setIsOnline(!result.error);
         } catch { setIsOnline(false); }
     }, []);
+
+    // Re-encolar ventas fallidas para reintento
+    const handleRequeueFailed = useCallback(async () => {
+        if (isRequeuing) return;
+        setIsRequeuing(true);
+        try {
+            const queue = await localforage.getItem(scopedKey('offline_sales_queue')) || [];
+            const requeued = queue.map(q => {
+                if (q.sync_status === 'failed') {
+                    const { failed_at, last_error, ...rest } = q;
+                    return { ...rest, sync_status: 'pending', attempts: 0, next_retry_at: null };
+                }
+                return q;
+            });
+            await localforage.setItem(scopedKey('offline_sales_queue'), requeued);
+            await checkQueue();
+            // Lanzar sync inmediatamente
+            await offlineQueueService.syncPendingSales(true);
+            await checkQueue();
+        } catch (e) {
+            console.warn('[SyncStatus] Error al re-encolar:', e);
+        } finally {
+            setIsRequeuing(false);
+        }
+    }, [isRequeuing, checkQueue]);
 
     // Botón de sincronización forzada
     const handleForceSync = useCallback(async () => {
@@ -119,17 +149,20 @@ export default function SyncStatus() {
 
     // Estado visual
     const hasPendingSales = pendingCount > 0;
+    const hasFailedSales  = failedCount > 0;
     let statusType = 'online';
     if (!isOnline) statusType = 'offline';
-    else if (isSyncing) statusType = 'syncing';
+    else if (isSyncing || isRequeuing) statusType = 'syncing';
     else if (justSynced) statusType = 'done';
     else if (hasPendingSales) statusType = 'pending';
+    else if (hasFailedSales) statusType = 'failed';
 
     const styles = {
         online:  'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 focus:ring-emerald-500',
         done:    'bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200 focus:ring-emerald-500',
         syncing: 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100 focus:ring-sky-500',
         pending: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 focus:ring-amber-500',
+        failed:  'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100 focus:ring-rose-500',
         offline: 'bg-rose-50 border-rose-200 text-rose-600 focus:ring-rose-500 animate-pulse',
     };
 
@@ -140,13 +173,14 @@ export default function SyncStatus() {
         done: 'Inventario sincronizado correctamente.',
         syncing: 'Sincronizando inventario con la nube...',
         pending: `${pendingCount} venta(s) pendiente(s) por subir. Clic para sincronizar.`,
+        failed:  `${failedCount} venta(s) fallaron al sincronizar. Clic para reintentar.`,
         offline: 'Sin conexión al servidor. Comprueba tu internet.',
     };
 
     return (
         <button
-            onClick={handleForceSync}
-            disabled={!isOnline || isSyncing}
+            onClick={statusType === 'failed' ? handleRequeueFailed : handleForceSync}
+            disabled={!isOnline || isSyncing || isRequeuing}
             title={tooltips[statusType]}
             className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wider transition-all duration-300 shadow-sm border focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed ${styles[statusType]}`}
         >
@@ -175,6 +209,13 @@ export default function SyncStatus() {
                     <CloudDownload size={13} strokeWidth={2.5} />
                     <span className="hidden sm:inline">Subir ({pendingCount})</span>
                     <span className="sm:hidden">{pendingCount}</span>
+                </>
+            )}
+            {statusType === 'failed' && (
+                <>
+                    <RefreshCw size={13} strokeWidth={2.5} />
+                    <span className="hidden sm:inline">Reintentar ({failedCount})</span>
+                    <span className="sm:hidden">{failedCount}</span>
                 </>
             )}
             {statusType === 'offline' && (
