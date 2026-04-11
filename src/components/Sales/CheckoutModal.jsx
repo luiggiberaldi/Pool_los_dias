@@ -347,14 +347,32 @@ export default function CheckoutModal({
 
                             {/* BANNER: Cobrar persona actual */}
                             {splitPaid < splitPeople ? (
-                                <div className="mb-3 p-3 bg-violet-500 rounded-xl text-white flex items-center justify-between shadow-md shadow-violet-500/30">
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cobrar ahora</p>
-                                        <p className="text-[11px] font-bold opacity-90">Persona {splitPaid + 1} de {splitPeople}</p>
+                                <div className="mb-3">
+                                    <div className="p-3 bg-violet-500 rounded-t-xl text-white flex items-center justify-between shadow-md shadow-violet-500/30">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cobrar ahora</p>
+                                            <p className="text-[11px] font-bold opacity-90">Persona {splitPaid + 1} de {splitPeople}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-black leading-none">${(cartTotalUsd / splitPeople).toFixed(2)}</p>
+                                            <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(cartTotalBs / splitPeople)}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-2xl font-black leading-none">${(cartTotalUsd / splitPeople).toFixed(2)}</p>
-                                        <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(cartTotalBs / splitPeople)}</p>
+                                    {/* Botones auto-rellenar */}
+                                    <div className="flex gap-1.5 p-2 bg-violet-400/20 dark:bg-violet-900/30 rounded-b-xl border-x border-b border-violet-200 dark:border-violet-700/40">
+                                        <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest self-center mr-1 shrink-0">Llenar:</p>
+                                        {methodsUsd.map(m => (
+                                            <button key={m.id} onClick={() => handleBarChange(m.id, (cartTotalUsd / splitPeople).toFixed(2))}
+                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-500 text-white hover:bg-violet-600 active:scale-95 transition-all shadow-sm">
+                                                $ {m.label}
+                                            </button>
+                                        ))}
+                                        {methodsBs.map(m => (
+                                            <button key={m.id} onClick={() => handleBarChange(m.id, (cartTotalBs / splitPeople).toFixed(2))}
+                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-400 text-white hover:bg-violet-500 active:scale-95 transition-all shadow-sm">
+                                                Bs {m.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             ) : (
