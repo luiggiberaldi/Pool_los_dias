@@ -381,11 +381,11 @@ export default function CheckoutModal({
                         <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                             {isPaid ? 'Vuelto' : 'Resta por Cobrar'}
                         </p>
-                        <div className="flex items-end justify-between">
+                        <div className="flex items-end justify-between md:flex-col md:items-start md:gap-0.5">
                             <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
                                 ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
                             </span>
-                            <div className="flex flex-col text-right">
+                            <div className="flex flex-col text-right md:text-left">
                                 <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
                                     Bs {formatBs(isPaid ? changeBs : remainingBs)}
                                 </span>
