@@ -399,7 +399,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
 
     return (
         <>
-        <Modal isOpen={true} onClose={onClose} title={`Cobro: ${table.name}`}>
+        <Modal isOpen={!postPaymentAction} onClose={onClose} title={`Cobro: ${table.name}`}>
             <div className="flex flex-col gap-4 py-2">
 
                 {/* Customer Selector */}
