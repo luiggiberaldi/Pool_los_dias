@@ -68,6 +68,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
     const [tableCheckoutData, setTableCheckoutData] = useState(null);
     const [showTablePayment, setShowTablePayment] = useState(false);
+    const [releaseTableOnCheckout, setReleaseTableOnCheckout] = useState(true);
 
     // ── Data hook ──
     const { customers, setCustomers, paymentMethods, salesData, setSalesData, isLoadingLocal, buildCurrentFloat } = useSalesData({
@@ -433,16 +434,17 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             )}
 
             {tableCheckoutData && showTablePayment && (
-                <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
+                <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); setReleaseTableOnCheckout(true); }}
                     cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
                     cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
                     discountData={{ active: false, amountUsd: 0, amountBs: 0 }} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={(payments, change) => handleTableCheckout(payments, change, selectedCustomerId)}
+                    onConfirmSale={(payments, change) => handleTableCheckout(payments, change, selectedCustomerId, releaseTableOnCheckout)}
                     onCreateCustomer={handleCreateCustomer} triggerHaptic={triggerHaptic}
                     copEnabled={copEnabled} tasaCop={tasaCop}
-                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData} />
+                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData}
+                    releaseTableOnCheckout={releaseTableOnCheckout} setReleaseTableOnCheckout={setReleaseTableOnCheckout} />
             )}
         </div>
     );

@@ -4,6 +4,7 @@ import { showToast } from '../components/Toast';
 import { round2, divR } from '../utils/dinero';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
+import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
 
 export function useSalesCheckout({
@@ -68,7 +69,7 @@ export function useSalesCheckout({
         setCartSelectedIndex(-1);
     }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
 
-    const handleTableCheckout = useCallback(async (payments, changeBreakdown, selectedCustomerId) => {
+    const handleTableCheckout = useCallback(async (payments, changeBreakdown, selectedCustomerId, shouldRelease = true) => {
         if (!tableCheckoutData) return;
         triggerHaptic && triggerHaptic();
 
@@ -132,9 +133,15 @@ export function useSalesCheckout({
         setSalesData(prev => [result.sale, ...prev]);
 
         try {
-            await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
+            if (shouldRelease) {
+                await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
+            } else {
+                // Limpiar deuda: resetear sesión (hours_paid=0, status=ACTIVE) y borrar order items
+                await useTablesStore.getState().resetSessionAfterPayment(tableCheckoutData.session.id);
+                await useOrdersStore.getState().cancelOrderBySessionId(tableCheckoutData.session.id);
+            }
         } catch (error) {
-            showToast("Venta completa, pero falló al liberar la mesa.", "warning");
+            showToast("Venta completa, pero falló al actualizar la mesa.", "warning");
         }
 
         setShowReceipt(result.sale);

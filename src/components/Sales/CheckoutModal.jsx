@@ -96,6 +96,8 @@ export default function CheckoutModal({
     currentFloatUsd = 0,
     currentFloatBs = 0,
     tableContext = null,
+    releaseTableOnCheckout = true,
+    setReleaseTableOnCheckout = null,
 }) {
     const {
         barValues, totalPaidUsd,
@@ -235,6 +237,23 @@ export default function CheckoutModal({
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* -- TOGGLE: Liberar mesa al cobrar -- */}
+                {tableContext && setReleaseTableOnCheckout && (
+                    <div className="mx-3 mb-3 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-3 py-2.5">
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Liberar mesa al cobrar</span>
+                            <span className="text-[10px] text-slate-400">{releaseTableOnCheckout ? 'La mesa quedará libre al confirmar' : 'La mesa seguirá ocupada'}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setReleaseTableOnCheckout(v => !v)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${releaseTableOnCheckout ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${releaseTableOnCheckout ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
                     </div>
                 )}
 

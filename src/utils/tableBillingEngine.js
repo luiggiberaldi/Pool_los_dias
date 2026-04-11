@@ -17,8 +17,12 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
     }
 
     if (gameMode === 'NORMAL') {
-        // Modo normal: solo se registra el tiempo, no se cobra por hora.
-        // El cobro es únicamente por consumos.
+        // Si se pagaron horas por adelantado (mesa de pool con prepago), sí se cobra el tiempo.
+        // Si no hay horas pagadas (mesa de bar/consumo), solo se registra el tiempo sin cobro.
+        if (hoursPaid > 0) {
+            const pricePerHour = config.pricePerHour || 0;
+            return round2(hoursPaid * pricePerHour);
+        }
         return 0;
     }
 

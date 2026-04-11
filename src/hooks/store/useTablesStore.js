@@ -397,6 +397,25 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
+    // "Cobrar sin liberar": limpia la deuda de la sesión (horas y consumos pagados)
+    // La mesa queda ACTIVA con $0 de deuda; el timer continúa corriendo.
+    resetSessionAfterPayment: async (sessionId) => {
+        const payload = { hours_paid: 0, extended_times: 0, status: 'ACTIVE' };
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, ...payload } : s
+        );
+        set({ activeSessions: newSessions });
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+        try {
+            const { error } = await supabaseCloud.from('table_sessions').update(payload).eq('id', sessionId);
+            if (error) throw error;
+            // Forzar sync inmediato para evitar que un realtime debounce traiga datos viejos
+            get().syncTablesAndSessions();
+        } catch (e) {
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
+        }
+    },
+
     addRoundToSession: async (sessionId) => {
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;

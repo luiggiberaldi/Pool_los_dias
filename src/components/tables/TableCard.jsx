@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone } from 'lucide-react';
+import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -282,7 +282,7 @@ function useBcvRate() {
 }
 
 export default function TableCard({ table, session }) {
-    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata } = useTablesStore();
+    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime } = useTablesStore();
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
@@ -308,6 +308,7 @@ export default function TableCard({ table, session }) {
     // Modal de nombre + personas al abrir mesa
     const [showOpenModal, setShowOpenModal] = useState(false);
     const [pendingOpen, setPendingOpen] = useState(null);
+    const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
     const [sessionClientName, setSessionClientName] = useState('');
     const [sessionGuestCount, setSessionGuestCount] = useState('');
     const [sessionClientId, setSessionClientId] = useState(null);
@@ -349,9 +350,21 @@ export default function TableCard({ table, session }) {
     };
 
     // Live Timer Update
+    const pauseKey = session ? `table_pause_${session.id}` : null;
+    const [isPaused, setIsPaused] = useState(() => {
+        if (!session) return false;
+        try { return JSON.parse(localStorage.getItem(`table_pause_${session.id}`))?.isPaused ?? false; }
+        catch { return false; }
+    });
+    const [pauseElapsed, setPauseElapsed] = useState(() => {
+        if (!session) return 0;
+        try { return JSON.parse(localStorage.getItem(`table_pause_${session.id}`))?.elapsedAtPause ?? 0; }
+        catch { return 0; }
+    });
+
     useEffect(() => {
         let interval;
-        if (isPlaying && session?.started_at) {
+        if (isPlaying && session?.started_at && !isPaused) {
             // Use rAF for initial sync to avoid synchronous setState in effect
             const raf = requestAnimationFrame(() => {
                 setElapsed(calculateElapsedTime(session.started_at));
@@ -366,13 +379,41 @@ export default function TableCard({ table, session }) {
                 cancelAnimationFrame(raf);
                 clearInterval(interval);
             };
+        } else if (isPaused) {
+            setElapsed(pauseElapsed);
         } else {
             const raf = requestAnimationFrame(() => {
                 setElapsed(0);
             });
             return () => cancelAnimationFrame(raf);
         }
-    }, [isPlaying, session?.started_at]);
+    }, [isPlaying, session?.started_at, isPaused, pauseElapsed]);
+
+    const handlePauseTimer = () => {
+        if (!pauseKey) return;
+        const currentElapsed = calculateElapsedTime(session.started_at);
+        setIsPaused(true);
+        setPauseElapsed(currentElapsed);
+        setElapsed(currentElapsed);
+        localStorage.setItem(pauseKey, JSON.stringify({ isPaused: true, elapsedAtPause: currentElapsed }));
+    };
+
+    const handleResumeTimer = async () => {
+        if (!pauseKey) return;
+        try {
+            const saved = JSON.parse(localStorage.getItem(pauseKey));
+            if (saved) {
+                // Calcular cuántos minutos estuvo pausado
+                const currentElapsed = calculateElapsedTime(session.started_at);
+                const pausedMinutes = currentElapsed - saved.elapsedAtPause;
+                // Mover started_at hacia adelante para compensar la pausa
+                const newStartedAt = new Date(new Date(session.started_at).getTime() + pausedMinutes * 60000).toISOString();
+                await updateSessionTime(session.id, newStartedAt);
+            }
+        } catch (e) { console.warn('Error reanudando timer', e); }
+        setIsPaused(false);
+        if (pauseKey) localStorage.removeItem(pauseKey);
+    };
 
     const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null) => {
         if (!currentUser) return;
@@ -572,8 +613,17 @@ export default function TableCard({ table, session }) {
                                     Orden Activa
                                 </div>
                                 <div className="text-xs font-medium opacity-80">Acumulando Consumo</div>
-                                <div className="text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 bg-white/10 px-2 py-0.5 rounded-full mt-0.5">
-                                    Tiempo en mesa: {formatElapsedTime(elapsed)}
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <div className={`text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 px-2 py-0.5 rounded-full ${isPaused ? 'bg-amber-500/30 text-amber-300 opacity-100' : 'bg-white/10'}`}>
+                                        {isPaused ? '⏸ ' : ''}Tiempo en mesa: {formatElapsedTime(elapsed)}
+                                    </div>
+                                    <button
+                                        onClick={isPaused ? handleResumeTimer : handlePauseTimer}
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
+                                        title={isPaused ? 'Reanudar tiempo' : 'Pausar tiempo'}
+                                    >
+                                        {isPaused ? <Play size={10} fill="currentColor" /> : <Pause size={10} />}
+                                    </button>
                                 </div>
                             </div>
                         ) : (
@@ -707,21 +757,58 @@ export default function TableCard({ table, session }) {
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 gap-1.5">
-                                <button 
-                                    onClick={() => setShowOrderPanel(true)}
-                                    className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
-                                >
-                                    <ShoppingBag size={13} fill="currentColor" />
-                                    <span>Consumo</span>
-                                </button>
-                                <button
-                                    onClick={() => { requestCheckout(session.id); notifyMesaCobrar(table.name, grandTotal); }}
-                                    className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
-                                >
-                                    <CreditCard size={13} />
-                                    <span>Cobrar</span>
-                                </button>
+                            <div className="flex flex-col gap-1.5">
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                        onClick={() => setShowOrderPanel(true)}
+                                        className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                                    >
+                                        <ShoppingBag size={13} fill="currentColor" />
+                                        <span>Consumo</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { requestCheckout(session.id); notifyMesaCobrar(table.name, grandTotal); }}
+                                        className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                                    >
+                                        <CreditCard size={13} />
+                                        <span>Cobrar</span>
+                                    </button>
+                                </div>
+
+                                {/* Liberar mesa — disponible cuando la deuda es $0 (ya fue cobrada o no tiene consumos) */}
+                                {grandTotal === 0 && isPlaying && (
+                                    !showReleaseConfirm ? (
+                                        <button
+                                            onClick={() => setShowReleaseConfirm(true)}
+                                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-[11px] py-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
+                                        >
+                                            <Check size={13} />
+                                            Liberar mesa
+                                        </button>
+                                    ) : (
+                                        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-xl px-3 py-2 flex flex-col gap-2">
+                                            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold text-center">¿Confirmar liberación de {table.name}?</p>
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                                <button
+                                                    onClick={() => setShowReleaseConfirm(false)}
+                                                    className="text-[11px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg py-1.5 transition-colors"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        setShowReleaseConfirm(false);
+                                                        await closeSession(session.id, currentUser?.id || 'SYSTEM', 0);
+                                                        showToast(`${table.name} liberada`, 'success');
+                                                    }}
+                                                    className="text-[11px] font-bold text-white bg-emerald-500 hover:bg-emerald-400 rounded-lg py-1.5 transition-colors"
+                                                >
+                                                    Confirmar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                )}
                             </div>
                         )}
                         </div>
