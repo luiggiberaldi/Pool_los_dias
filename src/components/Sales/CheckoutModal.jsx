@@ -388,29 +388,34 @@ export default function CheckoutModal({
                                             );
                                         })}
                                     </div>
-                                    {/* Barra de progreso por persona */}
-                                    <div className={`px-3 py-2 flex items-center justify-between gap-3 ${personDone ? 'bg-emerald-600' : 'bg-violet-700/60'}`}>
-                                        <div className="flex-1">
-                                            <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-white rounded-full transition-all duration-300"
-                                                    style={{ width: `${Math.min(100, (collectedForCurrent / perPersonUsd) * 100)}%` }}
-                                                />
-                                            </div>
+                                    {/* Progreso por persona */}
+                                    <div className={`px-3 pt-2 pb-3 ${personDone ? 'bg-emerald-600' : 'bg-violet-700/60'}`}>
+                                        {/* Barra */}
+                                        <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden mb-2">
+                                            <div
+                                                className="h-full bg-white rounded-full transition-all duration-300"
+                                                style={{ width: `${Math.min(100, (collectedForCurrent / perPersonUsd) * 100)}%` }}
+                                            />
                                         </div>
                                         {personDone ? (
-                                            <p className="text-xs font-black text-white shrink-0">¡Listo! Pulsa + Cobrado</p>
+                                            <p className="text-xs font-black text-white text-center">¡Listo! Pulsa + Cobrado</p>
                                         ) : collectedForCurrent > 0 ? (
-                                            <div className="text-right shrink-0">
-                                                <p className="text-xs font-black text-white leading-tight">
-                                                    Cobrado ${collectedForCurrent.toFixed(2)} · Falta ${stillNeedsUsd.toFixed(2)}
-                                                </p>
-                                                <p className="text-[10px] font-bold text-white/90 leading-tight">
-                                                    Bs {formatBs(collectedForCurrent * effectiveRate)} · Bs {formatBs(stillNeedsUsd * effectiveRate)}
-                                                </p>
+                                            <div className="flex justify-between gap-3">
+                                                {/* Cobrado */}
+                                                <div className="flex-1 bg-emerald-500/40 rounded-lg px-2 py-1">
+                                                    <p className="text-[9px] font-black text-emerald-200 uppercase tracking-widest">Cobrado</p>
+                                                    <p className="text-sm font-black text-white leading-tight">${collectedForCurrent.toFixed(2)}</p>
+                                                    <p className="text-[10px] font-bold text-emerald-200 leading-tight">Bs {formatBs(collectedForCurrent * effectiveRate)}</p>
+                                                </div>
+                                                {/* Falta */}
+                                                <div className="flex-1 bg-orange-500/40 rounded-lg px-2 py-1">
+                                                    <p className="text-[9px] font-black text-orange-200 uppercase tracking-widest">Falta</p>
+                                                    <p className="text-sm font-black text-white leading-tight">${stillNeedsUsd.toFixed(2)}</p>
+                                                    <p className="text-[10px] font-bold text-orange-200 leading-tight">Bs {formatBs(stillNeedsUsd * effectiveRate)}</p>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <p className="text-[11px] font-black text-white/70 shrink-0">Toca un campo de pago</p>
+                                            <p className="text-[11px] font-black text-white/70 text-center">Usa los botones de arriba o toca un campo</p>
                                         )}
                                     </div>
                                 </div>
