@@ -397,7 +397,7 @@ export default function CustomerPickerSection({
                             <span className={`text-sm font-bold ${selectedCustomer ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'}`}>
                                 {selectedCustomer ? selectedCustomer.name : 'Consumidor Final'}
                             </span>
-                            {selectedCustomer?.deuda && Math.abs(selectedCustomer.deuda) > (EPSILON || 0.001) && (
+                            {!!selectedCustomer?.deuda && Math.abs(selectedCustomer.deuda) > (EPSILON || 0.001) && (
                                 <div className={`text-xs font-semibold ${selectedCustomer.deuda > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                                     {selectedCustomer.deuda > 0
                                         ? `Debe $${selectedCustomer.deuda.toFixed(2)}`

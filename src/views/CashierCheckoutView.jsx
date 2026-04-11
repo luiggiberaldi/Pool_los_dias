@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard, Search, UserCheck, X, User } from 'lucide-react';
 import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
+import { useCustomersStore } from '../hooks/store/useCustomersStore';
 import { calculateSessionCost, calculateElapsedTime } from '../utils/tableBillingEngine';
 import { Modal } from '../components/Modal';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -166,21 +167,78 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const cachedUsers = useAuthStore(s => s.cachedUsers);
     const { products, copEnabled, tasaCop, useAutoRate } = useProductContext();
-    
+
     const [method, setMethod] = useState('EFECTIVO');
     const [receivedUSD, setReceivedUSD] = useState('');
     const [receivedBs, setReceivedBs] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Customer selection state
+    const { customers: allCustomers, fetchCustomers } = useCustomersStore();
+    useEffect(() => { fetchCustomers(); }, []);
+
+    const [customerSearch, setCustomerSearch] = useState('');
+
+    // Debug temporal — ver qué contiene la sesión
+    console.log('[PaymentModal] session.client_id:', session.client_id, 'session.client_name:', session.client_name);
+
+    const [selectedCustomer, setSelectedCustomer] = useState(() => {
+        if (!session.client_id && !session.client_name) return null;
+        // Intentar encontrar en store local primero (datos completos)
+        if (session.client_id) {
+            const cached = useCustomersStore.getState().customers;
+            const found = cached.find(c => c.id === session.client_id);
+            if (found) return found;
+        }
+        // Fallback: crear objeto mínimo con los datos del session (siempre disponibles)
+        if (session.client_name) {
+            return { id: session.client_id || null, name: session.client_name, deuda: 0 };
+        }
+        return null;
+    });
+    const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+    const customerSearchRef = useRef(null);
+    const dropdownRef = useRef(null);
+
+    // Cuando el store local carga, reemplazar el objeto mínimo con el completo (para tener deuda, etc.)
+    useEffect(() => {
+        if (session.client_id && allCustomers.length > 0) {
+            const found = allCustomers.find(c => c.id === session.client_id);
+            if (found) setSelectedCustomer(found);
+        }
+    }, [allCustomers, session.client_id]);
+
+    const isFiado = method === 'FIADO';
+
+    // Filter customers by search
+    const filteredCustomers = customerSearch.trim().length > 0
+        ? allCustomers.filter(c =>
+            (c.name || c.nombre || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+            (c.phone || c.telefono || '').includes(customerSearch)
+          ).slice(0, 6)
+        : [];
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+                customerSearchRef.current && !customerSearchRef.current.contains(e.target)) {
+                setShowCustomerDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     // Calculate totals
     const order = allOrders.find(o => o.table_session_id === session.id);
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
     const totalConsumption = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
-    
+
     // Elapsed time calculation
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
     const [elapsed, setElapsed] = useState(0);
-    
+
     useEffect(() => {
         if (isPlaying && session.started_at) {
             setElapsed(calculateElapsedTime(session.started_at));
@@ -195,10 +253,16 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     const rUsd = parseFloat(receivedUSD || '0');
     const rBs = parseFloat(receivedBs || '0');
     const totalReceivedInUSD = rUsd + (rBs / rates);
-    
+
     const changeUSD = totalReceivedInUSD > grandTotal ? totalReceivedInUSD - grandTotal : 0;
     const changeBs = changeUSD * rates;
-    const isReady = totalReceivedInUSD >= grandTotal;
+    const isReady = isFiado ? !!selectedCustomer : totalReceivedInUSD >= grandTotal;
+
+    const handleSelectCustomer = (customer) => {
+        setSelectedCustomer(customer);
+        setCustomerSearch('');
+        setShowCustomerDropdown(false);
+    };
 
     const handleConfirmPayment = async () => {
         if (!isReady) return;
@@ -228,26 +292,30 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
 
             // 3. Preparar array de pagos
             const paymentPayload = [];
-            if (rUsd > 0) {
-                paymentPayload.push({
-                    methodId: method === 'EFECTIVO' ? 'EFECTIVO' : method,
-                    amountUsd: rUsd,
-                    currency: 'USD'
-                });
-            }
-            if (rBs > 0) {
-                paymentPayload.push({
-                    methodId: method,
-                    amountUsd: round2(rBs / rates),
-                    currency: 'VES'
-                });
-            }
-            // Fallback preventivo si el total es 0 (ej. mesa libre cancelada/cortesía)
-            if (rUsd === 0 && rBs === 0 && grandTotal === 0) {
-                paymentPayload.push({ methodId: method, amountUsd: 0, currency: 'USD' });
+            if (isFiado) {
+                paymentPayload.push({ methodId: 'FIADO', amountUsd: grandTotal, currency: 'USD' });
+            } else {
+                if (rUsd > 0) {
+                    paymentPayload.push({
+                        methodId: method === 'EFECTIVO' ? 'EFECTIVO' : method,
+                        amountUsd: rUsd,
+                        currency: 'USD'
+                    });
+                }
+                if (rBs > 0) {
+                    paymentPayload.push({
+                        methodId: method,
+                        amountUsd: round2(rBs / rates),
+                        currency: 'VES'
+                    });
+                }
+                // Fallback preventivo si el total es 0
+                if (rUsd === 0 && rBs === 0 && grandTotal === 0) {
+                    paymentPayload.push({ methodId: method, amountUsd: 0, currency: 'USD' });
+                }
             }
 
-            // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa (solo si es rol MESERO)
+            // 4. Invocar transaccionario — atribuir venta al mesero que abrió la mesa
             let meseroUser = null;
             if (session.opened_by) {
                 let openerUser = cachedUsers?.find(u => u.id === session.opened_by) || null;
@@ -269,8 +337,8 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 cartSubtotalUsd: grandTotal,
                 payments: paymentPayload,
                 changeBreakdown: { changeUsdGiven: changeUSD, changeBsGiven: changeBs },
-                selectedCustomerId: null,
-                customers: [],
+                selectedCustomerId: selectedCustomer?.id || null,
+                customers: allCustomers,
                 products: products || [],
                 effectiveRate: rates,
                 tasaCop: tasaCop || 0,
@@ -288,17 +356,25 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 return;
             }
 
-            // 5. Abrir cajón de dinero automáticamente (Si está configurado y soportado por Web Serial API)
-            const wsCfg = getWebSerialConfig();
-            if (wsCfg.autoOpenDrawer) {
-                openCashDrawerWebSerial().catch(err => {
-                    console.log('Cajón no se pudo abrir por WebSerial:', err.message);
-                }); // Silencioso, no bloquea
+            // 5. Abrir cajón de dinero automáticamente (solo si NO es fiado)
+            if (!isFiado) {
+                const wsCfg = getWebSerialConfig();
+                if (wsCfg.autoOpenDrawer) {
+                    openCashDrawerWebSerial().catch(err => {
+                        console.log('Cajón no se pudo abrir por WebSerial:', err.message);
+                    });
+                }
             }
 
-            // 6. Cerrar finalmente la sesión en la base de datos de mesas
-            await closeSession(session.id, currentUser?.id || "SYSTEM", grandTotal, method);
-            showToast('Cobro Exitoso', `La mesa ${table.name} ha sido facturada correctamente.`, 'success');
+            // 6. Cerrar la sesión en la base de datos de mesas
+            await closeSession(session.id, currentUser?.id || "SYSTEM", grandTotal, isFiado ? 'FIADO' : method);
+            showToast(
+                'Cobro Exitoso',
+                isFiado
+                    ? `Mesa ${table.name} cargada a cuenta de ${selectedCustomer?.name || selectedCustomer?.nombre}.`
+                    : `La mesa ${table.name} ha sido facturada correctamente.`,
+                'success'
+            );
             onSuccess();
         } catch (error) {
             console.error(error);
@@ -311,16 +387,82 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     return (
         <Modal isOpen={true} onClose={onClose} title={`Cobro: ${table.name}`}>
             <div className="flex flex-col gap-4 py-2">
-                
+
+                {/* Customer Selector */}
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                        <User size={12} /> Cliente (opcional)
+                    </label>
+                    {selectedCustomer ? (
+                        <div className="flex items-center justify-between p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700/40 rounded-xl">
+                            <div className="flex items-center gap-2">
+                                <UserCheck size={16} className="text-sky-600" />
+                                <div>
+                                    <p className="text-sm font-bold text-sky-800 dark:text-sky-300 leading-none">
+                                        {selectedCustomer.name || selectedCustomer.nombre}
+                                    </p>
+                                    {selectedCustomer.phone || selectedCustomer.telefono ? (
+                                        <p className="text-[10px] text-sky-600 dark:text-sky-400 mt-0.5">
+                                            {selectedCustomer.phone || selectedCustomer.telefono}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setSelectedCustomer(null); if (isFiado) setMethod('EFECTIVO'); }}
+                                className="p-1 rounded-full text-sky-500 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            <div className="relative flex items-center">
+                                <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+                                <input
+                                    ref={customerSearchRef}
+                                    type="text"
+                                    value={customerSearch}
+                                    onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                                    onFocus={() => setShowCustomerDropdown(true)}
+                                    placeholder="Buscar cliente por nombre o teléfono..."
+                                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-sky-400 focus:outline-none"
+                                />
+                            </div>
+                            {showCustomerDropdown && filteredCustomers.length > 0 && (
+                                <div
+                                    ref={dropdownRef}
+                                    className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden"
+                                >
+                                    {filteredCustomers.map(c => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => handleSelectCustomer(c)}
+                                            className="w-full text-left px-4 py-3 hover:bg-sky-50 dark:hover:bg-sky-900/20 border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors"
+                                        >
+                                            <p className="text-sm font-bold text-slate-800 dark:text-white">{c.name || c.nombre}</p>
+                                            {(c.phone || c.telefono) && (
+                                                <p className="text-[10px] text-slate-500">{c.phone || c.telefono}</p>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Method Selector */}
-                <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    {['EFECTIVO', 'PUNTO', 'PAGO MOVIL'].map(m => (
+                <div className={`grid gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl ${selectedCustomer ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                    {['EFECTIVO', 'PUNTO', 'PAGO MOVIL', ...(selectedCustomer ? ['FIADO'] : [])].map(m => (
                         <button
                             key={m}
                             onClick={() => setMethod(m)}
                             className={`py-2 text-[10px] font-black rounded-lg transition-all ${
-                                method === m 
-                                    ? 'bg-white shadow-sm text-sky-600' 
+                                method === m
+                                    ? m === 'FIADO'
+                                        ? 'bg-white shadow-sm text-rose-600'
+                                        : 'bg-white shadow-sm text-sky-600'
                                     : 'text-slate-500 hover:text-slate-700'
                             }`}
                         >
@@ -345,38 +487,50 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                     </div>
                 </div>
 
-                {/* Denomination inputs (for EFECTIVO primarily) */}
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 ml-1">Recibido (Divisa)</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                            <input 
-                                type="number" 
-                                value={receivedUSD}
-                                onChange={e => setReceivedUSD(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-8 pr-3 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                placeholder="0.00"
-                            />
+                {/* Fiado notice OR denomination inputs */}
+                {isFiado ? (
+                    <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700/40 rounded-xl text-center">
+                        <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
+                            Se cargará ${grandTotal.toFixed(2)} a la cuenta de
+                        </p>
+                        <p className="text-base font-black text-rose-800 dark:text-rose-200 mt-1">
+                            {selectedCustomer?.name || selectedCustomer?.nombre}
+                        </p>
+                        <p className="text-[10px] text-rose-600/70 mt-1">No se abrirá la caja registradora</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-3 mt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-slate-500 ml-1">Recibido (Divisa)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                                <input
+                                    type="number"
+                                    value={receivedUSD}
+                                    onChange={e => setReceivedUSD(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-8 pr-3 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-slate-500 ml-1">Recibido (Bs)</label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs</span>
+                                <input
+                                    type="number"
+                                    value={receivedBs}
+                                    onChange={e => setReceivedBs(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-8 pr-3 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                    placeholder="0.00"
+                                />
+                            </div>
                         </div>
                     </div>
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 ml-1">Recibido (Bs)</label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Bs</span>
-                            <input 
-                                type="number" 
-                                value={receivedBs}
-                                onChange={e => setReceivedBs(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-8 pr-3 font-bold text-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                                placeholder="0.00"
-                            />
-                        </div>
-                    </div>
-                </div>
+                )}
 
                 {/* Change */}
-                {(rUsd > 0 || rBs > 0) && (
+                {!isFiado && (rUsd > 0 || rBs > 0) && (
                     <div className={`mt-2 p-3 rounded-xl flex items-center justify-between border ${!isReady ? 'bg-rose-50 border-rose-200' : 'bg-sky-50 border-sky-200'}`}>
                         <span className={`text-sm font-bold ${!isReady ? 'text-rose-600' : 'text-sky-700'}`}>
                             {!isReady ? 'Falta cobrar:' : 'Vuelto:'}
@@ -400,11 +554,13 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                     disabled={!isReady || isProcessing}
                     className={`w-full mt-4 py-4 rounded-xl font-black text-lg transition-all flex items-center justify-center gap-2 ${
                         isReady && !isProcessing
-                            ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 active:scale-95' 
+                            ? isFiado
+                                ? 'bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/30 active:scale-95'
+                                : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/30 active:scale-95'
                             : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                     }`}
                 >
-                    {isProcessing ? 'Procesando...' : <><CreditCard size={20}/> Confirmar Pago</>}
+                    {isProcessing ? 'Procesando...' : isFiado ? <><CreditCard size={20}/> Cargar a Cuenta</> : <><CreditCard size={20}/> Confirmar Pago</>}
                 </button>
             </div>
         </Modal>

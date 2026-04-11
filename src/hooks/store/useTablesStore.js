@@ -258,7 +258,7 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0) => {
+    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null) => {
         const userId = await getAuthUserId();
         const sessionPayload = {
             table_id: tableId,
@@ -269,6 +269,7 @@ export const useTablesStore = create((set, get) => ({
             started_at: new Date().toISOString(),
             ...(clientName ? { client_name: clientName } : {}),
             ...(guestCount > 0 ? { guest_count: guestCount } : {}),
+            ...(clientId ? { client_id: clientId } : {}),
         };
         if (userId) sessionPayload.user_id = userId;
 
@@ -326,8 +327,12 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    updateSessionMetadata: async (sessionId, clientName, guestCount) => {
-        const payload = { client_name: clientName || null, guest_count: guestCount || 0 };
+    updateSessionMetadata: async (sessionId, clientName, guestCount, clientId = null) => {
+        const payload = {
+            client_name: clientName || null,
+            guest_count: guestCount || 0,
+            ...(clientId !== undefined ? { client_id: clientId } : {}),
+        };
         const newSessions = get().activeSessions.map(s =>
             s.id === sessionId ? { ...s, ...payload } : s
         );

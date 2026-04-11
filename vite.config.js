@@ -14,8 +14,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        // Force SW update — v2 2026-04-09
-        additionalManifestEntries: [{ url: 'cache-bust-v2.txt', revision: Date.now().toString() }],
+        // Force SW update — v3 2026-04-11
+        additionalManifestEntries: [{ url: 'cache-bust-v3.txt', revision: Date.now().toString() }],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

@@ -429,7 +429,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             <KeyboardHelpModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
             {tableCheckoutData && !showTablePayment && (
-                <TableBillModal data={tableCheckoutData} onClose={() => setTableCheckoutData(null)} onProceedToPayment={() => setShowTablePayment(true)} />
+                <TableBillModal data={tableCheckoutData} onClose={() => setTableCheckoutData(null)} onProceedToPayment={() => { setShowTablePayment(true); if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id); }} />
             )}
 
             {tableCheckoutData && showTablePayment && (

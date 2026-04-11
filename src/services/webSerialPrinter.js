@@ -199,6 +199,9 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
 
     const d = new Date();
     p.bold(false).align(0).text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`).newline();
+    if (session?.client_name) {
+        p.bold(true).text(`Cliente: ${session.client_name}`).bold(false).newline();
+    }
     p.line('-', W);
 
     if (timeCost > 0) {

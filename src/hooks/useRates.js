@@ -7,7 +7,6 @@ const DEFAULT_RATES = {
     lastUpdate: new Date().toISOString()
 };
 
-const EXCHANGERATE_KEY = import.meta.env.VITE_EXCHANGERATE_KEY || '';
 const DEFAULT_EUR_USD_RATIO = 1.18;
 const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutos (era 30s)
 
@@ -96,15 +95,6 @@ export function useRates() {
         };
 
         const getExternalRatesFallback = async () => {
-            try {
-                const data = await fetchGeneric(`https://v6.exchangerate-api.com/v6/${EXCHANGERATE_KEY}/latest/USD`);
-                if (data?.result === "success") {
-                    return {
-                        eur: data.conversion_rates?.EUR ? 1 / data.conversion_rates.EUR : DEFAULT_EUR_USD_RATIO,
-                        cop: data.conversion_rates?.COP || null
-                    };
-                }
-            } catch (e) { /* ignore fetch errors, return defaults */ }
             return { eur: DEFAULT_EUR_USD_RATIO, cop: null };
         };
 

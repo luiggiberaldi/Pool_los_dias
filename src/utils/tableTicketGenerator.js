@@ -73,6 +73,13 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     doc.text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`, M, y);
     y += 5;
 
+    if (session?.client_name) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Cliente: ${session.client_name}`, M, y);
+        doc.setFont('helvetica', 'normal');
+        y += 5;
+    }
+
     dash(y);
     y += 6;
 
