@@ -359,17 +359,23 @@ export default function CheckoutModal({
                                         </div>
                                     </div>
                                     {/* Botones auto-rellenar */}
-                                    <div className="flex gap-1.5 p-2 bg-violet-400/20 dark:bg-violet-900/30 rounded-b-xl border-x border-b border-violet-200 dark:border-violet-700/40">
+                                    <div className="flex gap-1.5 p-2 bg-violet-400/20 dark:bg-violet-900/30 rounded-b-xl border-x border-b border-violet-200 dark:border-violet-700/40 flex-wrap">
                                         <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest self-center mr-1 shrink-0">Llenar:</p>
                                         {methodsUsd.map(m => (
-                                            <button key={m.id} onClick={() => handleBarChange(m.id, (cartTotalUsd / splitPeople).toFixed(2))}
-                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-500 text-white hover:bg-violet-600 active:scale-95 transition-all shadow-sm">
+                                            <button key={m.id} onClick={() => {
+                                                const prev = parseFloat(barValues[m.id] || '0') || 0;
+                                                handleBarChange(m.id, (prev + cartTotalUsd / splitPeople).toFixed(2));
+                                            }}
+                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-500 text-white hover:bg-violet-600 active:scale-95 transition-all shadow-sm min-w-[80px]">
                                                 $ {m.label}
                                             </button>
                                         ))}
                                         {methodsBs.map(m => (
-                                            <button key={m.id} onClick={() => handleBarChange(m.id, (cartTotalBs / splitPeople).toFixed(2))}
-                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-400 text-white hover:bg-violet-500 active:scale-95 transition-all shadow-sm">
+                                            <button key={m.id} onClick={() => {
+                                                const prev = parseFloat(barValues[m.id] || '0') || 0;
+                                                handleBarChange(m.id, (prev + cartTotalBs / splitPeople).toFixed(2));
+                                            }}
+                                                className="flex-1 py-1.5 rounded-lg text-[11px] font-black bg-violet-400 text-white hover:bg-violet-500 active:scale-95 transition-all shadow-sm min-w-[80px]">
                                                 Bs {m.label}
                                             </button>
                                         ))}
@@ -387,8 +393,8 @@ export default function CheckoutModal({
                                 <div className="flex items-center justify-between mb-2">
                                     <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Cobradas</p>
                                     <p className="text-[10px] font-bold text-violet-500">
-                                        {splitPaid < splitPeople
-                                            ? `Falta: $${((splitPeople - splitPaid) * (cartTotalUsd / splitPeople)).toFixed(2)}`
+                                        {remainingUsd > 0.001
+                                            ? `Falta: $${remainingUsd.toFixed(2)}`
                                             : '¡Cuenta completa!'}
                                     </p>
                                 </div>
