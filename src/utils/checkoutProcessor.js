@@ -32,7 +32,8 @@ export async function processSaleTransaction({
     useAutoRate,
     meseroId = null,
     meseroNombre = null,
-    tableName = null
+    tableName = null,
+    splitMeta = null
 }) {
     if (cart.length === 0) return { success: false, error: 'Carrito vacío' };
 
@@ -183,7 +184,8 @@ export async function processSaleTransaction({
         customerName: selectedCustomer ? selectedCustomer.name : 'Consumidor Final',
         customerDocument: selectedCustomer?.documentId || null,
         customerPhone: selectedCustomer?.phone || null,
-        fiadoUsd: fiadoAmountUsd
+        fiadoUsd: fiadoAmountUsd,
+        splitMeta: splitMeta || null
     };
 
     const existingSales = await storageService.getItem(SALES_KEY, []);

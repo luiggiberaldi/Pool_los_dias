@@ -56,7 +56,7 @@ function detectPaymentAnomaly({ barValues, paymentMethods, effectiveRate, cartTo
     return null;
 }
 
-export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic }) {
+export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic, splitMeta = null }) {
     const [barValues, setBarValues] = useState({});
     const [changeUsdGiven, setChangeUsdGiven] = useState('');
     const [changeBsGiven, setChangeBsGiven] = useState('');
@@ -100,18 +100,20 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         setBarValues(prev => ({ ...prev, [methodId]: v }));
     }, []);
 
-    const fillBar = useCallback((methodId, currency) => {
+    const fillBar = useCallback((methodId, currency, splitRemainingUsd = null) => {
         triggerHaptic && triggerHaptic();
+        const targetUsd = splitRemainingUsd != null ? splitRemainingUsd : remainingUsd;
+        const targetBs = splitRemainingUsd != null ? mulR(splitRemainingUsd, effectiveRate) : remainingBs;
         let val;
         if (currency === 'USD') {
-            val = remainingUsd > 0 ? round2(remainingUsd).toString() : null;
+            val = targetUsd > 0 ? round2(targetUsd).toString() : null;
         } else if (currency === 'COP') {
-            val = remainingUsd > 0 && tasaCop ? mulR(remainingUsd, tasaCop).toString() : null;
+            val = targetUsd > 0 && tasaCop ? mulR(targetUsd, tasaCop).toString() : null;
         } else {
-            val = remainingBs > 0 ? round2(remainingBs).toString() : null;
+            val = targetBs > 0 ? round2(targetBs).toString() : null;
         }
         if (val) setBarValues(prev => ({ ...prev, [methodId]: val }));
-    }, [remainingUsd, remainingBs, triggerHaptic, tasaCop]);
+    }, [remainingUsd, remainingBs, effectiveRate, triggerHaptic, tasaCop]);
 
     const _doConfirm = useCallback(async () => {
         if (submittingRef.current) return;
@@ -150,11 +152,11 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
             await onConfirmSale(payments, {
                 changeUsdGiven: round2(Math.min(defaultUsdChange, changeUsd)),
                 changeBsGiven: round2(Math.min(defaultBsChange, mulR(changeUsd, effectiveRate))),
-            });
+            }, splitMeta);
         } finally {
             submittingRef.current = false;
         }
-    }, [barValues, paymentMethods, effectiveRate, tasaCop, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd]);
+    }, [barValues, paymentMethods, effectiveRate, tasaCop, onConfirmSale, triggerHaptic, changeUsdGiven, changeBsGiven, changeUsd, splitMeta]);
 
     const handleConfirm = useCallback(async () => {
         const anomaly = detectPaymentAnomaly({ barValues, paymentMethods, effectiveRate, cartTotalUsd, totalPaidUsd });

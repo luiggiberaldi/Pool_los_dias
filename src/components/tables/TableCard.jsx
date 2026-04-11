@@ -284,6 +284,7 @@ function useBcvRate() {
 export default function TableCard({ table, session }) {
     const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime } = useTablesStore();
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
+    const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
@@ -498,7 +499,8 @@ export default function TableCard({ table, session }) {
 
     const isTimeFree = table.type === 'NORMAL';
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
-    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
+    const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
+    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
     const grandTotal = timeCost + totalConsumption;
     
     // Countdown logic
@@ -641,6 +643,8 @@ export default function TableCard({ table, session }) {
                                             <div className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
                                                 {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                             </div>
+                                            {/* Botón "+" solo visible en PREPAGO y PIÑA — en modo libre no tiene sentido */}
+                                            {(hasLimit || session?.game_mode === 'PINA') && (
                                             <button
                                                 onClick={handleAdjustTime}
                                                 className="p-1.5 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"
@@ -648,6 +652,7 @@ export default function TableCard({ table, session }) {
                                             >
                                                 <span className="text-lg font-black leading-none">+</span>
                                             </button>
+                                            )}
                                             {/* Pausa — solo en hora libre (sin límite de tiempo prepago) */}
                                             {!hasLimit && (
                                                 <button

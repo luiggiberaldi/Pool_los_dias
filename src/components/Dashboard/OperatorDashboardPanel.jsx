@@ -24,7 +24,7 @@ function formatElapsed(startedAt) {
 }
 
 export default function OperatorDashboardPanel({ onNavigate }) {
-    const { tables, activeSessions, config, paidHoursOffsets } = useTablesStore();
+    const { tables, activeSessions, config, paidHoursOffsets, paidRoundsOffsets } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
     const confirm = useConfirm();
@@ -150,7 +150,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         activeSessions.map(s => {
             if (s.status !== 'ACTIVE') return null;
             const elapsedMin = calculateElapsedTime(s.started_at);
-            const gameCost = calculateSessionCost(elapsedMin, s.game_mode, config, s.hours_paid, s.extended_times, s.paid_at, (paidHoursOffsets || {})[s.id] || 0);
+            const gameCost = calculateSessionCost(elapsedMin, s.game_mode, config, s.hours_paid, s.extended_times, s.paid_at, (paidHoursOffsets || {})[s.id] || 0, (paidRoundsOffsets || {})[s.id] || 0);
             const order = orders.find(o => o.table_session_id === s.id);
             const consumptionCost = order
                 ? orderItems.filter(i => i.order_id === order.id).reduce((sum, i) => sum + (i.unit_price_usd || 0) * i.qty, 0)

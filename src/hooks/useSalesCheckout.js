@@ -43,12 +43,12 @@ export function useSalesCheckout({
     }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
 
     // Accepts selectedCustomerId as argument since it's owned by the view
-    const handleCheckoutWithCustomer = useCallback(async (payments, changeBreakdown, selectedCustomerId) => {
+    const handleCheckoutWithCustomer = useCallback(async (payments, changeBreakdown, selectedCustomerId, splitMeta = null) => {
         triggerHaptic && triggerHaptic();
         const opts = {
             cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, payments, changeBreakdown,
             selectedCustomerId, customers, products, effectiveRate, tasaCop, copEnabled,
-            discountData, useAutoRate
+            discountData, useAutoRate, splitMeta
         };
         const result = await processSaleTransaction(opts);
         if (!result.success) {
@@ -69,7 +69,7 @@ export function useSalesCheckout({
         setCartSelectedIndex(-1);
     }, [cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd, effectiveRate, tasaCop, copEnabled, discountData, useAutoRate, customers, products, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, playCheckout, setShowConfetti, notifyLowStock, setCart, setShowCheckout, setSelectedCustomerId, setCartSelectedIndex, playError, triggerHaptic]);
 
-    const handleTableCheckout = useCallback(async (payments, changeBreakdown, selectedCustomerId, shouldRelease = true) => {
+    const handleTableCheckout = useCallback(async (payments, changeBreakdown, selectedCustomerId, shouldRelease = null, splitMeta = null) => {
         if (!tableCheckoutData) return;
         triggerHaptic && triggerHaptic();
 
@@ -85,7 +85,21 @@ export function useSalesCheckout({
         if (tableCheckoutData.currentItems?.length > 0) {
             tableCheckoutData.currentItems.forEach(item => {
                 const p = products.find(p => p.id === item.product_id);
-                if (p) syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 });
+                if (p) {
+                    syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 });
+                } else {
+                    console.warn(`[TableCheckout] Producto ${item.product_id} no encontrado en catálogo local, usando datos de orden`);
+                    syntheticCart.push({
+                        id: item.product_id,
+                        _originalId: item.product_id,
+                        name: item.product_name || 'Producto (sin catálogo)',
+                        priceUsdt: Number(item.unit_price_usd),
+                        priceUsd: Number(item.unit_price_usd),
+                        qty: Number(item.qty),
+                        costBs: 0, costUsd: 0,
+                        unit: 'unidad', category: 'otros', stock: 9999
+                    });
+                }
             });
         }
 
@@ -97,13 +111,11 @@ export function useSalesCheckout({
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
             discountData: { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },
-            useAutoRate
+            useAutoRate, splitMeta
         };
 
-        // Nombre de la mesa
         opts.tableName = tableCheckoutData.table?.name || null;
 
-        // Atribuir venta al mesero que abrió la mesa (solo si tiene rol MESERO)
         if (tableCheckoutData.session?.opened_by) {
             const cachedUsers = useAuthStore.getState().cachedUsers || [];
             let openerUser = cachedUsers.find(u => u.id === tableCheckoutData.session.opened_by) || null;
@@ -132,23 +144,26 @@ export function useSalesCheckout({
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
 
-        try {
-            if (shouldRelease) {
-                await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
-            } else {
-                // Limpiar deuda: resetear sesión (hours_paid=0, status=ACTIVE) y borrar order items
-                await useTablesStore.getState().resetSessionAfterPayment(tableCheckoutData.session.id);
-                await useOrdersStore.getState().cancelOrderBySessionId(tableCheckoutData.session.id);
+        // Si shouldRelease es null, el caller maneja la decisión (post-payment dialog)
+        if (shouldRelease !== null) {
+            try {
+                if (shouldRelease) {
+                    await useTablesStore.getState().closeSession(tableCheckoutData.session.id);
+                } else {
+                    await useTablesStore.getState().resetSessionAfterPayment(tableCheckoutData.session.id);
+                    await useOrdersStore.getState().cancelOrderBySessionId(tableCheckoutData.session.id);
+                }
+            } catch (error) {
+                showToast("Venta completa, pero falló al actualizar la mesa.", "warning");
             }
-        } catch (error) {
-            showToast("Venta completa, pero falló al actualizar la mesa.", "warning");
+            setTableCheckoutData(null);
         }
+        // Si shouldRelease === null, NO limpiar tableCheckoutData — el caller lo necesita para el dialog
 
         setShowReceipt(result.sale);
         playCheckout();
         setShowConfetti(true);
         notifyLowStock(result.updatedProducts);
-        setTableCheckoutData(null);
         setSelectedCustomerId('');
     }, [tableCheckoutData, effectiveRate, tasaCop, copEnabled, customers, products, useAutoRate, setProductsAfterCheckout, setCustomers, setSalesData, setShowReceipt, setTableCheckoutData, setSelectedCustomerId, setShowConfetti, playCheckout, playError, notifyLowStock, triggerHaptic]);
 

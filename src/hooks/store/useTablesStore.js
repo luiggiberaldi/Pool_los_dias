@@ -34,6 +34,7 @@ export const useTablesStore = create((set, get) => ({
     tables: [],
     activeSessions: [],
     paidHoursOffsets: {}, // { [sessionId]: number } — horas ya cobradas, guardadas solo localmente
+    paidRoundsOffsets: {}, // { [sessionId]: number } — piñas ya cobradas, guardadas solo localmente
     loading: true,
     realtimeChannel: null,
     _onlineHandler: null,
@@ -54,11 +55,13 @@ export const useTablesStore = create((set, get) => ({
             const cachedTables = await tablesCache.getItem(scopedKey('tables')) || [];
             const cachedSessions = await tablesCache.getItem(scopedKey('active_sessions')) || [];
             const cachedOffsets = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+            const cachedRoundsOffsets = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
 
             set({
                 tables: sortTables(cachedTables),
                 activeSessions: cachedSessions,
                 paidHoursOffsets: cachedOffsets,
+                paidRoundsOffsets: cachedRoundsOffsets,
                 loading: false
             });
 
@@ -86,8 +89,11 @@ export const useTablesStore = create((set, get) => ({
     // --- GESTIÓN DE COLA OFFLINE ---
     addPendingAction: async (action) => {
         const queue = await tablesCache.getItem(getPendingKey()) || [];
-        queue.push({ ...action, id: Date.now(), timestamp: new Date().toISOString() });
-        await tablesCache.setItem(getPendingKey(), queue);
+        // Deduplicar: si ya existe una acción del mismo tipo+sessionId, reemplazarla con la más reciente
+        const isDuplicate = (a, b) => a.type === b.type && a.sessionId === b.sessionId;
+        const filtered = queue.filter(existing => !isDuplicate(existing, action));
+        filtered.push({ ...action, id: Date.now(), timestamp: new Date().toISOString() });
+        await tablesCache.setItem(getPendingKey(), filtered);
     },
 
     processPendingActions: async () => {
@@ -195,9 +201,10 @@ export const useTablesStore = create((set, get) => ({
             await tablesCache.setItem(scopedKey('tables'), finalTables);
             await tablesCache.setItem(scopedKey('active_sessions'), mergedSessions);
 
-            // Restaurar paidHoursOffsets desde cache (datos locales que no están en Supabase)
+            // Restaurar paidHoursOffsets y paidRoundsOffsets desde cache (datos locales que no están en Supabase)
             const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
-            set({ paidHoursOffsets: offsetCache });
+            const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+            set({ paidHoursOffsets: offsetCache, paidRoundsOffsets: roundsOffsetCache });
 
         } catch (error) {
             console.warn('Sync cloud fallido (Modo Offline activo):', error.message);
@@ -207,10 +214,10 @@ export const useTablesStore = create((set, get) => ({
     subscribeToRealtime: () => {
         if (get().realtimeChannel) return;
 
-        let syncTimeout;
         const debouncedSync = () => {
-            clearTimeout(syncTimeout);
-            syncTimeout = setTimeout(() => get().syncTablesAndSessions(), 300);
+            clearTimeout(get()._syncTimeout);
+            const t = setTimeout(() => get().syncTablesAndSessions(), 300);
+            set({ _syncTimeout: t });
         };
 
         const channel = supabaseCloud
@@ -226,7 +233,7 @@ export const useTablesStore = create((set, get) => ({
                 }
                 debouncedSync();
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: scopedKey('tables') }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, (payload) => {
                  console.log("[REALTIME] tables change received:", payload);
                  if (payload.eventType === 'UPDATE') {
                     set(state => ({ tables: state.tables.map(t => t.id === payload.new.id ? payload.new : t) }));
@@ -237,7 +244,7 @@ export const useTablesStore = create((set, get) => ({
                 }
                 debouncedSync();
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: scopedKey('pool_config') }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'pool_config' }, (payload) => {
                 console.log("[REALTIME] pool_config change received:", payload);
                 if (payload.eventType === 'UPDATE' && payload.new) {
                     set(state => ({
@@ -256,9 +263,10 @@ export const useTablesStore = create((set, get) => ({
     },
 
     unsubscribeFromRealtime: () => {
+        clearTimeout(get()._syncTimeout);
         if (get().realtimeChannel) {
             supabaseCloud.removeChannel(get().realtimeChannel);
-            set({ realtimeChannel: null });
+            set({ realtimeChannel: null, _syncTimeout: null });
         }
     },
 
@@ -328,6 +336,13 @@ export const useTablesStore = create((set, get) => ({
 
         } catch (error) {
             console.warn('Guardado en nube fallido, encolado para más tarde.');
+            // Rollback: reemplazar sesión temporal con una marcada como pendiente
+            set(state => ({
+                activeSessions: state.activeSessions.map(s =>
+                    s.id === fakeId ? { ...s, _pendingSync: true } : s
+                )
+            }));
+            await tablesCache.setItem(scopedKey('active_sessions'), get().activeSessions);
             await get().addPendingAction({ type: 'OPEN_SESSION', payload: sessionPayload });
         }
     },
@@ -340,7 +355,7 @@ export const useTablesStore = create((set, get) => ({
         set({ activeSessions: updatedList });
         await tablesCache.setItem(scopedKey('active_sessions'), updatedList);
 
-        // Limpiar paid_at y hours_offset del cache local al cerrar la sesión
+        // Limpiar paid_at, hours_offset y rounds_offset del cache local al cerrar la sesión
         const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
         if (paidCache[sessionId]) {
             delete paidCache[sessionId];
@@ -353,6 +368,14 @@ export const useTablesStore = create((set, get) => ({
             const newOffsets = { ...get().paidHoursOffsets };
             delete newOffsets[sessionId];
             set({ paidHoursOffsets: newOffsets });
+        }
+        const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+        if (roundsOffsetCache[sessionId] !== undefined) {
+            delete roundsOffsetCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_rounds_offsets'), roundsOffsetCache);
+            const newRoundsOffsets = { ...get().paidRoundsOffsets };
+            delete newRoundsOffsets[sessionId];
+            set({ paidRoundsOffsets: newRoundsOffsets });
         }
 
         const cost = Number(totalCost);
@@ -455,6 +478,15 @@ export const useTablesStore = create((set, get) => ({
         await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
         set({ paidHoursOffsets: { ...get().paidHoursOffsets, [sessionId]: currentHours } });
 
+        // 2b. Guardar rounds_offset = piñas ya cobradas (billing diferencial para modo PIÑA)
+        if (session.game_mode === 'PINA') {
+            const currentRounds = 1 + (Number(session.extended_times) || 0);
+            const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+            roundsOffsetCache[sessionId] = currentRounds;
+            await tablesCache.setItem(scopedKey('paid_rounds_offsets'), roundsOffsetCache);
+            set({ paidRoundsOffsets: { ...get().paidRoundsOffsets, [sessionId]: currentRounds } });
+        }
+
         // 3. Update local state
         const newSessions = get().activeSessions.map(s =>
             s.id === sessionId ? { ...s, status: 'ACTIVE', paid_at: paidAt } : s
@@ -497,7 +529,7 @@ export const useTablesStore = create((set, get) => ({
             const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
             if (error) throw error;
         } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newRounds } });
         }
     },
 

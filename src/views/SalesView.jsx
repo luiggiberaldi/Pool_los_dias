@@ -3,6 +3,8 @@ import { FinancialEngine } from '../core/FinancialEngine';
 import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { useTablesStore } from '../hooks/store/useTablesStore';
+import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { showToast } from '../components/Toast';
@@ -68,7 +70,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
     const [tableCheckoutData, setTableCheckoutData] = useState(null);
     const [showTablePayment, setShowTablePayment] = useState(false);
-    const [releaseTableOnCheckout, setReleaseTableOnCheckout] = useState(true);
+    const [postPaymentSession, setPostPaymentSession] = useState(null); // { sessionId, tableName } — shown after payment
 
     // ── Data hook ──
     const { customers, setCustomers, paymentMethods, salesData, setSalesData, isLoadingLocal, buildCurrentFloat } = useSalesData({
@@ -397,7 +399,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     discountData={discountData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={(payments, change) => handleCheckoutWithCustomer(payments, change, selectedCustomerId)}
+                    onConfirmSale={(payments, change, splitMeta) => handleCheckoutWithCustomer(payments, change, selectedCustomerId, splitMeta)}
                     onCreateCustomer={handleCreateCustomer}
                     triggerHaptic={triggerHaptic} copEnabled={copEnabled} tasaCop={tasaCop}
                     currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} />
@@ -434,17 +436,65 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             )}
 
             {tableCheckoutData && showTablePayment && (
-                <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); setReleaseTableOnCheckout(true); }}
+                <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
                     cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
                     discountData={{ active: false, amountUsd: 0, amountBs: 0 }} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
-                    onConfirmSale={(payments, change) => handleTableCheckout(payments, change, selectedCustomerId, releaseTableOnCheckout)}
+                    onConfirmSale={(payments, change, splitMeta) => {
+                        const sessionId = tableCheckoutData.session?.id;
+                        const tableName = tableCheckoutData.table?.name || 'Mesa';
+                        handleTableCheckout(payments, change, selectedCustomerId, null, splitMeta).then(() => {
+                            setShowTablePayment(false);
+                            setPostPaymentSession({ sessionId, tableName });
+                        });
+                    }}
                     onCreateCustomer={handleCreateCustomer} triggerHaptic={triggerHaptic}
                     copEnabled={copEnabled} tasaCop={tasaCop}
-                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData}
-                    releaseTableOnCheckout={releaseTableOnCheckout} setReleaseTableOnCheckout={setReleaseTableOnCheckout} />
+                    currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData} />
+            )}
+
+            {/* Post-payment dialog: ¿Liberar mesa o dejar activa? */}
+            {postPaymentSession && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full animate-in fade-in zoom-in-95">
+                        <div className="text-center mb-5">
+                            <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
+                                <span className="text-2xl">✓</span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-800 dark:text-white">Cobro Exitoso</h3>
+                            <p className="text-sm text-slate-500 mt-1">¿Qué deseas hacer con <strong>{postPaymentSession.tableName}</strong>?</p>
+                        </div>
+                        <div className="flex flex-col gap-2.5">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await useTablesStore.getState().closeSession(postPaymentSession.sessionId);
+                                    } catch { showToast("Error al liberar mesa", "warning"); }
+                                    setPostPaymentSession(null);
+                                    setTableCheckoutData(null);
+                                }}
+                                className="w-full py-3.5 rounded-xl font-black text-white bg-emerald-500 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                            >
+                                Liberar Mesa
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await useTablesStore.getState().resetSessionAfterPayment(postPaymentSession.sessionId);
+                                        await useOrdersStore.getState().cancelOrderBySessionId(postPaymentSession.sessionId);
+                                    } catch { showToast("Error al resetear mesa", "warning"); }
+                                    setPostPaymentSession(null);
+                                    setTableCheckoutData(null);
+                                }}
+                                className="w-full py-3.5 rounded-xl font-black text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/30 border-2 border-violet-200 dark:border-violet-700/50 hover:bg-violet-100 dark:hover:bg-violet-900/50 active:scale-95 transition-all"
+                            >
+                                Dejar Activa
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

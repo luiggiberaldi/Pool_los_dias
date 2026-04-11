@@ -10,7 +10,7 @@ import { useConfirm } from '../hooks/useConfirm.jsx';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useProductContext } from '../context/ProductContext';
 import { showToast } from '../components/Toast';
-import { round2 } from '../utils/dinero';
+import { round2, subR, sumR, divR, mulR } from '../utils/dinero';
 import { openCashDrawerWebSerial, getWebSerialConfig } from '../services/webSerialPrinter';
 function useBcvRate() {
     try {
@@ -25,7 +25,7 @@ function useBcvRate() {
 }
 
 export default function CashierCheckoutView({ triggerHaptic, isActive }) {
-    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions, paidHoursOffsets } = useTablesStore();
+    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions, paidHoursOffsets, paidRoundsOffsets } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
     const tasaUSD = useBcvRate();
@@ -94,13 +94,14 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
 
                             const order = allOrders.find(o => o.table_session_id === session.id);
                             const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
-                            const totalConsumption = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
-                            
+                            const totalConsumption = round2(currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0));
+
                             const elapsed = calculateElapsedTime(session.started_at);
                             const isTimeFree = table.type === 'NORMAL';
                             const hoursOffset = (paidHoursOffsets || {})[session.id] || 0;
-                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
-                            const grandTotal = timeCost + totalConsumption;
+                            const roundsOffset = (paidRoundsOffsets || {})[session.id] || 0;
+                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
+                            const grandTotal = round2(timeCost + totalConsumption);
 
                             return (
                                 <div key={session.id} className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border-2 border-orange-500/30 flex flex-col gap-3">
@@ -164,7 +165,8 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
 }
 
 function PaymentModal({ session, table, config, rates, currentUser, onClose, onSuccess }) {
-    const { closeSession, paidHoursOffsets } = useTablesStore();
+    const { closeSession, resetSessionAfterPayment, paidHoursOffsets, paidRoundsOffsets } = useTablesStore();
+    const { cancelOrderBySessionId } = useOrdersStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const cachedUsers = useAuthStore(s => s.cachedUsers);
     const { products, copEnabled, tasaCop, useAutoRate } = useProductContext();
@@ -174,6 +176,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     const [receivedBs, setReceivedBs] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [splitPeople, setSplitPeople] = useState(null);
+    const [postPaymentAction, setPostPaymentAction] = useState(null); // { sessionId, tableName, grandTotal, method }
 
     // Customer selection state
     const { customers: allCustomers, fetchCustomers } = useCustomersStore();
@@ -235,7 +238,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     // Calculate totals
     const order = allOrders.find(o => o.table_session_id === session.id);
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
-    const totalConsumption = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
+    const totalConsumption = round2(currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0));
 
     // Elapsed time calculation
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
@@ -249,16 +252,17 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
 
     const isTimeFree = table.type === 'NORMAL';
     const hoursOffset = (paidHoursOffsets || {})[session?.id] || 0;
-    const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
-    const grandTotal = timeCost + totalConsumption;
+    const roundsOffset = (paidRoundsOffsets || {})[session?.id] || 0;
+    const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
+    const grandTotal = round2(timeCost + totalConsumption);
 
     // Change calculations
     const rUsd = parseFloat(receivedUSD || '0');
     const rBs = parseFloat(receivedBs || '0');
-    const totalReceivedInUSD = rUsd + (rBs / rates);
+    const totalReceivedInUSD = round2(rUsd + divR(rBs, rates));
 
-    const changeUSD = totalReceivedInUSD > grandTotal ? totalReceivedInUSD - grandTotal : 0;
-    const changeBs = changeUSD * rates;
+    const changeUSD = totalReceivedInUSD > grandTotal ? round2(subR(totalReceivedInUSD, grandTotal)) : 0;
+    const changeBs = round2(mulR(changeUSD, rates));
     const isReady = isFiado ? !!selectedCustomer : totalReceivedInUSD >= grandTotal;
 
     const handleSelectCustomer = (customer) => {
@@ -268,7 +272,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     };
 
     const handleConfirmPayment = async () => {
-        if (!isReady) return;
+        if (!isReady || isProcessing) return;
         setIsProcessing(true);
         try {
             // 1. Armar el carrito de compras a partir de currentItems
@@ -308,7 +312,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 if (rBs > 0) {
                     paymentPayload.push({
                         methodId: method,
-                        amountUsd: round2(rBs / rates),
+                        amountUsd: round2(divR(rBs, rates)),
                         currency: 'VES'
                     });
                 }
@@ -336,7 +340,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
-                cartTotalBs: grandTotal * rates,
+                cartTotalBs: round2(mulR(grandTotal, rates)),
                 cartSubtotalUsd: grandTotal,
                 payments: paymentPayload,
                 changeBreakdown: { changeUsdGiven: changeUSD, changeBsGiven: changeBs },
@@ -369,8 +373,15 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 }
             }
 
-            // 6. Cerrar la sesión en la base de datos de mesas
-            await closeSession(session.id, currentUser?.id || "SYSTEM", grandTotal, isFiado ? 'FIADO' : method);
+            // 6. Mostrar diálogo post-pago para decidir qué hacer con la mesa
+            setPostPaymentAction({
+                sessionId: session.id,
+                tableName: table.name,
+                grandTotal,
+                method: isFiado ? 'FIADO' : method,
+                customerName: selectedCustomer?.name || selectedCustomer?.nombre || null,
+                isFiado
+            });
             showToast(
                 'Cobro Exitoso',
                 isFiado
@@ -378,7 +389,6 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                     : `La mesa ${table.name} ha sido facturada correctamente.`,
                 'success'
             );
-            onSuccess();
         } catch (error) {
             console.error(error);
             showToast('Error de Cierre', 'No se pudo procesar el pago finalizado.', 'error');
@@ -388,6 +398,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     };
 
     return (
+        <>
         <Modal isOpen={true} onClose={onClose} title={`Cobro: ${table.name}`}>
             <div className="flex flex-col gap-4 py-2">
 
@@ -485,7 +496,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {(grandTotal * rates).toFixed(2)}
+                            Bs. {mulR(grandTotal, rates).toFixed(2)}
                         </span>
                     </div>
                 </div>
@@ -519,10 +530,10 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                             </div>
                             <div className="flex flex-col items-end">
                                 <span className="text-xl font-black text-violet-700 dark:text-violet-300 leading-none">
-                                    ${(grandTotal / splitPeople).toFixed(2)}
+                                    ${divR(grandTotal, splitPeople).toFixed(2)}
                                 </span>
                                 <span className="text-xs font-bold text-violet-600/70 dark:text-violet-400/70 mt-0.5">
-                                    Bs. {((grandTotal / splitPeople) * rates).toFixed(2)}
+                                    Bs. {mulR(divR(grandTotal, splitPeople), rates).toFixed(2)}
                                 </span>
                             </div>
                         </div>
@@ -579,7 +590,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                         </span>
                         <div className="flex flex-col items-end">
                             <span className={`text-lg font-black ${!isReady ? 'text-rose-600' : 'text-sky-600'}`}>
-                                ${!isReady ? (grandTotal - totalReceivedInUSD).toFixed(2) : changeUSD.toFixed(2)}
+                                ${!isReady ? subR(grandTotal, totalReceivedInUSD).toFixed(2) : changeUSD.toFixed(2)}
                             </span>
                             {isReady && changeUSD > 0 && (
                                 <span className="text-[10px] font-bold text-sky-600/70">
@@ -606,5 +617,48 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 </button>
             </div>
         </Modal>
+
+        {/* Post-payment dialog: ¿Liberar mesa o dejar activa? */}
+        {postPaymentAction && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full">
+                    <div className="text-center mb-5">
+                        <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
+                            <span className="text-2xl">✓</span>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-800 dark:text-white">Cobro Exitoso</h3>
+                        <p className="text-sm text-slate-500 mt-1">¿Qué deseas hacer con <strong>{postPaymentAction.tableName}</strong>?</p>
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await closeSession(postPaymentAction.sessionId, currentUser?.id || "SYSTEM", postPaymentAction.grandTotal, postPaymentAction.method);
+                                } catch { showToast("Error al liberar mesa", "warning"); }
+                                setPostPaymentAction(null);
+                                onSuccess();
+                            }}
+                            className="w-full py-3.5 rounded-xl font-black text-white bg-emerald-500 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                        >
+                            Liberar Mesa
+                        </button>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await resetSessionAfterPayment(postPaymentAction.sessionId);
+                                    await cancelOrderBySessionId(postPaymentAction.sessionId);
+                                } catch { showToast("Error al resetear mesa", "warning"); }
+                                setPostPaymentAction(null);
+                                onSuccess();
+                            }}
+                            className="w-full py-3.5 rounded-xl font-black text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/30 border-2 border-violet-200 dark:border-violet-700/50 hover:bg-violet-100 dark:hover:bg-violet-900/50 active:scale-95 transition-all"
+                        >
+                            Dejar Activa
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 }

@@ -8,7 +8,7 @@ export function calculateElapsedTime(startTimeISO) {
     return diffMinutes;
 }
 
-export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = 0, paidAt = null, hoursOffset = 0) {
+export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = 0, paidAt = null, hoursOffset = 0, roundsOffset = 0) {
     // Si ya fue cobrada sin liberar, la deuda es $0 aunque el timer siga corriendo
     if (paidAt) return 0;
 
@@ -16,7 +16,9 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
         // Piña mode has a fixed flat price regardless of time, but can be multiplied by rounds
         const basePrice = config.pricePina || 0;
         const rounds = 1 + (Number(extendedTimes) || 0);
-        return basePrice * rounds;
+        // roundsOffset = piñas ya cobradas en un ciclo anterior (cobrar sin liberar)
+        const billableRounds = Math.max(0, rounds - roundsOffset);
+        return round2(basePrice * billableRounds);
     }
 
     if (gameMode === 'NORMAL') {

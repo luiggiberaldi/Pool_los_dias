@@ -99,6 +99,16 @@ export default function CheckoutModal({
     releaseTableOnCheckout = true,
     setReleaseTableOnCheckout = null,
 }) {
+    const [showCheckoutTour, setShowCheckoutTour] = useState(
+        () => localStorage.getItem(CHECKOUT_TOUR_KEY) !== 'true'
+    );
+    const [splitPeople, setSplitPeople] = useState(null);
+    const [splitCustomInput, setSplitCustomInput] = useState('');
+    const [activeMethodId, setActiveMethodId] = useState(null);
+
+    // splitMeta simplified for visual-only mode (just records # of people)
+    const splitMeta = splitPeople ? { people: splitPeople, perPerson: [] } : null;
+
     const {
         barValues, totalPaidUsd,
         remainingUsd, remainingBs, changeUsd, changeBs,
@@ -107,23 +117,14 @@ export default function CheckoutModal({
         changeBsGiven, setChangeBsGiven,
         confirmFiar, setConfirmFiar,
         overpayAlertData, setOverpayAlertData, confirmOverpay,
-    } = useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic });
-
-    const [showCheckoutTour, setShowCheckoutTour] = useState(
-        () => localStorage.getItem(CHECKOUT_TOUR_KEY) !== 'true'
-    );
-    const [splitPeople, setSplitPeople] = useState(null);
-    const [splitCustomInput, setSplitCustomInput] = useState('');
-    const [splitPaid, setSplitPaid] = useState(0);
-    const [activeMethodId, setActiveMethodId] = useState(null);
-    const [splitBaseTotal, setSplitBaseTotal] = useState(0);
-    // [{personNum, amounts:{methodId: value}, totalUsd}]
-    const [splitSnapshots, setSplitSnapshots] = useState([]);
+    } = useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, cartTotalUsd, cartTotalBs, onConfirmSale, triggerHaptic, splitMeta });
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
     const methodsBs = paymentMethods.filter(m => m.currency === 'BS');
     const methodsCop = paymentMethods.filter(m => m.currency === 'COP');
+
+    // Compute per-person remaining for fillBar when split is active
 
     const renderPaymentBar = (method, styles) => {
         const val = barValues[method.id] || '';
@@ -248,23 +249,6 @@ export default function CheckoutModal({
                     </div>
                 )}
 
-                {/* -- TOGGLE: Liberar mesa al cobrar -- */}
-                {tableContext && setReleaseTableOnCheckout && (
-                    <div className="mx-3 mb-3 flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl px-3 py-2.5">
-                        <div className="flex flex-col">
-                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Liberar mesa al cobrar</span>
-                            <span className="text-[10px] text-slate-400">{releaseTableOnCheckout ? 'La mesa quedará libre al confirmar' : 'La mesa seguirá ocupada'}</span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setReleaseTableOnCheckout(v => !v)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${releaseTableOnCheckout ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                        >
-                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${releaseTableOnCheckout ? 'translate-x-5' : 'translate-x-0'}`} />
-                        </button>
-                    </div>
-                )}
-
                 {/* -- TOTAL BIMONEDA -- */}
                 <div data-tour="checkout-total" className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
                     {discountData?.active && (
@@ -299,17 +283,16 @@ export default function CheckoutModal({
                     </div>
                 </div>
 
-                {/* -- DIVIDIR CUENTA -- */}
+                {/* -- DIVIDIR CUENTA (Calculadora visual) -- */}
                 <div className="mx-3 mb-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
                         <Users size={11} /> Dividir cuenta
                     </p>
-                    {/* Botones rápidos + campo libre */}
                     <div className="flex gap-1.5 flex-wrap items-center">
                         {[2, 3, 4, 5, 6, 8].map(n => (
                             <button
                                 key={n}
-                                onClick={() => { setSplitPeople(n); setSplitCustomInput(''); setSplitPaid(0); }}
+                                onClick={() => { setSplitPeople(splitPeople === n ? null : n); setSplitCustomInput(''); }}
                                 className={`w-9 h-9 rounded-xl text-xs font-black transition-all border ${
                                     splitPeople === n
                                         ? 'bg-violet-500 text-white border-violet-500 shadow-md shadow-violet-500/30'
@@ -319,7 +302,6 @@ export default function CheckoutModal({
                                 {n}
                             </button>
                         ))}
-                        {/* Campo personalizado */}
                         <div className="flex items-center gap-1 ml-1">
                             <input
                                 type="number"
@@ -331,242 +313,39 @@ export default function CheckoutModal({
                                     const v = e.target.value;
                                     setSplitCustomInput(v);
                                     const n = parseInt(v);
-                                    if (n >= 2) { setSplitPeople(n); setSplitPaid(0); }
+                                    if (n >= 2) setSplitPeople(n);
+                                    else if (v === '') setSplitPeople(null);
                                 }}
                                 className="w-12 h-9 rounded-xl text-xs font-black text-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 focus:outline-none focus:border-violet-400"
                             />
                         </div>
-                        {splitPeople && (
-                            <button
-                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); setSplitBaseTotal(0); setSplitSnapshots([]); }}
-                                className="ml-auto px-3 py-1.5 rounded-xl text-xs font-black bg-red-100 dark:bg-red-900/30 text-red-500 border border-red-200 dark:border-red-700 hover:bg-red-500 hover:text-white transition-all active:scale-95"
-                            >
-                                ✕ Quitar
-                            </button>
-                        )}
                     </div>
 
-                    {/* Resultado + tracker */}
+                    {/* Resultado visual simple */}
                     {splitPeople && cartTotalUsd > 0 && (() => {
-                        const perPersonUsd = cartTotalUsd / splitPeople;
-                        const perPersonBs  = cartTotalBs  / splitPeople;
-                        const collectedForCurrent = Math.max(0, totalPaidUsd - splitBaseTotal);
-                        const stillNeedsUsd = Math.max(0, perPersonUsd - collectedForCurrent);
-                        const personDone = stillNeedsUsd < 0.005;
+                        const perPersonUsd = divR(cartTotalUsd, splitPeople);
+                        const perPersonBs = divR(cartTotalBs, splitPeople);
                         return (
-                        <div className="mt-2.5 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl">
-
-                            {/* BANNER: Cobrar persona actual */}
-                            {splitPaid < splitPeople ? (
-                                <div className="mb-3 rounded-xl overflow-hidden shadow-md shadow-violet-500/30">
-                                    {/* Cabecera */}
-                                    <div className="p-3 bg-violet-500 text-white flex items-center justify-between">
-                                        <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cobrar ahora</p>
-                                            <p className="text-[11px] font-bold opacity-90">Persona {splitPaid + 1} de {splitPeople}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-2xl font-black leading-none">${perPersonUsd.toFixed(2)}</p>
-                                            <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(perPersonBs)}</p>
-                                        </div>
-                                    </div>
-                                    {/* Botones rápidos por método */}
-                                    <div className="p-2 bg-violet-600 flex flex-wrap gap-1.5">
-                                        <p className="text-[9px] font-black text-white/60 uppercase tracking-widest self-center w-full">＋ Añadir parte vía:</p>
-                                        {[...methodsUsd, ...methodsBs].map(m => {
-                                            const amount = m.currency === 'BS' ? perPersonBs : perPersonUsd;
-                                            const label = m.currency === 'BS' ? `Bs ${formatBs(amount)}` : `$${amount.toFixed(2)}`;
-                                            return (
-                                                <button key={m.id}
-                                                    onClick={() => {
-                                                        const prev = parseFloat(barValues[m.id] || '0') || 0;
-                                                        handleBarChange(m.id, (prev + amount).toFixed(2));
-                                                        setActiveMethodId(m.id);
-                                                    }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition-all text-white border border-white/20">
-                                                    <span className="text-[10px] font-black">{m.label}</span>
-                                                    <span className="text-[10px] font-bold opacity-80">{label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    {/* Progreso por persona */}
-                                    <div className={`px-3 pt-2 pb-3 ${personDone ? 'bg-emerald-600' : 'bg-violet-700/60'}`}>
-                                        {/* Barra */}
-                                        <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden mb-2">
-                                            <div
-                                                className="h-full bg-white rounded-full transition-all duration-300"
-                                                style={{ width: `${Math.min(100, (collectedForCurrent / perPersonUsd) * 100)}%` }}
-                                            />
-                                        </div>
-                                        {personDone ? (
-                                            <p className="text-xs font-black text-white text-center">¡Listo! Pulsa + Cobrado</p>
-                                        ) : collectedForCurrent > 0 ? (
-                                            <div className="flex justify-between gap-3">
-                                                {/* Cobrado */}
-                                                <div className="flex-1 bg-emerald-500/40 rounded-lg px-2 py-1">
-                                                    <p className="text-[9px] font-black text-emerald-200 uppercase tracking-widest">Cobrado</p>
-                                                    <p className="text-sm font-black text-white leading-tight">${collectedForCurrent.toFixed(2)}</p>
-                                                    <p className="text-[10px] font-bold text-emerald-200 leading-tight">Bs {formatBs(collectedForCurrent * effectiveRate)}</p>
-                                                </div>
-                                                {/* Falta */}
-                                                <div className="flex-1 bg-orange-500/40 rounded-lg px-2 py-1">
-                                                    <p className="text-[9px] font-black text-orange-200 uppercase tracking-widest">Falta</p>
-                                                    <p className="text-sm font-black text-white leading-tight">${stillNeedsUsd.toFixed(2)}</p>
-                                                    <p className="text-[10px] font-bold text-orange-200 leading-tight">Bs {formatBs(stillNeedsUsd * effectiveRate)}</p>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-[11px] font-black text-white/70 text-center">Usa los botones de arriba o toca un campo</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="mb-3 p-3 bg-emerald-500 rounded-xl text-white flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30">
-                                    <span className="text-lg">✓</span>
-                                    <p className="text-sm font-black">¡Cuenta completa! Todas las personas pagaron</p>
-                                </div>
-                            )}
-
-                            {/* Tracker de cobro */}
-                            <div className="border-t border-violet-200 dark:border-violet-700/40 pt-2.5">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Cobradas</p>
-                                    <p className="text-[10px] font-bold text-violet-500">
-                                        {remainingUsd > 0.001
-                                            ? `Falta total: $${remainingUsd.toFixed(2)}`
-                                            : '¡Cuenta completa!'}
+                            <div className="mt-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest">
+                                        Cada persona ({splitPeople})
                                     </p>
                                 </div>
-                                {/* Barra de progreso general */}
-                                <div className="w-full h-2 bg-violet-200 dark:bg-violet-800/40 rounded-full mb-2.5 overflow-hidden">
-                                    <div
-                                        className="h-full bg-violet-500 rounded-full transition-all duration-300"
-                                        style={{ width: `${(splitPaid / splitPeople) * 100}%` }}
-                                    />
-                                </div>
-                                {/* Círculos por persona */}
-                                <div className="flex gap-1.5 flex-wrap mb-2.5">
-                                    {Array.from({ length: splitPeople }).map((_, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => setSplitPaid(i < splitPaid ? i : i + 1)}
-                                            className={`w-7 h-7 rounded-full text-[10px] font-black border-2 transition-all ${
-                                                i < splitPaid
-                                                    ? 'bg-violet-500 border-violet-500 text-white'
-                                                    : 'bg-white dark:bg-slate-800 border-violet-300 dark:border-violet-600 text-violet-400'
-                                            }`}
-                                        >
-                                            {i + 1}
-                                        </button>
-                                    ))}
-                                </div>
-                                {/* Botones + / - */}
-                                <div className="flex gap-2">
-                                    <button
-                                        disabled={splitPaid <= 0}
-                                        onClick={() => {
-                                            // Restaurar el último snapshot y quitarlo
-                                            const last = splitSnapshots[splitSnapshots.length - 1];
-                                            if (last) {
-                                                Object.entries(last.amounts).forEach(([id, val]) => {
-                                                    const cur = parseFloat(barValues[id] || '0') || 0;
-                                                    handleBarChange(id, Math.max(0, cur - val).toFixed(2));
-                                                });
-                                                setSplitSnapshots(prev => prev.slice(0, -1));
-                                            }
-                                            setSplitPaid(p => Math.max(0, p - 1));
-                                            setSplitBaseTotal(b => {
-                                                const prev = splitSnapshots[splitSnapshots.length - 2];
-                                                return prev ? prev._cumulativeUsd : 0;
-                                            });
-                                        }}
-                                        className="flex-1 py-1.5 rounded-xl text-xs font-black border border-violet-300 dark:border-violet-600 text-violet-500 disabled:opacity-30 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all"
-                                    >
-                                        − Quitar última
-                                    </button>
-                                    <button
-                                        disabled={splitPaid >= splitPeople || !personDone}
-                                        onClick={() => {
-                                            // Calcular el incremento de esta persona
-                                            const prevAmounts = {};
-                                            splitSnapshots.forEach(s => {
-                                                Object.entries(s.amounts).forEach(([id, val]) => {
-                                                    prevAmounts[id] = (prevAmounts[id] || 0) + val;
-                                                });
-                                            });
-                                            const personAmounts = {};
-                                            let personTotalUsd = 0;
-                                            paymentMethods.forEach(m => {
-                                                const cur = parseFloat(barValues[m.id] || '0') || 0;
-                                                const prev = prevAmounts[m.id] || 0;
-                                                const inc = parseFloat((cur - prev).toFixed(2));
-                                                if (inc > 0.001) {
-                                                    personAmounts[m.id] = inc;
-                                                    personTotalUsd += m.currency === 'BS' ? inc / effectiveRate : inc;
-                                                }
-                                            });
-                                            const snap = {
-                                                personNum: splitPaid + 1,
-                                                amounts: personAmounts,
-                                                totalUsd: personTotalUsd,
-                                                _cumulativeUsd: totalPaidUsd,
-                                            };
-                                            setSplitSnapshots(prev => [...prev, snap]);
-                                            setSplitBaseTotal(totalPaidUsd);
-                                            setSplitPaid(p => Math.min(splitPeople, p + 1));
-                                            setActiveMethodId(null);
-                                        }}
-                                        className={`flex-1 py-1.5 rounded-xl text-xs font-black transition-all shadow-sm ${
-                                            personDone && splitPaid < splitPeople
-                                                ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/30'
-                                                : 'bg-violet-500 text-white disabled:opacity-30 hover:bg-violet-600 shadow-violet-500/30'
-                                        }`}
-                                    >
-                                        {personDone ? '✓ + Cobrado' : `+ Cobrado (falta $${stillNeedsUsd.toFixed(2)})`}
-                                    </button>
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xl font-black text-violet-700 dark:text-violet-300 leading-none">
+                                        ${perPersonUsd.toFixed(2)}
+                                    </span>
+                                    <span className="text-xs font-bold text-violet-500/70 dark:text-violet-400/70 mt-0.5">
+                                        Bs {formatBs(perPersonBs)}
+                                    </span>
+                                    {copEnabled && tasaCop > 0 && (
+                                        <span className="text-xs font-bold text-amber-500/70 dark:text-amber-400/70 mt-0.5">
+                                            COP {(perPersonUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
-
-                            {/* Lista de cobrados */}
-                            {splitSnapshots.length > 0 && (
-                                <div className="mt-3 border-t border-violet-200 dark:border-violet-700/40 pt-2.5 space-y-1.5">
-                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-2">Pagos registrados</p>
-                                    {splitSnapshots.map((snap, idx) => {
-                                        const methodLabels = Object.entries(snap.amounts).map(([id, val]) => {
-                                            const m = paymentMethods.find(m => m.id === id);
-                                            if (!m) return null;
-                                            return m.currency === 'BS'
-                                                ? `Bs ${formatBs(val)}`
-                                                : `$${val.toFixed(2)}`;
-                                        }).filter(Boolean).join(' + ');
-                                        return (
-                                            <div key={idx} className="flex items-center justify-between bg-violet-100 dark:bg-violet-900/30 rounded-lg px-2.5 py-1.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-5 h-5 rounded-full bg-violet-500 text-white text-[9px] font-black flex items-center justify-center shrink-0">{snap.personNum}</span>
-                                                    <span className="text-[11px] font-bold text-violet-700 dark:text-violet-300">{methodLabels || `$${snap.totalUsd.toFixed(2)}`}</span>
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        // Restaurar montos al campo
-                                                        Object.entries(snap.amounts).forEach(([id, val]) => {
-                                                            const cur = parseFloat(barValues[id] || '0') || 0;
-                                                            handleBarChange(id, Math.max(0, cur - val).toFixed(2));
-                                                        });
-                                                        setSplitSnapshots(prev => prev.filter((_, i) => i !== idx));
-                                                        setSplitPaid(p => Math.max(0, p - 1));
-                                                        setSplitBaseTotal(splitSnapshots[idx - 1]?._cumulativeUsd || 0);
-                                                    }}
-                                                    className="text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md p-0.5 transition-all text-xs font-black"
-                                                >
-                                                    ✕
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
                         );
                     })()}
                 </div>
