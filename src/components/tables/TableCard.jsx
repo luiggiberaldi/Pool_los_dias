@@ -694,11 +694,16 @@ export default function TableCard({ table, session }) {
                                 <Eye size={16} />
                             </button>
                         </div>
-                        {session.game_mode === 'PINA' && (
+                        {session.game_mode === 'PINA' && (() => {
+                            const totalRounds = 1 + (Number(session.extended_times) || 0);
+                            const paidRounds = roundsOffset || 0;
+                            return (
                             <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mt-1 text-center">
-                                {1 + (Number(session.extended_times) || 0)} piña{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
+                                {totalRounds} piña{totalRounds !== 1 ? 's' : ''}
+                                {paidRounds > 0 && <span className="text-emerald-400 ml-1">({paidRounds} pagada{paidRounds !== 1 ? 's' : ''})</span>}
                             </div>
-                        )}
+                            );
+                        })()}
                     </>
                 )}
             </div>
