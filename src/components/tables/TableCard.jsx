@@ -469,6 +469,7 @@ export default function TableCard({ table, session }) {
         if (isExceeded && !exceededNotifiedRef.current) {
             exceededNotifiedRef.current = true;
             notifyTiempoExcedido(table.name);
+            showToast(`⏰ ${table.name} — Tiempo agotado. Agregar más tiempo o cobrar.`, 'warning', 8000);
         }
         if (!isExceeded) {
             exceededNotifiedRef.current = false;
@@ -595,7 +596,7 @@ export default function TableCard({ table, session }) {
                                     <>
                                         <div className="flex items-center justify-center gap-2">
                                             <div className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
-                                                {hasLimit ? formatElapsedTime(Math.abs(remainingMins)) : formatElapsedTime(elapsed)}
+                                                {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                             </div>
                                             <button 
                                                 onClick={handleAdjustTime} 
