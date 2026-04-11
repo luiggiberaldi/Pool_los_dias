@@ -112,6 +112,7 @@ export default function CheckoutModal({
     const [showCheckoutTour, setShowCheckoutTour] = useState(
         () => localStorage.getItem(CHECKOUT_TOUR_KEY) !== 'true'
     );
+    const [splitPeople, setSplitPeople] = useState(null);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -289,6 +290,43 @@ export default function CheckoutModal({
                             </span>
                         )}
                     </div>
+                </div>
+
+                {/* -- DIVIDIR CUENTA -- */}
+                <div className="mx-3 mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
+                        <Users size={11} /> Dividir cuenta
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                        {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                            <button
+                                key={n}
+                                onClick={() => setSplitPeople(splitPeople === n ? null : n)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                                    splitPeople === n
+                                        ? 'bg-violet-500 text-white border-violet-500 shadow-md shadow-violet-500/30'
+                                        : 'bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                }`}
+                            >
+                                {n} pers.
+                            </button>
+                        ))}
+                    </div>
+                    {splitPeople && cartTotalUsd > 0 && (
+                        <div className="mt-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
+                            <p className="text-xs font-bold text-violet-700 dark:text-violet-400">
+                                Por persona ({splitPeople})
+                            </p>
+                            <div className="text-right">
+                                <p className="text-lg font-black text-violet-700 dark:text-violet-300 leading-none">
+                                    ${(cartTotalUsd / splitPeople).toFixed(2)}
+                                </p>
+                                <p className="text-[11px] font-bold text-violet-500/80 mt-0.5">
+                                    Bs {formatBs(cartTotalBs / splitPeople)}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* -- SECCIÓN DÓLARES ($) -- */}

@@ -18,10 +18,10 @@ let activePort = null;
 export function getWebSerialConfig() {
     try {
         const saved = localStorage.getItem('web_serial_config');
-        const defaults = { autoOpenDrawer: false, baudRate: 9600, printerType: null, printerBrand: null, printerModel: null, paperWidth: 58 };
+        const defaults = { autoOpenDrawer: false, baudRate: 9600, printerType: 'system', printerBrand: 'Impresora del Sistema', printerModel: 'Driver del Sistema', paperWidth: 58 };
         return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
     } catch {
-        return { autoOpenDrawer: false, baudRate: 9600, printerType: null, printerBrand: null, printerModel: null, paperWidth: 58 };
+        return { autoOpenDrawer: false, baudRate: 9600, printerType: 'system', printerBrand: 'Impresora del Sistema', printerModel: 'Driver del Sistema', paperWidth: 58 };
     }
 }
 

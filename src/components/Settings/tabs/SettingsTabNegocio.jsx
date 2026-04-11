@@ -1,7 +1,6 @@
 import React from 'react';
 import { Store, Printer, Coins, Check } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
-import WebSerialPanel from '../WebSerialPanel';
 import { useAudit } from '../../../hooks/useAudit';
 
 export default function SettingsTabNegocio({
@@ -45,10 +44,6 @@ export default function SettingsTabNegocio({
                     <Check size={16} /> Guardar
                 </button>
             </SectionCard>
-
-
-            {/* Impresora Térmica + Cajón por USB Serial */}
-            <WebSerialPanel />
         </>
     );
 }

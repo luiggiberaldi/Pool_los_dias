@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard, Search, UserCheck, X, User } from 'lucide-react';
+import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard, Search, UserCheck, X, User, Users } from 'lucide-react';
 import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
@@ -173,6 +173,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     const [receivedUSD, setReceivedUSD] = useState('');
     const [receivedBs, setReceivedBs] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [splitPeople, setSplitPeople] = useState(null);
 
     // Customer selection state
     const { customers: allCustomers, fetchCustomers } = useCustomersStore();
@@ -487,6 +488,45 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                             Bs. {(grandTotal * rates).toFixed(2)}
                         </span>
                     </div>
+                </div>
+
+                {/* Split Bill */}
+                <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                        <Users size={12} /> Dividir Cuenta
+                    </label>
+                    <div className="flex gap-2 flex-wrap">
+                        {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                            <button
+                                key={n}
+                                onClick={() => setSplitPeople(splitPeople === n ? null : n)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
+                                    splitPeople === n
+                                        ? 'bg-violet-500 text-white border-violet-500 shadow-md shadow-violet-500/30'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-violet-400'
+                                }`}
+                            >
+                                {n} personas
+                            </button>
+                        ))}
+                    </div>
+                    {splitPeople && grandTotal > 0 && (
+                        <div className="mt-1 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-bold text-violet-700 dark:text-violet-400 uppercase tracking-widest">
+                                    Por persona ({splitPeople})
+                                </p>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-xl font-black text-violet-700 dark:text-violet-300 leading-none">
+                                    ${(grandTotal / splitPeople).toFixed(2)}
+                                </span>
+                                <span className="text-xs font-bold text-violet-600/70 dark:text-violet-400/70 mt-0.5">
+                                    Bs. {((grandTotal / splitPeople) * rates).toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Fiado notice OR denomination inputs */}
