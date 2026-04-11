@@ -116,6 +116,7 @@ export default function CheckoutModal({
     const [splitCustomInput, setSplitCustomInput] = useState('');
     const [splitPaid, setSplitPaid] = useState(0);
     const [activeMethodId, setActiveMethodId] = useState(null);
+    const [splitBaseTotal, setSplitBaseTotal] = useState(0); // totalPaidUsd al marcar la última persona
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -344,23 +345,49 @@ export default function CheckoutModal({
                     </div>
 
                     {/* Resultado + tracker */}
-                    {splitPeople && cartTotalUsd > 0 && (
+                    {splitPeople && cartTotalUsd > 0 && (() => {
+                        const perPersonUsd = cartTotalUsd / splitPeople;
+                        const perPersonBs  = cartTotalBs  / splitPeople;
+                        const collectedForCurrent = Math.max(0, totalPaidUsd - splitBaseTotal);
+                        const stillNeedsUsd = Math.max(0, perPersonUsd - collectedForCurrent);
+                        const personDone = stillNeedsUsd < 0.005;
+                        return (
                         <div className="mt-2.5 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl">
 
                             {/* BANNER: Cobrar persona actual */}
                             {splitPaid < splitPeople ? (
-                                <div className="mb-3">
-                                    <div className="p-3 bg-violet-500 rounded-t-xl text-white flex items-center justify-between shadow-md shadow-violet-500/30">
+                                <div className="mb-3 rounded-xl overflow-hidden shadow-md shadow-violet-500/30">
+                                    {/* Cabecera */}
+                                    <div className="p-3 bg-violet-500 text-white flex items-center justify-between">
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cobrar ahora</p>
                                             <p className="text-[11px] font-bold opacity-90">Persona {splitPaid + 1} de {splitPeople}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-black leading-none">${(cartTotalUsd / splitPeople).toFixed(2)}</p>
-                                            <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(cartTotalBs / splitPeople)}</p>
+                                            <p className="text-2xl font-black leading-none">${perPersonUsd.toFixed(2)}</p>
+                                            <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(perPersonBs)}</p>
                                         </div>
                                     </div>
-                                    {/* Botones auto-rellenar eliminados — flujo por método activo */}
+                                    {/* Barra de progreso por persona */}
+                                    <div className={`px-3 py-2 flex items-center justify-between gap-3 ${personDone ? 'bg-emerald-500' : 'bg-violet-400/30 dark:bg-violet-900/40'}`}>
+                                        <div className="flex-1">
+                                            <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-white rounded-full transition-all duration-300"
+                                                    style={{ width: `${Math.min(100, (collectedForCurrent / perPersonUsd) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                        {personDone ? (
+                                            <p className="text-[11px] font-black text-white shrink-0">¡Listo! Pulsa + Cobrado</p>
+                                        ) : collectedForCurrent > 0 ? (
+                                            <p className="text-[11px] font-black text-white shrink-0">
+                                                Cobrado ${collectedForCurrent.toFixed(2)} · Falta ${stillNeedsUsd.toFixed(2)}
+                                            </p>
+                                        ) : (
+                                            <p className="text-[11px] font-black text-white/70 shrink-0">Toca un campo de pago</p>
+                                        )}
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="mb-3 p-3 bg-emerald-500 rounded-xl text-white flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30">
@@ -375,11 +402,11 @@ export default function CheckoutModal({
                                     <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Cobradas</p>
                                     <p className="text-[10px] font-bold text-violet-500">
                                         {remainingUsd > 0.001
-                                            ? `Falta: $${remainingUsd.toFixed(2)}`
+                                            ? `Falta total: $${remainingUsd.toFixed(2)}`
                                             : '¡Cuenta completa!'}
                                     </p>
                                 </div>
-                                {/* Barra de progreso */}
+                                {/* Barra de progreso general */}
                                 <div className="w-full h-2 bg-violet-200 dark:bg-violet-800/40 rounded-full mb-2.5 overflow-hidden">
                                     <div
                                         className="h-full bg-violet-500 rounded-full transition-all duration-300"
@@ -406,38 +433,36 @@ export default function CheckoutModal({
                                 <div className="flex gap-2">
                                     <button
                                         disabled={splitPaid <= 0}
-                                        onClick={() => setSplitPaid(p => Math.max(0, p - 1))}
+                                        onClick={() => {
+                                            const prev = splitPaid - 1;
+                                            setSplitPaid(prev);
+                                            // retroceder el base al snapshot anterior (aproximación: restar perPersonUsd)
+                                            setSplitBaseTotal(b => Math.max(0, b - perPersonUsd));
+                                        }}
                                         className="flex-1 py-1.5 rounded-xl text-xs font-black border border-violet-300 dark:border-violet-600 text-violet-500 disabled:opacity-30 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all"
                                     >
                                         − Quitar
                                     </button>
                                     <button
-                                        disabled={splitPaid >= splitPeople}
+                                        disabled={splitPaid >= splitPeople || !personDone}
                                         onClick={() => {
-                                            if (splitPaid >= splitPeople) return;
-                                            // Sumar monto de esta persona al método activo
-                                            if (activeMethodId) {
-                                                const method = paymentMethods.find(m => m.id === activeMethodId);
-                                                if (method) {
-                                                    const prev = parseFloat(barValues[activeMethodId] || '0') || 0;
-                                                    const perPerson = method.currency === 'BS'
-                                                        ? cartTotalBs / splitPeople
-                                                        : cartTotalUsd / splitPeople;
-                                                    handleBarChange(activeMethodId, (prev + perPerson).toFixed(2));
-                                                }
-                                            }
+                                            setSplitBaseTotal(totalPaidUsd);
                                             setSplitPaid(p => Math.min(splitPeople, p + 1));
+                                            setActiveMethodId(null);
                                         }}
-                                        className="flex-1 py-1.5 rounded-xl text-xs font-black bg-violet-500 text-white disabled:opacity-30 hover:bg-violet-600 transition-all shadow-sm shadow-violet-500/30"
+                                        className={`flex-1 py-1.5 rounded-xl text-xs font-black transition-all shadow-sm ${
+                                            personDone && splitPaid < splitPeople
+                                                ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/30'
+                                                : 'bg-violet-500 text-white disabled:opacity-30 hover:bg-violet-600 shadow-violet-500/30'
+                                        }`}
                                     >
-                                        {activeMethodId
-                                            ? `+ Cobrado · ${paymentMethods.find(m => m.id === activeMethodId)?.label || ''}`
-                                            : '+ Cobrado'}
+                                        {personDone ? '✓ + Cobrado' : `+ Cobrado (falta $${stillNeedsUsd.toFixed(2)})`}
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
 
                 {/* -- SECCIÓN DÓLARES ($) -- */}
