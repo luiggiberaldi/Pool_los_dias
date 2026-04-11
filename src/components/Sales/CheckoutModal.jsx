@@ -344,22 +344,25 @@ export default function CheckoutModal({
                     {/* Resultado + tracker */}
                     {splitPeople && cartTotalUsd > 0 && (
                         <div className="mt-2.5 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl">
-                            {/* Monto por persona */}
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Por persona</p>
-                                    <p className="text-2xl font-black text-violet-700 dark:text-violet-300 leading-none mt-0.5">
-                                        ${(cartTotalUsd / splitPeople).toFixed(2)}
-                                    </p>
-                                    <p className="text-xs font-bold text-violet-500/80 mt-0.5">
-                                        Bs {formatBs(cartTotalBs / splitPeople)}
-                                    </p>
+
+                            {/* BANNER: Cobrar persona actual */}
+                            {splitPaid < splitPeople ? (
+                                <div className="mb-3 p-3 bg-violet-500 rounded-xl text-white flex items-center justify-between shadow-md shadow-violet-500/30">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Cobrar ahora</p>
+                                        <p className="text-[11px] font-bold opacity-90">Persona {splitPaid + 1} de {splitPeople}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-black leading-none">${(cartTotalUsd / splitPeople).toFixed(2)}</p>
+                                        <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(cartTotalBs / splitPeople)}</p>
+                                    </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Total</p>
-                                    <p className="text-sm font-black text-violet-600 dark:text-violet-400">{splitPeople} personas</p>
+                            ) : (
+                                <div className="mb-3 p-3 bg-emerald-500 rounded-xl text-white flex items-center justify-center gap-2 shadow-md shadow-emerald-500/30">
+                                    <span className="text-lg">✓</span>
+                                    <p className="text-sm font-black">¡Cuenta completa! Todas las personas pagaron</p>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Tracker de cobro */}
                             <div className="border-t border-violet-200 dark:border-violet-700/40 pt-2.5">
