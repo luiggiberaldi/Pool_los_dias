@@ -117,6 +117,8 @@ export default function CheckoutModal({
     const [splitPaid, setSplitPaid] = useState(0);
     const [activeMethodId, setActiveMethodId] = useState(null);
     const [splitBaseTotal, setSplitBaseTotal] = useState(0);
+    // [{personNum, amounts:{methodId: value}, totalUsd}]
+    const [splitSnapshots, setSplitSnapshots] = useState([]);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -336,7 +338,7 @@ export default function CheckoutModal({
                         </div>
                         {splitPeople && (
                             <button
-                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); setSplitBaseTotal(0); }}
+                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); setSplitBaseTotal(0); setSplitSnapshots([]); }}
                                 className="ml-auto px-3 py-1.5 rounded-xl text-xs font-black bg-red-100 dark:bg-red-900/30 text-red-500 border border-red-200 dark:border-red-700 hover:bg-red-500 hover:text-white transition-all active:scale-95"
                             >
                                 ✕ Quitar
@@ -464,18 +466,53 @@ export default function CheckoutModal({
                                     <button
                                         disabled={splitPaid <= 0}
                                         onClick={() => {
-                                            const prev = splitPaid - 1;
-                                            setSplitPaid(prev);
-                                            // retroceder el base al snapshot anterior (aproximación: restar perPersonUsd)
-                                            setSplitBaseTotal(b => Math.max(0, b - perPersonUsd));
+                                            // Restaurar el último snapshot y quitarlo
+                                            const last = splitSnapshots[splitSnapshots.length - 1];
+                                            if (last) {
+                                                Object.entries(last.amounts).forEach(([id, val]) => {
+                                                    const cur = parseFloat(barValues[id] || '0') || 0;
+                                                    handleBarChange(id, Math.max(0, cur - val).toFixed(2));
+                                                });
+                                                setSplitSnapshots(prev => prev.slice(0, -1));
+                                            }
+                                            setSplitPaid(p => Math.max(0, p - 1));
+                                            setSplitBaseTotal(b => {
+                                                const prev = splitSnapshots[splitSnapshots.length - 2];
+                                                return prev ? prev._cumulativeUsd : 0;
+                                            });
                                         }}
                                         className="flex-1 py-1.5 rounded-xl text-xs font-black border border-violet-300 dark:border-violet-600 text-violet-500 disabled:opacity-30 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-all"
                                     >
-                                        − Quitar
+                                        − Quitar última
                                     </button>
                                     <button
                                         disabled={splitPaid >= splitPeople || !personDone}
                                         onClick={() => {
+                                            // Calcular el incremento de esta persona
+                                            const prevAmounts = {};
+                                            splitSnapshots.forEach(s => {
+                                                Object.entries(s.amounts).forEach(([id, val]) => {
+                                                    prevAmounts[id] = (prevAmounts[id] || 0) + val;
+                                                });
+                                            });
+                                            const personAmounts = {};
+                                            let personTotalUsd = 0;
+                                            paymentMethods.forEach(m => {
+                                                const cur = parseFloat(barValues[m.id] || '0') || 0;
+                                                const prev = prevAmounts[m.id] || 0;
+                                                const inc = parseFloat((cur - prev).toFixed(2));
+                                                if (inc > 0.001) {
+                                                    personAmounts[m.id] = inc;
+                                                    personTotalUsd += m.currency === 'BS' ? inc / effectiveRate : inc;
+                                                }
+                                            });
+                                            const snap = {
+                                                personNum: splitPaid + 1,
+                                                amounts: personAmounts,
+                                                totalUsd: personTotalUsd,
+                                                _cumulativeUsd: totalPaidUsd,
+                                            };
+                                            setSplitSnapshots(prev => [...prev, snap]);
                                             setSplitBaseTotal(totalPaidUsd);
                                             setSplitPaid(p => Math.min(splitPeople, p + 1));
                                             setActiveMethodId(null);
@@ -490,6 +527,45 @@ export default function CheckoutModal({
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Lista de cobrados */}
+                            {splitSnapshots.length > 0 && (
+                                <div className="mt-3 border-t border-violet-200 dark:border-violet-700/40 pt-2.5 space-y-1.5">
+                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-2">Pagos registrados</p>
+                                    {splitSnapshots.map((snap, idx) => {
+                                        const methodLabels = Object.entries(snap.amounts).map(([id, val]) => {
+                                            const m = paymentMethods.find(m => m.id === id);
+                                            if (!m) return null;
+                                            return m.currency === 'BS'
+                                                ? `Bs ${formatBs(val)}`
+                                                : `$${val.toFixed(2)}`;
+                                        }).filter(Boolean).join(' + ');
+                                        return (
+                                            <div key={idx} className="flex items-center justify-between bg-violet-100 dark:bg-violet-900/30 rounded-lg px-2.5 py-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-violet-500 text-white text-[9px] font-black flex items-center justify-center shrink-0">{snap.personNum}</span>
+                                                    <span className="text-[11px] font-bold text-violet-700 dark:text-violet-300">{methodLabels || `$${snap.totalUsd.toFixed(2)}`}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        // Restaurar montos al campo
+                                                        Object.entries(snap.amounts).forEach(([id, val]) => {
+                                                            const cur = parseFloat(barValues[id] || '0') || 0;
+                                                            handleBarChange(id, Math.max(0, cur - val).toFixed(2));
+                                                        });
+                                                        setSplitSnapshots(prev => prev.filter((_, i) => i !== idx));
+                                                        setSplitPaid(p => Math.max(0, p - 1));
+                                                        setSplitBaseTotal(splitSnapshots[idx - 1]?._cumulativeUsd || 0);
+                                                    }}
+                                                    className="text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md p-0.5 transition-all text-xs font-black"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                         );
                     })()}
