@@ -369,7 +369,7 @@ export default function CheckoutModal({
                                         </div>
                                     </div>
                                     {/* Barra de progreso por persona */}
-                                    <div className={`px-3 py-2 flex items-center justify-between gap-3 ${personDone ? 'bg-emerald-500' : 'bg-violet-400/30 dark:bg-violet-900/40'}`}>
+                                    <div className={`px-3 py-2 flex items-center justify-between gap-3 ${personDone ? 'bg-emerald-600' : 'bg-violet-700/60'}`}>
                                         <div className="flex-1">
                                             <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden">
                                                 <div
@@ -385,7 +385,7 @@ export default function CheckoutModal({
                                                 <p className="text-xs font-black text-white leading-tight">
                                                     Cobrado ${collectedForCurrent.toFixed(2)} · Falta ${stillNeedsUsd.toFixed(2)}
                                                 </p>
-                                                <p className="text-[10px] font-bold text-white/80 leading-tight">
+                                                <p className="text-[10px] font-bold text-white/90 leading-tight">
                                                     Bs {formatBs(collectedForCurrent * effectiveRate)} · Bs {formatBs(stillNeedsUsd * effectiveRate)}
                                                 </p>
                                             </div>
