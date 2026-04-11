@@ -116,7 +116,7 @@ export default function CheckoutModal({
     const [splitCustomInput, setSplitCustomInput] = useState('');
     const [splitPaid, setSplitPaid] = useState(0);
     const [activeMethodId, setActiveMethodId] = useState(null);
-    const [splitBaseTotal, setSplitBaseTotal] = useState(0); // totalPaidUsd al marcar la última persona
+    const [splitBaseTotal, setSplitBaseTotal] = useState(0);
 
     const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
     const methodsUsd = paymentMethods.filter(m => m.currency === 'USD');
@@ -367,6 +367,26 @@ export default function CheckoutModal({
                                             <p className="text-2xl font-black leading-none">${perPersonUsd.toFixed(2)}</p>
                                             <p className="text-xs font-bold opacity-80 mt-0.5">Bs {formatBs(perPersonBs)}</p>
                                         </div>
+                                    </div>
+                                    {/* Botones rápidos por método */}
+                                    <div className="p-2 bg-violet-600 flex flex-wrap gap-1.5">
+                                        <p className="text-[9px] font-black text-white/60 uppercase tracking-widest self-center w-full">＋ Añadir parte vía:</p>
+                                        {[...methodsUsd, ...methodsBs].map(m => {
+                                            const amount = m.currency === 'BS' ? perPersonBs : perPersonUsd;
+                                            const label = m.currency === 'BS' ? `Bs ${formatBs(amount)}` : `$${amount.toFixed(2)}`;
+                                            return (
+                                                <button key={m.id}
+                                                    onClick={() => {
+                                                        const prev = parseFloat(barValues[m.id] || '0') || 0;
+                                                        handleBarChange(m.id, (prev + amount).toFixed(2));
+                                                        setActiveMethodId(m.id);
+                                                    }}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 active:scale-95 transition-all text-white border border-white/20">
+                                                    <span className="text-[10px] font-black">{m.label}</span>
+                                                    <span className="text-[10px] font-bold opacity-80">{label}</span>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                     {/* Barra de progreso por persona */}
                                     <div className={`px-3 py-2 flex items-center justify-between gap-3 ${personDone ? 'bg-emerald-600' : 'bg-violet-700/60'}`}>
