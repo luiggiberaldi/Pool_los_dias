@@ -25,7 +25,7 @@ function useBcvRate() {
 }
 
 export default function CashierCheckoutView({ triggerHaptic, isActive }) {
-    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions } = useTablesStore();
+    const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions, paidHoursOffsets } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
     const tasaUSD = useBcvRate();
@@ -98,7 +98,8 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
                             
                             const elapsed = calculateElapsedTime(session.started_at);
                             const isTimeFree = table.type === 'NORMAL';
-                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times) : 0;
+                            const hoursOffset = (paidHoursOffsets || {})[session.id] || 0;
+                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
                             const grandTotal = timeCost + totalConsumption;
 
                             return (
@@ -163,7 +164,7 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
 }
 
 function PaymentModal({ session, table, config, rates, currentUser, onClose, onSuccess }) {
-    const { closeSession } = useTablesStore();
+    const { closeSession, paidHoursOffsets } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const cachedUsers = useAuthStore(s => s.cachedUsers);
     const { products, copEnabled, tasaCop, useAutoRate } = useProductContext();
@@ -246,7 +247,8 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
     }, [isPlaying, session?.started_at]);
 
     const isTimeFree = table.type === 'NORMAL';
-    const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times) : 0;
+    const hoursOffset = (paidHoursOffsets || {})[session?.id] || 0;
+    const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
     const grandTotal = timeCost + totalConsumption;
 
     // Change calculations

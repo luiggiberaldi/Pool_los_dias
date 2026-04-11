@@ -8,7 +8,10 @@ export function calculateElapsedTime(startTimeISO) {
     return diffMinutes;
 }
 
-export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = 0) {
+export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = 0, paidAt = null, hoursOffset = 0) {
+    // Si ya fue cobrada sin liberar, la deuda es $0 aunque el timer siga corriendo
+    if (paidAt) return 0;
+
     if (gameMode === 'PINA') {
         // Piña mode has a fixed flat price regardless of time, but can be multiplied by rounds
         const basePrice = config.pricePina || 0;
@@ -18,10 +21,11 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
 
     if (gameMode === 'NORMAL') {
         // Si se pagaron horas por adelantado (mesa de pool con prepago), sí se cobra el tiempo.
-        // Si no hay horas pagadas (mesa de bar/consumo), solo se registra el tiempo sin cobro.
+        // hoursOffset = horas ya cobradas en un ciclo anterior (cobrar sin liberar).
         if (hoursPaid > 0) {
             const pricePerHour = config.pricePerHour || 0;
-            return round2(hoursPaid * pricePerHour);
+            const billableHours = Math.max(0, hoursPaid - hoursOffset);
+            return round2(billableHours * pricePerHour);
         }
         return 0;
     }
@@ -29,7 +33,8 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
     if (gameMode === 'PREPAGO') {
         const pricePerHour = config.pricePerHour || 0;
         if (hoursPaid <= 0) return 0;
-        return round2(hoursPaid * pricePerHour);
+        const billableHours = Math.max(0, hoursPaid - hoursOffset);
+        return round2(billableHours * pricePerHour);
     }
 
     return 0;

@@ -283,6 +283,7 @@ function useBcvRate() {
 
 export default function TableCard({ table, session }) {
     const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime } = useTablesStore();
+    const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
@@ -496,7 +497,8 @@ export default function TableCard({ table, session }) {
     };
 
     const isTimeFree = table.type === 'NORMAL';
-    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times) : 0;
+    const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
+    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset) : 0;
     const grandTotal = timeCost + totalConsumption;
     
     // Countdown logic
@@ -613,17 +615,8 @@ export default function TableCard({ table, session }) {
                                     Orden Activa
                                 </div>
                                 <div className="text-xs font-medium opacity-80">Acumulando Consumo</div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <div className={`text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 px-2 py-0.5 rounded-full ${isPaused ? 'bg-amber-500/30 text-amber-300 opacity-100' : 'bg-white/10'}`}>
-                                        {isPaused ? '⏸ ' : ''}Tiempo en mesa: {formatElapsedTime(elapsed)}
-                                    </div>
-                                    <button
-                                        onClick={isPaused ? handleResumeTimer : handlePauseTimer}
-                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
-                                        title={isPaused ? 'Reanudar tiempo' : 'Pausar tiempo'}
-                                    >
-                                        {isPaused ? <Play size={10} fill="currentColor" /> : <Pause size={10} />}
-                                    </button>
+                                <div className="text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 bg-white/10 px-2 py-0.5 rounded-full mt-0.5">
+                                    Tiempo en mesa: {formatElapsedTime(elapsed)}
                                 </div>
                             </div>
                         ) : (
@@ -648,13 +641,23 @@ export default function TableCard({ table, session }) {
                                             <div className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
                                                 {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                             </div>
-                                            <button 
-                                                onClick={handleAdjustTime} 
+                                            <button
+                                                onClick={handleAdjustTime}
                                                 className="p-1.5 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"
                                                 title="Ampliar tiempo"
                                             >
                                                 <span className="text-lg font-black leading-none">+</span>
                                             </button>
+                                            {/* Pausa — solo en hora libre (sin límite de tiempo prepago) */}
+                                            {!hasLimit && (
+                                                <button
+                                                    onClick={isPaused ? handleResumeTimer : handlePauseTimer}
+                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
+                                                    title={isPaused ? 'Reanudar tiempo' : 'Pausar tiempo'}
+                                                >
+                                                    {isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} />}
+                                                </button>
+                                            )}
                                         </div>
                                         {hasLimit && (
                                             <div className={`text-[10px] font-black tracking-wider uppercase mt-1 ${isExceeded ? 'text-rose-400' : 'text-amber-300'}`}>
@@ -775,8 +778,8 @@ export default function TableCard({ table, session }) {
                                     </button>
                                 </div>
 
-                                {/* Liberar mesa — disponible cuando la deuda es $0 (ya fue cobrada o no tiene consumos) */}
-                                {grandTotal === 0 && isPlaying && (
+                                {/* Liberar mesa — cuando ya fue cobrada (paid_at) o deuda en $0 */}
+                                {((session?.paid_at || grandTotal === 0) && isPlaying) && (
                                     !showReleaseConfirm ? (
                                         <button
                                             onClick={() => setShowReleaseConfirm(true)}

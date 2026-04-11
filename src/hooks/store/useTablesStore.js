@@ -33,6 +33,7 @@ const sortTables = (tables) => {
 export const useTablesStore = create((set, get) => ({
     tables: [],
     activeSessions: [],
+    paidHoursOffsets: {}, // { [sessionId]: number } — horas ya cobradas, guardadas solo localmente
     loading: true,
     realtimeChannel: null,
     _onlineHandler: null,
@@ -52,11 +53,13 @@ export const useTablesStore = create((set, get) => ({
             // 2. Cargar cache local (Lo que quedó guardado al irse la luz)
             const cachedTables = await tablesCache.getItem(scopedKey('tables')) || [];
             const cachedSessions = await tablesCache.getItem(scopedKey('active_sessions')) || [];
-            
-            set({ 
-                tables: sortTables(cachedTables), 
+            const cachedOffsets = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+
+            set({
+                tables: sortTables(cachedTables),
                 activeSessions: cachedSessions,
-                loading: false 
+                paidHoursOffsets: cachedOffsets,
+                loading: false
             });
 
             // 3. Procesar acciones pendientes antes de sincronizar con la nube
@@ -180,11 +183,21 @@ export const useTablesStore = create((set, get) => ({
                 await tablesCache.setItem(scopedKey('pool_config'), cloudConfig);
             }
 
+            // Restaurar paid_at local (no existe en Supabase) sobre las sesiones recién sincronizadas
+            const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+            const mergedSessions = sessionsData.map(s =>
+                paidCache[s.id] ? { ...s, paid_at: paidCache[s.id] } : s
+            );
+
             const finalTables = sortTables(tablesData);
-            set({ tables: finalTables, activeSessions: sessionsData });
-            
+            set({ tables: finalTables, activeSessions: mergedSessions });
+
             await tablesCache.setItem(scopedKey('tables'), finalTables);
-            await tablesCache.setItem(scopedKey('active_sessions'), sessionsData);
+            await tablesCache.setItem(scopedKey('active_sessions'), mergedSessions);
+
+            // Restaurar paidHoursOffsets desde cache (datos locales que no están en Supabase)
+            const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+            set({ paidHoursOffsets: offsetCache });
 
         } catch (error) {
             console.warn('Sync cloud fallido (Modo Offline activo):', error.message);
@@ -327,6 +340,21 @@ export const useTablesStore = create((set, get) => ({
         set({ activeSessions: updatedList });
         await tablesCache.setItem(scopedKey('active_sessions'), updatedList);
 
+        // Limpiar paid_at y hours_offset del cache local al cerrar la sesión
+        const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+        if (paidCache[sessionId]) {
+            delete paidCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+        }
+        const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+        if (offsetCache[sessionId] !== undefined) {
+            delete offsetCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
+            const newOffsets = { ...get().paidHoursOffsets };
+            delete newOffsets[sessionId];
+            set({ paidHoursOffsets: newOffsets });
+        }
+
         const cost = Number(totalCost);
         logEvent('MESAS', 'MESA_CERRADA', `Mesa ${tableName} cerrada${cost > 0 ? ` · $${cost.toFixed(2)}` : ''}`, getUser(), { sessionId, totalCost, paymentMethod });
 
@@ -384,8 +412,17 @@ export const useTablesStore = create((set, get) => ({
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
         const newHours = Math.max(0, (Number(session.hours_paid) || 0) + additionalHours);
-        
-        const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, hours_paid: newHours } : s);
+
+        // Si la sesión estaba "cobrada sin liberar", limpiar paid_at para reactivar billing del tiempo nuevo
+        if (session.paid_at) {
+            const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+            delete paidCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+        }
+
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, hours_paid: newHours, paid_at: null } : s
+        );
         set({ activeSessions: newSessions });
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
@@ -397,22 +434,41 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    // "Cobrar sin liberar": limpia la deuda de la sesión (horas y consumos pagados)
-    // La mesa queda ACTIVA con $0 de deuda; el timer continúa corriendo.
+    // "Cobrar sin liberar": marca la sesión como pagada sin cerrarla.
+    // paid_at y hours_offset se guardan SOLO localmente (no en Supabase).
+    // El timer sigue corriendo (hours_paid intacto), billing = $0.
+    // Al agregar más horas, solo se cobra la diferencia.
     resetSessionAfterPayment: async (sessionId) => {
-        const payload = { hours_paid: 0, extended_times: 0, status: 'ACTIVE' };
+        const paidAt = new Date().toISOString();
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // 1. Guardar paid_at en cache persistente
+        const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+        paidCache[sessionId] = paidAt;
+        await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+
+        // 2. Guardar hours_offset = horas ya cobradas (billing diferencial al agregar más tiempo)
+        const currentHours = Number(session.hours_paid) || 0;
+        const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+        offsetCache[sessionId] = currentHours;
+        await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
+        set({ paidHoursOffsets: { ...get().paidHoursOffsets, [sessionId]: currentHours } });
+
+        // 3. Update local state
         const newSessions = get().activeSessions.map(s =>
-            s.id === sessionId ? { ...s, ...payload } : s
+            s.id === sessionId ? { ...s, status: 'ACTIVE', paid_at: paidAt } : s
         );
         set({ activeSessions: newSessions });
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+
+        // 4. Solo mandamos status a Supabase (paid_at no existe como columna)
         try {
-            const { error } = await supabaseCloud.from('table_sessions').update(payload).eq('id', sessionId);
+            const { error } = await supabaseCloud.from('table_sessions').update({ status: 'ACTIVE' }).eq('id', sessionId);
             if (error) throw error;
-            // Forzar sync inmediato para evitar que un realtime debounce traiga datos viejos
             get().syncTablesAndSessions();
         } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { status: 'ACTIVE' } });
         }
     },
 
@@ -422,7 +478,16 @@ export const useTablesStore = create((set, get) => ({
         const newRounds = (Number(session.extended_times) || 0) + 1;
         const tableName = get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id;
 
-        const newSessions = get().activeSessions.map(s => s.id === sessionId ? { ...s, extended_times: newRounds } : s);
+        // Si estaba marcada como "ya cobrada", limpiar paid_at del cache al agregar nueva piña
+        if (session.paid_at) {
+            const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+            delete paidCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+        }
+
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, extended_times: newRounds, paid_at: null } : s
+        );
         set({ activeSessions: newSessions });
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
@@ -432,7 +497,7 @@ export const useTablesStore = create((set, get) => ({
             const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
             if (error) throw error;
         } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newRounds } });
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
         }
     },
 
