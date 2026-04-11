@@ -773,7 +773,7 @@ export default function TableCard({ table, session }) {
                             </div>
                         ) : (
                             <div className="flex flex-col gap-1.5">
-                                <div className="grid grid-cols-2 gap-1.5">
+                                <div className={`grid gap-1.5 ${grandTotal > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                     <button
                                         onClick={() => setShowOrderPanel(true)}
                                         className="bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
@@ -781,6 +781,7 @@ export default function TableCard({ table, session }) {
                                         <ShoppingBag size={13} fill="currentColor" />
                                         <span>Consumo</span>
                                     </button>
+                                    {grandTotal > 0 && (
                                     <button
                                         onClick={() => { requestCheckout(session.id); notifyMesaCobrar(table.name, grandTotal); }}
                                         className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
@@ -788,6 +789,7 @@ export default function TableCard({ table, session }) {
                                         <CreditCard size={13} />
                                         <span>Cobrar</span>
                                     </button>
+                                    )}
                                 </div>
 
                                 {/* Liberar mesa — cuando ya fue cobrada (paid_at) o deuda en $0 */}
