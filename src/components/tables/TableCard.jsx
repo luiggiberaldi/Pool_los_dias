@@ -669,6 +669,11 @@ export default function TableCard({ table, session }) {
                                                 {isExceeded ? 'TIEMPO EXCEDIDO' : 'TIEMPO RESTANTE'}
                                             </div>
                                         )}
+                                        {hasLimit && hoursOffset > 0 && (
+                                            <div className="text-[9px] font-bold text-emerald-300 mt-0.5">
+                                                {hoursOffset === 0.5 ? '30min' : `${hoursOffset}h`} pagada{hoursOffset !== 1 ? 's' : ''} de {session.hours_paid === 0.5 ? '30min' : `${Number(session.hours_paid)}h`}
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </>
