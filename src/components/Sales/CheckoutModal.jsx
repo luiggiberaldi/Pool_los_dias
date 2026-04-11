@@ -336,10 +336,10 @@ export default function CheckoutModal({
                         </div>
                         {splitPeople && (
                             <button
-                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); }}
-                                className="ml-auto text-[10px] text-slate-400 hover:text-red-400 transition-colors font-bold"
+                                onClick={() => { setSplitPeople(null); setSplitCustomInput(''); setSplitPaid(0); setSplitBaseTotal(0); }}
+                                className="ml-auto px-3 py-1.5 rounded-xl text-xs font-black bg-red-100 dark:bg-red-900/30 text-red-500 border border-red-200 dark:border-red-700 hover:bg-red-500 hover:text-white transition-all active:scale-95"
                             >
-                                Quitar
+                                ✕ Quitar
                             </button>
                         )}
                     </div>
