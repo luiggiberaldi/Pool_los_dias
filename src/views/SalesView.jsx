@@ -4,6 +4,7 @@ import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useTablesStore } from '../hooks/store/useTablesStore';
+import { calculateGrandTotalBs } from '../utils/tableBillingEngine';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -437,8 +438,8 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
             {tableCheckoutData && showTablePayment && (
                 <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
-                    cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={tableCheckoutData.grandTotal * effectiveRate}
-                    cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={tableCheckoutData.grandTotal * effectiveRate}
+                    cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate)}
+                    cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate)}
                     discountData={{ active: false, amountUsd: 0, amountBs: 0 }} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}

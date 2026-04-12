@@ -6,6 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
+import { calculateGrandTotalBs } from '../utils/tableBillingEngine';
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -106,7 +107,7 @@ export function useSalesCheckout({
         const opts = {
             cart: syntheticCart,
             cartTotalUsd: tableCheckoutData.grandTotal,
-            cartTotalBs: tableCheckoutData.grandTotal * effectiveRate,
+            cartTotalBs: calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate),
             cartSubtotalUsd: tableCheckoutData.grandTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
