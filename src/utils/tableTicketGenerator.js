@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
-import { calculateGrandTotalBs, calculateTimeCostBs } from './tableBillingEngine';
+import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown } from './tableBillingEngine';
 import { round2 } from './dinero';
 
 /**
@@ -36,14 +36,16 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const CX = WIDTH / 2;
     const RIGHT = WIDTH - M;
 
-    // Calcular datos de pagos previos
+    // Calcular datos de pagos previos — modo mixto aware
     const isPina = session.game_mode === 'PINA';
-    const totalRounds = isPina ? 1 + (Number(session.extended_times) || 0) : 0;
-    const totalHours = !isPina ? (Number(session.hours_paid) || 0) : 0;
+    const pinaCount = isPina ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+    const hasPinas = isPina || pinaCount > 0;
+    const totalHours = Number(session.hours_paid) || 0;
+    const hasHours = totalHours > 0;
     const hasPaidBefore = roundsOffset > 0 || hoursOffset > 0;
 
     const itemCount = currentItems?.length || 0;
-    const H = 100 + (itemCount * 18) + (hasPaidBefore ? 16 : 0);
+    const H = 100 + (itemCount * 18) + (hasPaidBefore ? 16 : 0) + (hasPinas && hasHours ? 30 : 0);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
     const INK = [33, 37, 41];
@@ -94,10 +96,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     dash(y);
     y += 6;
 
-    // TIEMPO / PARTIDAS
-    if (isPina) {
+    // PIÑAS — show if session has piñas (any mode)
+    if (hasPinas) {
         const pricePerPina = config?.pricePina || 0;
-        const fullCost = round2(totalRounds * pricePerPina);
+        const fullCost = round2(pinaCount * pricePerPina);
         const paidCost = round2(roundsOffset * pricePerPina);
 
         doc.setFont('helvetica', 'bold');
@@ -106,10 +108,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         doc.setFont('helvetica', 'normal');
 
         // Total line
-        doc.text(`${totalRounds} piña${totalRounds !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, M, y);
+        doc.text(`${pinaCount} piña${pinaCount !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, M, y);
         doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
         y += 4;
-        const fullBs = config ? calculateTimeCostBs(fullCost, session?.game_mode, config, tasaUSD) : (fullCost * (tasaUSD || 1));
+        const fullBs = config ? calculateTimeCostBs(fullCost, 'PINA', config, tasaUSD) : (fullCost * (tasaUSD || 1));
         doc.setFontSize(7);
         doc.setTextColor(...PAID_CLR);
         doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
@@ -126,10 +128,12 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
             y += 5;
         }
         y += 1;
-    } else if (timeCost > 0 || hoursOffset > 0) {
+    }
+
+    // HORAS — show if session has hours paid (any mode)
+    if (hasHours) {
         const pricePerHour = config?.pricePerHour || 0;
-        const fullHours = totalHours;
-        const fullCost = round2(fullHours * pricePerHour);
+        const fullCost = round2(totalHours * pricePerHour);
         const paidCost = round2(hoursOffset * pricePerHour);
 
         doc.setFont('helvetica', 'bold');
@@ -138,10 +142,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         doc.setFont('helvetica', 'normal');
 
         // Total line
-        doc.text(`${fullHours}h x $${pricePerHour.toFixed(2)}`, M, y);
+        doc.text(`${totalHours}h x $${pricePerHour.toFixed(2)}`, M, y);
         doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
         y += 4;
-        const fullBs = config ? calculateTimeCostBs(fullCost, session?.game_mode, config, tasaUSD) : (fullCost * (tasaUSD || 1));
+        const fullBs = config ? calculateTimeCostBs(fullCost, 'NORMAL', config, tasaUSD) : (fullCost * (tasaUSD || 1));
         doc.setFontSize(7);
         doc.setTextColor(...PAID_CLR);
         doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
@@ -193,7 +197,8 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     y += 6;
 
     doc.setFontSize(8);
-    doc.text(`Ref: BS. ${config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
+    const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
+    doc.text(`Ref: BS. ${config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
 
     y += 8;
     doc.setFont('helvetica', 'normal');

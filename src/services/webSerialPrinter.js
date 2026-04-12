@@ -238,32 +238,36 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     p.line('-', W);
 
     const isPina = session.game_mode === 'PINA';
-    const totalRounds = isPina ? 1 + (Number(session.extended_times) || 0) : 0;
-    const totalHours = !isPina ? (Number(session.hours_paid) || 0) : 0;
+    const pinaCount = isPina ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+    const hasPinas = isPina || pinaCount > 0;
+    const totalHours = Number(session.hours_paid) || 0;
+    const hasHours = totalHours > 0;
     const hasPaidBefore = roundsOffset > 0 || hoursOffset > 0;
 
-    if (isPina) {
+    if (hasPinas) {
         const pricePerPina = config?.pricePina || 0;
-        const fullCost = round2(totalRounds * pricePerPina);
+        const fullCost = round2(pinaCount * pricePerPina);
         const paidCost = round2(roundsOffset * pricePerPina);
 
         p.bold(true).text('Partidas (La Pina)').newline().bold(false);
-        p.row(`${totalRounds} pina${totalRounds !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
-        const fullBs = calculateTimeCostBs(fullCost, session?.game_mode, config || {}, tasaUSD);
+        p.row(`${pinaCount} pina${pinaCount !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+        const fullBs = calculateTimeCostBs(fullCost, 'PINA', config || {}, tasaUSD);
         p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
 
         if (roundsOffset > 0) {
             p.row(`Pagado (${roundsOffset} pina${roundsOffset !== 1 ? 's' : ''})`, `-$${paidCost.toFixed(2)}`, W);
         }
         p.newline();
-    } else if (timeCost > 0 || hoursOffset > 0) {
+    }
+
+    if (hasHours) {
         const pricePerHour = config?.pricePerHour || 0;
         const fullCost = round2(totalHours * pricePerHour);
         const paidCost = round2(hoursOffset * pricePerHour);
 
         p.bold(true).text('Tiempo de Mesa').newline().bold(false);
         p.row(`${totalHours}h x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
-        const fullBs = calculateTimeCostBs(fullCost, session?.game_mode, config || {}, tasaUSD);
+        const fullBs = calculateTimeCostBs(fullCost, 'NORMAL', config || {}, tasaUSD);
         p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
 
         if (hoursOffset > 0) {

@@ -42,7 +42,9 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
-    const isMixed = breakdown.hasPinas && breakdown.hasHours;
+    // Full breakdown (sin offsets) para mostrar totales completos
+    const fullBreakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
+    const isMixed = fullBreakdown.hasPinas && fullBreakdown.hasHours;
 
     const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown);
 
@@ -51,10 +53,10 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
 
     // Header subtitle
     const headerParts = [];
-    if (breakdown.hasPinas) {
+    if (fullBreakdown.hasPinas) {
         headerParts.push(`${pinaCount} piña(s)`);
     }
-    if (breakdown.hasHours) {
+    if (fullBreakdown.hasHours) {
         headerParts.push(`${formatElapsedTime(elapsed)} de sesión`);
     }
     if (headerParts.length === 0) {
@@ -104,7 +106,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
 
                     {/* Piñas — visible si la sesión tiene piñas */}
-                    {breakdown.hasPinas && breakdown.pinaCost > 0 && (
+                    {fullBreakdown.hasPinas && (
                         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-2xl overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-100 dark:border-amber-900/30">
                                 <TargetIcon size={13} />
@@ -120,15 +122,21 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                     <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePina || 0} por piña</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-base font-black text-slate-800 dark:text-white">${breakdown.pinaCost.toFixed(2)}</p>
-                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(breakdown.pinaCost, 0, config, tasaUSD).pinaCostBs)}</p>
+                                    <p className="text-base font-black text-slate-800 dark:text-white">${fullBreakdown.pinaCost.toFixed(2)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(fullBreakdown.pinaCost, 0, config, tasaUSD).pinaCostBs)}</p>
                                 </div>
                             </div>
+                            {roundsOffset > 0 && (
+                                <div className="flex items-center justify-between px-4 py-2 border-t border-amber-100 dark:border-amber-900/30 bg-amber-100/40 dark:bg-amber-900/20">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Pagado ({roundsOffset} piña{roundsOffset !== 1 ? 's' : ''})</p>
+                                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">-${(roundsOffset * (config.pricePina || 0)).toFixed(2)}</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* Tiempo de sesión — visible si la sesión tiene horas */}
-                    {breakdown.hasHours && breakdown.hourCost > 0 && (
+                    {fullBreakdown.hasHours && (
                         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-blue-100 dark:border-blue-900/30">
                                 <Clock size={13} className="text-blue-500" />
@@ -142,10 +150,16 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                     <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePerHour || 0}/hora · {Number(session.hours_paid) || 0}h pagadas</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-base font-black text-slate-800 dark:text-white">${breakdown.hourCost.toFixed(2)}</p>
-                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(0, breakdown.hourCost, config, tasaUSD).hourCostBs)}</p>
+                                    <p className="text-base font-black text-slate-800 dark:text-white">${fullBreakdown.hourCost.toFixed(2)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(0, fullBreakdown.hourCost, config, tasaUSD).hourCostBs)}</p>
                                 </div>
                             </div>
+                            {hoursOffset > 0 && (
+                                <div className="flex items-center justify-between px-4 py-2 border-t border-blue-100 dark:border-blue-900/30 bg-blue-100/40 dark:bg-blue-900/20">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Pagado ({hoursOffset}h)</p>
+                                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">-${(hoursOffset * (config.pricePerHour || 0)).toFixed(2)}</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -247,7 +261,8 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Total a Cobrar</p>
                             {isMixed && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
-                                    Piñas ${breakdown.pinaCost.toFixed(2)} + Tiempo ${breakdown.hourCost.toFixed(2)}{totalConsumption > 0 ? ` + Consumos $${totalConsumption.toFixed(2)}` : ''}
+                                    Piñas ${fullBreakdown.pinaCost.toFixed(2)} + Tiempo ${fullBreakdown.hourCost.toFixed(2)}{totalConsumption > 0 ? ` + Consumos $${totalConsumption.toFixed(2)}` : ''}
+                                    {(roundsOffset > 0 || hoursOffset > 0) ? ` − Pagado $${(roundsOffset * (config.pricePina || 0) + hoursOffset * (config.pricePerHour || 0)).toFixed(2)}` : ''}
                                 </p>
                             )}
                             {!isMixed && timeCost > 0 && totalConsumption > 0 && (
