@@ -110,7 +110,7 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
     }, [isActive, syncTablesAndSessions]);
 
     const filteredTables = useMemo(() => {
-        return tables.filter(table => {
+        const filtered = tables.filter(table => {
             const session    = activeSessions.find(s => s.table_id === table.id);
             const isOccupied = !!session;
 
@@ -124,7 +124,20 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
 
             return true;
         });
-    }, [tables, activeSessions, typeFilter, statusFilter, ownerFilter, currentUser]);
+
+        // Meseros: sus mesas primero, luego el resto
+        if (isMesero && currentUser?.id) {
+            filtered.sort((a, b) => {
+                const sA = activeSessions.find(s => s.table_id === a.id);
+                const sB = activeSessions.find(s => s.table_id === b.id);
+                const aMine = sA?.opened_by === currentUser.id ? 1 : 0;
+                const bMine = sB?.opened_by === currentUser.id ? 1 : 0;
+                return bMine - aMine;
+            });
+        }
+
+        return filtered;
+    }, [tables, activeSessions, typeFilter, statusFilter, ownerFilter, currentUser, isMesero]);
 
     if (loading) {
         return (
