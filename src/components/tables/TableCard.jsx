@@ -1285,25 +1285,21 @@ export default function TableCard({ table, session }) {
         </Modal>
 
         {/* Modal Modificar Tiempo / Partidas */}
-        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={isMixedMode ? "Añadir Piñas / Tiempo" : hasPinas && !hasHoursActive ? "Añadir Piñas" : "Modificar Tiempo"}>
+        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={isMixedMode ? "Agregar Tiempo" : hasPinas && !hasHoursActive ? "Añadir Piñas" : "Modificar Tiempo"}>
             <div className="flex flex-col gap-4 py-2">
-                {/* Sección Piñas — visible en modo PINA o mixto */}
-                {(hasPinas) && (
-                    <>
-                        {isMixedMode && <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Piñas</span>}
-                        <button
-                            onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }}
-                            className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg"
-                        >
-                            <TargetIcon size={20} /> + 1 Piña
-                        </button>
-                    </>
+                {/* Sección Piñas — solo visible en modo PINA puro (mixto usa botón dedicado "+ Nueva Piña") */}
+                {(hasPinas && !isMixedMode) && (
+                    <button
+                        onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }}
+                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg"
+                    >
+                        <TargetIcon size={20} /> + 1 Piña
+                    </button>
                 )}
 
                 {/* Sección Tiempo — visible si tiene horas (mixto o prepago) */}
                 {hasHoursActive && hasLimit && (
                     <div className="flex flex-col gap-2">
-                        {isMixedMode && <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mt-1">Tiempo</span>}
                         {!isMixedMode && (
                             <p className="text-sm text-slate-500 font-medium leading-relaxed">
                                 Esta mesa tiene un prepago. Puede ajustar el tiempo:
