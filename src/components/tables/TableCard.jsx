@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock } from 'lucide-react';
-import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
+import { calculateElapsedTime, calculateSessionCost, formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
@@ -512,7 +512,7 @@ export default function TableCard({ table, session }) {
         if (!session) return;
         try {
             await generatePartialSessionTicketPDF({
-                table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD
+                table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config
             });
             showToast('Pre-cuenta enviada a la impresora', 'success');
         } catch (err) {
@@ -727,7 +727,7 @@ export default function TableCard({ table, session }) {
                                 </div>
                                 {tasaUSD > 0 && (
                                     <span className="text-[10px] font-semibold text-emerald-200/70 leading-tight">
-                                        Bs. {(grandTotal * tasaUSD).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 )}
                             </div>
@@ -1163,7 +1163,7 @@ export default function TableCard({ table, session }) {
                         </span>
                         <div className="flex flex-col items-end">
                             <span className="text-lg font-black">${timeCost.toFixed(2)}</span>
-                            <span className="text-xs font-medium text-slate-400">Bs. {(timeCost * tasaUSD).toFixed(2)}</span>
+                            <span className="text-xs font-medium text-slate-400">Bs. {calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD).toFixed(2)}</span>
                         </div>
                     </div>
                     <span className="text-xs text-slate-500">
@@ -1205,14 +1205,14 @@ export default function TableCard({ table, session }) {
                 <div className="flex justify-between items-center mt-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
                     <div className="flex flex-col">
                         <span className="text-sm font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Total Cuenta</span>
-                        <span className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa: Bs. {Number(tasaUSD).toFixed(2)}</span>
+                        <span className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa BCV: Bs. {Number(tasaUSD).toFixed(2)}</span>
                     </div>
                     <div className="flex flex-col items-end">
                         <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none mb-1">
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {(grandTotal * tasaUSD).toFixed(2)}
+                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toFixed(2)}
                         </span>
                     </div>
                 </div>

@@ -212,7 +212,7 @@ export async function openCashDrawerWebSerial() {
  * Se usa en lugar del PDF+iframe para evitar que la impresora térmica
  * abra el cajón al recibir un trabajo de impresión del sistema.
  */
-export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD }) {
+export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config }) {
     const port = await getConnectedPrinter();
     if (!port) return false;
 
@@ -261,7 +261,21 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     p.text(`$${grandTotal.toFixed(2)}`).newline();
     p.bold(false);
     if (tasaUSD && tasaUSD > 1) {
-        p.text(`Ref: Bs. ${(grandTotal * tasaUSD).toFixed(2)}`).newline();
+        // Calcular Bs con tasa implícita si hay config de precios Bs
+        let totalBs;
+        if (config && timeCost > 0) {
+            const gameMode = session?.game_mode;
+            const priceBs = gameMode === 'PINA' ? (config.pricePinaBs || 0) : (config.pricePerHourBs || 0);
+            const priceUsd = gameMode === 'PINA' ? (config.pricePina || 0) : (config.pricePerHour || 0);
+            const timeBs = (priceBs > 0 && priceUsd > 0)
+                ? Math.round(timeCost * (priceBs / priceUsd) * 100) / 100
+                : timeCost * tasaUSD;
+            const consumoBs = (grandTotal - timeCost) * tasaUSD;
+            totalBs = Math.round((timeBs + consumoBs) * 100) / 100;
+        } else {
+            totalBs = Math.round(grandTotal * tasaUSD * 100) / 100;
+        }
+        p.text(`Ref: Bs. ${totalBs.toFixed(2)}`).newline();
     }
     p.newline();
     p.align(1).text('*** NO ES RECIBO DE PAGO ***').newline();

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Clock, Coffee, Layers, ChevronRight, Timer } from 'lucide-react';
-import { formatElapsedTime } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { useTablesStore } from '../../hooks/store/useTablesStore';
 
 function formatBs(val) {
     return (val || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -25,8 +26,9 @@ function useBcvRate() {
  */
 export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const { table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal } = data;
+    const config = useTablesStore(state => state.config);
     const tasaUSD = useBcvRate();
-    const grandTotalBs = grandTotal * tasaUSD;
+    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD);
 
     return (
         <div
@@ -81,7 +83,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-base font-black text-slate-800 dark:text-white">${timeCost.toFixed(2)}</p>
-                                    <p className="text-[10px] text-slate-400">Bs {formatBs(timeCost * tasaUSD)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD))}</p>
                                 </div>
                             </div>
                         </div>
@@ -131,7 +133,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-base font-black text-slate-800 dark:text-white">${timeCost.toFixed(2)}</p>
-                                    <p className="text-[10px] text-slate-400">Bs {formatBs(timeCost * tasaUSD)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD))}</p>
                                 </div>
                             </div>
                         </div>

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
+import { calculateGrandTotalBs } from './tableBillingEngine';
 
 /**
  * Genera e imprime una pre-cuenta para mesa de pool.
@@ -7,7 +8,7 @@ import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialP
  *   SIN abrir el cajón de dinero (el cajón solo debe abrirse en ventas exitosas).
  * - Sin impresora térmica: genera PDF via jsPDF + iframe.
  */
-export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD }) {
+export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config }) {
     // Intentar ESC/POS directo si hay impresora configurada o puerto disponible.
     // Esto evita pasar por el driver de Windows que abre el cajón automáticamente.
     const cfg = getWebSerialConfig();
@@ -16,7 +17,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         // Impresora térmica configurada: SIEMPRE usar ESC/POS directo.
         // NO hacer fallback a PDF — el driver de Windows abre el cajón en cada trabajo de impresión.
         try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config });
             if (printed) return;
             // Si returned false (sin puerto), mostrar instrucción al usuario
             throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
@@ -28,7 +29,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const tryEscPos = 'serial' in navigator;
     if (tryEscPos) {
         try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD });
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config });
             if (printed) return;
         } catch (err) {
             console.warn('[PreCuenta] ESC/POS falló, usando fallback PDF:', err.message);
@@ -127,7 +128,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     y += 6;
 
     doc.setFontSize(8);
-    doc.text(`Ref: BS. ${(grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
+    doc.text(`Ref: BS. ${config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
 
     y += 8;
     doc.setFont('helvetica', 'normal');

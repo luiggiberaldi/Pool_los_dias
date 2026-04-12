@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle, Search, Clock, Trophy, ArrowLeftRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Layers, Check, Plus, Trash2, Edit2, X, DollarSign, AlertTriangle, Search, Clock, Trophy } from 'lucide-react';
 import { SectionCard } from '../../SettingsShared';
 import { useTablesStore } from '../../../hooks/store/useTablesStore';
-import { mulR, divR } from '../../../utils/dinero';
 
 function useBcvRate() {
     const getEffectiveRate = () => {
@@ -28,67 +27,36 @@ function useBcvRate() {
 export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const { config, updateConfig, tables, activeSessions, addTable, updateTable, deleteTable } = useTablesStore();
     const bcvRate = useBcvRate();
-    
+
     // Config State — synced from store config
     const [pricePerHour, setPricePerHour] = useState(config?.pricePerHour || 0);
     const [pricePina, setPricePina] = useState(config?.pricePina || 0);
-    // Bs state for bidirectional inputs
-    const [pricePerHourBs, setPricePerHourBs] = useState(() =>
-        bcvRate > 0 && config?.pricePerHour ? String(mulR(config.pricePerHour, bcvRate)) : ''
-    );
-    const [pricePinaBs, setPricePinaBs] = useState(() =>
-        bcvRate > 0 && config?.pricePina ? String(mulR(config.pricePina, bcvRate)) : ''
-    );
-    // Track which field the user is actively editing to avoid overwriting
-    const editingRef = useRef(null);
+    // Bs prices — independent, not auto-converted
+    const [pricePerHourBs, setPricePerHourBs] = useState(config?.pricePerHourBs || '');
+    const [pricePinaBs, setPricePinaBs] = useState(config?.pricePinaBs || '');
 
-    // Bidirectional handlers
-    const handleHourUsdChange = (val) => {
-        editingRef.current = 'hourUsd';
-        setPricePerHour(val);
-        if (!val || parseFloat(val) <= 0) { setPricePerHourBs(''); return; }
-        if (bcvRate > 0) setPricePerHourBs(String(mulR(parseFloat(val), bcvRate)));
-    };
-    const handleHourBsChange = (val) => {
-        editingRef.current = 'hourBs';
-        setPricePerHourBs(val);
-        if (!val || parseFloat(val) <= 0) { setPricePerHour(''); return; }
-        if (bcvRate > 0) setPricePerHour(String(divR(parseFloat(val), bcvRate)));
-    };
-    const handlePinaUsdChange = (val) => {
-        editingRef.current = 'pinaUsd';
-        setPricePina(val);
-        if (!val || parseFloat(val) <= 0) { setPricePinaBs(''); return; }
-        if (bcvRate > 0) setPricePinaBs(String(mulR(parseFloat(val), bcvRate)));
-    };
-    const handlePinaBsChange = (val) => {
-        editingRef.current = 'pinaBs';
-        setPricePinaBs(val);
-        if (!val || parseFloat(val) <= 0) { setPricePina(''); return; }
-        if (bcvRate > 0) setPricePina(String(divR(parseFloat(val), bcvRate)));
-    };
+    // Implied rates (informational)
+    const impliedRateHour = (parseFloat(pricePerHourBs) > 0 && parseFloat(pricePerHour) > 0)
+        ? (parseFloat(pricePerHourBs) / parseFloat(pricePerHour)).toFixed(2)
+        : null;
+    const impliedRatePina = (parseFloat(pricePinaBs) > 0 && parseFloat(pricePina) > 0)
+        ? (parseFloat(pricePinaBs) / parseFloat(pricePina)).toFixed(2)
+        : null;
 
     // Sync local state when external config changes (e.g., from another tab/device)
     const configPricePerHour = config?.pricePerHour;
     const configPricePina = config?.pricePina;
+    const configPricePerHourBs = config?.pricePerHourBs;
+    const configPricePinaBs = config?.pricePinaBs;
     useEffect(() => {
         const raf = requestAnimationFrame(() => {
-            if (configPricePerHour != null) {
-                setPricePerHour(configPricePerHour);
-                if (bcvRate > 0 && editingRef.current !== 'hourBs') {
-                    setPricePerHourBs(String(mulR(configPricePerHour, bcvRate)));
-                }
-            }
-            if (configPricePina != null) {
-                setPricePina(configPricePina);
-                if (bcvRate > 0 && editingRef.current !== 'pinaBs') {
-                    setPricePinaBs(String(mulR(configPricePina, bcvRate)));
-                }
-            }
-            editingRef.current = null;
+            if (configPricePerHour != null) setPricePerHour(configPricePerHour);
+            if (configPricePina != null) setPricePina(configPricePina);
+            if (configPricePerHourBs != null) setPricePerHourBs(configPricePerHourBs || '');
+            if (configPricePinaBs != null) setPricePinaBs(configPricePinaBs || '');
         });
         return () => cancelAnimationFrame(raf);
-    }, [configPricePerHour, configPricePina]);
+    }, [configPricePerHour, configPricePina, configPricePerHourBs, configPricePinaBs]);
 
     // Form State for adding new tables
     const [tableName, setTableName] = useState(() => {
@@ -145,7 +113,9 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const handleSaveConfig = async () => {
         await updateConfig({
             pricePerHour: parseFloat(pricePerHour) || 0,
-            pricePina: parseFloat(pricePina) || 0
+            pricePerHourBs: parseFloat(pricePerHourBs) || 0,
+            pricePina: parseFloat(pricePina) || 0,
+            pricePinaBs: parseFloat(pricePinaBs) || 0,
         });
         showToast('Tarifas guardadas', 'success');
         triggerHaptic?.('light');
@@ -235,12 +205,13 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
         <div className="space-y-6">
             {/* Tarifas */}
             <div data-tour="settings-mesas-rates">
-            <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Aplica globalmente para Mesas de Pool" iconColor="text-emerald-500">
-                {/* BCV Rate Badge */}
+            <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Precio en $ y Bs por separado" iconColor="text-emerald-500">
+                {/* BCV Reference */}
                 {bcvRate > 0 && (
                     <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <ArrowLeftRight size={13} className="text-slate-400 shrink-0" />
+                        <DollarSign size={13} className="text-slate-400 shrink-0" />
                         <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Tasa BCV: <span className="text-emerald-600 dark:text-emerald-400">{bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span></span>
+                        <span className="text-[10px] text-slate-400 ml-auto">(referencia)</span>
                     </div>
                 )}
 
@@ -261,50 +232,55 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                     <input
                                         type="number"
                                         value={pricePerHour}
-                                        onChange={e => handleHourUsdChange(e.target.value)}
+                                        onChange={e => setPricePerHour(e.target.value)}
                                         onWheel={e => e.target.blur()}
                                         className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-sky-500/30 transition-all dark:text-white"
                                     />
                                 </div>
                             </div>
-                            {bcvRate > 0 && (
-                                <>
-                                    <ArrowLeftRight size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
-                                    <div className="flex-1">
-                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Bolívares</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
-                                            <input
-                                                type="number"
-                                                value={pricePerHourBs}
-                                                onChange={e => handleHourBsChange(e.target.value)}
-                                                onWheel={e => e.target.blur()}
-                                                className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
+                            <Plus size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
+                            <div className="flex-1">
+                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bol\u00edvares</label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        value={pricePerHourBs}
+                                        onChange={e => setPricePerHourBs(e.target.value)}
+                                        onWheel={e => e.target.blur()}
+                                        placeholder="0"
+                                        className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        {/* Implied rate + price per minute */}
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold text-slate-400">
+                            {pricePerHour > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <Clock size={10} /> ${(parseFloat(pricePerHour) / 60).toFixed(4)}/min
+                                </span>
+                            )}
+                            {impliedRateHour && (
+                                <span className={`px-1.5 py-0.5 rounded-full ${
+                                    Math.abs(parseFloat(impliedRateHour) - bcvRate) / bcvRate < 0.1
+                                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                        : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                                }`}>
+                                    Tasa: {parseFloat(impliedRateHour).toLocaleString('es-VE')} Bs/$
+                                    {bcvRate > 0 && <span className="opacity-60"> (BCV: {bcvRate.toLocaleString('es-VE')})</span>}
+                                </span>
                             )}
                         </div>
-                        {/* Price per minute preview */}
-                        {pricePerHour > 0 && (
-                            <div className="mt-2 text-[10px] font-bold text-slate-400 flex items-center gap-1.5">
-                                <Clock size={10} />
-                                ${(parseFloat(pricePerHour) / 60).toFixed(4)}/min
-                                {bcvRate > 0 && pricePerHourBs && (
-                                    <span className="text-emerald-500">· Bs {(parseFloat(pricePerHourBs) / 60).toFixed(2)}/min</span>
-                                )}
-                            </div>
-                        )}
                     </div>
 
-                    {/* La Piña Block */}
+                    {/* La Pi\u00f1a Block */}
                     <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-3">
                             <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                                 <Trophy size={14} className="text-amber-600 dark:text-amber-400" />
                             </div>
-                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">La Piña</span>
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">La Pi\u00f1a</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex-1">
@@ -314,31 +290,41 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                     <input
                                         type="number"
                                         value={pricePina}
-                                        onChange={e => handlePinaUsdChange(e.target.value)}
+                                        onChange={e => setPricePina(e.target.value)}
                                         onWheel={e => e.target.blur()}
                                         className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-amber-500/30 transition-all dark:text-white"
                                     />
                                 </div>
                             </div>
-                            {bcvRate > 0 && (
-                                <>
-                                    <ArrowLeftRight size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
-                                    <div className="flex-1">
-                                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Bolívares</label>
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
-                                            <input
-                                                type="number"
-                                                value={pricePinaBs}
-                                                onChange={e => handlePinaBsChange(e.target.value)}
-                                                onWheel={e => e.target.blur()}
-                                                className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                            <Plus size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
+                            <div className="flex-1">
+                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bol\u00edvares</label>
+                                <div className="relative">
+                                    <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
+                                    <input
+                                        type="number"
+                                        value={pricePinaBs}
+                                        onChange={e => setPricePinaBs(e.target.value)}
+                                        onWheel={e => e.target.blur()}
+                                        placeholder="0"
+                                        className="w-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/30 transition-all text-emerald-700 dark:text-emerald-300"
+                                    />
+                                </div>
+                            </div>
                         </div>
+                        {/* Implied rate for Pi\u00f1a */}
+                        {impliedRatePina && (
+                            <div className="mt-2 text-[10px] font-bold">
+                                <span className={`px-1.5 py-0.5 rounded-full ${
+                                    Math.abs(parseFloat(impliedRatePina) - bcvRate) / bcvRate < 0.1
+                                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                        : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                                }`}>
+                                    Tasa: {parseFloat(impliedRatePina).toLocaleString('es-VE')} Bs/$
+                                    {bcvRate > 0 && <span className="opacity-60"> (BCV: {bcvRate.toLocaleString('es-VE')})</span>}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 

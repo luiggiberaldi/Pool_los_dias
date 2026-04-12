@@ -41,7 +41,9 @@ export const useTablesStore = create((set, get) => ({
 
     config: {
         pricePerHour: 5,
-        pricePina: 2
+        pricePerHourBs: 0,
+        pricePina: 2,
+        pricePinaBs: 0,
     },
 
     init: async () => {
@@ -137,11 +139,22 @@ export const useTablesStore = create((set, get) => ({
         await tablesCache.setItem(scopedKey('pool_config'), merged);
 
         try {
-            await supabaseCloud.from('pool_config').update({
+            // Intentar actualizar con los nuevos campos Bs
+            const { error } = await supabaseCloud.from('pool_config').update({
                 price_per_hour: merged.pricePerHour,
+                price_per_hour_bs: merged.pricePerHourBs || 0,
                 price_pina: merged.pricePina,
+                price_pina_bs: merged.pricePinaBs || 0,
                 updated_at: new Date().toISOString()
             }).eq('id', 1);
+            // Si falla por columnas nuevas, reintentar sin ellas
+            if (error && error.message?.includes('column')) {
+                await supabaseCloud.from('pool_config').update({
+                    price_per_hour: merged.pricePerHour,
+                    price_pina: merged.pricePina,
+                    updated_at: new Date().toISOString()
+                }).eq('id', 1);
+            }
         } catch (e) {
             console.error('Error updating config in cloud', e);
         }
@@ -183,7 +196,9 @@ export const useTablesStore = create((set, get) => ({
             if (!configError && configData) {
                 const cloudConfig = {
                     pricePerHour: Number(configData.price_per_hour) || get().config.pricePerHour,
-                    pricePina: Number(configData.price_pina) || get().config.pricePina
+                    pricePerHourBs: Number(configData.price_per_hour_bs) || get().config.pricePerHourBs || 0,
+                    pricePina: Number(configData.price_pina) || get().config.pricePina,
+                    pricePinaBs: Number(configData.price_pina_bs) || get().config.pricePinaBs || 0,
                 };
                 set({ config: cloudConfig });
                 await tablesCache.setItem(scopedKey('pool_config'), cloudConfig);

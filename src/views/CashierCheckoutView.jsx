@@ -4,7 +4,7 @@ import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
 import { useCustomersStore } from '../hooks/store/useCustomersStore';
-import { calculateSessionCost, calculateElapsedTime } from '../utils/tableBillingEngine';
+import { calculateSessionCost, calculateElapsedTime, calculateGrandTotalBs } from '../utils/tableBillingEngine';
 import { Modal } from '../components/Modal';
 import { useConfirm } from '../hooks/useConfirm.jsx';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
@@ -340,7 +340,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
-                cartTotalBs: round2(mulR(grandTotal, rates)),
+                cartTotalBs: calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates),
                 cartSubtotalUsd: grandTotal,
                 payments: paymentPayload,
                 changeBreakdown: { changeUsdGiven: changeUSD, changeBsGiven: changeBs },
@@ -489,14 +489,14 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 <div className="flex justify-between items-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
                     <div className="flex flex-col">
                         <span className="text-xs font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">Total a pagar</span>
-                        <span className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa: Bs. {Number(rates).toFixed(2)}</span>
+                        <span className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa BCV: Bs. {Number(rates).toFixed(2)}</span>
                     </div>
                     <div className="flex flex-col items-end">
                         <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 leading-none mb-1">
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {mulR(grandTotal, rates).toFixed(2)}
+                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates).toFixed(2)}
                         </span>
                     </div>
                 </div>
@@ -533,7 +533,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                                     ${divR(grandTotal, splitPeople).toFixed(2)}
                                 </span>
                                 <span className="text-xs font-bold text-violet-600/70 dark:text-violet-400/70 mt-0.5">
-                                    Bs. {mulR(divR(grandTotal, splitPeople), rates).toFixed(2)}
+                                    Bs. {divR(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates), splitPeople).toFixed(2)}
                                 </span>
                             </div>
                         </div>

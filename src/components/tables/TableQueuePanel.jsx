@@ -3,7 +3,7 @@ import { CreditCard, Clock, X, ChevronRight, Coffee, Timer } from 'lucide-react'
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { formatElapsedTime, calculateElapsedTime, calculateSessionCost } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 
 /**
  * Panel shown in SalesView (cashier) listing all tables that have requested checkout.
@@ -97,7 +97,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                             {/* Total */}
                             <div className="text-right shrink-0">
                                 <p className="font-black text-orange-600 dark:text-orange-400 text-base">${grandTotal.toFixed(2)}</p>
-                                <p className="text-[10px] text-slate-400">Bs {(grandTotal * tasaUSD).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-[10px] text-slate-400">Bs {calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, tasaUSD).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
                             </div>
 
                             <ChevronRight size={18} className="text-orange-400 shrink-0" />
