@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTablesStore } from '../hooks/store/useTablesStore';
+import { useAuthStore } from '../hooks/store/authStore';
 import TableCard from '../components/tables/TableCard';
-import { Layers } from 'lucide-react';
+import { Layers, PauseCircle, PlayCircle } from 'lucide-react';
+import { calculateElapsedTime } from '../utils/tableBillingEngine';
+import { showToast } from '../components/Toast';
 
 const TYPE_FILTERS   = ['Todas', 'Pool', 'Bar'];
 const STATUS_FILTERS = ['Todas', 'Libres', 'Ocupadas'];
@@ -23,9 +26,79 @@ function FilterPill({ label, active, onClick }) {
 
 export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) {
     const { tables, activeSessions, loading, syncTablesAndSessions } = useTablesStore();
+    const { role } = useAuthStore();
+    const isAdmin = role === 'ADMIN';
 
     const [typeFilter,   setTypeFilter]   = useState('Todas');
     const [statusFilter, setStatusFilter] = useState('Todas');
+
+    // Detectar si hay alguna sesión pausada (para el botón global)
+    const pausableSessions = useMemo(() =>
+        activeSessions.filter(s => s.game_mode !== 'PINA'),
+        [activeSessions]
+    );
+    const [anyPaused, setAnyPaused] = useState(false);
+
+    // Verificar estado de pausa al montar y cuando cambian sesiones
+    useEffect(() => {
+        const checkPauses = () => {
+            const hasPaused = pausableSessions.some(s => {
+                try {
+                    const data = JSON.parse(localStorage.getItem(`table_pause_${s.id}`));
+                    return data?.isPaused === true;
+                } catch { return false; }
+            });
+            setAnyPaused(hasPaused);
+        };
+        checkPauses();
+        // Escuchar cambios de pausa desde las TableCards individuales
+        window.addEventListener('storage', checkPauses);
+        const interval = setInterval(checkPauses, 1000);
+        return () => {
+            window.removeEventListener('storage', checkPauses);
+            clearInterval(interval);
+        };
+    }, [pausableSessions]);
+
+    const handlePauseAll = () => {
+        let count = 0;
+        pausableSessions.forEach(s => {
+            const key = `table_pause_${s.id}`;
+            try {
+                const existing = JSON.parse(localStorage.getItem(key));
+                if (existing?.isPaused) return; // ya pausada
+            } catch {}
+            const currentElapsed = calculateElapsedTime(s.started_at);
+            localStorage.setItem(key, JSON.stringify({ isPaused: true, elapsedAtPause: currentElapsed }));
+            count++;
+        });
+        setAnyPaused(true);
+        // Forzar re-render de las TableCards
+        window.dispatchEvent(new StorageEvent('storage', { key: 'global_pause_trigger' }));
+        showToast(`${count} mesa${count !== 1 ? 's' : ''} pausada${count !== 1 ? 's' : ''}`, 'success');
+    };
+
+    const handleResumeAll = () => {
+        let count = 0;
+        pausableSessions.forEach(s => {
+            const key = `table_pause_${s.id}`;
+            try {
+                const saved = JSON.parse(localStorage.getItem(key));
+                if (!saved?.isPaused) return;
+                // Compensar tiempo de pausa ajustando started_at
+                const currentElapsed = calculateElapsedTime(s.started_at);
+                const pausedMinutes = currentElapsed - saved.elapsedAtPause;
+                const newStartedAt = new Date(new Date(s.started_at).getTime() + pausedMinutes * 60000).toISOString();
+                // Actualizar sesión en store
+                useTablesStore.getState().updateSessionTime(s.id, newStartedAt);
+            } catch {}
+            localStorage.removeItem(key);
+            count++;
+        });
+        setAnyPaused(false);
+        window.dispatchEvent(new StorageEvent('storage', { key: 'global_pause_trigger' }));
+        showToast(`${count} mesa${count !== 1 ? 's' : ''} reanudada${count !== 1 ? 's' : ''}`, 'success');
+    };
 
     useEffect(() => {
         if (isActive) {
@@ -76,6 +149,20 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
                             {filteredTables.length} mesa{filteredTables.length !== 1 ? 's' : ''} mostrada{filteredTables.length !== 1 ? 's' : ''}
                         </p>
                     </div>
+                    {/* Botón pausa general de emergencia — solo admin, solo si hay sesiones activas */}
+                    {isAdmin && pausableSessions.length > 0 && (
+                        <button
+                            onClick={anyPaused ? handleResumeAll : handlePauseAll}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs transition-all active:scale-95 shadow-sm ${
+                                anyPaused
+                                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
+                                    : 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20'
+                            }`}
+                        >
+                            {anyPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
+                            {anyPaused ? 'Reanudar Todas' : 'Pausar Todas'}
+                        </button>
+                    )}
                 </div>
 
                 {/* Filter rows */}

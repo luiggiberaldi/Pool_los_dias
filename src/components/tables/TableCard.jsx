@@ -364,6 +364,25 @@ export default function TableCard({ table, session }) {
         catch { return 0; }
     });
 
+    // Escuchar pausa/reanudación global desde TablesView
+    useEffect(() => {
+        const handleGlobalPause = () => {
+            if (!pauseKey) return;
+            try {
+                const data = JSON.parse(localStorage.getItem(pauseKey));
+                if (data?.isPaused && !isPaused) {
+                    setIsPaused(true);
+                    setPauseElapsed(data.elapsedAtPause);
+                    setElapsed(data.elapsedAtPause);
+                } else if (!data && isPaused) {
+                    setIsPaused(false);
+                }
+            } catch {}
+        };
+        window.addEventListener('storage', handleGlobalPause);
+        return () => window.removeEventListener('storage', handleGlobalPause);
+    }, [pauseKey, isPaused]);
+
     useEffect(() => {
         let interval;
         if (isPlaying && session?.started_at && !isPaused) {
@@ -653,15 +672,15 @@ export default function TableCard({ table, session }) {
                                                 <span className="text-lg font-black leading-none">+</span>
                                             </button>
                                             )}
-                                            {/* Pausa — solo en hora libre (sin límite de tiempo prepago) */}
-                                            {!hasLimit && (
-                                                <button
-                                                    onClick={isPaused ? handleResumeTimer : handlePauseTimer}
-                                                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
-                                                    title={isPaused ? 'Reanudar tiempo' : 'Pausar tiempo'}
-                                                >
-                                                    {isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} />}
-                                                </button>
+                                            {/* Pausa — disponible en prepago y hora libre, NO en piña */}
+                                            {session?.game_mode !== 'PINA' && (
+                                            <button
+                                                onClick={isPaused ? handleResumeTimer : handlePauseTimer}
+                                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
+                                                title={isPaused ? 'Reanudar tiempo' : 'Pausar tiempo'}
+                                            >
+                                                {isPaused ? <Play size={12} fill="currentColor" /> : <Pause size={12} />}
+                                            </button>
                                             )}
                                         </div>
                                         {hasLimit && (
