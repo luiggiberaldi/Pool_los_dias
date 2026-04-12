@@ -51,7 +51,14 @@ export const useTablesStore = create((set, get) => ({
         try {
             // 1. Cargar config
             const cachedConfig = await tablesCache.getItem(scopedKey('pool_config'));
-            if (cachedConfig) set({ config: cachedConfig });
+            if (cachedConfig) {
+                // Enriquecer con precios Bs de localStorage (cloud sync)
+                const lsHourBs = parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+                const lsPinaBs = parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
+                if (lsHourBs > 0 && !cachedConfig.pricePerHourBs) cachedConfig.pricePerHourBs = lsHourBs;
+                if (lsPinaBs > 0 && !cachedConfig.pricePinaBs) cachedConfig.pricePinaBs = lsPinaBs;
+                set({ config: cachedConfig });
+            }
 
             // 2. Cargar cache local (Lo que quedó guardado al irse la luz)
             const cachedTables = await tablesCache.getItem(scopedKey('tables')) || [];
@@ -138,6 +145,10 @@ export const useTablesStore = create((set, get) => ({
         set({ config: merged });
         await tablesCache.setItem(scopedKey('pool_config'), merged);
 
+        // Guardar precios Bs en localStorage para cloud sync cross-device
+        if (merged.pricePerHourBs != null) localStorage.setItem('pool_price_per_hour_bs', String(merged.pricePerHourBs));
+        if (merged.pricePinaBs != null) localStorage.setItem('pool_price_pina_bs', String(merged.pricePinaBs));
+
         try {
             // Intentar actualizar con los nuevos campos Bs
             const { error } = await supabaseCloud.from('pool_config').update({
@@ -194,11 +205,14 @@ export const useTablesStore = create((set, get) => ({
             const { data: configData, error: configError } = await configQuery.maybeSingle();
 
             if (!configError && configData) {
+                // Leer precios Bs de localStorage (cloud sync) como fallback
+                const lsHourBs = parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+                const lsPinaBs = parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
                 const cloudConfig = {
                     pricePerHour: Number(configData.price_per_hour) || get().config.pricePerHour,
-                    pricePerHourBs: Number(configData.price_per_hour_bs) || get().config.pricePerHourBs || 0,
+                    pricePerHourBs: Number(configData.price_per_hour_bs) || lsHourBs || get().config.pricePerHourBs || 0,
                     pricePina: Number(configData.price_pina) || get().config.pricePina,
-                    pricePinaBs: Number(configData.price_pina_bs) || get().config.pricePinaBs || 0,
+                    pricePinaBs: Number(configData.price_pina_bs) || lsPinaBs || get().config.pricePinaBs || 0,
                 };
                 set({ config: cloudConfig });
                 await tablesCache.setItem(scopedKey('pool_config'), cloudConfig);

@@ -22,6 +22,9 @@ const SYNC_KEYS = [
     'cajero_puede_abrir_caja',
     'cajero_puede_cerrar_caja',
     'max_discount_cajero',
+    // ── Precios Bs independientes para mesas ──
+    'pool_price_per_hour_bs',
+    'pool_price_pina_bs',
 ];
 
 // Clave para rastrear el último pull exitoso (evita re-descargar datos sin cambios)
