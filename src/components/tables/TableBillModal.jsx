@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 
 function formatBs(val) {
@@ -147,7 +147,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             <div className="flex items-center justify-between px-4 py-3">
                                 <div>
                                     <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePerHour || 0}/hora · {Number(session.hours_paid) || 0}h pagadas</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePerHour || 0}/hora · {formatHoursPaid(Number(session.hours_paid) || 0)} pagadas</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-base font-black text-slate-800 dark:text-white">${fullBreakdown.hourCost.toFixed(2)}</p>
@@ -156,7 +156,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             </div>
                             {hoursOffset > 0 && (
                                 <div className="flex items-center justify-between px-4 py-2 border-t border-blue-100 dark:border-blue-900/30 bg-blue-100/40 dark:bg-blue-900/20">
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Pagado ({hoursOffset}h)</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Pagado ({formatHoursPaid(hoursOffset)})</p>
                                     <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">-${(hoursOffset * (config.pricePerHour || 0)).toFixed(2)}</p>
                                 </div>
                             )}

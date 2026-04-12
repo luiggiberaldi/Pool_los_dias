@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
-import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown } from './tableBillingEngine';
+import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown, formatHoursPaid } from './tableBillingEngine';
 import { round2 } from './dinero';
 
 /**
@@ -142,7 +142,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         doc.setFont('helvetica', 'normal');
 
         // Total line
-        doc.text(`${totalHours}h x $${pricePerHour.toFixed(2)}`, M, y);
+        doc.text(`${formatHoursPaid(totalHours)} x $${pricePerHour.toFixed(2)}`, M, y);
         doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
         y += 4;
         const fullBs = config ? calculateTimeCostBs(fullCost, 'NORMAL', config, tasaUSD) : (fullCost * (tasaUSD || 1));
@@ -156,7 +156,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         // Paid deduction
         if (hoursOffset > 0) {
             doc.setTextColor(...PAID_CLR);
-            doc.text(`Pagado (${hoursOffset}h)`, M, y);
+            doc.text(`Pagado (${formatHoursPaid(hoursOffset)})`, M, y);
             doc.text(`-$${paidCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
             doc.setTextColor(...INK);
             y += 5;

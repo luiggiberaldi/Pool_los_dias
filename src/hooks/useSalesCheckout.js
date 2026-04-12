@@ -6,7 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
-import { calculateGrandTotalBs } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../utils/tableBillingEngine';
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -76,12 +76,33 @@ export function useSalesCheckout({
 
         const syntheticCart = [];
         if (tableCheckoutData.timeCost > 0) {
-            syntheticCart.push({
-                id: crypto.randomUUID(),
-                name: `Tiempo Jugado (${tableCheckoutData.table.name})`,
-                priceUsdt: tableCheckoutData.timeCost, priceUsd: tableCheckoutData.timeCost,
-                qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
-            });
+            const session = tableCheckoutData.session;
+            const config = useTablesStore.getState().config;
+            const paidHoursOffsets = useTablesStore.getState().paidHoursOffsets || {};
+            const paidRoundsOffsets = useTablesStore.getState().paidRoundsOffsets || {};
+            const hoursOff = paidHoursOffsets[session?.id] || 0;
+            const roundsOff = paidRoundsOffsets[session?.id] || 0;
+            const breakdown = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOff, roundsOff);
+
+            if (breakdown.pinaCost > 0) {
+                const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                const billableRounds = Math.max(0, pinaCount - roundsOff);
+                syntheticCart.push({
+                    id: crypto.randomUUID(),
+                    name: `Piña ${tableCheckoutData.table.name}`,
+                    priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
+                    qty: billableRounds, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                });
+            }
+            if (breakdown.hourCost > 0) {
+                const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOff);
+                syntheticCart.push({
+                    id: crypto.randomUUID(),
+                    name: `Tiempo ${tableCheckoutData.table.name} (${formatHoursPaid(billableHours)})`,
+                    priceUsdt: round2(breakdown.hourCost), priceUsd: round2(breakdown.hourCost),
+                    qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                });
+            }
         }
         if (tableCheckoutData.currentItems?.length > 0) {
             tableCheckoutData.currentItems.forEach(item => {

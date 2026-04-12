@@ -4,7 +4,7 @@ import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
 import { useCustomersStore } from '../hooks/store/useCustomersStore';
-import { calculateSessionCost, calculateElapsedTime, calculateGrandTotalBs } from '../utils/tableBillingEngine';
+import { calculateSessionCost, calculateElapsedTime, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../utils/tableBillingEngine';
 import { Modal } from '../components/Modal';
 import { useConfirm } from '../hooks/useConfirm.jsx';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
@@ -285,16 +285,32 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
                 isWeight: false
             }));
 
-            // 2. Si la mesa cobró tiempo, ingresarlo como ítem virtual
+            // 2. Si la mesa cobró tiempo, ingresarlo como ítems separados (piñas + horas)
             if (timeCost > 0) {
-                cart.push({
-                    id: `MESA-${session.id}`,
-                    _originalId: `MESA-${session.id}`,
-                    name: `Mesa ${table.name} (${session.game_mode})`,
-                    qty: 1,
-                    priceUsd: round2(timeCost),
-                    isWeight: false
-                });
+                const breakdown = calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
+                if (breakdown.pinaCost > 0) {
+                    const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                    const billableRounds = Math.max(0, pinaCount - roundsOffset);
+                    cart.push({
+                        id: `MESA-PINA-${session.id}`,
+                        _originalId: `MESA-PINA-${session.id}`,
+                        name: `Piña ${table.name}`,
+                        qty: billableRounds,
+                        priceUsd: round2(config.pricePina || 0),
+                        isWeight: false
+                    });
+                }
+                if (breakdown.hourCost > 0) {
+                    const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOffset);
+                    cart.push({
+                        id: `MESA-HORA-${session.id}`,
+                        _originalId: `MESA-HORA-${session.id}`,
+                        name: `Tiempo ${table.name} (${formatHoursPaid(billableHours)})`,
+                        qty: 1,
+                        priceUsd: round2(breakdown.hourCost),
+                        isWeight: false
+                    });
+                }
             }
 
             // 3. Preparar array de pagos

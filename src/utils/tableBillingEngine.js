@@ -142,3 +142,17 @@ export function formatElapsedTime(elapsedMinutes) {
 
     return `${hours}h ${mins.toString().padStart(2, '0')}m`;
 }
+
+/**
+ * Formats hours_paid (decimal) into a human-readable string.
+ * 0.5 → "1/2 h", 1 → "1 h", 1.5 → "1 1/2 h", 2 → "2 h"
+ */
+export function formatHoursPaid(hours) {
+    if (!hours || hours <= 0) return "0 h";
+    const whole = Math.floor(hours);
+    const hasHalf = (hours - whole) >= 0.45; // tolerancia para 0.5
+
+    if (whole === 0 && hasHalf) return '1/2 h';
+    if (hasHalf) return `${whole} 1/2 h`;
+    return `${whole} h`;
+}

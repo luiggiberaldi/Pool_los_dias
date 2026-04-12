@@ -10,7 +10,7 @@
 
 import { capitalizeName } from '../utils/calculatorUtils';
 import { lookupPrinter } from './printerDatabase';
-import { calculateTimeCostBs } from '../utils/tableBillingEngine';
+import { calculateTimeCostBs, formatHoursPaid } from '../utils/tableBillingEngine';
 import { round2 } from '../utils/dinero';
 
 let activePort = null;
@@ -266,12 +266,12 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
         const paidCost = round2(hoursOffset * pricePerHour);
 
         p.bold(true).text('Tiempo de Mesa').newline().bold(false);
-        p.row(`${totalHours}h x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+        p.row(`${formatHoursPaid(totalHours)} x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
         const fullBs = calculateTimeCostBs(fullCost, 'NORMAL', config || {}, tasaUSD);
         p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
 
         if (hoursOffset > 0) {
-            p.row(`Pagado (${hoursOffset}h)`, `-$${paidCost.toFixed(2)}`, W);
+            p.row(`Pagado (${formatHoursPaid(hoursOffset)})`, `-$${paidCost.toFixed(2)}`, W);
         }
         p.newline();
     }
