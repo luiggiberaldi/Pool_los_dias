@@ -92,6 +92,11 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
     const changeBs = round2(Math.max(0, subR(totalPaidBs, cartTotalBs)));
     const isPaid = remainingUsd < EPSILON;
 
+    // Ref to always have the latest remaining values available for fillBar,
+    // avoiding stale closures when user types in one method then clicks Total on another.
+    const remainingRef = useRef({ usd: remainingUsd, bs: remainingBs });
+    remainingRef.current = { usd: remainingUsd, bs: remainingBs };
+
     const handleBarChange = useCallback((methodId, value) => {
         let v = value.replace(',', '.');
         if (!/^[0-9.]*$/.test(v)) return;
@@ -102,8 +107,9 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
 
     const fillBar = useCallback((methodId, currency, splitRemainingUsd = null) => {
         triggerHaptic && triggerHaptic();
-        const targetUsd = splitRemainingUsd != null ? splitRemainingUsd : remainingUsd;
-        const targetBs = splitRemainingUsd != null ? mulR(splitRemainingUsd, effectiveRate) : remainingBs;
+        const curRemaining = remainingRef.current;
+        const targetUsd = splitRemainingUsd != null ? splitRemainingUsd : curRemaining.usd;
+        const targetBs = splitRemainingUsd != null ? mulR(splitRemainingUsd, effectiveRate) : curRemaining.bs;
         let val;
         if (currency === 'USD') {
             val = targetUsd > 0 ? round2(targetUsd).toString() : null;
@@ -113,7 +119,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
             val = targetBs > 0 ? round2(targetBs).toString() : null;
         }
         if (val) setBarValues(prev => ({ ...prev, [methodId]: val }));
-    }, [remainingUsd, remainingBs, effectiveRate, triggerHaptic, tasaCop]);
+    }, [effectiveRate, triggerHaptic, tasaCop]);
 
     const _doConfirm = useCallback(async () => {
         if (submittingRef.current) return;
