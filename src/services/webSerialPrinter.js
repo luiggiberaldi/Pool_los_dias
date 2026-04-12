@@ -11,6 +11,7 @@
 import { capitalizeName } from '../utils/calculatorUtils';
 import { lookupPrinter } from './printerDatabase';
 import { calculateTimeCostBs } from '../utils/tableBillingEngine';
+import { round2 } from '../utils/dinero';
 
 let activePort = null;
 
@@ -213,7 +214,7 @@ export async function openCashDrawerWebSerial() {
  * Se usa en lugar del PDF+iframe para evitar que la impresora térmica
  * abra el cajón al recibir un trabajo de impresión del sistema.
  */
-export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config }) {
+export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset = 0, roundsOffset = 0 }) {
     const port = await getConnectedPrinter();
     if (!port) return false;
 
@@ -236,19 +237,38 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     }
     p.line('-', W);
 
-    if (timeCost > 0) {
-        const isPina = session.game_mode === 'PINA';
-        p.bold(true).text(isPina ? 'Partidas (La Pina)' : 'Tiempo de Mesa').newline().bold(false);
-        if (isPina) {
-            const partidas = 1 + (Number(session.extended_times) || 0);
-            p.row(`${partidas} pina${partidas !== 1 ? 's' : ''} x $${(timeCost / partidas).toFixed(2)}`, `$${timeCost.toFixed(2)}`, W);
-        } else {
-            const horas = elapsed / 60;
-            const timeStr = horas < 1 ? Math.ceil(horas * 60) + ' min' : horas.toFixed(1) + 'h';
-            p.row(timeStr, `$${timeCost.toFixed(2)}`, W);
+    const isPina = session.game_mode === 'PINA';
+    const totalRounds = isPina ? 1 + (Number(session.extended_times) || 0) : 0;
+    const totalHours = !isPina ? (Number(session.hours_paid) || 0) : 0;
+    const hasPaidBefore = roundsOffset > 0 || hoursOffset > 0;
+
+    if (isPina) {
+        const pricePerPina = config?.pricePina || 0;
+        const fullCost = round2(totalRounds * pricePerPina);
+        const paidCost = round2(roundsOffset * pricePerPina);
+
+        p.bold(true).text('Partidas (La Pina)').newline().bold(false);
+        p.row(`${totalRounds} pina${totalRounds !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+        const fullBs = calculateTimeCostBs(fullCost, session?.game_mode, config || {}, tasaUSD);
+        p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+
+        if (roundsOffset > 0) {
+            p.row(`Pagado (${roundsOffset} pina${roundsOffset !== 1 ? 's' : ''})`, `-$${paidCost.toFixed(2)}`, W);
         }
-        const timeBs = calculateTimeCostBs(timeCost, session?.game_mode, config || {}, tasaUSD);
-        p.row('', `Bs ${timeBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+        p.newline();
+    } else if (timeCost > 0 || hoursOffset > 0) {
+        const pricePerHour = config?.pricePerHour || 0;
+        const fullCost = round2(totalHours * pricePerHour);
+        const paidCost = round2(hoursOffset * pricePerHour);
+
+        p.bold(true).text('Tiempo de Mesa').newline().bold(false);
+        p.row(`${totalHours}h x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+        const fullBs = calculateTimeCostBs(fullCost, session?.game_mode, config || {}, tasaUSD);
+        p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+
+        if (hoursOffset > 0) {
+            p.row(`Pagado (${hoursOffset}h)`, `-$${paidCost.toFixed(2)}`, W);
+        }
         p.newline();
     }
 
@@ -265,27 +285,13 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     }
 
     p.line('=', W);
-    p.align(1).bold(true).text('TOTAL ESTIMADO:').newline();
+    p.align(1).bold(true).text(hasPaidBefore ? 'TOTAL PENDIENTE:' : 'TOTAL ESTIMADO:').newline();
     p.text(`$${grandTotal.toFixed(2)}`).newline();
     p.bold(false);
     if (tasaUSD && tasaUSD > 1) {
-        // Calcular Bs con tasa implícita si hay config de precios Bs
-        let totalBs;
-        if (timeCost > 0) {
-            const gameMode = session?.game_mode;
-            // Leer de config con fallback a localStorage
-            const priceBs = gameMode === 'PINA'
-                ? (config?.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0)
-                : (config?.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0);
-            const priceUsd = gameMode === 'PINA' ? (config?.pricePina || 0) : (config?.pricePerHour || 0);
-            const timeBs = (priceBs > 0 && priceUsd > 0)
-                ? Math.round(timeCost * (priceBs / priceUsd) * 100) / 100
-                : timeCost * tasaUSD;
-            const consumoBs = (grandTotal - timeCost) * tasaUSD;
-            totalBs = Math.round((timeBs + consumoBs) * 100) / 100;
-        } else {
-            totalBs = Math.round(grandTotal * tasaUSD * 100) / 100;
-        }
+        const consumo = Math.max(0, grandTotal - timeCost);
+        const totalBs = calculateTimeCostBs(timeCost, session?.game_mode, config || {}, tasaUSD)
+            + Math.round(consumo * tasaUSD * 100) / 100;
         p.text(`Ref: Bs. ${totalBs.toFixed(2)}`).newline();
     }
     p.newline();

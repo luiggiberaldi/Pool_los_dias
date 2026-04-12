@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
 import { calculateGrandTotalBs, calculateTimeCostBs } from './tableBillingEngine';
+import { round2 } from './dinero';
 
 /**
  * Genera e imprime una pre-cuenta para mesa de pool.
@@ -8,28 +9,23 @@ import { calculateGrandTotalBs, calculateTimeCostBs } from './tableBillingEngine
  *   SIN abrir el cajón de dinero (el cajón solo debe abrirse en ventas exitosas).
  * - Sin impresora térmica: genera PDF via jsPDF + iframe.
  */
-export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config }) {
+export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config, hoursOffset = 0, roundsOffset = 0 }) {
     // Intentar ESC/POS directo si hay impresora configurada o puerto disponible.
-    // Esto evita pasar por el driver de Windows que abre el cajón automáticamente.
     const cfg = getWebSerialConfig();
     const hasWebSerialConfigured = cfg.printerType && cfg.printerType !== 'system';
     if (hasWebSerialConfigured) {
-        // Impresora térmica configurada: SIEMPRE usar ESC/POS directo.
-        // NO hacer fallback a PDF — el driver de Windows abre el cajón en cada trabajo de impresión.
         try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config });
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
             if (printed) return;
-            // Si returned false (sin puerto), mostrar instrucción al usuario
             throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
         } catch (err) {
-            throw err; // Propagar el error para que el llamador muestre toast
+            throw err;
         }
     }
-    // Sin impresora térmica configurada: usar PDF del sistema
     const tryEscPos = 'serial' in navigator;
     if (tryEscPos) {
         try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config });
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
             if (printed) return;
         } catch (err) {
             console.warn('[PreCuenta] ESC/POS falló, usando fallback PDF:', err.message);
@@ -40,12 +36,19 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const CX = WIDTH / 2;
     const RIGHT = WIDTH - M;
 
+    // Calcular datos de pagos previos
+    const isPina = session.game_mode === 'PINA';
+    const totalRounds = isPina ? 1 + (Number(session.extended_times) || 0) : 0;
+    const totalHours = !isPina ? (Number(session.hours_paid) || 0) : 0;
+    const hasPaidBefore = roundsOffset > 0 || hoursOffset > 0;
+
     const itemCount = currentItems?.length || 0;
-    const H = 100 + (itemCount * 18);
+    const H = 100 + (itemCount * 18) + (hasPaidBefore ? 16 : 0);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
     const INK = [33, 37, 41];
     const RULE = [206, 212, 218];
+    const PAID_CLR = [120, 120, 120];
 
     let y = 8;
     const dash = (yy) => {
@@ -92,28 +95,69 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     y += 6;
 
     // TIEMPO / PARTIDAS
-    if (timeCost > 0) {
-        const isPina = session.game_mode === 'PINA';
+    if (isPina) {
+        const pricePerPina = config?.pricePina || 0;
+        const fullCost = round2(totalRounds * pricePerPina);
+        const paidCost = round2(roundsOffset * pricePerPina);
+
         doc.setFont('helvetica', 'bold');
-        doc.text(isPina ? "Partidas (La Piña)" : "Tiempo de Mesa", M, y);
+        doc.text("Partidas (La Piña)", M, y);
         y += 4;
         doc.setFont('helvetica', 'normal');
-        if (isPina) {
-            const partidas = 1 + (Number(session.extended_times) || 0);
-            doc.text(`${partidas} piña${partidas !== 1 ? 's' : ''} x $${(timeCost / partidas).toFixed(2)}`, M, y);
-        } else {
-            const horas = elapsed / 60;
-            doc.text(`${horas < 1 ? Math.ceil(horas * 60) + ' min' : (horas).toFixed(1) + 'h'}`, M, y);
-        }
-        doc.text(`$${timeCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+
+        // Total line
+        doc.text(`${totalRounds} piña${totalRounds !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, M, y);
+        doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
         y += 4;
-        const timeBs = config ? calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD) : (timeCost * (tasaUSD || 1));
+        const fullBs = config ? calculateTimeCostBs(fullCost, session?.game_mode, config, tasaUSD) : (fullCost * (tasaUSD || 1));
         doc.setFontSize(7);
-        doc.setTextColor(120, 120, 120);
-        doc.text(`Bs ${timeBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
+        doc.setTextColor(...PAID_CLR);
+        doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
         doc.setFontSize(8);
         doc.setTextColor(...INK);
-        y += 6;
+        y += 5;
+
+        // Paid deduction
+        if (roundsOffset > 0) {
+            doc.setTextColor(...PAID_CLR);
+            doc.text(`Pagado (${roundsOffset} piña${roundsOffset !== 1 ? 's' : ''})`, M, y);
+            doc.text(`-$${paidCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+            doc.setTextColor(...INK);
+            y += 5;
+        }
+        y += 1;
+    } else if (timeCost > 0 || hoursOffset > 0) {
+        const pricePerHour = config?.pricePerHour || 0;
+        const fullHours = totalHours;
+        const fullCost = round2(fullHours * pricePerHour);
+        const paidCost = round2(hoursOffset * pricePerHour);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text("Tiempo de Mesa", M, y);
+        y += 4;
+        doc.setFont('helvetica', 'normal');
+
+        // Total line
+        doc.text(`${fullHours}h x $${pricePerHour.toFixed(2)}`, M, y);
+        doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+        y += 4;
+        const fullBs = config ? calculateTimeCostBs(fullCost, session?.game_mode, config, tasaUSD) : (fullCost * (tasaUSD || 1));
+        doc.setFontSize(7);
+        doc.setTextColor(...PAID_CLR);
+        doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
+        doc.setFontSize(8);
+        doc.setTextColor(...INK);
+        y += 5;
+
+        // Paid deduction
+        if (hoursOffset > 0) {
+            doc.setTextColor(...PAID_CLR);
+            doc.text(`Pagado (${hoursOffset}h)`, M, y);
+            doc.text(`-$${paidCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+            doc.setTextColor(...INK);
+            y += 5;
+        }
+        y += 1;
     }
 
     // CONSUMO
@@ -130,7 +174,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
             y += 4;
             const itemBs = t * (tasaUSD || 1);
             doc.setFontSize(7);
-            doc.setTextColor(120, 120, 120);
+            doc.setTextColor(...PAID_CLR);
             doc.text(`Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
             doc.setFontSize(8);
             doc.setTextColor(...INK);
@@ -144,7 +188,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
 
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text("TOTAL ESTIMADO:", M, y);
+    doc.text(hasPaidBefore ? "TOTAL PENDIENTE:" : "TOTAL ESTIMADO:", M, y);
     doc.text(`$${grandTotal.toFixed(2)}`, RIGHT, y, { align: 'right' });
     y += 6;
 
@@ -164,7 +208,6 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     document.body.appendChild(iframe);
     iframe.onload = () => {
         try {
-            // Eliminar márgenes del browser para evitar recorte en impresión
             const style = iframe.contentDocument.createElement('style');
             style.textContent = '@page { margin: 0; } body { margin: 0; }';
             iframe.contentDocument.head.appendChild(style);

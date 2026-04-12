@@ -513,7 +513,8 @@ export default function TableCard({ table, session }) {
         if (!session) return;
         try {
             await generatePartialSessionTicketPDF({
-                table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config
+                table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config,
+                hoursOffset, roundsOffset
             });
             showToast('Pre-cuenta enviada a la impresora', 'success');
         } catch (err) {
