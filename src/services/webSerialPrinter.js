@@ -155,34 +155,44 @@ export async function sendEscPosCommand(commandArray) {
 
     const cfg = getWebSerialConfig();
 
-    try {
-        if (!activePort.writable) {
-            await activePort.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
+    // Helper: abrir, escribir y cerrar para asegurar flush completo
+    const writeToPort = async (port) => {
+        const needsOpen = !port.writable;
+        if (needsOpen) {
+            await port.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
         }
 
-        const writer = activePort.writable.getWriter();
+        const writer = port.writable.getWriter();
         const data = new Uint8Array(commandArray);
         await writer.write(data);
         writer.releaseLock();
 
+        // Cerrar y reabrir fuerza flush del buffer USB al dispositivo
+        try {
+            await port.close();
+        } catch (_) {}
+        // Reabrir para mantener el puerto listo para el siguiente comando
+        try {
+            await port.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
+        } catch (_) {}
+
         return true;
+    };
+
+    try {
+        return await writeToPort(activePort);
     } catch (err) {
-        // Si el puerto estaba abierto pero se perdió la conexión, intentar reconectar
-        if (err.message?.includes('already') || err.message?.includes('closed') || err.message?.includes('lost')) {
+        // Si el puerto estaba en estado roto, intentar reconectar
+        if (err.message?.includes('already') || err.message?.includes('closed') || err.message?.includes('lost') || err.message?.includes('failed')) {
             try { await activePort.close(); } catch (_) {}
             try {
-                await activePort.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
-                const writer = activePort.writable.getWriter();
-                const data = new Uint8Array(commandArray);
-                await writer.write(data);
-                writer.releaseLock();
-                return true;
+                return await writeToPort(activePort);
             } catch (retryErr) {
                 console.error('Web Serial Retry Error:', retryErr);
             }
         }
         console.error('Web Serial Error:', err);
-        throw new Error('Error al enviar a la impresora: ' + err.message);
+        throw new Error(`Error de impresión: ${err.message}`);
     }
 }
 
