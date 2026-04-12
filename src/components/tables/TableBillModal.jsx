@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Clock, Coffee, Layers, ChevronRight, Timer } from 'lucide-react';
+import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare } from 'lucide-react';
 import { formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 
@@ -61,6 +61,14 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                         <X size={18} />
                     </button>
                 </div>
+
+                {/* ── Nota de mesa ──────────────────────────── */}
+                {session?.notes && (
+                    <div className="shrink-0 mx-4 mt-2 flex items-start gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-700/40 rounded-xl">
+                        <MessageSquare size={13} className="text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{session.notes}</p>
+                    </div>
+                )}
 
                 {/* ── Scrollable body ─────────────────────────── */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">

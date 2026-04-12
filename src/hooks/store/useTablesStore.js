@@ -445,11 +445,12 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    updateSessionMetadata: async (sessionId, clientName, guestCount, clientId = null) => {
+    updateSessionMetadata: async (sessionId, clientName, guestCount, clientId = null, notes = undefined) => {
         const payload = {
             client_name: clientName || null,
             guest_count: guestCount || 0,
             ...(clientId !== undefined ? { client_id: clientId } : {}),
+            ...(notes !== undefined ? { notes: notes || null } : {}),
         };
         const newSessions = get().activeSessions.map(s =>
             s.id === sessionId ? { ...s, ...payload } : s

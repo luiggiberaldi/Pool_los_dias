@@ -81,6 +81,13 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
         y += 5;
     }
 
+    if (session?.notes) {
+        doc.setFontSize(7);
+        doc.text(`Nota: ${session.notes.substring(0, 60)}`, M, y);
+        doc.setFontSize(8);
+        y += 4;
+    }
+
     dash(y);
     y += 6;
 

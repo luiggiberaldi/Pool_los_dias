@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock } from 'lucide-react';
+import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock, MessageSquare } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -325,6 +325,7 @@ export default function TableCard({ table, session }) {
     const [editClientName, setEditClientName] = useState('');
     const [editGuestCount, setEditGuestCount] = useState('');
     const [editClientId, setEditClientId] = useState(null);
+    const [editNotes, setEditNotes] = useState('');
     const [showEditCustomerSheet, setShowEditCustomerSheet] = useState(false);
 
 
@@ -604,7 +605,7 @@ export default function TableCard({ table, session }) {
                             </div>
                         ) : (
                         <button
-                            onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setEditClientId(session.client_id || null); setShowEditMetaModal(true); }}
+                            onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setEditClientId(session.client_id || null); setEditNotes(session.notes || ''); setShowEditMetaModal(true); }}
                             className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md self-start transition-colors ${session.client_id ? 'bg-sky-400/30 hover:bg-sky-400/50 opacity-100' : 'opacity-80 bg-white/15 hover:bg-white/30'}`}
                             title="Editar nombre y personas"
                         >
@@ -617,12 +618,18 @@ export default function TableCard({ table, session }) {
                     )}
                     {isPlaying && !session?.client_name && !(session?.guest_count > 0) && !isLockedForMe && (
                         <button
-                            onClick={() => { setEditClientName(''); setEditGuestCount(''); setEditClientId(null); setShowEditMetaModal(true); }}
+                            onClick={() => { setEditClientName(''); setEditGuestCount(''); setEditClientId(null); setEditNotes(session?.notes || ''); setShowEditMetaModal(true); }}
                             className="text-[10px] font-bold opacity-50 hover:opacity-80 bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded-md self-start transition-colors flex items-center gap-1"
                             title="Añadir nombre y personas"
                         >
                             <Edit2 size={8} /> Añadir info
                         </button>
+                    )}
+                    {isPlaying && session?.notes && (
+                        <div className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md self-start bg-amber-400/20 text-amber-100 max-w-full">
+                            <MessageSquare size={9} className="shrink-0" />
+                            <span className="truncate">{session.notes}</span>
+                        </div>
                     )}
                 </div>
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
@@ -1062,10 +1069,24 @@ export default function TableCard({ table, session }) {
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
                     />
                 </div>
+                <div>
+                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1">
+                        <MessageSquare size={10} /> Nota
+                    </label>
+                    <textarea
+                        placeholder="Ej: Cumpleaños, mesa reservada, nota especial..."
+                        value={editNotes}
+                        onChange={e => setEditNotes(e.target.value)}
+                        maxLength={200}
+                        rows={2}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30 resize-none"
+                    />
+                    <p className="text-[10px] text-slate-400 text-right mt-0.5">{editNotes.length}/200</p>
+                </div>
                 <button
                     onClick={async () => {
                         const name = editClientId ? (allCustomers.find(c => c.id === editClientId)?.name || editClientName) : editClientName.trim();
-                        await updateSessionMetadata(session.id, name, parseInt(editGuestCount) || 0, editClientId);
+                        await updateSessionMetadata(session.id, name, parseInt(editGuestCount) || 0, editClientId, editNotes.trim());
                         setShowEditMetaModal(false);
                         showToast('Información actualizada', 'success');
                     }}

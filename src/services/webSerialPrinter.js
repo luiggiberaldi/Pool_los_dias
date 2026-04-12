@@ -230,6 +230,9 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     if (session?.client_name) {
         p.bold(true).text(`Cliente: ${session.client_name}`).bold(false).newline();
     }
+    if (session?.notes) {
+        p.text(`Nota: ${session.notes.substring(0, W - 6)}`).newline();
+    }
     p.line('-', W);
 
     if (timeCost > 0) {

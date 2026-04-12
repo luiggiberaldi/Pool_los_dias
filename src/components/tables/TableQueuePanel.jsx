@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CreditCard, Clock, X, ChevronRight, Coffee, Timer } from 'lucide-react';
+import { CreditCard, Clock, X, ChevronRight, Coffee, Timer, MessageSquare } from 'lucide-react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -81,6 +81,11 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                                 <p className="font-bold text-slate-800 dark:text-white text-sm truncate">{table.name}</p>
                                 {meseroName && (
                                     <p className="text-[10px] font-bold text-orange-500/80 truncate">{meseroName}</p>
+                                )}
+                                {session.notes && (
+                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 truncate flex items-center gap-1">
+                                        <MessageSquare size={9} className="shrink-0" /> {session.notes}
+                                    </p>
                                 )}
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <span className="flex items-center gap-1 text-[10px] text-slate-400">

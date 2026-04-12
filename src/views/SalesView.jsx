@@ -458,7 +458,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
             {/* Post-payment dialog: ¿Liberar mesa o dejar activa? */}
             {postPaymentSession && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md" onClick={e => e.stopPropagation()}>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full animate-in fade-in zoom-in-95">
                         <div className="text-center mb-5">
                             <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">

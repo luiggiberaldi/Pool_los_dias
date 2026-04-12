@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard, Search, UserCheck, X, User, Users } from 'lucide-react';
+import { Layers, CheckCircle2, AlertCircle, RefreshCw, DollarSign, CreditCard, Search, UserCheck, X, User, Users, MessageSquare } from 'lucide-react';
 import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
@@ -402,6 +402,14 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
         <Modal isOpen={!postPaymentAction} onClose={onClose} title={`Cobro: ${table.name}`}>
             <div className="flex flex-col gap-4 py-2">
 
+                {/* Session notes */}
+                {session?.notes && (
+                    <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-700/40 rounded-xl">
+                        <MessageSquare size={13} className="text-amber-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">{session.notes}</p>
+                    </div>
+                )}
+
                 {/* Customer Selector */}
                 <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
@@ -620,7 +628,7 @@ function PaymentModal({ session, table, config, rates, currentUser, onClose, onS
 
         {/* Post-payment dialog: ¿Liberar mesa o dejar activa? */}
         {postPaymentAction && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-md">
                 <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full">
                     <div className="text-center mb-5">
                         <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
