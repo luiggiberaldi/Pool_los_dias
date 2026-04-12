@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
-import { calculateGrandTotalBs } from './tableBillingEngine';
+import { calculateGrandTotalBs, calculateTimeCostBs } from './tableBillingEngine';
 
 /**
  * Genera e imprime una pre-cuenta para mesa de pool.
@@ -41,7 +41,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const RIGHT = WIDTH - M;
 
     const itemCount = currentItems?.length || 0;
-    const H = 90 + (itemCount * 14);
+    const H = 100 + (itemCount * 18);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
     const INK = [33, 37, 41];
@@ -106,6 +106,13 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
             doc.text(`${horas < 1 ? Math.ceil(horas * 60) + ' min' : (horas).toFixed(1) + 'h'}`, M, y);
         }
         doc.text(`$${timeCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
+        y += 4;
+        const timeBs = config ? calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD) : (timeCost * (tasaUSD || 1));
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Bs ${timeBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
+        doc.setFontSize(8);
+        doc.setTextColor(...INK);
         y += 6;
     }
 
@@ -120,6 +127,13 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
             doc.text(`${i.qty}x ${i.product_name.substring(0, 16)}`, M, y);
             const t = i.qty * i.unit_price_usd;
             doc.text(`$${t.toFixed(2)}`, RIGHT, y, { align: 'right' });
+            y += 4;
+            const itemBs = t * (tasaUSD || 1);
+            doc.setFontSize(7);
+            doc.setTextColor(120, 120, 120);
+            doc.text(`Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
+            doc.setFontSize(8);
+            doc.setTextColor(...INK);
             y += 5;
         });
         y += 2;

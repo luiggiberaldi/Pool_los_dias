@@ -10,6 +10,7 @@
 
 import { capitalizeName } from '../utils/calculatorUtils';
 import { lookupPrinter } from './printerDatabase';
+import { calculateTimeCostBs } from '../utils/tableBillingEngine';
 
 let activePort = null;
 
@@ -246,6 +247,8 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
             const timeStr = horas < 1 ? Math.ceil(horas * 60) + ' min' : horas.toFixed(1) + 'h';
             p.row(timeStr, `$${timeCost.toFixed(2)}`, W);
         }
+        const timeBs = calculateTimeCostBs(timeCost, session?.game_mode, config || {}, tasaUSD);
+        p.row('', `Bs ${timeBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
         p.newline();
     }
 
@@ -255,6 +258,8 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
             const t = i.qty * i.unit_price_usd;
             const name = (i.product_name || '').substring(0, Math.floor(W * 0.55));
             p.row(`${i.qty}x ${name}`, `$${t.toFixed(2)}`, W);
+            const itemBs = t * (tasaUSD || 1);
+            p.row('', `Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
         });
         p.newline();
     }
