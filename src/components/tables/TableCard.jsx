@@ -511,6 +511,7 @@ export default function TableCard({ table, session }) {
             await generatePartialSessionTicketPDF({
                 table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD
             });
+            showToast('Pre-cuenta enviada a la impresora', 'success');
         } catch (err) {
             showToast(err.message || 'Error al imprimir pre-cuenta', 'error');
         }

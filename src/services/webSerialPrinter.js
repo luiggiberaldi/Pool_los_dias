@@ -150,12 +150,13 @@ export async function detectAndAutoConfig() {
 export async function sendEscPosCommand(commandArray) {
     if (!activePort) {
         const port = await getConnectedPrinter();
-        if (!port) throw new Error('No hay impresora conectada.');
+        if (!port) throw new Error('No hay impresora conectada. Ve a Configuración → Impresora y pulsa "Detectar".');
     }
+
+    const cfg = getWebSerialConfig();
 
     try {
         if (!activePort.writable) {
-            const cfg = getWebSerialConfig();
             await activePort.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
         }
 
@@ -166,11 +167,22 @@ export async function sendEscPosCommand(commandArray) {
 
         return true;
     } catch (err) {
-        if (activePort && err.message?.includes('already')) {
+        // Si el puerto estaba abierto pero se perdió la conexión, intentar reconectar
+        if (err.message?.includes('already') || err.message?.includes('closed') || err.message?.includes('lost')) {
             try { await activePort.close(); } catch (_) {}
+            try {
+                await activePort.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
+                const writer = activePort.writable.getWriter();
+                const data = new Uint8Array(commandArray);
+                await writer.write(data);
+                writer.releaseLock();
+                return true;
+            } catch (retryErr) {
+                console.error('Web Serial Retry Error:', retryErr);
+            }
         }
         console.error('Web Serial Error:', err);
-        throw new Error('Error al enviar el comando a la impresora: ' + err.message);
+        throw new Error('Error al enviar a la impresora: ' + err.message);
     }
 }
 
@@ -243,9 +255,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     }
     p.newline();
     p.align(1).text('*** NO ES RECIBO DE PAGO ***').newline();
-    // ⚠️ feed sin cut — el corte de papel dispara el cajón en muchas impresoras.
-    // Para la pre-cuenta usamos solo avance; el cliente rasga el papel manualmente.
-    p.feed(6);
+    p.feed(4).cut();
 
     await sendEscPosCommand(Array.from(p.build()));
     return true;
