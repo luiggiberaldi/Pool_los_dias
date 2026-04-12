@@ -23,6 +23,9 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
     const [packagingType, setPackagingType] = useState('suelto');
     const [stockInLotes, setStockInLotes] = useState('');
     const [granelUnit, setGranelUnit] = useState('kg');
+    const [isCombo, setIsCombo] = useState(false);
+    const [linkedProductId, setLinkedProductId] = useState(null);
+    const [linkedQty, setLinkedQty] = useState('1');
     const [isFormShaking, setIsFormShaking] = useState(false);
     const [productMovements, setProductMovements] = useState([]);
     const fileInputRef = useRef(null);
@@ -78,6 +81,7 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd('');
         setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null);
         setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
+        setIsCombo(false); setLinkedProductId(null); setLinkedQty('1');
         setProductMovements([]);
     };
 
@@ -179,6 +183,11 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
 
         if (u === 'kg' || u === 'litro') setGranelUnit(u);
 
+        // Restaurar datos de combo si existen
+        setIsCombo(!!product.isCombo);
+        setLinkedProductId(product.linkedProductId || null);
+        setLinkedQty(product.linkedQty ? String(product.linkedQty) : '1');
+
         try {
             const allSales = await storageService.getItem('bodega_sales_v1', []);
             const movements = allSales
@@ -204,6 +213,8 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         image, setImage, packagingType, setPackagingType,
         stockInLotes, setStockInLotes, granelUnit, setGranelUnit,
         isFormShaking, productMovements,
+        isCombo, setIsCombo, linkedProductId, setLinkedProductId,
+        linkedQty, setLinkedQty,
         fileInputRef,
         handleImageUpload, handlePriceUsdChange, handlePriceBsChange,
         handleCostUsdChange, handleCostBsChange,
