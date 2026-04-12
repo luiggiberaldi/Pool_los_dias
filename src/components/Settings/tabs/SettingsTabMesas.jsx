@@ -9,24 +9,25 @@ function useBcvRate() {
             const useAuto = JSON.parse(localStorage.getItem('bodega_use_auto_rate') ?? 'true');
             if (!useAuto) {
                 const manual = parseFloat(localStorage.getItem('bodega_custom_rate'));
-                if (manual > 0) return manual;
+                if (manual > 0) return { rate: manual, isManual: true };
             }
             const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-            return saved?.bcv?.price || 1;
-        } catch { return 1; }
+            return { rate: saved?.bcv?.price || 1, isManual: false };
+        } catch { return { rate: 1, isManual: false }; }
     };
-    const [rate, setRate] = useState(getEffectiveRate);
+    const [data, setData] = useState(getEffectiveRate);
     useEffect(() => {
-        const handleStorage = () => setRate(getEffectiveRate());
+        const handleStorage = () => setData(getEffectiveRate());
         window.addEventListener('storage', handleStorage);
         return () => window.removeEventListener('storage', handleStorage);
     }, []);
-    return rate;
+    return data;
 }
 
 export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const { config, updateConfig, tables, activeSessions, addTable, updateTable, deleteTable } = useTablesStore();
-    const bcvRate = useBcvRate();
+    const { rate: bcvRate, isManual: isManualRate } = useBcvRate();
+    const rateLabel = isManualRate ? 'Tasa Manual' : 'Tasa BCV';
 
     // Config State — synced from store config
     const [pricePerHour, setPricePerHour] = useState(config?.pricePerHour || 0);
@@ -206,12 +207,12 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             {/* Tarifas */}
             <div data-tour="settings-mesas-rates">
             <SectionCard icon={DollarSign} title="Tarifas de Juego" subtitle="Precio en $ y Bs por separado" iconColor="text-emerald-500">
-                {/* BCV Reference */}
+                {/* Rate Reference */}
                 {bcvRate > 0 && (
                     <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
                         <DollarSign size={13} className="text-slate-400 shrink-0" />
-                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Tasa BCV: <span className="text-emerald-600 dark:text-emerald-400">{bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span></span>
-                        <span className="text-[10px] text-slate-400 ml-auto">(referencia)</span>
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{rateLabel}: <span className="text-emerald-600 dark:text-emerald-400">{bcvRate.toLocaleString('es-VE', { minimumFractionDigits: 2 })} Bs/$</span></span>
+                        {isManualRate && <span className="text-[10px] text-amber-500 ml-auto">manual</span>}
                     </div>
                 )}
 
@@ -240,7 +241,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                             </div>
                             <Plus size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
                             <div className="flex-1">
-                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bol\u00edvares</label>
+                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bolívares</label>
                                 <div className="relative">
                                     <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
                                     <input
@@ -268,19 +269,19 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                                         : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
                                 }`}>
                                     Tasa: {parseFloat(impliedRateHour).toLocaleString('es-VE')} Bs/$
-                                    {bcvRate > 0 && <span className="opacity-60"> (BCV: {bcvRate.toLocaleString('es-VE')})</span>}
+                                    {bcvRate > 0 && <span className="opacity-60"> ({rateLabel}: {bcvRate.toLocaleString('es-VE')})</span>}
                                 </span>
                             )}
                         </div>
                     </div>
 
-                    {/* La Pi\u00f1a Block */}
+                    {/* La Piña Block */}
                     <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-3">
                             <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                                 <Trophy size={14} className="text-amber-600 dark:text-amber-400" />
                             </div>
-                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">La Pi\u00f1a</span>
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wider">La Piña</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex-1">
@@ -298,7 +299,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                             </div>
                             <Plus size={14} className="text-slate-300 dark:text-slate-600 mt-5 shrink-0" />
                             <div className="flex-1">
-                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bol\u00edvares</label>
+                                <label className="text-[10px] uppercase font-bold text-emerald-500 mb-1 block">Bolívares</label>
                                 <div className="relative">
                                     <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center font-bold text-emerald-500 text-xs">Bs</span>
                                     <input
