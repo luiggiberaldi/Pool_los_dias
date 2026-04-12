@@ -55,9 +55,13 @@ export const useTablesStore = create((set, get) => ({
                 // Enriquecer con precios Bs de localStorage (cloud sync)
                 const lsHourBs = parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
                 const lsPinaBs = parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
-                if (lsHourBs > 0 && !cachedConfig.pricePerHourBs) cachedConfig.pricePerHourBs = lsHourBs;
-                if (lsPinaBs > 0 && !cachedConfig.pricePinaBs) cachedConfig.pricePinaBs = lsPinaBs;
+                // Tomar el mayor entre cache y localStorage (evita perder datos)
+                cachedConfig.pricePerHourBs = Math.max(cachedConfig.pricePerHourBs || 0, lsHourBs);
+                cachedConfig.pricePinaBs = Math.max(cachedConfig.pricePinaBs || 0, lsPinaBs);
                 set({ config: cachedConfig });
+                // Siempre publicar a localStorage para que cloud sync los distribuya
+                if (cachedConfig.pricePerHourBs > 0) localStorage.setItem('pool_price_per_hour_bs', String(cachedConfig.pricePerHourBs));
+                if (cachedConfig.pricePinaBs > 0) localStorage.setItem('pool_price_pina_bs', String(cachedConfig.pricePinaBs));
             }
 
             // 2. Cargar cache local (Lo que quedó guardado al irse la luz)
@@ -87,6 +91,21 @@ export const useTablesStore = create((set, get) => ({
                 const handler = () => get().processPendingActions();
                 window.addEventListener('online', handler);
                 set({ _onlineHandler: handler });
+
+                // 6. Escuchar precios Bs vía cloud sync (StorageEvent)
+                const priceHandler = (e) => {
+                    if (e.key === 'pool_price_per_hour_bs' || e.key === 'pool_price_pina_bs') {
+                        const val = parseFloat(e.newValue) || 0;
+                        if (val > 0) {
+                            const cfg = { ...get().config };
+                            if (e.key === 'pool_price_per_hour_bs') cfg.pricePerHourBs = val;
+                            if (e.key === 'pool_price_pina_bs') cfg.pricePinaBs = val;
+                            set({ config: cfg });
+                            tablesCache.setItem(scopedKey('pool_config'), cfg);
+                        }
+                    }
+                };
+                window.addEventListener('storage', priceHandler);
             }
 
         } catch (error) {
