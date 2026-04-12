@@ -282,9 +282,10 @@ function useBcvRate() {
 }
 
 export default function TableCard({ table, session }) {
-    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime, addPinaToSession, addHoursToSession } = useTablesStore();
+    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime, addPinaToSession, addHoursToSession, pauseSession, resumeSession } = useTablesStore();
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
+    const pausedData = useTablesStore(state => session ? state.pausedSessions[session.id] : null);
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
@@ -363,36 +364,8 @@ export default function TableCard({ table, session }) {
     };
 
     // Live Timer Update
-    const pauseKey = session ? `table_pause_${session.id}` : null;
-    const [isPaused, setIsPaused] = useState(() => {
-        if (!session) return false;
-        try { return JSON.parse(localStorage.getItem(`table_pause_${session.id}`))?.isPaused ?? false; }
-        catch { return false; }
-    });
-    const [pauseElapsed, setPauseElapsed] = useState(() => {
-        if (!session) return 0;
-        try { return JSON.parse(localStorage.getItem(`table_pause_${session.id}`))?.elapsedAtPause ?? 0; }
-        catch { return 0; }
-    });
-
-    // Escuchar pausa/reanudación global desde TablesView
-    useEffect(() => {
-        const handleGlobalPause = () => {
-            if (!pauseKey) return;
-            try {
-                const data = JSON.parse(localStorage.getItem(pauseKey));
-                if (data?.isPaused && !isPaused) {
-                    setIsPaused(true);
-                    setPauseElapsed(data.elapsedAtPause);
-                    setElapsed(data.elapsedAtPause);
-                } else if (!data && isPaused) {
-                    setIsPaused(false);
-                }
-            } catch {}
-        };
-        window.addEventListener('storage', handleGlobalPause);
-        return () => window.removeEventListener('storage', handleGlobalPause);
-    }, [pauseKey, isPaused]);
+    const isPaused = pausedData?.isPaused ?? false;
+    const pauseElapsed = pausedData?.elapsedAtPause ?? 0;
 
     useEffect(() => {
         let interval;
@@ -422,29 +395,15 @@ export default function TableCard({ table, session }) {
     }, [isPlaying, session?.started_at, isPaused, pauseElapsed]);
 
     const handlePauseTimer = () => {
-        if (!pauseKey) return;
+        if (!session) return;
         const currentElapsed = calculateElapsedTime(session.started_at);
-        setIsPaused(true);
-        setPauseElapsed(currentElapsed);
         setElapsed(currentElapsed);
-        localStorage.setItem(pauseKey, JSON.stringify({ isPaused: true, elapsedAtPause: currentElapsed }));
+        pauseSession(session.id, currentElapsed);
     };
 
     const handleResumeTimer = async () => {
-        if (!pauseKey) return;
-        try {
-            const saved = JSON.parse(localStorage.getItem(pauseKey));
-            if (saved) {
-                // Calcular cuántos minutos estuvo pausado
-                const currentElapsed = calculateElapsedTime(session.started_at);
-                const pausedMinutes = currentElapsed - saved.elapsedAtPause;
-                // Mover started_at hacia adelante para compensar la pausa
-                const newStartedAt = new Date(new Date(session.started_at).getTime() + pausedMinutes * 60000).toISOString();
-                await updateSessionTime(session.id, newStartedAt);
-            }
-        } catch (e) { console.warn('Error reanudando timer', e); }
-        setIsPaused(false);
-        if (pauseKey) localStorage.removeItem(pauseKey);
+        if (!session) return;
+        await resumeSession(session.id);
     };
 
     const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null, includePina = false) => {

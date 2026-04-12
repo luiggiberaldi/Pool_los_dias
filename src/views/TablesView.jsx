@@ -40,66 +40,31 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
         activeSessions.filter(s => s.game_mode !== 'PINA'),
         [activeSessions]
     );
-    const [anyPaused, setAnyPaused] = useState(false);
-
-    // Verificar estado de pausa al montar y cuando cambian sesiones
-    useEffect(() => {
-        const checkPauses = () => {
-            const hasPaused = pausableSessions.some(s => {
-                try {
-                    const data = JSON.parse(localStorage.getItem(`table_pause_${s.id}`));
-                    return data?.isPaused === true;
-                } catch { return false; }
-            });
-            setAnyPaused(hasPaused);
-        };
-        checkPauses();
-        // Escuchar cambios de pausa desde las TableCards individuales
-        window.addEventListener('storage', checkPauses);
-        const interval = setInterval(checkPauses, 1000);
-        return () => {
-            window.removeEventListener('storage', checkPauses);
-            clearInterval(interval);
-        };
-    }, [pausableSessions]);
+    const pausedSessions = useTablesStore(state => state.pausedSessions);
+    const { pauseSession, resumeSession } = useTablesStore();
+    const anyPaused = useMemo(() =>
+        pausableSessions.some(s => pausedSessions[s.id]?.isPaused),
+        [pausableSessions, pausedSessions]
+    );
 
     const handlePauseAll = () => {
         let count = 0;
         pausableSessions.forEach(s => {
-            const key = `table_pause_${s.id}`;
-            try {
-                const existing = JSON.parse(localStorage.getItem(key));
-                if (existing?.isPaused) return; // ya pausada
-            } catch {}
+            if (pausedSessions[s.id]?.isPaused) return; // ya pausada
             const currentElapsed = calculateElapsedTime(s.started_at);
-            localStorage.setItem(key, JSON.stringify({ isPaused: true, elapsedAtPause: currentElapsed }));
+            pauseSession(s.id, currentElapsed);
             count++;
         });
-        setAnyPaused(true);
-        // Forzar re-render de las TableCards
-        window.dispatchEvent(new StorageEvent('storage', { key: 'global_pause_trigger' }));
         showToast(`${count} mesa${count !== 1 ? 's' : ''} pausada${count !== 1 ? 's' : ''}`, 'success');
     };
 
-    const handleResumeAll = () => {
+    const handleResumeAll = async () => {
         let count = 0;
-        pausableSessions.forEach(s => {
-            const key = `table_pause_${s.id}`;
-            try {
-                const saved = JSON.parse(localStorage.getItem(key));
-                if (!saved?.isPaused) return;
-                // Compensar tiempo de pausa ajustando started_at
-                const currentElapsed = calculateElapsedTime(s.started_at);
-                const pausedMinutes = currentElapsed - saved.elapsedAtPause;
-                const newStartedAt = new Date(new Date(s.started_at).getTime() + pausedMinutes * 60000).toISOString();
-                // Actualizar sesión en store
-                useTablesStore.getState().updateSessionTime(s.id, newStartedAt);
-            } catch {}
-            localStorage.removeItem(key);
+        for (const s of pausableSessions) {
+            if (!pausedSessions[s.id]?.isPaused) continue;
+            await resumeSession(s.id);
             count++;
-        });
-        setAnyPaused(false);
-        window.dispatchEvent(new StorageEvent('storage', { key: 'global_pause_trigger' }));
+        }
         showToast(`${count} mesa${count !== 1 ? 's' : ''} reanudada${count !== 1 ? 's' : ''}`, 'success');
     };
 

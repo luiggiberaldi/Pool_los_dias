@@ -35,6 +35,7 @@ export const useTablesStore = create((set, get) => ({
     activeSessions: [],
     paidHoursOffsets: {}, // { [sessionId]: number } — horas ya cobradas, guardadas solo localmente
     paidRoundsOffsets: {}, // { [sessionId]: number } — piñas ya cobradas, guardadas solo localmente
+    pausedSessions: {}, // { [sessionId]: { isPaused: true, elapsedAtPause: number } } — sincronizado via broadcast
     loading: true,
     realtimeChannel: null,
     _onlineHandler: null,
@@ -270,6 +271,45 @@ export const useTablesStore = create((set, get) => ({
 
         const channel = supabaseCloud
             .channel('pool_tables_sync_v2')
+            .on('broadcast', { event: 'table_pause' }, ({ payload }) => {
+                console.log("[REALTIME] broadcast table_pause:", payload);
+                if (payload?.sessionId) {
+                    set(state => ({
+                        pausedSessions: {
+                            ...state.pausedSessions,
+                            [payload.sessionId]: { isPaused: true, elapsedAtPause: payload.elapsedAtPause }
+                        }
+                    }));
+                }
+            })
+            .on('broadcast', { event: 'table_resume' }, ({ payload }) => {
+                console.log("[REALTIME] broadcast table_resume:", payload);
+                if (payload?.sessionId) {
+                    set(state => {
+                        const { [payload.sessionId]: _, ...rest } = state.pausedSessions;
+                        return { pausedSessions: rest };
+                    });
+                }
+            })
+            .on('broadcast', { event: 'table_pause_state_request' }, () => {
+                // Otro dispositivo solicita el estado actual de pausas
+                const paused = get().pausedSessions;
+                if (Object.keys(paused).length > 0) {
+                    get().realtimeChannel?.send({
+                        type: 'broadcast',
+                        event: 'table_pause_state_sync',
+                        payload: { pausedSessions: paused }
+                    });
+                }
+            })
+            .on('broadcast', { event: 'table_pause_state_sync' }, ({ payload }) => {
+                console.log("[REALTIME] broadcast table_pause_state_sync:", payload);
+                if (payload?.pausedSessions) {
+                    set(state => ({
+                        pausedSessions: { ...payload.pausedSessions, ...state.pausedSessions }
+                    }));
+                }
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions' }, (payload) => {
                 console.log("[REALTIME] table_sessions change received:", payload);
                 if (payload.eventType === 'UPDATE') {
@@ -306,6 +346,16 @@ export const useTablesStore = create((set, get) => ({
             })
             .subscribe((status) => {
                 console.log("[REALTIME] status pool_tables_sync_v2:", status);
+                // Al conectarse, solicitar estado de pausas de otros dispositivos
+                if (status === 'SUBSCRIBED') {
+                    setTimeout(() => {
+                        channel.send({
+                            type: 'broadcast',
+                            event: 'table_pause_state_request',
+                            payload: {}
+                        });
+                    }, 500);
+                }
             });
         set({ realtimeChannel: channel });
     },
@@ -405,6 +455,14 @@ export const useTablesStore = create((set, get) => ({
         const session = get().activeSessions.find(s => s.id === sessionId);
         const tableName = session ? (get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id) : sessionId;
 
+        // Limpiar estado de pausa si existía
+        if (get().pausedSessions[sessionId]) {
+            set(state => {
+                const { [sessionId]: _, ...rest } = state.pausedSessions;
+                return { pausedSessions: rest };
+            });
+        }
+
         const updatedList = get().activeSessions.filter(s => s.id !== sessionId);
         set({ activeSessions: updatedList });
         await tablesCache.setItem(scopedKey('active_sessions'), updatedList);
@@ -484,6 +542,46 @@ export const useTablesStore = create((set, get) => ({
         } catch (e) {
             await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { started_at: newStartedAt } });
         }
+    },
+
+    pauseSession: (sessionId, elapsedAtPause) => {
+        set(state => ({
+            pausedSessions: {
+                ...state.pausedSessions,
+                [sessionId]: { isPaused: true, elapsedAtPause }
+            }
+        }));
+        // Broadcast a otros dispositivos
+        get().realtimeChannel?.send({
+            type: 'broadcast',
+            event: 'table_pause',
+            payload: { sessionId, elapsedAtPause }
+        });
+    },
+
+    resumeSession: async (sessionId) => {
+        const pauseData = get().pausedSessions[sessionId];
+        if (pauseData) {
+            const session = get().activeSessions.find(s => s.id === sessionId);
+            if (session) {
+                const now = new Date();
+                const startedAt = new Date(session.started_at);
+                const currentElapsed = (now - startedAt) / 60000;
+                const pausedMinutes = currentElapsed - pauseData.elapsedAtPause;
+                const newStartedAt = new Date(startedAt.getTime() + pausedMinutes * 60000).toISOString();
+                await get().updateSessionTime(sessionId, newStartedAt);
+            }
+        }
+        set(state => {
+            const { [sessionId]: _, ...rest } = state.pausedSessions;
+            return { pausedSessions: rest };
+        });
+        // Broadcast a otros dispositivos
+        get().realtimeChannel?.send({
+            type: 'broadcast',
+            event: 'table_resume',
+            payload: { sessionId }
+        });
     },
 
     addHoursToSession: async (sessionId, additionalHours) => {
