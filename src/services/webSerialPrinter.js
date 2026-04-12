@@ -263,10 +263,13 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     if (tasaUSD && tasaUSD > 1) {
         // Calcular Bs con tasa implícita si hay config de precios Bs
         let totalBs;
-        if (config && timeCost > 0) {
+        if (timeCost > 0) {
             const gameMode = session?.game_mode;
-            const priceBs = gameMode === 'PINA' ? (config.pricePinaBs || 0) : (config.pricePerHourBs || 0);
-            const priceUsd = gameMode === 'PINA' ? (config.pricePina || 0) : (config.pricePerHour || 0);
+            // Leer de config con fallback a localStorage
+            const priceBs = gameMode === 'PINA'
+                ? (config?.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0)
+                : (config?.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0);
+            const priceUsd = gameMode === 'PINA' ? (config?.pricePina || 0) : (config?.pricePerHour || 0);
             const timeBs = (priceBs > 0 && priceUsd > 0)
                 ? Math.round(timeCost * (priceBs / priceUsd) * 100) / 100
                 : timeCost * tasaUSD;

@@ -54,20 +54,18 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
 export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
     if (costUSD <= 0) return 0;
 
+    // Leer precios Bs de config, con fallback directo a localStorage
+    let priceBs, priceUsd;
     if (gameMode === 'PINA') {
-        const priceBs = config.pricePinaBs || 0;
-        const priceUsd = config.pricePina || 0;
-        // Si tiene precio Bs independiente, calcular proporcionalmente
-        if (priceBs > 0 && priceUsd > 0) {
-            return round2(costUSD * (priceBs / priceUsd));
-        }
+        priceBs = config.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
+        priceUsd = config.pricePina || 0;
     } else {
-        // NORMAL y PREPAGO usan pricePerHour
-        const priceBs = config.pricePerHourBs || 0;
-        const priceUsd = config.pricePerHour || 0;
-        if (priceBs > 0 && priceUsd > 0) {
-            return round2(costUSD * (priceBs / priceUsd));
-        }
+        priceBs = config.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+        priceUsd = config.pricePerHour || 0;
+    }
+
+    if (priceBs > 0 && priceUsd > 0) {
+        return round2(costUSD * (priceBs / priceUsd));
     }
 
     // Fallback: usar tasa BCV
