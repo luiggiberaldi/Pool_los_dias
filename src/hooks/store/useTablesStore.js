@@ -327,7 +327,7 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null) => {
+    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null, includePina = false) => {
         const userId = await getAuthUserId();
 
         // Cerrar sesiones huérfanas (ACTIVE/CHECKOUT) para la misma mesa
@@ -358,6 +358,8 @@ export const useTablesStore = create((set, get) => ({
             ...(clientName ? { client_name: clientName } : {}),
             ...(guestCount > 0 ? { guest_count: guestCount } : {}),
             ...(clientId ? { client_id: clientId } : {}),
+            // Modo mixto: si se incluye piña en una sesión NORMAL, extended_times=1 (1 piña, conteo directo)
+            ...((includePina && gameMode !== 'PINA') ? { extended_times: 1 } : {}),
         };
         if (userId) sessionPayload.user_id = userId;
 
@@ -370,8 +372,12 @@ export const useTablesStore = create((set, get) => ({
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         const tableName = get().tables.find(t => t.id === tableId)?.name ?? tableId;
-        const modeLabel = gameMode === 'PINA' ? 'La Piña' : gameMode === 'PREPAGO' ? `Prepago ${hoursPaid}h` : 'Normal';
-        logEvent('MESAS', 'MESA_ABIERTA', `Mesa ${tableName} abierta · ${modeLabel}`, getUser(), { tableId, gameMode, hoursPaid });
+        const parts = [];
+        if (gameMode === 'PINA' || includePina) parts.push('Piña');
+        if (hoursPaid > 0) parts.push(`${hoursPaid}h`);
+        else if (gameMode !== 'PINA') parts.push('Libre');
+        const modeLabel = parts.join(' + ') || 'Normal';
+        logEvent('MESAS', 'MESA_ABIERTA', `Mesa ${tableName} abierta · ${modeLabel}`, getUser(), { tableId, gameMode, hoursPaid, includePina });
 
         try {
             const { data, error } = await supabaseCloud.from('table_sessions').insert(sessionPayload).select().single();
@@ -527,9 +533,15 @@ export const useTablesStore = create((set, get) => ({
         await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
         set({ paidHoursOffsets: { ...get().paidHoursOffsets, [sessionId]: currentHours } });
 
-        // 2b. Guardar rounds_offset = piñas ya cobradas (billing diferencial para modo PIÑA)
-        if (session.game_mode === 'PINA') {
-            const currentRounds = 1 + (Number(session.extended_times) || 0);
+        // 2b. Guardar rounds_offset = piñas ya cobradas (billing diferencial — aplica a PINA y modo mixto)
+        const hasPinas = session.game_mode === 'PINA' || Number(session.extended_times) > 0;
+        if (hasPinas) {
+            let currentRounds;
+            if (session.game_mode === 'PINA') {
+                currentRounds = 1 + (Number(session.extended_times) || 0);
+            } else {
+                currentRounds = Number(session.extended_times) || 0;
+            }
             const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
             roundsOffsetCache[sessionId] = currentRounds;
             await tablesCache.setItem(scopedKey('paid_rounds_offsets'), roundsOffsetCache);
@@ -579,6 +591,44 @@ export const useTablesStore = create((set, get) => ({
             if (error) throw error;
         } catch (e) {
             await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newRounds } });
+        }
+    },
+
+    // Agregar piña a una sesión que NO empezó como PINA (modo mixto).
+    // Para PINA puro o sesiones que ya tienen piñas, delega a addRoundToSession.
+    addPinaToSession: async (sessionId) => {
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        if (!session) return;
+
+        // Si ya tiene piñas (PINA o piñas previas con extended_times > 0), agregar otra
+        if (session.game_mode === 'PINA' || Number(session.extended_times) > 0) {
+            return get().addRoundToSession(sessionId);
+        }
+
+        // Primera piña en sesión que no era PINA: extended_times = 1 (conteo directo, no 1+N)
+        const newExtendedTimes = 1;
+        const tableName = get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id;
+
+        // Si estaba "cobrada sin liberar", limpiar paid_at
+        if (session.paid_at) {
+            const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+            delete paidCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+        }
+
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, extended_times: newExtendedTimes, paid_at: null } : s
+        );
+        set({ activeSessions: newSessions });
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+
+        logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Primera piña añadida (modo mixto)`, getUser(), { sessionId });
+
+        try {
+            const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newExtendedTimes }).eq('id', sessionId);
+            if (error) throw error;
+        } catch (e) {
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newExtendedTimes } });
         }
     },
 

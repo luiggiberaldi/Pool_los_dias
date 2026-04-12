@@ -23,9 +23,6 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
     const [packagingType, setPackagingType] = useState('suelto');
     const [stockInLotes, setStockInLotes] = useState('');
     const [granelUnit, setGranelUnit] = useState('kg');
-    const [isCombo, setIsCombo] = useState(false);
-    const [linkedProductId, setLinkedProductId] = useState('');
-    const [linkedQty, setLinkedQty] = useState('12');
     const [isFormShaking, setIsFormShaking] = useState(false);
     const [productMovements, setProductMovements] = useState([]);
     const fileInputRef = useRef(null);
@@ -81,7 +78,6 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         setStock(''); setUnit('unidad'); setUnitsPerPackage(''); setSellByUnit(false); setUnitPriceUsd('');
         setCategory('otros'); setLowStockAlert('5'); setImage(null); setEditingId(null);
         setPackagingType('suelto'); setStockInLotes(''); setGranelUnit('kg');
-        setIsCombo(false); setLinkedProductId(''); setLinkedQty('12');
         setProductMovements([]);
     };
 
@@ -99,7 +95,7 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         const productData = buildProductPayload({
             name, barcode, priceUsd, priceBs, costUsd, costBs, stock, stockInLotes,
             packagingType, unitsPerPackage, granelUnit, sellByUnit, unitPriceUsd,
-            category, lowStockAlert, isCombo, linkedProductId, linkedQty
+            category, lowStockAlert
         }, effectiveRate);
 
         if (editingId) {
@@ -160,9 +156,6 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         setCategory(product.category || 'otros');
         setLowStockAlert(product.lowStockAlert ?? 5);
         setImage(product.image);
-        setIsCombo(product.isCombo || false);
-        setLinkedProductId(product.linkedProductId || '');
-        setLinkedQty(product.linkedQty ? product.linkedQty.toString() : '12');
 
         const u = product.unit || 'unidad';
         if (product.packagingType) {
@@ -210,8 +203,7 @@ export function useProductForm({ products, effectiveRate, setProducts, broadcast
         category, setCategory, lowStockAlert, setLowStockAlert,
         image, setImage, packagingType, setPackagingType,
         stockInLotes, setStockInLotes, granelUnit, setGranelUnit,
-        isCombo, setIsCombo, linkedProductId, setLinkedProductId,
-        linkedQty, setLinkedQty, isFormShaking, productMovements,
+        isFormShaking, productMovements,
         fileInputRef,
         handleImageUpload, handlePriceUsdChange, handlePriceBsChange,
         handleCostUsdChange, handleCostBsChange,

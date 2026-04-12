@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock, MessageSquare } from 'lucide-react';
-import { calculateElapsedTime, calculateSessionCost, formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { calculateElapsedTime, calculateSessionCost, calculateSessionCostBreakdown, formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
@@ -282,7 +282,7 @@ function useBcvRate() {
 }
 
 export default function TableCard({ table, session }) {
-    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime } = useTablesStore();
+    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime, addPinaToSession, addHoursToSession } = useTablesStore();
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const tasaUSD = useBcvRate();
@@ -309,6 +309,13 @@ export default function TableCard({ table, session }) {
     const [showTotalDetails, setShowTotalDetails] = useState(false);
     const [showPinaConfirm, setShowPinaConfirm] = useState(false);
     const [adjustMins, setAdjustMins] = useState('');
+
+    // Modo mixto: toggles para modal unificado de apertura
+    const [modePina, setModePina] = useState(false);
+    const [modeHora, setModeHora] = useState(false);
+    const [selectedHours, setSelectedHours] = useState(0);
+    // Modal para agregar hora a sesión activa (piña → mixto)
+    const [showAddHoursModal, setShowAddHoursModal] = useState(false);
 
     // Modal de nombre + personas al abrir mesa
     const [showOpenModal, setShowOpenModal] = useState(false);
@@ -440,12 +447,17 @@ export default function TableCard({ table, session }) {
         if (pauseKey) localStorage.removeItem(pauseKey);
     };
 
-    const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null) => {
+    const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null, includePina = false) => {
         if (!currentUser) return;
-        const modeLabel = hours === 0 ? 'Libre' : hours === 0.5 ? 'Prepago 30 min' : `Prepago ${hours} hr${hours !== 1 ? 's' : ''}`;
+        const parts = [];
+        if (includePina) parts.push('Piña');
+        if (hours === 0) parts.push('Libre');
+        else if (hours === 0.5) parts.push('Prepago 30 min');
+        else parts.push(`Prepago ${hours} hr${hours !== 1 ? 's' : ''}`);
+        const modeLabel = parts.join(' + ');
         const ok = await confirm({ title: `Abrir ${table.name}`, message: `¿Confirmar apertura en modo ${modeLabel}?`, confirmText: 'Abrir Mesa', cancelText: 'Cancelar', variant: 'warning' });
         if (!ok) return;
-        await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount, clientId);
+        await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount, clientId, includePina);
         setShowModeModal(false);
     };
 
@@ -468,6 +480,9 @@ export default function TableCard({ table, session }) {
         setSessionClientName('');
         setSessionGuestCount('');
         setSessionClientId(null);
+        setModePina(false);
+        setModeHora(false);
+        setSelectedHours(0);
         refreshCustomers();
         setPendingOpen({ mode, hours });
         setShowOpenModal(true);
@@ -488,7 +503,33 @@ export default function TableCard({ table, session }) {
         const { mode, hours } = pendingOpen;
         if (mode === 'PINA') await handleStartPina(name, guests, sessionClientId);
         else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests, sessionClientId);
+        else if (mode === 'SHOW_MODE') {
+            // Para mesas de pool: mostrar modal unificado de modo
+            setShowModeModal(true);
+        }
         else await handleStartNormal(hours, name, guests, sessionClientId);
+        if (mode !== 'SHOW_MODE') setPendingOpen(null);
+    };
+
+    // Confirmar apertura desde el modal unificado de modo
+    const handleConfirmMode = async () => {
+        if (!modePina && !modeHora) return;
+        setShowModeModal(false);
+        const name = sessionClientId
+            ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim())
+            : sessionClientName.trim();
+        const guests = parseInt(sessionGuestCount) || 0;
+
+        if (modePina && !modeHora) {
+            // Solo piña
+            await handleStartPina(name, guests, sessionClientId);
+        } else if (!modePina && modeHora) {
+            // Solo hora
+            await handleStartNormal(selectedHours, name, guests, sessionClientId);
+        } else {
+            // Ambos: piña + hora → NORMAL con piña incluida
+            await handleStartNormal(selectedHours, name, guests, sessionClientId, true);
+        }
         setPendingOpen(null);
     };
 
@@ -526,6 +567,10 @@ export default function TableCard({ table, session }) {
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
+    const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset) : null;
+    const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
+    const hasPinas = costBreakdown ? costBreakdown.hasPinas : (session?.game_mode === 'PINA');
+    const hasHoursActive = costBreakdown ? costBreakdown.hasHours : (session?.hours_paid > 0);
     const grandTotal = timeCost + totalConsumption;
     
     // Countdown logic
@@ -636,7 +681,7 @@ export default function TableCard({ table, session }) {
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
                     isAvailable ? 'bg-emerald-100 text-emerald-700' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : hasPinas ? 'LA PIÑA' : 'JUG.'}
                 </div>
             </div>
 
@@ -671,7 +716,47 @@ export default function TableCard({ table, session }) {
                             </div>
                         ) : (
                             <>
-                                {session.game_mode === 'PINA' ? (
+                                {isMixedMode ? (
+                                    /* ── Display mixto: piñas + timer ── */
+                                    <div className="flex flex-col items-center gap-1.5 mt-1 w-full">
+                                        {/* Timer */}
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className={`text-2xl sm:text-3xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
+                                                {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
+                                            </div>
+                                            {hasLimit && !isLockedForMe && (
+                                                <button onClick={handleAdjustTime} className="p-1 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95">
+                                                    <span className="text-base font-black leading-none">+</span>
+                                                </button>
+                                            )}
+                                            {!isLockedForMe && (
+                                                <button
+                                                    onClick={isPaused ? handleResumeTimer : handlePauseTimer}
+                                                    className={`w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
+                                                >
+                                                    {isPaused ? <Play size={10} fill="currentColor" /> : <Pause size={10} />}
+                                                </button>
+                                            )}
+                                        </div>
+                                        {hasLimit && (
+                                            <div className={`text-[9px] font-black tracking-wider uppercase ${isExceeded ? 'text-rose-400' : 'text-amber-300'}`}>
+                                                {isExceeded ? 'TIEMPO EXCEDIDO' : 'TIEMPO RESTANTE'}
+                                            </div>
+                                        )}
+                                        {/* Piñas (compacto) */}
+                                        {(() => {
+                                            const totalRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                                            const paidRounds = roundsOffset || 0;
+                                            return (
+                                                <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full text-center flex items-center gap-1.5">
+                                                    <TargetIcon size={10} />
+                                                    {totalRounds} piña{totalRounds !== 1 ? 's' : ''}
+                                                    {paidRounds > 0 && <span className="text-emerald-400">({paidRounds} pagada{paidRounds !== 1 ? 's' : ''})</span>}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                ) : session.game_mode === 'PINA' || (hasPinas && !hasHoursActive) ? (
                                     <div className="flex flex-col items-center gap-1 mt-1">
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center shrink-0">
@@ -735,7 +820,7 @@ export default function TableCard({ table, session }) {
                                 </div>
                                 {tasaUSD > 0 && (
                                     <span className="text-[10px] font-semibold text-emerald-200/70 leading-tight">
-                                        Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                 )}
                             </div>
@@ -747,8 +832,8 @@ export default function TableCard({ table, session }) {
                                 <Eye size={16} />
                             </button>
                         </div>
-                        {session.game_mode === 'PINA' && (() => {
-                            const totalRounds = 1 + (Number(session.extended_times) || 0);
+                        {hasPinas && !isMixedMode && (() => {
+                            const totalRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
                             const paidRounds = roundsOffset || 0;
                             return (
                             <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mt-1 text-center">
@@ -772,22 +857,13 @@ export default function TableCard({ table, session }) {
                             <Play size={14} fill="currentColor" /> Ocupar
                         </button>
                     ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                data-tour="mesa-btn-normal"
-                                onClick={() => handleRequestOpen('SHOW_MODE')}
-                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
-                            >
-                                <Play size={12} fill="currentColor" /> Normal
-                            </button>
-                            <button
-                                data-tour="mesa-btn-pina"
-                                onClick={currentUser?.role === 'MESERO' ? () => setShowPinaConfirm(true) : () => handleRequestOpen('PINA')}
-                                className="bg-amber-500 hover:bg-amber-400 text-white font-bold text-[11px] sm:text-xs py-2.5 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
-                            >
-                                <TargetIcon size={12} /> Piña
-                            </button>
-                        </div>
+                        <button
+                            data-tour="mesa-btn-abrir"
+                            onClick={() => handleRequestOpen('SHOW_MODE')}
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm py-2.5 px-3 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <Play size={14} fill="currentColor" /> Abrir Mesa
+                        </button>
                     )
                 ) : isLockedForMe ? (
                         /* ── Mesa bloqueada para este mesero ── */
@@ -799,8 +875,8 @@ export default function TableCard({ table, session }) {
                         </div>
                 ) : (
                         <div className="flex flex-col gap-1.5">
-                        {/* Botón exclusivo Piña: nueva partida */}
-                        {session?.game_mode === 'PINA' && !isCheckoutPending && (
+                        {/* Botón Piña: nueva partida (PINA o mixto con piñas) */}
+                        {hasPinas && !isCheckoutPending && (
                             <div className="flex flex-col gap-1">
                                 <button
                                     onClick={async () => {
@@ -816,6 +892,30 @@ export default function TableCard({ table, session }) {
                                         className="w-full text-[10px] font-bold text-white/80 bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/30 transition-colors py-1 rounded-lg flex items-center justify-center gap-1 whitespace-nowrap"
                                     >
                                         <X size={10} strokeWidth={2.5} /> Quitar última piña
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Botones modo mixto: agregar el modo faltante */}
+                        {!isCheckoutPending && !isTimeFree && (
+                            <div className="flex gap-1.5">
+                                {/* Agregar Piña a sesión que no tiene piñas */}
+                                {!hasPinas && (
+                                    <button
+                                        onClick={async () => { await addPinaToSession(session.id); }}
+                                        className="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        <TargetIcon size={10} /> + Piña
+                                    </button>
+                                )}
+                                {/* Agregar Hora a sesión que no tiene horas */}
+                                {!hasHoursActive && (
+                                    <button
+                                        onClick={() => setShowAddHoursModal(true)}
+                                        className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        <Clock size={10} /> + Hora
                                     </button>
                                 )}
                             </div>
@@ -922,38 +1022,124 @@ export default function TableCard({ table, session }) {
             </div>
         </Modal>
 
-        {/* Modal de Elegir Tiempo Prepago */}
+        {/* Modal Unificado de Modo de Juego — Piña / Hora / Ambos */}
         <Modal isOpen={showModeModal} onClose={() => setShowModeModal(false)} title="Modo de Juego">
-            <div className="flex flex-col gap-3 py-2">
-                <button
-                    onClick={() => { const n=sessionClientId ? (allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName) : sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(0, n, g, sessionClientId); }}
-                    className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/50 group transition-all"
-                >
-                    <div className="font-black text-slate-800 group-hover:text-sky-700">Abierta (Libre)</div>
-                    <div className="text-sm text-slate-500">Mesa por tiempo ilimitado, cobro al final.</div>
-                </button>
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                    <button onClick={() => { const n=sessionClientId?(allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName):sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(0.5, n, g, sessionClientId); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
-                        <span className="text-xl">30 Min</span>
-                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
+            <div className="flex flex-col gap-4 py-2">
+                {/* Toggles de modo */}
+                <div className="flex flex-col gap-2.5">
+                    {/* Toggle Piña */}
+                    <button
+                        onClick={() => setModePina(!modePina)}
+                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                            modePina
+                                ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-400 shadow-sm shadow-amber-200/50'
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+                        }`}
+                    >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                            modePina ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                        }`}>
+                            <TargetIcon size={20} />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <div className={`font-black text-sm ${modePina ? 'text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                La Piña
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                ${config.pricePina || 0} por partida
+                            </div>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                            modePina ? 'bg-amber-500 border-amber-500' : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                            {modePina && <Check size={14} className="text-white" />}
+                        </div>
                     </button>
-                    <button onClick={() => { const n=sessionClientId?(allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName):sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(1, n, g, sessionClientId); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
-                        <span className="text-xl">1 Hrs</span>
-                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
-                    </button>
-                    <button onClick={() => { const n=sessionClientId?(allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName):sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(2, n, g, sessionClientId); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
-                        <span className="text-xl">2 Hrs</span>
-                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
-                    </button>
-                    <button onClick={() => { const n=sessionClientId?(allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName):sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(3, n, g, sessionClientId); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
-                        <span className="text-xl">3 Hrs</span>
-                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
-                    </button>
-                    <button onClick={() => { const n=sessionClientId?(allCustomers.find(c=>c.id===sessionClientId)?.name||sessionClientName):sessionClientName; const g=parseInt(sessionGuestCount)||0; handleStartNormal(4, n, g, sessionClientId); }} className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 border border-emerald-200 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center">
-                        <span className="text-xl">4 Hrs</span>
-                        <span className="text-xs font-semibold opacity-70 mt-0.5">PREPAGO</span>
+
+                    {/* Toggle Hora */}
+                    <button
+                        onClick={() => { setModeHora(!modeHora); if (!modeHora) setSelectedHours(0); }}
+                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                            modeHora
+                                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 shadow-sm shadow-emerald-200/50'
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
+                        }`}
+                    >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                            modeHora ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                        }`}>
+                            <Clock size={20} />
+                        </div>
+                        <div className="flex-1 text-left">
+                            <div className={`font-black text-sm ${modeHora ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                Por Hora
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                ${config.pricePerHour || 0}/hora · Prepago o libre
+                            </div>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                            modeHora ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                            {modeHora && <Check size={14} className="text-white" />}
+                        </div>
                     </button>
                 </div>
+
+                {/* Selector de tiempo (solo si hora está activo) */}
+                {modeHora && (
+                    <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 duration-200">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seleccionar tiempo</span>
+                        <button
+                            onClick={() => setSelectedHours(0)}
+                            className={`w-full text-left p-3 rounded-xl border transition-all ${
+                                selectedHours === 0
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 text-emerald-700 dark:text-emerald-400'
+                                    : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 text-slate-600 dark:text-slate-300'
+                            }`}
+                        >
+                            <div className="font-black text-sm">Abierta (Libre)</div>
+                            <div className="text-xs opacity-70">Sin límite, cobro al final</div>
+                        </button>
+                        <div className="grid grid-cols-3 gap-2">
+                            {[0.5, 1, 2, 3, 4].map(h => (
+                                <button
+                                    key={h}
+                                    onClick={() => setSelectedHours(h)}
+                                    className={`p-2.5 rounded-xl font-black transition-colors flex flex-col items-center justify-center ${
+                                        selectedHours === h
+                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
+                                    }`}
+                                >
+                                    <span className="text-lg">{h === 0.5 ? '30' : h}</span>
+                                    <span className="text-[10px] font-semibold opacity-70">{h === 0.5 ? 'MIN' : 'HRS'}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Resumen de selección */}
+                {(modePina || modeHora) && (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                        <span>Modo:</span>
+                        <div className="flex gap-1.5">
+                            {modePina && <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">Piña</span>}
+                            {modePina && modeHora && <span>+</span>}
+                            {modeHora && <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full">{selectedHours === 0 ? 'Libre' : selectedHours === 0.5 ? '30 min' : `${selectedHours}h`}</span>}
+                        </div>
+                    </div>
+                )}
+
+                {/* Botón confirmar */}
+                <button
+                    onClick={handleConfirmMode}
+                    disabled={!modePina && !modeHora}
+                    className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-400 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 disabled:active:scale-100"
+                >
+                    {!modePina && !modeHora ? 'Selecciona un modo' : 'Abrir Mesa'}
+                </button>
             </div>
         </Modal>
 
@@ -1161,6 +1347,27 @@ export default function TableCard({ table, session }) {
             </div>
         </Modal>
 
+        {/* Modal: Agregar Hora a sesión activa (modo mixto) */}
+        <Modal isOpen={showAddHoursModal} onClose={() => setShowAddHoursModal(false)} title="Agregar Tiempo">
+            <div className="flex flex-col gap-3 py-2">
+                <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                    Agregar tiempo prepago a esta mesa. El costo se sumará al total de la cuenta.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                    {[0.5, 1, 2, 3, 4].map(h => (
+                        <button
+                            key={h}
+                            onClick={async () => { await addHoursToSession(session?.id, h); setShowAddHoursModal(false); showToast(`${h === 0.5 ? '30 min' : h + 'h'} agregadas`, 'success'); }}
+                            className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center"
+                        >
+                            <span className="text-xl">{h === 0.5 ? '30' : h}</span>
+                            <span className="text-[10px] font-semibold opacity-70">{h === 0.5 ? 'MIN' : h === 1 ? 'HORA' : 'HORAS'}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </Modal>
+
         {/* Portals: rendered in document.body to escape card's CSS transform context */}
         {showOrderPanel && createPortal(
             <div className="fixed inset-0 z-[100] overflow-hidden flex">
@@ -1176,24 +1383,55 @@ export default function TableCard({ table, session }) {
         {/* Modal de Detalle de Gastos */}
         <Modal isOpen={showTotalDetails} onClose={() => setShowTotalDetails(false)} title={`Detalle de Cuenta`}>
              <div className="flex flex-col gap-3 py-4 text-slate-800 dark:text-white max-h-[70vh] overflow-y-auto">
-                {/* Tiempo / Juego — solo para mesas de Pool/Piña */}
-                {table?.type !== 'NORMAL' && (
+                {/* Piñas — visible si la sesión tiene piñas */}
+                {table?.type !== 'NORMAL' && costBreakdown?.hasPinas && (
+                <div className="flex flex-col p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/40">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-amber-700 dark:text-amber-400">Piñas jugadas</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-lg font-black">${(costBreakdown.pinaCost || 0).toFixed(2)}</span>
+                            <span className="text-xs font-medium text-slate-400">
+                                Bs. {calculateTimeCostBsBreakdown(costBreakdown.pinaCost, 0, config, tasaUSD).pinaCostBs.toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
+                    <span className="text-xs text-amber-600 dark:text-amber-400/70">
+                        {session?.game_mode === 'PINA' ? 1 + (Number(session?.extended_times) || 0) : Number(session?.extended_times) || 0} piña(s) · ${config.pricePina || 0} c/u
+                    </span>
+                </div>
+                )}
+
+                {/* Tiempo — visible si la sesión tiene horas */}
+                {table?.type !== 'NORMAL' && costBreakdown?.hasHours && (
                 <div className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/10">
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                            {session?.game_mode === 'PINA' ? 'Piñas jugadas' : 'Tiempo de Juego'}
-                        </span>
+                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Tiempo de Juego</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-lg font-black">${(costBreakdown.hourCost || 0).toFixed(2)}</span>
+                            <span className="text-xs font-medium text-slate-400">
+                                Bs. {calculateTimeCostBsBreakdown(0, costBreakdown.hourCost, config, tasaUSD).hourCostBs.toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
+                    <span className="text-xs text-slate-500">
+                        {formatElapsedTime(elapsed)} · {Number(session?.hours_paid) || 0}h pagadas
+                    </span>
+                </div>
+                )}
+
+                {/* Tiempo/Piña fallback para mesas sin breakdown */}
+                {table?.type !== 'NORMAL' && !costBreakdown?.hasPinas && !costBreakdown?.hasHours && timeCost > 0 && (
+                <div className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/10">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Tiempo de Juego</span>
                         <div className="flex flex-col items-end">
                             <span className="text-lg font-black">${timeCost.toFixed(2)}</span>
                             <span className="text-xs font-medium text-slate-400">Bs. {calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD).toFixed(2)}</span>
                         </div>
                     </div>
-                    <span className="text-xs text-slate-500">
-                         {session?.game_mode === 'PINA' ? `${1 + (Number(session?.extended_times) || 0)} piña(s)` : `${formatElapsedTime(elapsed)} horas jugadas`}
-                    </span>
                 </div>
                 )}
-                
+
                 {/* Consumos Detallados */}
                 <div className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/10">
                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/50 dark:border-white/5">
@@ -1208,7 +1446,7 @@ export default function TableCard({ table, session }) {
                             {currentItems.map((item, idx) => (
                                 <div key={idx} className="flex justify-between items-start text-sm">
                                     <span className="text-slate-700 dark:text-slate-300 font-medium">
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold mr-1">{item.qty}x</span> 
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-bold mr-1">{item.qty}x</span>
                                         {item.product_name}
                                     </span>
                                     <div className="flex flex-col items-end shrink-0 ml-2">
@@ -1234,7 +1472,7 @@ export default function TableCard({ table, session }) {
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD).toFixed(2)}
+                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown).toFixed(2)}
                         </span>
                     </div>
                 </div>

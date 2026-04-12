@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 
 function formatBs(val) {
@@ -19,16 +19,47 @@ function useBcvRate() {
     } catch { return 1; }
 }
 
+function TargetIcon({size}) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+        </svg>
+    );
+}
+
 /**
  * TableBillModal — Paso 1 del flujo de cobro de mesa.
- * Muestra el desglose completo de la cuenta (tiempo + consumos).
- * El cajero revisa con el cliente antes de proceder al pago.
+ * Muestra el desglose completo de la cuenta (tiempo + piñas + consumos).
+ * Soporta modo mixto (piña + hora simultáneamente).
  */
 export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const { table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal } = data;
     const config = useTablesStore(state => state.config);
+    const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
+    const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const tasaUSD = useBcvRate();
-    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD);
+
+    const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
+    const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
+    const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
+    const isMixed = breakdown.hasPinas && breakdown.hasHours;
+
+    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown);
+
+    // Helper: piña count depends on game mode
+    const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+
+    // Header subtitle
+    const headerParts = [];
+    if (breakdown.hasPinas) {
+        headerParts.push(`${pinaCount} piña(s)`);
+    }
+    if (breakdown.hasHours) {
+        headerParts.push(`${formatElapsedTime(elapsed)} de sesión`);
+    }
+    if (headerParts.length === 0) {
+        headerParts.push(session.game_mode === 'PINA' ? `${pinaCount} piña(s)` : `${formatElapsedTime(elapsed)} de sesión`);
+    }
 
     return (
         <div
@@ -49,9 +80,8 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                         <h2 className="font-black text-slate-800 dark:text-white text-lg leading-tight">{table.name}</h2>
                         <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
                             <Timer size={11} />
-                            {session.game_mode === 'PINA'
-                                ? `${1 + (Number(session.extended_times) || 0)} piña(s) · La Piña`
-                                : `${formatElapsedTime(elapsed)} de sesión`}
+                            {headerParts.join(' · ')}
+                            {isMixed && <span className="text-amber-500 font-bold ml-1">MIXTO</span>}
                         </p>
                     </div>
                     <button
@@ -73,30 +103,54 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                 {/* ── Scrollable body ─────────────────────────── */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
 
-                    {/* Tiempo de juego */}
-                    {session.game_mode === 'PINA' && timeCost > 0 && (
-                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">
-                            <div className="flex items-center gap-2 px-4 py-2 border-b border-blue-100 dark:border-blue-900/30">
-                                <Clock size={13} className="text-blue-500" />
-                                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                    {/* Piñas — visible si la sesión tiene piñas */}
+                    {breakdown.hasPinas && breakdown.pinaCost > 0 && (
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-2xl overflow-hidden">
+                            <div className="flex items-center gap-2 px-4 py-2 border-b border-amber-100 dark:border-amber-900/30">
+                                <TargetIcon size={13} />
+                                <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
                                     Piñas jugadas
                                 </p>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3">
                                 <div>
                                     <p className="text-sm font-bold text-slate-700 dark:text-white">
-                                        {1 + (Number(session.extended_times) || 0)} piña{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
+                                        {pinaCount} piña{pinaCount !== 1 ? 's' : ''}
                                     </p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">Precio fijo por piña</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePina || 0} por piña</p>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-base font-black text-slate-800 dark:text-white">${timeCost.toFixed(2)}</p>
-                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBs(timeCost, session?.game_mode, config, tasaUSD))}</p>
+                                    <p className="text-base font-black text-slate-800 dark:text-white">${breakdown.pinaCost.toFixed(2)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(breakdown.pinaCost, 0, config, tasaUSD).pinaCostBs)}</p>
                                 </div>
                             </div>
                         </div>
                     )}
-                    {session.game_mode === 'NORMAL' && elapsed > 0 && (
+
+                    {/* Tiempo de sesión — visible si la sesión tiene horas */}
+                    {breakdown.hasHours && breakdown.hourCost > 0 && (
+                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">
+                            <div className="flex items-center gap-2 px-4 py-2 border-b border-blue-100 dark:border-blue-900/30">
+                                <Clock size={13} className="text-blue-500" />
+                                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                                    Tiempo de Juego
+                                </p>
+                            </div>
+                            <div className="flex items-center justify-between px-4 py-3">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">${config.pricePerHour || 0}/hora · {Number(session.hours_paid) || 0}h pagadas</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-base font-black text-slate-800 dark:text-white">${breakdown.hourCost.toFixed(2)}</p>
+                                    <p className="text-[10px] text-slate-400">Bs {formatBs(calculateTimeCostBsBreakdown(0, breakdown.hourCost, config, tasaUSD).hourCostBs)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tiempo referencial (modo NORMAL libre, sin prepago, sin piñas) */}
+                    {session.game_mode === 'NORMAL' && !breakdown.hasPinas && !breakdown.hasHours && elapsed > 0 && (
                         <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 rounded-2xl overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-800/40">
                                 <Clock size={13} className="text-slate-400" />
@@ -115,29 +169,20 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             </div>
                         </div>
                     )}
-                    {timeCost > 0 && session.game_mode !== 'PINA' && session.game_mode !== 'NORMAL' && (
+
+                    {/* Fallback: PREPAGO sin breakdown (backward compat) */}
+                    {timeCost > 0 && !breakdown.hasPinas && !breakdown.hasHours && session.game_mode !== 'NORMAL' && (
                         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">
                             <div className="flex items-center gap-2 px-4 py-2 border-b border-blue-100 dark:border-blue-900/30">
                                 <Clock size={13} className="text-blue-500" />
                                 <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                                    {session.game_mode === 'PINA' ? 'Piñas jugadas' : 'Tiempo de Juego'}
+                                    Tiempo de Juego
                                 </p>
                             </div>
                             <div className="flex items-center justify-between px-4 py-3">
                                 <div>
-                                    {session.game_mode === 'PINA' ? (
-                                        <>
-                                            <p className="text-sm font-bold text-slate-700 dark:text-white">
-                                                {1 + (Number(session.extended_times) || 0)} piña{(1 + (Number(session.extended_times) || 0)) !== 1 ? 's' : ''}
-                                            </p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Precio fijo por piña</p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Tarifa por hora</p>
-                                        </>
-                                    )}
+                                    <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Tarifa por hora</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-base font-black text-slate-800 dark:text-white">${timeCost.toFixed(2)}</p>
@@ -200,7 +245,12 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     >
                         <div>
                             <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Total a Cobrar</p>
-                            {timeCost > 0 && totalConsumption > 0 && (
+                            {isMixed && (
+                                <p className="text-[10px] text-white/60 mt-0.5">
+                                    Piñas ${breakdown.pinaCost.toFixed(2)} + Tiempo ${breakdown.hourCost.toFixed(2)}{totalConsumption > 0 ? ` + Consumos $${totalConsumption.toFixed(2)}` : ''}
+                                </p>
+                            )}
+                            {!isMixed && timeCost > 0 && totalConsumption > 0 && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
                                     Tiempo ${timeCost.toFixed(2)} + Consumos ${totalConsumption.toFixed(2)}
                                 </p>

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, Banknote, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus, Gift, Percent } from 'lucide-react';
+import { Camera, X, AlertTriangle, Package, Tag, Scale, Droplets, ChevronDown, ChevronUp, Barcode, Banknote, CheckCircle, Clock, ShoppingBag, CreditCard, ArrowUpRight, Plus, Minus, Percent } from 'lucide-react';
 import { Modal } from '../Modal';
 import { useProductContext } from '../../context/ProductContext';
 import SpotlightTour from '../SpotlightTour';
@@ -74,10 +74,7 @@ export default function ProductFormModal({
     handleSave,
     categories,
     productMovements,
-    products,
-    isCombo, setIsCombo,
-    linkedProductId, setLinkedProductId,
-    linkedQty, setLinkedQty
+    products
 }) {
     const fileInputRef = useRef(null);
     const [showSummary, setShowSummary] = useState(false);
@@ -461,119 +458,8 @@ export default function ProductFormModal({
                         )}
                     </div>
 
-                    {/* ─── STOCK / COMBO SECTION ─── */}
+                    {/* ─── STOCK SECTION ─── */}
                     <div data-tour="pf-stock" className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-                        {/* Tab selector: Producto Normal | Combo/Promo */}
-                        <div className="flex gap-1 mb-3 bg-slate-200/60 dark:bg-slate-700/40 rounded-lg p-0.5">
-                            <button type="button" onClick={() => { setIsCombo(false); }}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-black transition-all ${!isCombo ? 'bg-white dark:bg-slate-800 text-slate-700 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <Droplets size={13} /> Producto Normal
-                            </button>
-                            <button type="button" onClick={() => { setIsCombo(true); setShowLoteCalc(false); }}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-black transition-all ${isCombo ? 'bg-violet-500 text-white shadow-sm shadow-violet-500/30' : 'text-slate-400 hover:text-slate-600'}`}>
-                                <Gift size={13} /> Combo / Promo
-                            </button>
-                        </div>
-
-                        {isCombo ? (() => {
-                            const linkedProduct = products?.find(p => p.id === linkedProductId);
-                            const parsedQty = parseInt(linkedQty) || 0;
-                            const individualTotal = linkedProduct ? linkedProduct.priceUsdt * parsedQty : 0;
-                            const savingsUsd = individualTotal > 0 && parsedPrice > 0 ? individualTotal - parsedPrice : 0;
-                            const savingsPct = individualTotal > 0 && parsedPrice > 0 ? ((savingsUsd / individualTotal) * 100) : 0;
-                            const availableCombos = linkedProduct && parsedQty > 0 ? Math.floor(linkedProduct.stock / parsedQty) : 0;
-
-                            return (
-                            <div className="space-y-3 animate-in fade-in zoom-in-95">
-                                {/* Producto base */}
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1.5 block uppercase">Producto base que descuenta stock</label>
-                                    <select value={linkedProductId} onChange={e => setLinkedProductId(e.target.value)}
-                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-xl font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-violet-500/50 text-sm">
-                                        <option value="">Selecciona producto...</option>
-                                        {products?.filter(p => !p.isCombo).map(p => (
-                                            <option key={p.id} value={p.id}>{p.name} — ${p.priceUsdt?.toFixed(2)} c/u (Stock: {p.stock})</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Cantidad con presets */}
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1.5 block uppercase">Cantidad por combo</label>
-                                    <div className="flex gap-2 items-center">
-                                        <div className="flex gap-1 flex-wrap flex-1">
-                                            {[3, 5, 6, 12, 24].map(n => (
-                                                <button key={n} type="button" onClick={() => setLinkedQty(String(n))}
-                                                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${String(n) === String(linkedQty) ? 'bg-violet-500 text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-violet-400'}`}>
-                                                    {n}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <input type="number" value={linkedQty} onChange={e => setLinkedQty(e.target.value)} placeholder="Otro"
-                                            className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-xl font-black text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-violet-500/50 text-center text-sm" />
-                                    </div>
-                                </div>
-
-                                {/* Sugerencia de precio */}
-                                {linkedProduct && parsedQty > 0 && (
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1.5 block uppercase">Precio sugerido con descuento</label>
-                                        <div className="flex gap-1.5">
-                                            {[10, 15, 20].map(pct => {
-                                                const suggested = Math.round((individualTotal * (1 - pct / 100)) * 100) / 100;
-                                                return (
-                                                    <button key={pct} type="button"
-                                                        onClick={() => {
-                                                            handlePriceUsdChange({ target: { value: String(suggested) } });
-                                                        }}
-                                                        className="flex-1 py-2 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all active:scale-95">
-                                                        <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">-{pct}%</div>
-                                                        <div className="text-xs font-black text-emerald-700 dark:text-emerald-300">${suggested.toFixed(2)}</div>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Preview card */}
-                                {linkedProduct && parsedQty > 0 && parsedPrice > 0 && (
-                                    <div className="bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-700/40 rounded-xl p-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs font-black text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
-                                                <Gift size={13} /> Vista previa del combo
-                                            </span>
-                                            {availableCombos > 0 && (
-                                                <span className="text-[10px] font-bold bg-violet-200 dark:bg-violet-800/50 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
-                                                    {availableCombos} disponibles
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between text-xs">
-                                                <span className="text-slate-600 dark:text-slate-400">{parsedQty}x {linkedProduct.name}</span>
-                                                <span className="font-bold text-violet-600 dark:text-violet-400">${parsedPrice.toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-[11px]">
-                                                <span className="text-slate-400">Individual ({parsedQty} x ${linkedProduct.priceUsdt?.toFixed(2)})</span>
-                                                <span className="text-slate-400 line-through">${individualTotal.toFixed(2)}</span>
-                                            </div>
-                                            {savingsUsd > 0 && (
-                                                <div className="flex justify-between text-xs pt-1 border-t border-violet-200 dark:border-violet-700/40">
-                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                                        <Percent size={11} /> Ahorro cliente
-                                                    </span>
-                                                    <span className="font-black text-emerald-600 dark:text-emerald-400">
-                                                        ${savingsUsd.toFixed(2)} (-{savingsPct.toFixed(0)}%)
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            );
-                        })() : (
                             <div className="grid grid-cols-2 gap-3 animate-in fade-in zoom-in-95">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 ml-1 mb-1 block uppercase">Stock Físico</label>

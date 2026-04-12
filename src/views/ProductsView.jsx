@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare, Warehouse } from 'lucide-react';
+import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare, Warehouse, Gift } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
 import ShareInventoryModal from '../components/ShareInventoryModal';
@@ -13,6 +13,7 @@ import ProductFormModal from '../components/Products/ProductFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
 import BulkPriceAdjustModal from '../components/Products/BulkPriceAdjustModal';
+import ComboFormModal from '../components/Products/ComboFormModal';
 import { useProductContext } from '../context/ProductContext';
 import EmptyState from '../components/EmptyState';
 import Skeleton from '../components/Skeleton';
@@ -62,12 +63,40 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     // ── Form hook ──
     const form = useProductForm({ products, effectiveRate, setProducts, broadcastProductDelta, triggerHaptic, auditLog, onClose: () => setIsModalOpen(false) });
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isComboModalOpen, setIsComboModalOpen] = useState(false);
+    const [editingCombo, setEditingCombo] = useState(null);
 
     const handleEdit = async (product) => {
-        await form.handleEdit(product);
-        setIsModalOpen(true);
+        if (product.isCombo) {
+            setEditingCombo(product);
+            setIsComboModalOpen(true);
+        } else {
+            await form.handleEdit(product);
+            setIsModalOpen(true);
+        }
     };
     const handleClose = () => { form.handleClose(); setIsModalOpen(false); };
+
+    const handleComboSave = (comboProduct) => {
+        if (editingCombo) {
+            setProducts(products.map(p => p.id === comboProduct.id ? comboProduct : p));
+            if (broadcastProductDelta) {
+                const { image: _img, ...withoutImage } = comboProduct;
+                broadcastProductDelta('product_update', { product: withoutImage });
+            }
+            auditLog('INVENTARIO', 'COMBO_EDITADO', `Combo "${comboProduct.name}" editado - $${comboProduct.priceUsdt}`);
+        } else {
+            setProducts([comboProduct, ...products]);
+            if (broadcastProductDelta) {
+                const { image: _img, ...withoutImage } = comboProduct;
+                broadcastProductDelta('product_added', { product: withoutImage });
+            }
+            auditLog('INVENTARIO', 'COMBO_CREADO', `Combo "${comboProduct.name}" creado - $${comboProduct.priceUsdt}`);
+        }
+        setIsComboModalOpen(false);
+        setEditingCombo(null);
+        triggerHaptic && triggerHaptic();
+    };
 
     // ── Pagination hook ──
     const pagination = useProductPagination({ products, effectiveRate, triggerHaptic });
@@ -185,11 +214,18 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                             </>
                         )}
                         {!isCajero && (
+                            <>
+                            <button onClick={() => { triggerHaptic && triggerHaptic(); setIsComboModalOpen(true); setEditingCombo(null); }}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-xl shadow-md shadow-violet-500/20 transition-all active:scale-95 font-bold text-sm">
+                                <Gift size={16} strokeWidth={2.5} />
+                                <span className="hidden sm:inline">Combo</span>
+                            </button>
                             <button data-tour="add-product" onClick={() => { triggerHaptic && triggerHaptic(); setIsModalOpen(true); }}
                                 className="flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md shadow-brand/20 transition-all active:scale-95 font-bold text-sm">
                                 <Plus size={16} strokeWidth={2.5} />
                                 <span className="hidden sm:inline">Nuevo</span>
                             </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -433,15 +469,24 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 packagingType={form.packagingType} setPackagingType={form.setPackagingType}
                 stockInLotes={form.stockInLotes} setStockInLotes={form.setStockInLotes}
                 granelUnit={form.granelUnit} setGranelUnit={form.setGranelUnit}
-                isCombo={form.isCombo} setIsCombo={form.setIsCombo}
-                linkedProductId={form.linkedProductId} setLinkedProductId={form.setLinkedProductId}
-                linkedQty={form.linkedQty} setLinkedQty={form.setLinkedQty}
                 effectiveRate={effectiveRate} copEnabled={copEnabled} tasaCop={tasaCop}
                 isFormShaking={form.isFormShaking}
                 handleImageUpload={form.handleImageUpload}
                 handleSave={form.handleSave}
                 categories={categories} products={products}
                 productMovements={form.editingId ? form.productMovements : null}
+            />
+
+            <ComboFormModal
+                isOpen={isComboModalOpen}
+                onClose={() => { setIsComboModalOpen(false); setEditingCombo(null); }}
+                products={products}
+                categories={categories}
+                effectiveRate={effectiveRate}
+                copEnabled={copEnabled}
+                tasaCop={tasaCop}
+                onSave={handleComboSave}
+                editingCombo={editingCombo}
             />
 
             <ProductShareModal isOpen={!!shareProduct} onClose={() => setShareProduct(null)}

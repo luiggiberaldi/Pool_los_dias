@@ -16,10 +16,7 @@ export function buildProductPayload(formData, effectiveRate) {
         sellByUnit,
         unitPriceUsd,
         category,
-        lowStockAlert,
-        isCombo,
-        linkedProductId,
-        linkedQty
+        lowStockAlert
     } = formData;
 
     const formattedName = name.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
@@ -51,7 +48,7 @@ export function buildProductPayload(formData, effectiveRate) {
         priceBs: finalPriceBs,
         costUsd: finalCostUsd,
         costBs: finalCostBs,
-        stock: isCombo ? 0 : finalStock, // Combos don't have their own stock
+        stock: finalStock,
         unit: legacyUnit,
         packagingType: packagingType,
         unitsPerPackage: parsedUnitsPerPkg,
@@ -59,9 +56,6 @@ export function buildProductPayload(formData, effectiveRate) {
         unitPriceUsd: isLote && sellByUnit ? finalUnitPrice : null,
         stockInLotes: isLote && stockInLotes ? parseInt(stockInLotes) : null,
         category: category,
-        lowStockAlert: lowStockAlert ? parseInt(lowStockAlert) : 5,
-        isCombo: !!isCombo,
-        linkedProductId: isCombo ? linkedProductId : null,
-        linkedQty: isCombo ? parseInt(linkedQty) || 1 : null
+        lowStockAlert: lowStockAlert ? parseInt(lowStockAlert) : 5
     };
 }

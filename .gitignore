@@ -86,3 +86,4 @@ scripts/
 .vercel
 capacitor.config.json
 .env
+.env

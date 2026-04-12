@@ -101,7 +101,8 @@ export async function processSaleTransaction({
           priceUsd: i.priceUsd,
           isCombo: i.isCombo || false,
           linkedProductId: i.linkedProductId || null,
-          linkedQty: i.linkedQty || 1
+          linkedQty: i.linkedQty || 1,
+          comboItems: i.comboItems || null
       })),
       payments: rpcPayments,
       fiadoUsd: fiadoAmountUsd
@@ -226,10 +227,19 @@ export async function processSaleTransaction({
         else if (item._mode === 'unit') deduction = (item.qty / (item._unitsPerPackage || 1));
         else deduction = item.qty;
 
-        if (item.isCombo && item.linkedProductId) {
-            const linkedDeduction = deduction * (item.linkedQty || 1);
-            deductions[item.linkedProductId] = (deductions[item.linkedProductId] || 0) + linkedDeduction;
-            // Combos don't deduct their own stock, only the linked product
+        if (item.isCombo) {
+            if (item.comboItems && item.comboItems.length > 0) {
+                // Multi-product combo
+                item.comboItems.forEach(ci => {
+                    const ciDeduction = deduction * (ci.qty || 1);
+                    deductions[ci.productId] = (deductions[ci.productId] || 0) + ciDeduction;
+                });
+            } else if (item.linkedProductId) {
+                // Legacy single-product combo
+                const linkedDeduction = deduction * (item.linkedQty || 1);
+                deductions[item.linkedProductId] = (deductions[item.linkedProductId] || 0) + linkedDeduction;
+            }
+            // Combos don't deduct their own stock
         } else {
             const id = item._originalId || item.id;
             deductions[id] = (deductions[id] || 0) + deduction;
