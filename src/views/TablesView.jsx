@@ -26,11 +26,14 @@ function FilterPill({ label, active, onClick }) {
 
 export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) {
     const { tables, activeSessions, loading, syncTablesAndSessions } = useTablesStore();
-    const { role } = useAuthStore();
+    const { role, currentUser } = useAuthStore();
     const isAdmin = role === 'ADMIN';
 
     const [typeFilter,   setTypeFilter]   = useState('Todas');
     const [statusFilter, setStatusFilter] = useState('Todas');
+    const [ownerFilter, setOwnerFilter]   = useState('Todas');
+
+    const isMesero = role === 'MESERO';
 
     // Detectar si hay alguna sesión pausada (para el botón global)
     const pausableSessions = useMemo(() =>
@@ -117,9 +120,11 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
             if (statusFilter === 'Libres'   &&  isOccupied) return false;
             if (statusFilter === 'Ocupadas' && !isOccupied) return false;
 
+            if (ownerFilter === 'Mis Mesas' && (!isOccupied || session.opened_by !== currentUser?.id)) return false;
+
             return true;
         });
-    }, [tables, activeSessions, typeFilter, statusFilter]);
+    }, [tables, activeSessions, typeFilter, statusFilter, ownerFilter, currentUser]);
 
     if (loading) {
         return (
@@ -179,6 +184,14 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
                             <FilterPill key={f} label={f} active={statusFilter === f} onClick={() => setStatusFilter(f)} />
                         ))}
                     </div>
+                    {isMesero && (
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0 w-10">Mías</span>
+                        {['Todas', 'Mis Mesas'].map(f => (
+                            <FilterPill key={f} label={f} active={ownerFilter === f} onClick={() => setOwnerFilter(f)} />
+                        ))}
+                    </div>
+                    )}
                 </div>
             </div>
 

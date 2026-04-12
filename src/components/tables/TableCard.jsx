@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause } from 'lucide-react';
+import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, formatElapsedTime } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -295,6 +295,9 @@ export default function TableCard({ table, session }) {
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
     const isCheckoutPending = session?.status === 'CHECKOUT';
 
+    // Bloqueo de mesa: si un mesero abrió la mesa, otros meseros no pueden interactuar
+    const isLockedForMe = currentUser?.role === 'MESERO' && isPlaying && session?.opened_by && session.opened_by !== currentUser?.id;
+
     const [elapsed, setElapsed] = useState(() =>
         isPlaying && session?.started_at ? calculateElapsedTime(session.started_at) : 0
     );
@@ -545,10 +548,14 @@ export default function TableCard({ table, session }) {
         <>
         <div className={`relative flex flex-col rounded-3xl p-4 sm:p-5 shadow-sm border-2 overflow-hidden transition-all duration-300 ${
             isAvailable
-                ? 'bg-white border-slate-200' 
-                : table.type === 'NORMAL'
-                    ? 'bg-gradient-to-br from-violet-600 to-fuchsia-500 border-transparent shadow-lg text-white scale-[1.02]'
-                    : 'bg-gradient-to-br from-indigo-600 to-sky-500 border-transparent shadow-lg text-white scale-[1.02]'
+                ? 'bg-white border-slate-200'
+                : isLockedForMe
+                    ? table.type === 'NORMAL'
+                        ? 'bg-gradient-to-br from-violet-600/70 to-fuchsia-500/70 border-white/20 shadow-lg text-white opacity-75'
+                        : 'bg-gradient-to-br from-indigo-600/70 to-sky-500/70 border-white/20 shadow-lg text-white opacity-75'
+                    : table.type === 'NORMAL'
+                        ? 'bg-gradient-to-br from-violet-600 to-fuchsia-500 border-transparent shadow-lg text-white scale-[1.02]'
+                        : 'bg-gradient-to-br from-indigo-600 to-sky-500 border-transparent shadow-lg text-white scale-[1.02]'
         }`}>
             {/* Header: Title / Flow Actions */}
             <div className="flex flex-wrap items-start justify-between mb-2 gap-2 border-b border-white/5 pb-2">
@@ -557,7 +564,7 @@ export default function TableCard({ table, session }) {
                         <h3 className={`text-base sm:text-lg font-black tracking-tight leading-tight whitespace-nowrap shrink-0 ${isAvailable ? 'text-slate-800' : 'text-white'}`}>
                             {table.name}
                         </h3>
-                        {isPlaying && (
+                        {isPlaying && !isLockedForMe && (
                             <>
                                 <button
                                     onClick={handlePrintPartial}
@@ -577,6 +584,11 @@ export default function TableCard({ table, session }) {
                                 )}
                             </>
                         )}
+                        {isLockedForMe && (
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center bg-white/20 text-white/60 shrink-0" title="Mesa asignada a otro mesero">
+                                <Lock size={12} />
+                            </div>
+                        )}
                     </div>
                     {isPlaying && staffName && (
                         <span className="text-[10px] font-bold opacity-70 bg-white/15 px-1.5 py-0.5 rounded-md self-start whitespace-nowrap">
@@ -584,6 +596,13 @@ export default function TableCard({ table, session }) {
                         </span>
                     )}
                     {isPlaying && (session?.client_name || session?.guest_count > 0) && (
+                        isLockedForMe ? (
+                            <div className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md self-start ${session.client_id ? 'bg-sky-400/30 opacity-100' : 'opacity-80 bg-white/15'}`}>
+                                {session.client_id ? <UserCheck size={9} className="shrink-0" /> : null}
+                                {session.client_name && <span className="whitespace-nowrap">{session.client_name}</span>}
+                                {session.guest_count > 0 && <span className="flex items-center gap-0.5"><Users size={9} />{session.guest_count}</span>}
+                            </div>
+                        ) : (
                         <button
                             onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setEditClientId(session.client_id || null); setShowEditMetaModal(true); }}
                             className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md self-start transition-colors ${session.client_id ? 'bg-sky-400/30 hover:bg-sky-400/50 opacity-100' : 'opacity-80 bg-white/15 hover:bg-white/30'}`}
@@ -594,8 +613,9 @@ export default function TableCard({ table, session }) {
                             {session.guest_count > 0 && <span className="flex items-center gap-0.5"><Users size={9} />{session.guest_count}</span>}
                             <Edit2 size={8} className="opacity-60" />
                         </button>
+                        )
                     )}
-                    {isPlaying && !session?.client_name && !(session?.guest_count > 0) && (
+                    {isPlaying && !session?.client_name && !(session?.guest_count > 0) && !isLockedForMe && (
                         <button
                             onClick={() => { setEditClientName(''); setEditGuestCount(''); setEditClientId(null); setShowEditMetaModal(true); }}
                             className="text-[10px] font-bold opacity-50 hover:opacity-80 bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded-md self-start transition-colors flex items-center gap-1"
@@ -664,7 +684,7 @@ export default function TableCard({ table, session }) {
                                                 {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                             </div>
                                             {/* Botón "+" solo visible en PREPAGO y PIÑA — en modo libre no tiene sentido */}
-                                            {(hasLimit || session?.game_mode === 'PINA') && (
+                                            {(hasLimit || session?.game_mode === 'PINA') && !isLockedForMe && (
                                             <button
                                                 onClick={handleAdjustTime}
                                                 className="p-1.5 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"
@@ -674,7 +694,7 @@ export default function TableCard({ table, session }) {
                                             </button>
                                             )}
                                             {/* Pausa — disponible en prepago y hora libre, NO en piña */}
-                                            {session?.game_mode !== 'PINA' && (
+                                            {session?.game_mode !== 'PINA' && !isLockedForMe && (
                                             <button
                                                 onClick={isPaused ? handleResumeTimer : handlePauseTimer}
                                                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${isPaused ? 'bg-emerald-500 hover:bg-emerald-400 text-white' : 'bg-white/20 hover:bg-white/40 text-white'}`}
@@ -761,6 +781,14 @@ export default function TableCard({ table, session }) {
                             </button>
                         </div>
                     )
+                ) : isLockedForMe ? (
+                        /* ── Mesa bloqueada para este mesero ── */
+                        <div className="flex flex-col items-center gap-1.5 py-2">
+                            <div className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-3 flex items-center justify-center gap-2">
+                                <Lock size={14} className="text-white/50" />
+                                <span className="text-[11px] font-bold text-white/60">Mesa asignada a {staffName || 'otro mesero'}</span>
+                            </div>
+                        </div>
                 ) : (
                         <div className="flex flex-col gap-1.5">
                         {/* Botón exclusivo Piña: nueva partida */}
