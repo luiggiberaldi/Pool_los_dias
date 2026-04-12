@@ -1285,45 +1285,51 @@ export default function TableCard({ table, session }) {
         </Modal>
 
         {/* Modal Modificar Tiempo / Partidas */}
-        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={session?.game_mode === 'PINA' ? "Añadir Piñas" : "Modificar Tiempo"}>
+        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={isMixedMode ? "Añadir Piñas / Tiempo" : hasPinas && !hasHoursActive ? "Añadir Piñas" : "Modificar Tiempo"}>
             <div className="flex flex-col gap-4 py-2">
-                {session?.game_mode === 'PINA' ? (
+                {/* Sección Piñas — visible en modo PINA o mixto */}
+                {(hasPinas) && (
                     <>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                            Añade más piñas a esta mesa sin tener que cerrarla y volverla a abrir.
-                        </p>
-                        <button 
-                            onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }} 
+                        {isMixedMode && <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Piñas</span>}
+                        <button
+                            onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }}
                             className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg"
                         >
                             <TargetIcon size={20} /> + 1 Piña
                         </button>
                     </>
-                ) : hasLimit ? (
-                    <>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                            Esta mesa tiene un prepago. Puede ajustar el tiempo:
-                        </p>
-                        <div className="flex flex-col gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar</span>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 0.5); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 30 Min</button>
-                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 1); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 1 Hora</button>
-                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
-                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
-                            </div>
-                            {currentUser?.role === 'ADMIN' && (
-                                <>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
-                                        <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
-                                    </div>
-                                </>
-                            )}
+                )}
+
+                {/* Sección Tiempo — visible si tiene horas (mixto o prepago) */}
+                {hasHoursActive && hasLimit && (
+                    <div className="flex flex-col gap-2">
+                        {isMixedMode && <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mt-1">Tiempo</span>}
+                        {!isMixedMode && (
+                            <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                Esta mesa tiene un prepago. Puede ajustar el tiempo:
+                            </p>
+                        )}
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar</span>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 0.5); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 30 Min</button>
+                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 1); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 1 Hora</button>
+                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
+                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
                         </div>
-                    </>
-                ) : (
+                        {currentUser?.role === 'ADMIN' && (
+                            <>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
+                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* Solo piña puro sin horas y no mixto — no mostrar nada extra */}
+                {!hasPinas && !hasHoursActive && !hasLimit && (
                     <>
                         <p className="text-sm text-slate-500 font-medium leading-relaxed">
                             Ajuste manual para compensar tiempo si faltó la luz.
