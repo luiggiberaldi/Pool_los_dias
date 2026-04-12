@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Tag, AlertTriangle, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer, Check } from 'lucide-react';
+import { Tag, AlertTriangle, Minus, Plus, Pencil, Trash2, Package, Layers, Clock, Printer, Check, Gift } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_ICONS, UNITS } from '../../config/categories';
 import { formatUsd, formatBs, smartCashRounding } from '../../utils/calculatorUtils';
 
@@ -18,7 +18,8 @@ export default function ProductCard({
     onPrint,
     readOnly = false,
     onEdit,
-    onDelete
+    onDelete,
+    allProducts
 }) {
     // Staged delta: tracks uncommitted stock changes before the user confirms
     const [delta, setDelta] = useState(0);
@@ -108,6 +109,18 @@ export default function ProductCard({
             {/* Info */}
             <div className="p-3 flex flex-col flex-1">
                 <h3 className="font-bold text-slate-700 dark:text-slate-200 text-[13px] sm:text-sm leading-tight line-clamp-2 mb-2">{p.name}</h3>
+
+                {p.isCombo && (() => {
+                    const linked = allProducts?.find(lp => lp.id === p.linkedProductId);
+                    const availQty = linked && p.linkedQty > 0 ? Math.floor(linked.stock / p.linkedQty) : null;
+                    return (
+                        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-violet-600 dark:text-violet-400 mb-2 mt-[-4px]">
+                            <Gift size={11} />
+                            <span>Combo · {p.linkedQty}x {linked?.name || '?'}</span>
+                            {availQty !== null && <span className="text-slate-400 ml-auto">({availQty} disp)</span>}
+                        </div>
+                    );
+                })()}
 
                 {p.unit === 'paquete' && p.unitsPerPackage && (
                     <div className="flex items-center gap-1 text-[10px] sm:text-xs font-bold text-indigo-500 dark:text-indigo-400 mb-2 mt-[-4px]">

@@ -309,6 +309,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                                             onAdjustStock={adjustStock} onConfirmStock={handleConfirmStock}
                                             onShare={setShareProduct} onEdit={handleEdit} onDelete={handleDelete}
                                             readOnly={isCajero}
+                                            allProducts={products}
                                             daysRemaining={salesVelocityMap[p.id] > 0 && (p.stock ?? 0) > 0 ? Math.round((p.stock ?? 0) / salesVelocityMap[p.id]) : null}
                                             isSelected={selectedIds.has(p.id)}
                                             onToggleSelect={() => handleToggleSelect(p.id)}
