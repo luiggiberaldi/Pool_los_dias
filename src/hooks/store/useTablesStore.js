@@ -310,6 +310,107 @@ export const useTablesStore = create((set, get) => ({
                     }));
                 }
             })
+            // --- Sincronización de offsets de pago entre dispositivos ---
+            .on('broadcast', { event: 'table_payment_reset' }, async ({ payload }) => {
+                console.log("[REALTIME] broadcast table_payment_reset:", payload);
+                if (!payload?.sessionId) return;
+                const { sessionId, paidAt, hoursOffset, roundsOffset, hasPinas } = payload;
+
+                // Guardar paid_at en cache local
+                const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+                paidCache[sessionId] = paidAt;
+                await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+
+                // Guardar hours offset
+                const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+                offsetCache[sessionId] = hoursOffset;
+                await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
+                set(state => ({ paidHoursOffsets: { ...state.paidHoursOffsets, [sessionId]: hoursOffset } }));
+
+                // Guardar rounds offset
+                if (hasPinas) {
+                    const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+                    roundsOffsetCache[sessionId] = roundsOffset;
+                    await tablesCache.setItem(scopedKey('paid_rounds_offsets'), roundsOffsetCache);
+                    set(state => ({ paidRoundsOffsets: { ...state.paidRoundsOffsets, [sessionId]: roundsOffset } }));
+                }
+
+                // Actualizar paid_at en la sesión local
+                set(state => ({
+                    activeSessions: state.activeSessions.map(s =>
+                        s.id === sessionId ? { ...s, paid_at: paidAt, status: 'ACTIVE' } : s
+                    )
+                }));
+            })
+            .on('broadcast', { event: 'table_offsets_state_request' }, async () => {
+                // Otro dispositivo solicita el estado actual de offsets de pago
+                const paidHoursOffsets = get().paidHoursOffsets;
+                const paidRoundsOffsets = get().paidRoundsOffsets;
+                const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+                if (Object.keys(paidHoursOffsets).length > 0 || Object.keys(paidRoundsOffsets).length > 0) {
+                    get().realtimeChannel?.send({
+                        type: 'broadcast',
+                        event: 'table_offsets_state_sync',
+                        payload: { paidHoursOffsets, paidRoundsOffsets, paidSessions: paidCache }
+                    });
+                }
+            })
+            .on('broadcast', { event: 'table_offsets_state_sync' }, async ({ payload }) => {
+                console.log("[REALTIME] broadcast table_offsets_state_sync:", payload);
+                if (!payload) return;
+                const { paidHoursOffsets: remoteHours, paidRoundsOffsets: remoteRounds, paidSessions: remotePaid } = payload;
+
+                // Merge offsets remotos con los locales (remoto gana si no existe localmente)
+                if (remoteHours) {
+                    const localOffsets = { ...get().paidHoursOffsets };
+                    const merged = { ...remoteHours, ...localOffsets };
+                    set({ paidHoursOffsets: merged });
+                    await tablesCache.setItem(scopedKey('paid_hours_offsets'), merged);
+                }
+                if (remoteRounds) {
+                    const localRounds = { ...get().paidRoundsOffsets };
+                    const merged = { ...remoteRounds, ...localRounds };
+                    set({ paidRoundsOffsets: merged });
+                    await tablesCache.setItem(scopedKey('paid_rounds_offsets'), merged);
+                }
+                if (remotePaid) {
+                    const localPaid = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+                    const mergedPaid = { ...remotePaid, ...localPaid };
+                    await tablesCache.setItem(scopedKey('paid_sessions'), mergedPaid);
+                    // Actualizar paid_at en sesiones locales
+                    set(state => ({
+                        activeSessions: state.activeSessions.map(s =>
+                            mergedPaid[s.id] ? { ...s, paid_at: mergedPaid[s.id] } : s
+                        )
+                    }));
+                }
+            })
+            .on('broadcast', { event: 'table_offsets_clear' }, async ({ payload }) => {
+                console.log("[REALTIME] broadcast table_offsets_clear:", payload);
+                if (!payload?.sessionId) return;
+                const { sessionId } = payload;
+
+                // Limpiar offsets locales de la sesión cerrada en otro dispositivo
+                const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+                delete paidCache[sessionId];
+                await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+
+                const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+                delete offsetCache[sessionId];
+                await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
+                set(state => {
+                    const { [sessionId]: _, ...rest } = state.paidHoursOffsets;
+                    return { paidHoursOffsets: rest };
+                });
+
+                const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+                delete roundsOffsetCache[sessionId];
+                await tablesCache.setItem(scopedKey('paid_rounds_offsets'), roundsOffsetCache);
+                set(state => {
+                    const { [sessionId]: _, ...rest } = state.paidRoundsOffsets;
+                    return { paidRoundsOffsets: rest };
+                });
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions' }, (payload) => {
                 console.log("[REALTIME] table_sessions change received:", payload);
                 if (payload.eventType === 'UPDATE') {
@@ -346,12 +447,17 @@ export const useTablesStore = create((set, get) => ({
             })
             .subscribe((status) => {
                 console.log("[REALTIME] status pool_tables_sync_v2:", status);
-                // Al conectarse, solicitar estado de pausas de otros dispositivos
+                // Al conectarse, solicitar estado de pausas y offsets de otros dispositivos
                 if (status === 'SUBSCRIBED') {
                     setTimeout(() => {
                         channel.send({
                             type: 'broadcast',
                             event: 'table_pause_state_request',
+                            payload: {}
+                        });
+                        channel.send({
+                            type: 'broadcast',
+                            event: 'table_offsets_state_request',
                             payload: {}
                         });
                     }, 500);
@@ -492,6 +598,13 @@ export const useTablesStore = create((set, get) => ({
 
         const cost = Number(totalCost);
         logEvent('MESAS', 'MESA_CERRADA', `Mesa ${tableName} cerrada${cost > 0 ? ` · $${cost.toFixed(2)}` : ''}`, getUser(), { sessionId, totalCost, paymentMethod });
+
+        // Broadcast limpieza de offsets a otros dispositivos
+        get().realtimeChannel?.send({
+            type: 'broadcast',
+            event: 'table_offsets_clear',
+            payload: { sessionId }
+        });
 
         const updatePayload = {
             status: 'CLOSED',
@@ -661,6 +774,19 @@ export const useTablesStore = create((set, get) => ({
         } catch (e) {
             await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { status: 'ACTIVE' } });
         }
+
+        // 5. Broadcast offsets a otros dispositivos para que reflejen $0
+        get().realtimeChannel?.send({
+            type: 'broadcast',
+            event: 'table_payment_reset',
+            payload: {
+                sessionId,
+                paidAt,
+                hoursOffset: currentHours,
+                roundsOffset: hasPinas ? (session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0) : 0,
+                hasPinas
+            }
+        });
     },
 
     addRoundToSession: async (sessionId) => {
