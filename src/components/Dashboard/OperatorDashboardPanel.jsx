@@ -27,6 +27,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const { tables, activeSessions, config, paidHoursOffsets, paidRoundsOffsets } = useTablesStore();
     const { orders, orderItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
+    const cachedUsers = useAuthStore(s => s.cachedUsers);
     const confirm = useConfirm();
     const role = currentUser?.role || currentUser?.rol;
     const isMesero = role === 'MESERO';
@@ -93,6 +94,12 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         setTopMeseros([]);
     };
 
+    const getStaffName = (staffId) => {
+        if (!staffId || !cachedUsers?.length) return null;
+        const u = cachedUsers.find(u => u.id === staffId);
+        return u?.name || u?.nombre || null;
+    };
+
     const activeTables = useMemo(() =>
         activeSessions
             .filter(s => s.status === 'ACTIVE')
@@ -100,9 +107,10 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                 ...s,
                 tableName: tables.find(t => t.id === s.table_id)?.name || 'Mesa',
                 elapsedMin: calculateElapsedTime(s.started_at),
+                ownerName: getStaffName(s.opened_by),
             }))
             .sort((a, b) => b.elapsedMin - a.elapsedMin),
-        [activeSessions, tables, now] // eslint-disable-line react-hooks/exhaustive-deps
+        [activeSessions, tables, now, cachedUsers] // eslint-disable-line react-hooks/exhaustive-deps
     );
 
     const checkoutTables = useMemo(() =>
@@ -278,15 +286,19 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                     <div className="grid grid-cols-2 gap-2">
                         {activeTables.map(t => {
                             const isLong = t.elapsedMin >= 90;
+                            const isMine = t.opened_by === currentUser?.id;
                             return isMesero ? (
                                 <button key={t.id}
                                     onClick={() => onNavigate?.('mesas')}
-                                    className={`rounded-xl p-3 border text-left active:scale-95 transition-all ${isLong ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
-                                    <p className={`text-xs font-black leading-none mb-1 ${isLong ? 'text-amber-800' : 'text-slate-800'}`}>{t.tableName}</p>
+                                    className={`rounded-xl p-3 border text-left active:scale-95 transition-all ${isMine ? 'bg-sky-50 border-sky-200' : isLong ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
+                                    <p className={`text-xs font-black leading-none mb-1 ${isMine ? 'text-sky-800' : isLong ? 'text-amber-800' : 'text-slate-800'}`}>{t.tableName}</p>
                                     <div className="flex items-center gap-1">
-                                        <Clock size={10} className={isLong ? 'text-amber-500' : 'text-slate-400'} />
-                                        <span className={`text-[10px] font-bold ${isLong ? 'text-amber-600' : 'text-slate-500'}`}>{formatElapsed(t.started_at)}</span>
+                                        <Clock size={10} className={isMine ? 'text-sky-500' : isLong ? 'text-amber-500' : 'text-slate-400'} />
+                                        <span className={`text-[10px] font-bold ${isMine ? 'text-sky-600' : isLong ? 'text-amber-600' : 'text-slate-500'}`}>{formatElapsed(t.started_at)}</span>
                                     </div>
+                                    {t.ownerName && (
+                                        <p className={`text-[9px] font-bold mt-1 ${isMine ? 'text-sky-500' : 'text-slate-400'}`}>{isMine ? 'Mi mesa' : t.ownerName}</p>
+                                    )}
                                 </button>
                             ) : (
                                 <div key={t.id}
@@ -296,6 +308,9 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                                         <Clock size={10} className={isLong ? 'text-amber-500' : 'text-slate-400'} />
                                         <span className={`text-[10px] font-bold ${isLong ? 'text-amber-600' : 'text-slate-500'}`}>{formatElapsed(t.started_at)}</span>
                                     </div>
+                                    {t.ownerName && (
+                                        <p className="text-[9px] font-bold text-slate-400 mt-1">{t.ownerName}</p>
+                                    )}
                                 </div>
                             );
                         })}
