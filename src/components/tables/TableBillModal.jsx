@@ -1,7 +1,10 @@
-import React from 'react';
-import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent } from 'lucide-react';
 import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
+import { useAuthStore } from '../../hooks/store/authStore';
+import { useProductContext } from '../../context/ProductContext';
+import DiscountModal from '../Sales/DiscountModal';
 
 function formatBs(val) {
     return (val || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,6 +41,15 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const tasaUSD = useBcvRate();
+    const { currentUser } = useAuthStore();
+    const { effectiveRate } = useProductContext();
+    const canDiscount = currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO';
+
+    const [discount, setDiscount] = useState({ type: 'percentage', value: 0 });
+    const [showDiscountModal, setShowDiscountModal] = useState(false);
+    const [itemDiscounts, setItemDiscounts] = useState({});
+    const [discountPopoverItem, setDiscountPopoverItem] = useState(null);
+    const [discountCustomValue, setDiscountCustomValue] = useState('');
 
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
@@ -47,6 +59,25 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const isMixed = fullBreakdown.hasPinas && fullBreakdown.hasHours;
 
     const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown);
+
+    // Item discounts: recalculate consumption total
+    const itemDiscountTotal = (currentItems || []).reduce((acc, item) => {
+        const disc = itemDiscounts[item.id];
+        if (!disc || disc.value <= 0) return acc;
+        const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
+        return acc + (disc.type === 'percentage' ? lineTotal * (disc.value / 100) : Math.min(disc.value * Number(item.qty), lineTotal));
+    }, 0);
+    const adjustedConsumption = totalConsumption - itemDiscountTotal;
+
+    // Grand total with item discounts applied
+    const subtotalAfterItems = grandTotal - itemDiscountTotal;
+
+    // Total discount (applied on top of item discounts)
+    const discountAmountUsd = discount.value > 0
+        ? (discount.type === 'percentage' ? subtotalAfterItems * (discount.value / 100) : Math.min(discount.value, subtotalAfterItems))
+        : 0;
+    const finalTotal = subtotalAfterItems - discountAmountUsd;
+    const finalTotalBs = finalTotal * tasaUSD;
 
     // Helper: piña count depends on game mode
     const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
@@ -218,25 +249,90 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             <div className="divide-y divide-amber-100 dark:divide-amber-900/20">
                                 {currentItems.map((item, i) => {
                                     const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
+                                    const disc = itemDiscounts[item.id];
+                                    const hasDisc = disc && disc.value > 0;
+                                    const discAmt = hasDisc ? (disc.type === 'percentage' ? lineTotal * (disc.value / 100) : Math.min(disc.value * Number(item.qty), lineTotal)) : 0;
+                                    const finalLine = lineTotal - discAmt;
                                     return (
-                                        <div key={i} className="flex items-center justify-between px-4 py-3">
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                <span className="w-7 h-7 bg-amber-200 dark:bg-amber-800/60 rounded-lg flex items-center justify-center text-[11px] font-black text-amber-700 dark:text-amber-300 shrink-0">
-                                                    {item.qty}
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-slate-700 dark:text-white truncate">
-                                                        {item.product_name || item.name}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400">
-                                                        ${Number(item.unit_price_usd).toFixed(2)} c/u
-                                                    </p>
+                                        <div key={i}>
+                                            <div className="flex items-center justify-between px-4 py-3">
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <span className="w-7 h-7 bg-amber-200 dark:bg-amber-800/60 rounded-lg flex items-center justify-center text-[11px] font-black text-amber-700 dark:text-amber-300 shrink-0">
+                                                        {item.qty}
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-bold text-slate-700 dark:text-white truncate">
+                                                            {item.product_name || item.name}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400">
+                                                            ${Number(item.unit_price_usd).toFixed(2)} c/u
+                                                            {hasDisc && <span className="ml-1 text-rose-500 font-bold">-{disc.type === 'percentage' ? `${disc.value}%` : `$${disc.value}`}</span>}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0 pl-3">
+                                                    {canDiscount && (
+                                                        <button onClick={() => { setDiscountPopoverItem(discountPopoverItem === item.id ? null : item.id); setDiscountCustomValue(''); }}
+                                                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-90 ${hasDisc ? 'bg-rose-100 text-rose-500' : 'bg-amber-100 text-amber-500 hover:bg-amber-200'}`}>
+                                                            <Percent size={10} />
+                                                        </button>
+                                                    )}
+                                                    <div className="text-right">
+                                                        {hasDisc ? (
+                                                            <>
+                                                                <p className="text-[10px] line-through text-slate-400">${lineTotal.toFixed(2)}</p>
+                                                                <p className="text-sm font-black text-slate-800 dark:text-white">${finalLine.toFixed(2)}</p>
+                                                            </>
+                                                        ) : (
+                                                            <p className="text-sm font-black text-slate-800 dark:text-white">${lineTotal.toFixed(2)}</p>
+                                                        )}
+                                                        <p className="text-[10px] text-slate-400">Bs {formatBs(finalLine * tasaUSD)}</p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="text-right shrink-0 pl-3">
-                                                <p className="text-sm font-black text-slate-800 dark:text-white">${lineTotal.toFixed(2)}</p>
-                                                <p className="text-[10px] text-slate-400">Bs {formatBs(lineTotal * tasaUSD)}</p>
-                                            </div>
+                                            {/* Per-item discount popover */}
+                                            {discountPopoverItem === item.id && (
+                                                <div className="mx-4 mb-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-lg">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Descuento · {item.product_name || item.name}</p>
+                                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                                        {[10, 15, 20, 50].map(pct => (
+                                                            <button key={pct} onClick={() => {
+                                                                setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'percentage', value: pct } }));
+                                                                setDiscountPopoverItem(null);
+                                                            }}
+                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${disc?.type === 'percentage' && disc?.value === pct ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'}`}>
+                                                                {pct}%
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <div className="flex-1 flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2">
+                                                            <span className="text-slate-400 text-xs font-bold">$</span>
+                                                            <input type="number" inputMode="decimal" step="any" min="0" value={discountCustomValue} onChange={e => setDiscountCustomValue(e.target.value)}
+                                                                placeholder="Monto" className="flex-1 bg-transparent text-xs font-bold text-slate-700 dark:text-white py-1.5 px-1 outline-none w-16" />
+                                                        </div>
+                                                        <button onClick={() => {
+                                                            const v = parseFloat(discountCustomValue);
+                                                            if (v > 0) {
+                                                                setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'fixed', value: v } }));
+                                                            }
+                                                            setDiscountPopoverItem(null);
+                                                        }}
+                                                            className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg active:scale-95">
+                                                            OK
+                                                        </button>
+                                                        {hasDisc && (
+                                                            <button onClick={() => {
+                                                                setItemDiscounts(prev => { const next = { ...prev }; delete next[item.id]; return next; });
+                                                                setDiscountPopoverItem(null);
+                                                            }}
+                                                                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs font-bold rounded-lg active:scale-95">
+                                                                Quitar
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -252,6 +348,17 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                         </div>
                     )}
 
+                    {/* Descuento general */}
+                    {discountAmountUsd > 0 && (
+                        <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-2xl p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Descuento aplicado</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{discount.type === 'percentage' ? `${discount.value}%` : `$${discount.value} fijo`}</p>
+                            </div>
+                            <p className="text-base font-black text-rose-500">-${discountAmountUsd.toFixed(2)}</p>
+                        </div>
+                    )}
+
                     {/* Total */}
                     <div
                         className="rounded-2xl p-4 flex items-center justify-between"
@@ -261,19 +368,23 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Total a Cobrar</p>
                             {isMixed && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
-                                    Piñas ${fullBreakdown.pinaCost.toFixed(2)} + Tiempo ${fullBreakdown.hourCost.toFixed(2)}{totalConsumption > 0 ? ` + Consumos $${totalConsumption.toFixed(2)}` : ''}
+                                    Piñas ${fullBreakdown.pinaCost.toFixed(2)} + Tiempo ${fullBreakdown.hourCost.toFixed(2)}{adjustedConsumption > 0 ? ` + Consumos $${adjustedConsumption.toFixed(2)}` : ''}
                                     {(roundsOffset > 0 || hoursOffset > 0) ? ` − Pagado $${(roundsOffset * (config.pricePina || 0) + hoursOffset * (config.pricePerHour || 0)).toFixed(2)}` : ''}
+                                    {discountAmountUsd > 0 ? ` − Desc $${discountAmountUsd.toFixed(2)}` : ''}
                                 </p>
                             )}
-                            {!isMixed && timeCost > 0 && totalConsumption > 0 && (
+                            {!isMixed && (timeCost > 0 || adjustedConsumption > 0 || discountAmountUsd > 0) && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
-                                    Tiempo ${timeCost.toFixed(2)} + Consumos ${totalConsumption.toFixed(2)}
+                                    {timeCost > 0 ? `Tiempo $${timeCost.toFixed(2)}` : ''}
+                                    {timeCost > 0 && adjustedConsumption > 0 ? ' + ' : ''}
+                                    {adjustedConsumption > 0 ? `Consumos $${adjustedConsumption.toFixed(2)}` : ''}
+                                    {discountAmountUsd > 0 ? ` − Desc $${discountAmountUsd.toFixed(2)}` : ''}
                                 </p>
                             )}
                         </div>
                         <div className="text-right">
-                            <p className="text-2xl font-black text-white">${grandTotal.toFixed(2)}</p>
-                            <p className="text-xs font-bold text-white/70">Bs {formatBs(grandTotalBs)}</p>
+                            <p className="text-2xl font-black text-white">${finalTotal.toFixed(2)}</p>
+                            <p className="text-xs font-bold text-white/70">Bs {formatBs(finalTotalBs)}</p>
                         </div>
                     </div>
                 </div>
@@ -286,15 +397,39 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     >
                         Cerrar
                     </button>
+                    {canDiscount && (
+                        <button
+                            onClick={() => setShowDiscountModal(true)}
+                            className={`py-3.5 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 active:scale-95 transition-all ${discountAmountUsd > 0 ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}
+                        >
+                            <Percent size={14} />
+                            {discountAmountUsd > 0 ? `${discount.type === 'percentage' ? discount.value + '%' : '$' + discount.value}` : 'Desc'}
+                        </button>
+                    )}
                     <button
-                        onClick={onProceedToPayment}
+                        onClick={() => onProceedToPayment(discount, itemDiscounts)}
                         className="flex-[2] py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-500/25"
                         style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)' }}
                     >
-                        Cobrar
+                        Cobrar ${finalTotal.toFixed(2)}
                         <ChevronRight size={16} />
                     </button>
                 </div>
+
+                {/* Discount Modal */}
+                {showDiscountModal && (
+                    <DiscountModal
+                        currentDiscount={discount}
+                        onApply={(d) => { setDiscount(d); setShowDiscountModal(false); }}
+                        onClose={() => setShowDiscountModal(false)}
+                        cartSubtotalUsd={subtotalAfterItems}
+                        effectiveRate={effectiveRate || tasaUSD}
+                        tasaCop={0}
+                        copEnabled={false}
+                        userRole={currentUser?.role || 'ADMIN'}
+                        maxDiscountPercent={100}
+                    />
+                )}
             </div>
         </div>
     );

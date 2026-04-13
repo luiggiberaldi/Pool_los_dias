@@ -132,7 +132,7 @@ export function useSalesCheckout({
             cartSubtotalUsd: tableCheckoutData.grandTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
-            discountData: { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },
+            discountData: tableCheckoutData.discountData || { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },
             useAutoRate, splitMeta
         };
 

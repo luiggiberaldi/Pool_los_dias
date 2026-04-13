@@ -125,11 +125,13 @@ export function OrderPanel({ session, table, onClose }) {
                     </div>
                 ) : (
                     <div className="space-y-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
-                        {currentItems.map(item => (
+                        {currentItems.map(item => {
+                            const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
+                            return (
                             <div key={item.id}
                                 className={`flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl px-4 py-3 transition-all duration-300 ${removingItem === item.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                                 {/* Editable Qty badge */}
-                                <button 
+                                <button
                                     onClick={() => {
                                         setQtyModalItem(item);
                                         setQtyInputValue(item.qty);
@@ -143,8 +145,7 @@ export function OrderPanel({ session, table, onClose }) {
                                 <div className="flex-1 min-w-0">
                                     <div className="text-slate-800 font-bold text-sm truncate">{item.product_name}</div>
                                     <div className="text-slate-500 text-xs font-medium">
-                                        ${Number(item.unit_price_usd).toFixed(2)} c/u · <span className="text-emerald-500 font-bold">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
-                                        <span className="ml-2 text-[10px] text-slate-400">({(Number(item.unit_price_usd) * (order?.exchange_rate_used || effectiveRate || 1)).toFixed(2)} Bs)</span>
+                                        ${Number(item.unit_price_usd).toFixed(2)} c/u · <span className="text-emerald-500 font-bold">${lineTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
                                 {/* Controls */}
@@ -167,7 +168,8 @@ export function OrderPanel({ session, table, onClose }) {
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

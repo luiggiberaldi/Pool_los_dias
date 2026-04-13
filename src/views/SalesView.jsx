@@ -433,14 +433,38 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             <KeyboardHelpModal isOpen={showKeyboardHelp} onClose={() => setShowKeyboardHelp(false)} />
 
             {tableCheckoutData && !showTablePayment && (
-                <TableBillModal data={tableCheckoutData} onClose={() => setTableCheckoutData(null)} onProceedToPayment={() => { setShowTablePayment(true); if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id); }} />
+                <TableBillModal data={tableCheckoutData} onClose={() => { setTableCheckoutData(null); }}
+                    onProceedToPayment={(disc, itemDiscs) => {
+                        // Calculate discount amounts and attach to checkout data
+                        const _itemDiscs = itemDiscs || {};
+                        const _itemDiscAmt = (tableCheckoutData.currentItems || []).reduce((acc, item) => {
+                            const d = _itemDiscs[item.id];
+                            if (!d || d.value <= 0) return acc;
+                            const lt = Number(item.unit_price_usd) * Number(item.qty);
+                            return acc + (d.type === 'percentage' ? lt * (d.value / 100) : Math.min(d.value * Number(item.qty), lt));
+                        }, 0);
+                        const _sub = tableCheckoutData.grandTotal - _itemDiscAmt;
+                        const _totalDisc = disc && disc.value > 0 ? (disc.type === 'percentage' ? _sub * (disc.value / 100) : Math.min(disc.value, _sub)) : 0;
+                        const totalDiscAmt = _totalDisc + _itemDiscAmt;
+                        setTableCheckoutData(prev => ({
+                            ...prev,
+                            discountData: { active: totalDiscAmt > 0, amountUsd: totalDiscAmt, amountBs: totalDiscAmt * effectiveRate, type: disc?.type || 'percentage', value: disc?.value || 0 },
+                            grandTotal: prev.grandTotal - totalDiscAmt,
+                        }));
+                        setShowTablePayment(true);
+                        if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id);
+                    }} />
             )}
 
-            {tableCheckoutData && showTablePayment && (
+            {tableCheckoutData && showTablePayment && (() => {
+                const discData = tableCheckoutData.discountData || { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 };
+                const finalTotal = tableCheckoutData.grandTotal;
+                const finalTotalBs = finalTotal * effectiveRate;
+                return (
                 <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
-                    cartSubtotalUsd={tableCheckoutData.grandTotal} cartSubtotalBs={calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate)}
-                    cartTotalUsd={tableCheckoutData.grandTotal} cartTotalBs={calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate)}
-                    discountData={{ active: false, amountUsd: 0, amountBs: 0 }} effectiveRate={effectiveRate}
+                    cartSubtotalUsd={finalTotal} cartSubtotalBs={finalTotalBs}
+                    cartTotalUsd={finalTotal} cartTotalBs={finalTotalBs}
+                    discountData={discData} effectiveRate={effectiveRate}
                     customers={customers} selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
                     paymentMethods={paymentMethods}
                     onConfirmSale={(payments, change, splitMeta) => {
@@ -454,7 +478,8 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     onCreateCustomer={handleCreateCustomer} triggerHaptic={triggerHaptic}
                     copEnabled={copEnabled} tasaCop={tasaCop}
                     currentFloatUsd={currentFloat.usd} currentFloatBs={currentFloat.bs} tableContext={tableCheckoutData} />
-            )}
+                );
+            })()}
 
             {/* Post-payment dialog: ¿Liberar mesa o dejar activa? */}
             {postPaymentSession && (
