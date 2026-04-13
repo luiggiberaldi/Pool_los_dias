@@ -9,24 +9,27 @@ export function useNotificationCenter({ products, activeSessions, pausedSessions
     const notifications = useMemo(() => {
         const items = [];
 
-        // 1. Stock bajo
+        // 1. Stock bajo (agrupado en una sola notificación)
         const lowStock = (products || []).filter(p => {
             const stock = p.stock ?? Infinity;
             const threshold = p.lowStockAlert ?? 5;
             return stock <= threshold && stock >= 0;
         });
-        lowStock.forEach(p => {
+        if (lowStock.length > 0) {
+            const names = lowStock.slice(0, 3).map(p => p.name);
+            const extra = lowStock.length > 3 ? ` y ${lowStock.length - 3} más` : '';
             items.push({
-                id: `stock-${p.id}`,
+                id: 'stock-low',
                 type: 'warning',
                 icon: 'package',
-                title: 'Stock bajo',
-                message: `${p.name}: ${p.stock ?? 0} unidades`,
+                title: `Stock bajo (${lowStock.length})`,
+                message: `${names.join(', ')}${extra}`,
                 action: 'inventario',
             });
-        });
+        }
 
-        // 2. Mesas con tiempo vencido (solo HORA con hours_paid > 0)
+        // 2. Mesas con tiempo vencido (agrupado)
+        const expiredTables = [];
         (activeSessions || []).forEach(session => {
             if (session.status !== 'ACTIVE') return;
             if (!session.hours_paid || session.hours_paid <= 0) return;
@@ -40,18 +43,20 @@ export function useNotificationCenter({ products, activeSessions, pausedSessions
             }
             const paidMinutes = session.hours_paid * 60;
             if (elapsedMin >= paidMinutes) {
-                const overMin = Math.floor(elapsedMin - paidMinutes);
                 const tableName = session.table_name || `Mesa ${session.table_number || '?'}`;
-                items.push({
-                    id: `time-${session.id}`,
-                    type: 'urgent',
-                    icon: 'clock',
-                    title: 'Tiempo vencido',
-                    message: `${tableName}: +${overMin} min extra`,
-                    action: 'mesas',
-                });
+                expiredTables.push(tableName);
             }
         });
+        if (expiredTables.length > 0) {
+            items.push({
+                id: 'time-expired',
+                type: 'urgent',
+                icon: 'clock',
+                title: `Tiempo vencido (${expiredTables.length})`,
+                message: expiredTables.slice(0, 3).join(', ') + (expiredTables.length > 3 ? ` y ${expiredTables.length - 3} más` : ''),
+                action: 'mesas',
+            });
+        }
 
         // 3. Caja abierta mucho tiempo (>12 horas)
         if (activeCashSession?.opened_at) {
