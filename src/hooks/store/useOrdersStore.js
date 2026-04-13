@@ -96,7 +96,7 @@ export const useOrdersStore = create((set, get) => ({
             // Fetch OPEN orders, filtrado por user_id si la columna existe
             let query = supabaseCloud
                 .from('orders')
-                .select('id, table_id, session_id, status, exchange_rate_used, user_id, created_at')
+                .select('id, table_id, table_session_id, status, exchange_rate_used, user_id, created_at')
                 .eq('status', 'OPEN');
             if (userId) query = query.eq('user_id', userId);
 
