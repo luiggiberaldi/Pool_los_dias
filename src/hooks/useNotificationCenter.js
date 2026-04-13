@@ -25,6 +25,7 @@ export function useNotificationCenter({ products, activeSessions, pausedSessions
                 title: `Stock bajo (${lowStock.length})`,
                 message: `${names.join(', ')}${extra}`,
                 action: 'inventario',
+                navFilter: { key: 'nav_inventory_filter', value: 'bajo-stock' },
             });
         }
 

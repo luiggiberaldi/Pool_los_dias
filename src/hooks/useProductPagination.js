@@ -12,7 +12,14 @@ function calculateGridItems() {
 
 export function useProductPagination({ products, effectiveRate, triggerHaptic }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeCategory, setActiveCategory] = useState('todos');
+    const [activeCategory, setActiveCategory] = useState(() => {
+        const pending = localStorage.getItem('nav_inventory_filter');
+        if (pending) {
+            localStorage.removeItem('nav_inventory_filter');
+            return pending;
+        }
+        return 'todos';
+    });
     const [currentPage, setCurrentPage] = useState(1);
     const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
     const [sortField, setSortField] = useState(null);
