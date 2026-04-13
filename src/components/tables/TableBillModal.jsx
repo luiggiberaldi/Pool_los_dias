@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent } from 'lucide-react';
+import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent, Tag, Trash2 } from 'lucide-react';
 import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -253,6 +253,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                     const hasDisc = disc && disc.value > 0;
                                     const discAmt = hasDisc ? (disc.type === 'percentage' ? lineTotal * (disc.value / 100) : Math.min(disc.value * Number(item.qty), lineTotal)) : 0;
                                     const finalLine = lineTotal - discAmt;
+                                    const isOpen = discountPopoverItem === item.id;
                                     return (
                                         <div key={i}>
                                             <div className="flex items-center justify-between px-4 py-3">
@@ -264,24 +265,31 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                                         <p className="text-sm font-bold text-slate-700 dark:text-white truncate">
                                                             {item.product_name || item.name}
                                                         </p>
-                                                        <p className="text-[10px] text-slate-400">
-                                                            ${Number(item.unit_price_usd).toFixed(2)} c/u
-                                                            {hasDisc && <span className="ml-1 text-rose-500 font-bold">-{disc.type === 'percentage' ? `${disc.value}%` : `$${disc.value}`}</span>}
-                                                        </p>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <p className="text-[10px] text-slate-400">
+                                                                ${Number(item.unit_price_usd).toFixed(2)} c/u
+                                                            </p>
+                                                            {hasDisc && (
+                                                                <span className="inline-flex items-center gap-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-500 text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">
+                                                                    <Tag size={7} />
+                                                                    {disc.type === 'percentage' ? `${disc.value}%` : `$${disc.value}`}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 shrink-0 pl-3">
                                                     {canDiscount && (
-                                                        <button onClick={() => { setDiscountPopoverItem(discountPopoverItem === item.id ? null : item.id); setDiscountCustomValue(''); }}
-                                                            className={`w-6 h-6 rounded-md flex items-center justify-center transition-all active:scale-90 ${hasDisc ? 'bg-rose-100 text-rose-500' : 'bg-amber-100 text-amber-500 hover:bg-amber-200'}`}>
-                                                            <Percent size={10} />
+                                                        <button onClick={() => { setDiscountPopoverItem(isOpen ? null : item.id); setDiscountCustomValue(''); }}
+                                                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all active:scale-90 ${isOpen ? 'bg-rose-500 text-white shadow-md shadow-rose-500/25 scale-110' : hasDisc ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-500 hover:bg-rose-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-amber-100 hover:text-amber-500'}`}>
+                                                            <Percent size={12} />
                                                         </button>
                                                     )}
-                                                    <div className="text-right">
+                                                    <div className="text-right min-w-[60px]">
                                                         {hasDisc ? (
                                                             <>
                                                                 <p className="text-[10px] line-through text-slate-400">${lineTotal.toFixed(2)}</p>
-                                                                <p className="text-sm font-black text-slate-800 dark:text-white">${finalLine.toFixed(2)}</p>
+                                                                <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${finalLine.toFixed(2)}</p>
                                                             </>
                                                         ) : (
                                                             <p className="text-sm font-black text-slate-800 dark:text-white">${lineTotal.toFixed(2)}</p>
@@ -290,46 +298,78 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* Per-item discount popover */}
-                                            {discountPopoverItem === item.id && (
-                                                <div className="mx-4 mb-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-lg">
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Descuento · {item.product_name || item.name}</p>
-                                                    <div className="flex flex-wrap gap-1.5 mb-2">
-                                                        {[10, 15, 20, 50].map(pct => (
-                                                            <button key={pct} onClick={() => {
-                                                                setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'percentage', value: pct } }));
-                                                                setDiscountPopoverItem(null);
-                                                            }}
-                                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${disc?.type === 'percentage' && disc?.value === pct ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'}`}>
-                                                                {pct}%
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <div className="flex-1 flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2">
-                                                            <span className="text-slate-400 text-xs font-bold">$</span>
-                                                            <input type="number" inputMode="decimal" step="any" min="0" value={discountCustomValue} onChange={e => setDiscountCustomValue(e.target.value)}
-                                                                placeholder="Monto" className="flex-1 bg-transparent text-xs font-bold text-slate-700 dark:text-white py-1.5 px-1 outline-none w-16" />
+
+                                            {/* Per-item discount panel */}
+                                            {isOpen && (
+                                                <div className="mx-3 mb-3 rounded-2xl overflow-hidden border border-rose-200 dark:border-rose-800/40 bg-gradient-to-b from-rose-50 to-white dark:from-rose-950/30 dark:to-slate-900 shadow-lg shadow-rose-500/5">
+                                                    {/* Header */}
+                                                    <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-5 h-5 rounded-md bg-rose-500 flex items-center justify-center">
+                                                                <Tag size={10} className="text-white" />
+                                                            </div>
+                                                            <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate max-w-[160px]">
+                                                                {item.product_name || item.name}
+                                                            </p>
                                                         </div>
-                                                        <button onClick={() => {
-                                                            const v = parseFloat(discountCustomValue);
-                                                            if (v > 0) {
-                                                                setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'fixed', value: v } }));
-                                                            }
-                                                            setDiscountPopoverItem(null);
-                                                        }}
-                                                            className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg active:scale-95">
-                                                            OK
-                                                        </button>
                                                         {hasDisc && (
                                                             <button onClick={() => {
                                                                 setItemDiscounts(prev => { const next = { ...prev }; delete next[item.id]; return next; });
                                                                 setDiscountPopoverItem(null);
                                                             }}
-                                                                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 text-xs font-bold rounded-lg active:scale-95">
-                                                                Quitar
+                                                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-500 transition-colors active:scale-95">
+                                                                <Trash2 size={10} />
+                                                                <span className="text-[10px] font-bold">Quitar</span>
                                                             </button>
                                                         )}
+                                                    </div>
+
+                                                    {/* Preset percentage cards */}
+                                                    <div className="px-4 pb-2.5">
+                                                        <div className="grid grid-cols-4 gap-2">
+                                                            {[10, 15, 20, 50].map(pct => {
+                                                                const isActive = disc?.type === 'percentage' && disc?.value === pct;
+                                                                const saved = lineTotal * (pct / 100);
+                                                                return (
+                                                                    <button key={pct} onClick={() => {
+                                                                        setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'percentage', value: pct } }));
+                                                                        setDiscountPopoverItem(null);
+                                                                    }}
+                                                                        className={`py-2.5 rounded-xl text-center transition-all active:scale-95 ${isActive
+                                                                            ? 'bg-rose-500 text-white shadow-md shadow-rose-500/25'
+                                                                            : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/20'}`}>
+                                                                        <span className="block text-sm font-black leading-none">{pct}%</span>
+                                                                        <span className={`block text-[9px] font-medium mt-1 ${isActive ? 'text-white/70' : 'text-slate-400'}`}>
+                                                                            -${saved.toFixed(2)}
+                                                                        </span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Custom amount */}
+                                                    <div className="px-4 pb-3">
+                                                        <div className="flex gap-2 items-center">
+                                                            <div className="flex-1 flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 focus-within:border-rose-400 focus-within:ring-2 focus-within:ring-rose-100 dark:focus-within:ring-rose-900/30 transition-all">
+                                                                <span className="text-rose-400 text-sm font-black mr-1">$</span>
+                                                                <input type="number" inputMode="decimal" step="any" min="0"
+                                                                    value={discountCustomValue}
+                                                                    onChange={e => setDiscountCustomValue(e.target.value)}
+                                                                    placeholder="Monto fijo por unidad"
+                                                                    className="flex-1 bg-transparent text-sm font-bold text-slate-700 dark:text-white py-2.5 outline-none placeholder-slate-300 dark:placeholder-slate-600" />
+                                                            </div>
+                                                            <button onClick={() => {
+                                                                const v = parseFloat(discountCustomValue);
+                                                                if (v > 0) {
+                                                                    setItemDiscounts(prev => ({ ...prev, [item.id]: { type: 'fixed', value: v } }));
+                                                                    setDiscountPopoverItem(null);
+                                                                }
+                                                            }}
+                                                                className="h-[42px] px-5 bg-rose-500 hover:bg-rose-600 text-white text-sm font-black rounded-xl active:scale-95 transition-all shadow-md shadow-rose-500/20">
+                                                                OK
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
