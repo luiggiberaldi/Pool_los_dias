@@ -190,19 +190,19 @@ export function OrderPanel({ session, table, onClose }) {
                     />
                 </div>
 
-                {/* Category pills */}
+                {/* Category dropdown */}
                 {categories.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 mb-3 shrink-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}>
-                        {categories.map(cat => (
-                            <button key={cat} onClick={() => setActiveCategory(cat)}
-                                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                    activeCategory === cat
-                                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30 border border-indigo-500'
-                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                                }`}>
-                                {cat}
-                            </button>
-                        ))}
+                    <div className="relative mb-3 shrink-0">
+                        <select
+                            value={activeCategory}
+                            onChange={e => setActiveCategory(e.target.value)}
+                            className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-sm cursor-pointer"
+                        >
+                            {categories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                        <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     </div>
                 )}
 
