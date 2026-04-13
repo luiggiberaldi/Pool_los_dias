@@ -23,9 +23,8 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         return saleLocalDay === today;
     };
 
-    // Helper: filtra solo por día calendario (ignora sesión de caja)
+    // Helper: filtra solo por día calendario (incluye ventas cerradas del día)
     const isToday = (s) => {
-        if (s.cajaCerrada === true) return false;
         const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
         return saleLocalDay === today;
     };
