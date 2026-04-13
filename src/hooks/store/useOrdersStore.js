@@ -96,7 +96,7 @@ export const useOrdersStore = create((set, get) => ({
             // Fetch OPEN orders, filtrado por user_id si la columna existe
             let query = supabaseCloud
                 .from('orders')
-                .select('*')
+                .select('id, table_id, session_id, status, exchange_rate_used, user_id, created_at')
                 .eq('status', 'OPEN');
             if (userId) query = query.eq('user_id', userId);
 
@@ -109,7 +109,7 @@ export const useOrdersStore = create((set, get) => ({
             if (orderIds.length > 0) {
                 const { data: openItems, error: itemsError } = await supabaseCloud
                     .from('order_items')
-                    .select('*')
+                    .select('id, order_id, product_id, product_name, unit_price_usd, qty')
                     .in('order_id', orderIds);
                 if (itemsError) throw itemsError;
                 items = openItems;

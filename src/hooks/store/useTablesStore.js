@@ -411,7 +411,7 @@ export const useTablesStore = create((set, get) => ({
                     return { paidRoundsOffsets: rest };
                 });
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions', filter: 'status=in.(ACTIVE,CHECKOUT)' }, (payload) => {
                 console.log("[REALTIME] table_sessions change received:", payload);
                 if (payload.eventType === 'UPDATE') {
                     set(state => ({ activeSessions: state.activeSessions.map(s => s.id === payload.new.id ? payload.new : s) }));

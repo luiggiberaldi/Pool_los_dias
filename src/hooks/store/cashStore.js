@@ -161,7 +161,7 @@ export const useCashStore = create((set, get) => ({
         if (cashPollingInterval) return;
         cashPollingInterval = setInterval(() => {
             get().syncCashSession();
-        }, 15_000);
+        }, 60_000);
     },
 
     // Capa C: Al volver al primer plano — crítico para PWA en móvil
