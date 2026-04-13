@@ -192,7 +192,7 @@ export function OrderPanel({ session, table, onClose }) {
 
                 {/* Category pills */}
                 {categories.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 mb-3 shrink-0 no-scrollbar">
+                    <div className="flex gap-2 overflow-x-auto pb-2 mb-3 shrink-0 no-scrollbar" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}>
                         {categories.map(cat => (
                             <button key={cat} onClick={() => setActiveCategory(cat)}
                                 className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
