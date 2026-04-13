@@ -42,7 +42,7 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
 
     // Libre: game_mode NORMAL sin horas prepagadas → cobro por minuto
     let libreCost = 0;
-    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0 && !hasPinas;
+    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0;
     if (isLibre && elapsedMinutes > 0) {
         const pricePerHour = config.pricePerHour || 0;
         libreCost = round2((elapsedMinutes / 60) * pricePerHour);
