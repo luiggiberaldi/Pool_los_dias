@@ -74,7 +74,8 @@ export default function ProductFormModal({
     handleSave,
     categories,
     productMovements,
-    products
+    products,
+    isCombo
 }) {
     const fileInputRef = useRef(null);
     const [showSummary, setShowSummary] = useState(false);

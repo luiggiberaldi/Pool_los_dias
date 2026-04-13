@@ -475,6 +475,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 handleSave={form.handleSave}
                 categories={categories} products={products}
                 productMovements={form.editingId ? form.productMovements : null}
+                isCombo={form.isCombo}
             />
 
             <ComboFormModal
