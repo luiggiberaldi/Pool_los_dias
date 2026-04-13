@@ -77,7 +77,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         recentSales, weekData, lowStockProducts,
         totalDeudas, topProducts, topStaff,
         paymentBreakdown, salesPaymentBreakdown, todayTopProducts,
-    } = useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate });
+    } = useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate, activeCashSession });
 
     // ── Carga de datos ──
     useEffect(() => {

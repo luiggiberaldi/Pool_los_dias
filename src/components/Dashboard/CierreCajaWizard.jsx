@@ -139,6 +139,16 @@ export default function CierreCajaWizard({
                                         <span className="text-sm font-bold">{todayItemsSold} items</span>
                                     </div>
                                 </div>
+                                {todaySales.length > 0 && (() => {
+                                    const timestamps = todaySales.map(s => new Date(s.timestamp)).sort((a, b) => a - b);
+                                    const fmt = (d) => d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                                    return (
+                                        <div className="mt-2 pt-2 border-t border-white/20 flex justify-between text-[11px] text-indigo-200">
+                                            <span>Primera: {fmt(timestamps[0])}</span>
+                                            <span>Última: {fmt(timestamps[timestamps.length - 1])}</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Ganancia + Egresos — solo admin */}

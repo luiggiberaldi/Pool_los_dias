@@ -9,38 +9,46 @@ export function getLocalISODate(d = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
-export function useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate }) {
+export function useDashboardMetrics({ sales, customers, products, bcvRate, selectedChartDate, activeCashSession }) {
     const today = getLocalISODate();
+    const sessionOpenedAt = activeCashSession?.opened_at || null;
+
+    // Helper: filtra por período de sesión de caja si existe, sino por día calendario
+    const isInSessionPeriod = (s) => {
+        if (s.cajaCerrada === true) return false;
+        if (sessionOpenedAt) {
+            return s.timestamp >= sessionOpenedAt;
+        }
+        const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+        return saleLocalDay === today;
+    };
 
     const todaySales = useMemo(() =>
         sales.filter(s => {
             if (s.status === 'ANULADA') return false;
             if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
-            if (s.cajaCerrada === true) return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
-            return saleLocalDay === today;
+            return isInSessionPeriod(s);
         }),
-        [sales, today]
+        [sales, today, sessionOpenedAt]
     );
 
     const todayCashFlow = useMemo(() =>
         sales.filter(s => {
             if (s.status === 'ANULADA') return false;
             if (!['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'].includes(s.tipo)) return false;
-            if (s.cajaCerrada === true) return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
-            return saleLocalDay === today;
+            return isInSessionPeriod(s);
         }),
-        [sales, today]
+        [sales, today, sessionOpenedAt]
     );
 
     const todayApertura = useMemo(() =>
         sales.find(s => {
             if (s.tipo !== 'APERTURA_CAJA' || s.cajaCerrada) return false;
+            if (sessionOpenedAt) return s.timestamp >= sessionOpenedAt;
             const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
             return saleLocalDay === today;
         }),
-        [sales, today]
+        [sales, today, sessionOpenedAt]
     );
 
     const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [todaySales]);
@@ -53,11 +61,9 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     const todayExpenses = useMemo(() =>
         sales.filter(s => {
             if (s.tipo !== 'PAGO_PROVEEDOR') return false;
-            if (s.cajaCerrada === true) return false;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
-            return saleLocalDay === today;
+            return isInSessionPeriod(s);
         }),
-        [sales, today]
+        [sales, today, sessionOpenedAt]
     );
     const todayExpensesUsd = useMemo(() =>
         todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0),
