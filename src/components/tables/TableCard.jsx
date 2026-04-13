@@ -1276,7 +1276,7 @@ export default function TableCard({ table, session }) {
                             <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
                             <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
                         </div>
-                        {currentUser?.role === 'ADMIN' && (
+                        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO') && (
                             <>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
                                 <div className="grid grid-cols-2 gap-2">
