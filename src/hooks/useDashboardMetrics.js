@@ -16,11 +16,8 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     // Helper: filtra por período de sesión de caja
     const isInSessionPeriod = (s) => {
         if (s.cajaCerrada === true) return false;
-        if (sessionOpenedAt) {
-            return s.timestamp >= sessionOpenedAt;
-        }
-        const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
-        return saleLocalDay === today;
+        if (!sessionOpenedAt) return false; // sin caja abierta = sin datos de sesión
+        return s.timestamp >= sessionOpenedAt;
     };
 
     // Helper: filtra solo por día calendario (incluye ventas cerradas del día)
