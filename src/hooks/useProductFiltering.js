@@ -5,6 +5,7 @@ export function useProductFiltering(products, searchTerm, activeCategory, sortFi
 
     const filteredProducts = useMemo(() => {
         let result = products.filter(p => {
+            if (!p || !p.name) return false;
             const term = deferredSearchTerm.toLowerCase();
             const matchesSearch = p.name.toLowerCase().includes(term) || (p.barcode && p.barcode.toLowerCase().includes(term));
             if (activeCategory === 'bajo-stock') {

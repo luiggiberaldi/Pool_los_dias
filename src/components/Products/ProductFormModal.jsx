@@ -474,7 +474,6 @@ export default function ProductFormModal({
                                         className="w-full bg-amber-50 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/30 p-3.5 rounded-xl font-bold text-amber-700 dark:text-amber-400 outline-none focus:ring-2 focus:ring-amber-500/50" />
                                 </div>
                             </div>
-                        )}
                     </div>
 
                     {/* ─── PRE-SAVE SUMMARY ─── */}
