@@ -20,6 +20,20 @@ export function useProductPagination({ products, effectiveRate, triggerHaptic })
         }
         return 'todos';
     });
+
+    // Listen for navigation filter changes when already mounted
+    useEffect(() => {
+        const handler = () => {
+            const pending = localStorage.getItem('nav_inventory_filter');
+            if (pending) {
+                localStorage.removeItem('nav_inventory_filter');
+                setActiveCategory(pending);
+                setCurrentPage(1);
+            }
+        };
+        window.addEventListener('nav_inventory_filter', handler);
+        return () => window.removeEventListener('nav_inventory_filter', handler);
+    }, []);
     const [currentPage, setCurrentPage] = useState(1);
     const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
     const [sortField, setSortField] = useState(null);

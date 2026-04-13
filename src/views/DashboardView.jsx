@@ -378,7 +378,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                                 const colors = n.type === 'urgent' ? 'bg-red-50 border-red-100 text-red-600' : n.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-sky-50 border-sky-100 text-sky-600';
                                 const IconComp = n.icon === 'clock' ? Clock : n.icon === 'package' ? Package : n.icon === 'wallet' ? Wallet : Users;
                                 return (
-                                    <button key={n.id} onClick={() => { if (n.action && onNavigate) { triggerHaptic?.(); setShowNotifPanel(false); if (n.navFilter) localStorage.setItem(n.navFilter.key, n.navFilter.value); onNavigate(n.action); } }}
+                                    <button key={n.id} onClick={() => { if (n.action && onNavigate) { triggerHaptic?.(); setShowNotifPanel(false); if (n.navFilter) { localStorage.setItem(n.navFilter.key, n.navFilter.value); window.dispatchEvent(new Event(n.navFilter.key)); } onNavigate(n.action); } }}
                                         className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all active:scale-[0.98] ${colors} ${n.action ? 'cursor-pointer' : 'cursor-default'}`}>
                                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60 shrink-0">
                                             <IconComp size={16} strokeWidth={2.5} />
