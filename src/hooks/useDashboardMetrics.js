@@ -13,7 +13,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     const today = getLocalISODate();
     const sessionOpenedAt = activeCashSession?.opened_at || null;
 
-    // Helper: filtra por período de sesión de caja si existe, sino por día calendario
+    // Helper: filtra por período de sesión de caja
     const isInSessionPeriod = (s) => {
         if (s.cajaCerrada === true) return false;
         if (sessionOpenedAt) {
@@ -23,6 +23,14 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         return saleLocalDay === today;
     };
 
+    // Helper: filtra solo por día calendario (ignora sesión de caja)
+    const isToday = (s) => {
+        if (s.cajaCerrada === true) return false;
+        const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : today;
+        return saleLocalDay === today;
+    };
+
+    // ── Métricas de SESIÓN DE CAJA (default cuando hay caja abierta) ──
     const todaySales = useMemo(() =>
         sales.filter(s => {
             if (s.status === 'ANULADA') return false;
@@ -73,6 +81,26 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
     const todayProfit = useMemo(() =>
         FinancialEngine.calculateAggregateProfit(todaySales, bcvRate, products),
         [todaySales, bcvRate, products]
+    );
+
+    // ── Métricas solo del DÍA CALENDARIO (para tab "Hoy") ──
+    const daySales = useMemo(() =>
+        sales.filter(s => {
+            if (s.status === 'ANULADA') return false;
+            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
+            return isToday(s);
+        }),
+        [sales, today]
+    );
+    const dayTotalUsd = useMemo(() => daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [daySales]);
+    const dayTotalBs = useMemo(() => daySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [daySales]);
+    const dayItemsSold = useMemo(() =>
+        daySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0),
+        [daySales]
+    );
+    const dayProfit = useMemo(() =>
+        FinancialEngine.calculateAggregateProfit(daySales, bcvRate, products),
+        [daySales, bcvRate, products]
     );
 
     const recentSales = useMemo(() => {
@@ -171,9 +199,9 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         today, todaySales, todayCashFlow, todayApertura,
         todayTotalBs, todayTotalUsd, todayItemsSold,
         todayExpenses, todayExpensesUsd, todayProfit,
+        daySales, dayTotalUsd, dayTotalBs, dayItemsSold, dayProfit,
         recentSales, weekData, lowStockProducts,
         totalDeudas, topProducts, topStaff,
         paymentBreakdown, salesPaymentBreakdown, todayTopProducts,
-        paymentBreakdown, todayTopProducts,
     };
 }
