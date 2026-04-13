@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, TrendingDown, ArrowUpRight, Trash2, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut, Award, LineChart, ListChecks, RotateCcw } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, TrendingDown, ArrowUpRight, Trash2, Users, Send, Ban, ChevronDown, ChevronUp, UserPlus, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, CheckCircle2, LogOut, Award, LineChart, ListChecks, RotateCcw, Bell, Clock, Wallet, X } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { getPaymentLabel, PAYMENT_ICONS, getPaymentIcon, toTitleCase } from '../config/paymentMethods';
 import SalesHistory from '../components/Dashboard/SalesHistory';
@@ -28,6 +28,8 @@ import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
 import { shareSaleWhatsApp } from '../utils/dashboardActions';
 import { useDashboardMetrics, getLocalISODate } from '../hooks/useDashboardMetrics';
+import { useNotificationCenter } from '../hooks/useNotificationCenter';
+import { useTablesStore } from '../hooks/store/useTablesStore';
 import Skeleton from '../components/Skeleton';
 
 const SALES_KEY = 'bodega_sales_v1';
@@ -66,8 +68,13 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const [showTopDeudas, setShowTopDeudas] = useState(false);
     const [isAperturaOpen, setIsAperturaOpen] = useState(false);
     const [isReporteTurnoOpen, setIsReporteTurnoOpen] = useState(false);
+    const [showNotifPanel, setShowNotifPanel] = useState(false);
     const touchStartY = useRef(0);
     const scrollRef = useRef(null);
+
+    // Tables store for notification center
+    const activeSessions = useTablesStore(s => s.activeSessions);
+    const pausedSessions = useTablesStore(s => s.pausedSessions);
 
     // ── Métricas extraídas al hook ──
     const {
@@ -90,6 +97,11 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const displaySalesCount = dashTab === 'hoy' ? daySales.length : todaySales.length;
     const displayItemsSold = dashTab === 'hoy' ? dayItemsSold : todayItemsSold;
     const displayProfit = dashTab === 'hoy' ? dayProfit : todayProfit;
+
+    // Notification center
+    const { notifications, urgentCount, totalCount } = useNotificationCenter({
+        products, activeSessions, pausedSessions, activeCashSession, customers
+    });
 
     // ── Carga de datos ──
     useEffect(() => {
@@ -319,7 +331,19 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 <div className="flex sm:hidden absolute z-0 pointer-events-none inset-x-0 top-1 justify-center">
                     <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '105px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
                 </div>
-                <div className="flex items-center justify-end z-20">
+                <div className="flex items-center justify-end gap-2 z-20">
+                    {/* Bell notification icon */}
+                    <div className="relative">
+                        <button onClick={() => { triggerHaptic?.(); setShowNotifPanel(!showNotifPanel); }}
+                            className={`p-2 flex items-center justify-center rounded-full shadow-sm border transition-all active:scale-95 ${totalCount > 0 ? 'bg-amber-50 border-amber-100 text-amber-600 hover:bg-amber-100' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                            <Bell size={16} strokeWidth={2.5} />
+                            {totalCount > 0 && (
+                                <span className={`absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-black text-white px-1 ${urgentCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`}>
+                                    {totalCount}
+                                </span>
+                            )}
+                        </button>
+                    </div>
                     {isAdmin && (
                         <button onClick={async () => {
                             const ok = await confirm({ title: 'Cerrar sesión', message: 'Se cerrará tu acceso a la nube.', confirmText: 'Cerrar sesión', cancelText: 'Cancelar', variant: 'logout' });
@@ -333,6 +357,44 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     )}
                 </div>
             </div>
+
+            {/* ── NOTIFICATION PANEL ── */}
+            {showNotifPanel && (
+                <div className="absolute right-3 sm:right-5 top-[110px] sm:top-[150px] z-50 w-[calc(100%-24px)] sm:w-80 max-h-[60vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between p-3 border-b border-slate-100">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">Notificaciones</h3>
+                        <button onClick={() => setShowNotifPanel(false)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400 active:scale-90 transition-all">
+                            <X size={14} />
+                        </button>
+                    </div>
+                    {notifications.length === 0 ? (
+                        <div className="flex flex-col items-center py-8 gap-2">
+                            <Bell size={28} className="text-slate-200" />
+                            <p className="text-xs text-slate-400 font-medium">Sin notificaciones</p>
+                        </div>
+                    ) : (
+                        <div className="p-2 space-y-1.5">
+                            {notifications.map(n => {
+                                const colors = n.type === 'urgent' ? 'bg-red-50 border-red-100 text-red-600' : n.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-600' : 'bg-sky-50 border-sky-100 text-sky-600';
+                                const IconComp = n.icon === 'clock' ? Clock : n.icon === 'package' ? Package : n.icon === 'wallet' ? Wallet : Users;
+                                return (
+                                    <button key={n.id} onClick={() => { if (n.action && onNavigate) { triggerHaptic?.(); setShowNotifPanel(false); onNavigate(n.action); } }}
+                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all active:scale-[0.98] ${colors} ${n.action ? 'cursor-pointer' : 'cursor-default'}`}>
+                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/60 shrink-0">
+                                            <IconComp size={16} strokeWidth={2.5} />
+                                        </div>
+                                        <div className="text-left min-w-0">
+                                            <p className="text-[11px] font-black uppercase tracking-wider">{n.title}</p>
+                                            <p className="text-[11px] font-medium opacity-80 truncate">{n.message}</p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+            {showNotifPanel && <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />}
 
             {/* ── SCROLL CONTENT ── */}
             <div className="flex flex-col gap-3 px-3 sm:px-4 md:px-6 lg:px-8 pt-2 pb-28">
