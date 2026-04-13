@@ -40,12 +40,22 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
         hourCost = round2(billableHours * pricePerHour);
     }
 
+    // Libre: game_mode NORMAL sin horas prepagadas → cobro por minuto
+    let libreCost = 0;
+    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0 && !hasPinas;
+    if (isLibre && elapsedMinutes > 0) {
+        const pricePerHour = config.pricePerHour || 0;
+        libreCost = round2((elapsedMinutes / 60) * pricePerHour);
+    }
+
     return {
         pinaCost,
         hourCost,
+        libreCost,
         hasPinas,
         hasHours: hoursPaid > 0,
-        total: round2(pinaCost + hourCost)
+        isLibre,
+        total: round2(pinaCost + hourCost + libreCost)
     };
 }
 
@@ -61,9 +71,10 @@ export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid
  * Calcula el costo en Bs con desglose separado para piñas y horas
  * (cada uno puede tener tasa Bs distinta configurada).
  */
-export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV) {
+export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV, libreCost = 0) {
     let pinaCostBs = 0;
     let hourCostBs = 0;
+    let libreCostBs = 0;
 
     if (pinaCost > 0) {
         const priceBs = config.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
@@ -85,7 +96,17 @@ export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV
         }
     }
 
-    return { pinaCostBs, hourCostBs, totalBs: round2(pinaCostBs + hourCostBs) };
+    if (libreCost > 0) {
+        const priceBs = config.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+        const priceUsd = config.pricePerHour || 0;
+        if (priceBs > 0 && priceUsd > 0) {
+            libreCostBs = round2(libreCost * (priceBs / priceUsd));
+        } else {
+            libreCostBs = round2(libreCost * (tasaBCV || 1));
+        }
+    }
+
+    return { pinaCostBs, hourCostBs, libreCostBs, totalBs: round2(pinaCostBs + hourCostBs + libreCostBs) };
 }
 
 /**
@@ -117,8 +138,8 @@ export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
  */
 export function calculateGrandTotalBs(timeCost, totalConsumption, gameMode, config, tasaBCV, breakdown = null) {
     let timeBs;
-    if (breakdown && (breakdown.pinaCost > 0 || breakdown.hourCost > 0)) {
-        const mixed = calculateTimeCostBsBreakdown(breakdown.pinaCost, breakdown.hourCost, config, tasaBCV);
+    if (breakdown && (breakdown.pinaCost > 0 || breakdown.hourCost > 0 || breakdown.libreCost > 0)) {
+        const mixed = calculateTimeCostBsBreakdown(breakdown.pinaCost, breakdown.hourCost, config, tasaBCV, breakdown.libreCost);
         timeBs = mixed.totalBs;
     } else {
         timeBs = calculateTimeCostBs(timeCost, gameMode, config, tasaBCV);

@@ -640,7 +640,7 @@ export default function TableCard({ table, session }) {
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
                     isAvailable ? 'bg-emerald-100 text-emerald-700' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : hasPinas ? 'LA PIÑA' : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : hasPinas ? 'LA PIÑA' : costBreakdown?.isLibre ? 'ABIERTA' : 'JUG.'}
                 </div>
             </div>
 
@@ -764,6 +764,11 @@ export default function TableCard({ table, session }) {
                                         {hasLimit && hoursOffset > 0 && (
                                             <div className="text-[9px] font-bold text-emerald-300 mt-0.5">
                                                 {hoursOffset === 0.5 ? '30min' : `${hoursOffset}h`} pagada{hoursOffset !== 1 ? 's' : ''} de {session.hours_paid === 0.5 ? '30min' : `${Number(session.hours_paid)}h`}
+                                            </div>
+                                        )}
+                                        {costBreakdown?.isLibre && (
+                                            <div className="text-[10px] font-black tracking-wider uppercase mt-1 text-emerald-300">
+                                                ${timeCost.toFixed(2)} acumulado
                                             </div>
                                         )}
                                     </>
