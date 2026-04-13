@@ -862,7 +862,7 @@ export default function TableCard({ table, session }) {
                         )}
 
                         {/* Botones modo mixto: agregar el modo faltante */}
-                        {!isCheckoutPending && !isTimeFree && !costBreakdown?.isLibre && (
+                        {!isCheckoutPending && !isTimeFree && (
                             <div className="flex gap-1.5">
                                 {/* Agregar Piña a sesión que no tiene piñas */}
                                 {!hasPinas && (
@@ -873,8 +873,8 @@ export default function TableCard({ table, session }) {
                                         <TargetIcon size={10} /> + Piña
                                     </button>
                                 )}
-                                {/* Agregar Hora a sesión que no tiene horas */}
-                                {!hasHoursActive && (
+                                {/* Agregar Hora a sesión que no tiene horas — oculto en libre */}
+                                {!hasHoursActive && !costBreakdown?.isLibre && (
                                     <button
                                         onClick={() => setShowAddHoursModal(true)}
                                         className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
