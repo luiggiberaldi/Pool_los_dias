@@ -862,7 +862,7 @@ export default function TableCard({ table, session }) {
                         )}
 
                         {/* Botones modo mixto: agregar el modo faltante */}
-                        {!isCheckoutPending && !isTimeFree && (
+                        {!isCheckoutPending && !isTimeFree && !costBreakdown?.isLibre && (
                             <div className="flex gap-1.5">
                                 {/* Agregar Piña a sesión que no tiene piñas */}
                                 {!hasPinas && (
