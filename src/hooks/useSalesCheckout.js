@@ -6,7 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
-import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -74,55 +74,114 @@ export function useSalesCheckout({
         if (!tableCheckoutData) return;
         triggerHaptic && triggerHaptic();
 
-        const syntheticCart = [];
-        if (tableCheckoutData.timeCost > 0) {
-            const session = tableCheckoutData.session;
-            const config = useTablesStore.getState().config;
-            const paidHoursOffsets = useTablesStore.getState().paidHoursOffsets || {};
-            const paidRoundsOffsets = useTablesStore.getState().paidRoundsOffsets || {};
-            const hoursOff = paidHoursOffsets[session?.id] || 0;
-            const roundsOff = paidRoundsOffsets[session?.id] || 0;
-            const breakdown = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOff, roundsOff);
+        const seatId = tableCheckoutData.seatId || null;
+        const session = tableCheckoutData.session;
+        const seats = session?.seats || [];
+        const config = useTablesStore.getState().config;
+        const paidHoursOffsets = useTablesStore.getState().paidHoursOffsets || {};
+        const paidRoundsOffsets = useTablesStore.getState().paidRoundsOffsets || {};
+        const hoursOff = paidHoursOffsets[session?.id] || 0;
+        const roundsOff = paidRoundsOffsets[session?.id] || 0;
 
-            if (breakdown.pinaCost > 0) {
-                const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
-                const billableRounds = Math.max(0, pinaCount - roundsOff);
+        const syntheticCart = [];
+
+        if (seatId && seats.length > 0) {
+            // ═══ PER-SEAT CHECKOUT ═══
+            const seat = seats.find(s => s.id === seatId);
+            if (!seat) { showToast('Asiento no encontrado', 'error'); return; }
+
+            const seatTimeCost = calculateSeatCostBreakdown(seat, tableCheckoutData.elapsed, config);
+            const tableName = `${tableCheckoutData.table?.name || 'Mesa'} (${seat.label || 'Persona'})`;
+
+            // Time cost for this seat
+            if (seatTimeCost.pinaCost > 0) {
                 syntheticCart.push({
                     id: crypto.randomUUID(),
-                    name: `Piña ${tableCheckoutData.table.name}`,
+                    name: `Piña ${tableName}`,
                     priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
-                    qty: billableRounds, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                    qty: seat.pinas || 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                 });
             }
-            if (breakdown.hourCost > 0) {
-                const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOff);
+            if (seatTimeCost.hourCost > 0) {
                 syntheticCart.push({
                     id: crypto.randomUUID(),
-                    name: `Tiempo ${tableCheckoutData.table.name} (${formatHoursPaid(billableHours)})`,
-                    priceUsdt: round2(breakdown.hourCost), priceUsd: round2(breakdown.hourCost),
+                    name: `Tiempo ${tableName} (${formatHoursPaid(seat.hoursPaid || 0)})`,
+                    priceUsdt: round2(seatTimeCost.hourCost), priceUsd: round2(seatTimeCost.hourCost),
                     qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                 });
             }
-        }
-        if (tableCheckoutData.currentItems?.length > 0) {
-            tableCheckoutData.currentItems.forEach(item => {
+            if (seatTimeCost.libreCost > 0) {
+                syntheticCart.push({
+                    id: crypto.randomUUID(),
+                    name: `Tiempo libre ${tableName}`,
+                    priceUsdt: round2(seatTimeCost.libreCost), priceUsd: round2(seatTimeCost.libreCost),
+                    qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                });
+            }
+
+            // Seat-specific items
+            const seatItems = (tableCheckoutData.currentItems || []).filter(i => i.seat_id === seatId);
+            seatItems.forEach(item => {
                 const p = products.find(p => p.id === item.product_id);
-                if (p) {
-                    syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 });
-                } else {
-                    console.warn(`[TableCheckout] Producto ${item.product_id} no encontrado en catálogo local, usando datos de orden`);
+                syntheticCart.push(p
+                    ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 }
+                    : { id: item.product_id, name: item.product_name || 'Producto', priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: 0, costUsd: 0, unit: 'unidad', category: 'otros', stock: 9999 }
+                );
+            });
+
+            // Shared portion
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || []);
+            if (fullBreakdown) {
+                const seatBd = fullBreakdown.seats.find(s => s.seat.id === seatId);
+                if (seatBd && seatBd.sharedPortion > 0) {
                     syntheticCart.push({
-                        id: item.product_id,
-                        _originalId: item.product_id,
-                        name: item.product_name || 'Producto (sin catálogo)',
-                        priceUsdt: Number(item.unit_price_usd),
-                        priceUsd: Number(item.unit_price_usd),
-                        qty: Number(item.qty),
-                        costBs: 0, costUsd: 0,
-                        unit: 'unidad', category: 'otros', stock: 9999
+                        id: crypto.randomUUID(),
+                        name: `Compartido ${tableCheckoutData.table?.name || 'Mesa'} (÷${fullBreakdown.seats.filter(s => !s.seat.paid).length})`,
+                        priceUsdt: round2(seatBd.sharedPortion), priceUsd: round2(seatBd.sharedPortion),
+                        qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                     });
                 }
-            });
+            }
+        } else {
+            // ═══ CLASSIC (FULL TABLE) CHECKOUT ═══
+            if (tableCheckoutData.timeCost > 0) {
+                const breakdown = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOff, roundsOff);
+
+                if (breakdown.pinaCost > 0) {
+                    const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                    const billableRounds = Math.max(0, pinaCount - roundsOff);
+                    syntheticCart.push({
+                        id: crypto.randomUUID(),
+                        name: `Piña ${tableCheckoutData.table.name}`,
+                        priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
+                        qty: billableRounds, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                    });
+                }
+                if (breakdown.hourCost > 0) {
+                    const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOff);
+                    syntheticCart.push({
+                        id: crypto.randomUUID(),
+                        name: `Tiempo ${tableCheckoutData.table.name} (${formatHoursPaid(billableHours)})`,
+                        priceUsdt: round2(breakdown.hourCost), priceUsd: round2(breakdown.hourCost),
+                        qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                    });
+                }
+            }
+            if (tableCheckoutData.currentItems?.length > 0) {
+                tableCheckoutData.currentItems.forEach(item => {
+                    const p = products.find(p => p.id === item.product_id);
+                    if (p) {
+                        syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 });
+                    } else {
+                        syntheticCart.push({
+                            id: item.product_id, _originalId: item.product_id,
+                            name: item.product_name || 'Producto (sin catálogo)',
+                            priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd),
+                            qty: Number(item.qty), costBs: 0, costUsd: 0, unit: 'unidad', category: 'otros', stock: 9999
+                        });
+                    }
+                });
+            }
         }
 
         const opts = {
@@ -136,7 +195,9 @@ export function useSalesCheckout({
             useAutoRate, splitMeta
         };
 
-        opts.tableName = tableCheckoutData.table?.name || null;
+        opts.tableName = seatId
+            ? `${tableCheckoutData.table?.name || 'Mesa'} (${seats.find(s => s.id === seatId)?.label || 'Persona'})`
+            : (tableCheckoutData.table?.name || null);
 
         if (tableCheckoutData.session?.opened_by) {
             const cachedUsers = useAuthStore.getState().cachedUsers || [];
@@ -165,6 +226,31 @@ export function useSalesCheckout({
         setProductsAfterCheckout(result.updatedProducts);
         if (result.updatedCustomers) setCustomers(result.updatedCustomers);
         setSalesData(prev => [result.sale, ...prev]);
+
+        // Per-seat: mark seat as paid
+        if (seatId && seats.length > 0) {
+            try {
+                const updatedSeats = seats.map(s => s.id === seatId ? { ...s, paid: true } : s);
+                await useTablesStore.getState().updateSessionSeats(session.id, updatedSeats);
+                const allPaid = updatedSeats.every(s => s.paid);
+                if (allPaid) {
+                    // All seats paid — show release dialog (shouldRelease = null lets caller decide)
+                    // Don't auto-release — let post-payment dialog handle it
+                } else {
+                    // More seats to pay — close checkout, go back to bill modal
+                    setTableCheckoutData(null);
+                    showToast(`${seats.find(s => s.id === seatId)?.label || 'Persona'} pagado`, 'success');
+                }
+            } catch (e) {
+                showToast("Venta completa, pero falló al marcar asiento como pagado.", "warning");
+            }
+            setShowReceipt(result.sale);
+            playCheckout();
+            setShowConfetti(true);
+            notifyLowStock(result.updatedProducts);
+            setSelectedCustomerId('');
+            return;
+        }
 
         // Si shouldRelease es null, el caller maneja la decisión (post-payment dialog)
         if (shouldRelease !== null) {

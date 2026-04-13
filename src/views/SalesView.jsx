@@ -4,7 +4,7 @@ import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useTablesStore } from '../hooks/store/useTablesStore';
-import { calculateGrandTotalBs } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -434,7 +434,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
             {tableCheckoutData && !showTablePayment && (
                 <TableBillModal data={tableCheckoutData} onClose={() => { setTableCheckoutData(null); }}
-                    onProceedToPayment={(disc, itemDiscs) => {
+                    onProceedToPayment={(disc, itemDiscs, seatId) => {
                         // Calculate discount amounts and attach to checkout data
                         const _itemDiscs = itemDiscs || {};
                         const _itemDiscAmt = (tableCheckoutData.currentItems || []).reduce((acc, item) => {
@@ -443,13 +443,25 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                             const lt = Number(item.unit_price_usd) * Number(item.qty);
                             return acc + (d.type === 'percentage' ? lt * (d.value / 100) : Math.min(d.value * Number(item.qty), lt));
                         }, 0);
-                        const _sub = tableCheckoutData.grandTotal - _itemDiscAmt;
+
+                        // If per-seat, use seat subtotal instead of table grandTotal
+                        let baseTotal = tableCheckoutData.grandTotal;
+                        if (seatId) {
+                            const seats = tableCheckoutData.session?.seats || [];
+                            const config = useTablesStore.getState().config;
+                            const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || []);
+                            const seatBd = fb?.seats.find(s => s.seat.id === seatId);
+                            if (seatBd) baseTotal = seatBd.subtotal;
+                        }
+
+                        const _sub = baseTotal - _itemDiscAmt;
                         const _totalDisc = disc && disc.value > 0 ? (disc.type === 'percentage' ? _sub * (disc.value / 100) : Math.min(disc.value, _sub)) : 0;
                         const totalDiscAmt = _totalDisc + _itemDiscAmt;
                         setTableCheckoutData(prev => ({
                             ...prev,
                             discountData: { active: totalDiscAmt > 0, amountUsd: totalDiscAmt, amountBs: totalDiscAmt * effectiveRate, type: disc?.type || 'percentage', value: disc?.value || 0 },
-                            grandTotal: prev.grandTotal - totalDiscAmt,
+                            grandTotal: baseTotal - totalDiscAmt,
+                            ...(seatId ? { seatId } : {}),
                         }));
                         setShowTablePayment(true);
                         if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id);

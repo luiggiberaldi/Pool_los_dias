@@ -177,3 +177,65 @@ export function formatHoursPaid(hours) {
     if (hasHalf) return `${whole} 1/2 h`;
     return `${whole} h`;
 }
+
+/**
+ * Calcula el costo de UN seat según su gameMode individual.
+ * seat: { gameMode: 'HOURS'|'PINA'|'LIBRE'|'NONE', hoursPaid, pinas }
+ */
+export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
+    if (!seat || seat.gameMode === 'NONE') {
+        return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
+    }
+    if (seat.gameMode === 'PINA') {
+        const pinas = seat.pinas || 1;
+        return calculateSessionCostBreakdown(elapsedMinutes, 'PINA', config, 0, pinas - 1);
+    }
+    if (seat.gameMode === 'HOURS') {
+        const hours = seat.hoursPaid || 0;
+        return calculateSessionCostBreakdown(elapsedMinutes, 'NORMAL', config, hours, 0);
+    }
+    if (seat.gameMode === 'LIBRE') {
+        return calculateSessionCostBreakdown(elapsedMinutes, 'NORMAL', config, 0, 0);
+    }
+    return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
+}
+
+/**
+ * Calcula el desglose completo de una mesa con seats.
+ * Si seats está vacío, retorna null (usar cálculo legacy de sesión).
+ * orderItems: array de items con seat_id (null = compartido).
+ */
+export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = []) {
+    if (!seats || seats.length === 0) return null;
+
+    const activeSeats = seats.filter(s => !s.paid);
+    const allSeats = seats;
+    const sharedItems = orderItems.filter(i => !i.seat_id);
+    const sharedTotal = sharedItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
+    const sharedPerSeat = activeSeats.length > 0 ? round2(sharedTotal / activeSeats.length) : 0;
+
+    const seatBreakdowns = allSeats.map(seat => {
+        const timeCost = calculateSeatCostBreakdown(seat, elapsedMinutes, config);
+        const seatItems = orderItems.filter(i => i.seat_id === seat.id);
+        const consumption = seatItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
+        const sharedPortion = seat.paid ? 0 : sharedPerSeat;
+        return {
+            seat,
+            timeCost,
+            items: seatItems,
+            consumption: round2(consumption),
+            sharedPortion,
+            subtotal: round2(timeCost.total + consumption + sharedPortion)
+        };
+    });
+
+    const grandTotal = seatBreakdowns.reduce((acc, sb) => acc + sb.subtotal, 0);
+
+    return {
+        seats: seatBreakdowns,
+        sharedItems,
+        sharedTotal: round2(sharedTotal),
+        sharedPerSeat,
+        grandTotal: round2(grandTotal)
+    };
+}

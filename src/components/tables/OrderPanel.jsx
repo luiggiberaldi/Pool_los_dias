@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, X, Plus, Minus, Trash2, Loader2, Search, ChevronDown, UtensilsCrossed } from 'lucide-react';
+import { ShoppingBag, X, Plus, Minus, Trash2, Loader2, Search, ChevronDown, UtensilsCrossed, Users } from 'lucide-react';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
@@ -37,6 +37,11 @@ export function OrderPanel({ session, table, onClose }) {
     const [qtyInputValue, setQtyInputValue] = useState(1);
     const searchRef = useRef(null);
 
+    // Seats support
+    const seats = session?.seats || [];
+    const hasSeats = seats.length > 0;
+    const [selectedSeatId, setSelectedSeatId] = useState(null);
+
     // Derive order and items
     const order = allOrders.find(o => o.table_session_id === session.id) || null;
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
@@ -56,7 +61,7 @@ export function OrderPanel({ session, table, onClose }) {
         syncOrders();
     }, []);
 
-    const handleAddProduct = async (product) => {
+    const handleAddProduct = async (product, seatIdOverride) => {
         if (!currentUser) {
             showToast('Sin sesión', 'No hay usuario activo. Vuelve a iniciar sesión.', 'error');
             return;
@@ -68,8 +73,9 @@ export function OrderPanel({ session, table, onClose }) {
             name: product.name,
             price: product.priceUsdt || product.priceUsd || product.price || 0
         };
+        const seatId = seatIdOverride !== undefined ? seatIdOverride : selectedSeatId;
         try {
-            await addItemToSession(table.id, session.id, currentUser.id, productForOrder, effectiveRate);
+            await addItemToSession(table.id, session.id, currentUser.id, productForOrder, effectiveRate, seatId);
         } catch (e) {
             console.error(e);
             const msg = e?.message || e?.details || e?.hint || JSON.stringify(e) || 'Error desconocido';
@@ -105,6 +111,39 @@ export function OrderPanel({ session, table, onClose }) {
                 </button>
             </div>
 
+            {/* ── SEAT SELECTOR BAR ── */}
+            {hasSeats && (
+                <div className="px-5 mb-3 shrink-0">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+                        <button
+                            onClick={() => setSelectedSeatId(null)}
+                            className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                selectedSeatId === null
+                                    ? 'bg-slate-700 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                        >
+                            <Users size={11} /> Compartido
+                        </button>
+                        {seats.map(seat => (
+                            <button
+                                key={seat.id}
+                                onClick={() => setSelectedSeatId(seat.id)}
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    selectedSeatId === seat.id
+                                        ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
+                                        : seat.paid
+                                            ? 'bg-emerald-50 text-emerald-400 line-through'
+                                            : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-500'
+                                }`}
+                            >
+                                {seat.label || `Persona ${seats.indexOf(seat) + 1}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* ── ORDER ITEMS SECTION ── */}
             <div className="px-5 mb-3 shrink-0">
                 <div className="flex items-center justify-between mb-3">
@@ -127,6 +166,7 @@ export function OrderPanel({ session, table, onClose }) {
                     <div className="space-y-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
                         {currentItems.map(item => {
                             const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
+                            const seatLabel = hasSeats ? (item.seat_id ? (seats.find(s => s.id === item.seat_id)?.label || '?') : 'Compartido') : null;
                             return (
                             <div key={item.id}
                                 className={`flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl px-4 py-3 transition-all duration-300 ${removingItem === item.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
@@ -146,11 +186,12 @@ export function OrderPanel({ session, table, onClose }) {
                                     <div className="text-slate-800 font-bold text-sm truncate">{item.product_name}</div>
                                     <div className="text-slate-500 text-xs font-medium">
                                         ${Number(item.unit_price_usd).toFixed(2)} c/u · <span className="text-emerald-500 font-bold">${lineTotal.toFixed(2)}</span>
+                                        {seatLabel && <span className="ml-1.5 text-[10px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-md font-bold">{seatLabel}</span>}
                                     </div>
                                 </div>
                                 {/* Controls */}
                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => handleAddProduct({ id: item.product_id, name: item.product_name, price: item.unit_price_usd })}
+                                    <button onClick={() => handleAddProduct({ id: item.product_id, name: item.product_name, price: item.unit_price_usd }, item.seat_id || null)}
                                         disabled={!!addingItem}
                                         className="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40">
                                         <Plus size={14} />

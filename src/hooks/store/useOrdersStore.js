@@ -109,7 +109,7 @@ export const useOrdersStore = create((set, get) => ({
             if (orderIds.length > 0) {
                 const { data: openItems, error: itemsError } = await supabaseCloud
                     .from('order_items')
-                    .select('id, order_id, product_id, product_name, unit_price_usd, qty')
+                    .select('id, order_id, product_id, product_name, unit_price_usd, qty, seat_id')
                     .in('order_id', orderIds);
                 if (itemsError) throw itemsError;
                 items = openItems;
@@ -133,7 +133,7 @@ export const useOrdersStore = create((set, get) => ({
     },
 
     // Añade un ítem a la sesión (crea la orden si no existe)
-    addItemToSession: async (tableId, sessionId, creatorId, productInfo, exchangeRate = 1) => {
+    addItemToSession: async (tableId, sessionId, creatorId, productInfo, exchangeRate = 1, seatId = null) => {
         let order = get().getOrderBySessionId(sessionId);
         const userId = await getAuthUserId();
 
@@ -165,7 +165,7 @@ export const useOrdersStore = create((set, get) => ({
             }
 
             // Chequear si el producto ya existe en la orden
-            const existingItem = get().orderItems.find(i => i.order_id === order.id && i.product_id === productInfo.id);
+            const existingItem = get().orderItems.find(i => i.order_id === order.id && i.product_id === productInfo.id && (i.seat_id || null) === (seatId || null));
 
             if (existingItem) {
                 const { data: updatedItem, error: err } = await supabaseCloud
@@ -188,7 +188,8 @@ export const useOrdersStore = create((set, get) => ({
                         product_name: productInfo.name,
                         unit_price_usd: productInfo.priceUsd || productInfo.priceUsdt || productInfo.price || 0,
                         qty: 1,
-                        added_by: creatorId
+                        added_by: creatorId,
+                        ...(seatId ? { seat_id: seatId } : {})
                     }])
                     .select()
                     .single();

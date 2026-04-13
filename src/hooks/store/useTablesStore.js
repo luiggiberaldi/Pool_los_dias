@@ -483,7 +483,7 @@ export const useTablesStore = create((set, get) => ({
         }
     },
 
-    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null, includePina = false) => {
+    openSession: async (tableId, staffId, gameMode = 'NORMAL', hoursPaid = 0, clientName = '', guestCount = 0, clientId = null, includePina = false, seats = []) => {
         const userId = await getAuthUserId();
 
         // Cerrar sesiones huérfanas (ACTIVE/CHECKOUT) para la misma mesa
@@ -514,8 +514,8 @@ export const useTablesStore = create((set, get) => ({
             ...(clientName ? { client_name: clientName } : {}),
             ...(guestCount > 0 ? { guest_count: guestCount } : {}),
             ...(clientId ? { client_id: clientId } : {}),
-            // Modo mixto: si se incluye piña en una sesión NORMAL, extended_times=1 (1 piña, conteo directo)
             ...((includePina && gameMode !== 'PINA') ? { extended_times: 1 } : {}),
+            ...(seats && seats.length > 0 ? { seats, guest_count: seats.length } : {}),
         };
         if (userId) sessionPayload.user_id = userId;
 
@@ -639,6 +639,21 @@ export const useTablesStore = create((set, get) => ({
             if (error) throw error;
         } catch (e) {
             await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload });
+        }
+    },
+
+    updateSessionSeats: async (sessionId, seats) => {
+        const payload = { seats: seats || [] };
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, ...payload, guest_count: (seats || []).length } : s
+        );
+        set({ activeSessions: newSessions });
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+        try {
+            const { error } = await supabaseCloud.from('table_sessions').update({ ...payload, guest_count: (seats || []).length }).eq('id', sessionId);
+            if (error) throw error;
+        } catch (e) {
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { ...payload, guest_count: (seats || []).length } });
         }
     },
 

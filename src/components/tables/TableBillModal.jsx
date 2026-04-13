@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent, Tag, Trash2 } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../../utils/tableBillingEngine';
+import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent, Tag, Trash2, Users, Target } from 'lucide-react';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
@@ -50,7 +50,12 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const [itemDiscounts, setItemDiscounts] = useState({});
     const [discountPopoverItem, setDiscountPopoverItem] = useState(null);
     const [discountCustomValue, setDiscountCustomValue] = useState('');
+    const [payingSeatId, setPayingSeatId] = useState(null);
 
+    // Seats mode
+    const seats = session?.seats || [];
+    const hasSeats = seats.length > 0;
+    const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems) : null;
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
@@ -135,6 +140,97 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
 
                 {/* ── Scrollable body ─────────────────────────── */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+
+                    {/* ═══ SEATS MODE: Per-seat breakdown ═══ */}
+                    {hasSeats && seatBreakdown && (
+                        <>
+                            {seatBreakdown.seats.map(sb => {
+                                const seat = sb.seat;
+                                const modeLabels = { HOURS: 'Hora', PINA: 'Piña', LIBRE: 'Libre', NONE: 'Solo Consumo' };
+                                const modeColors = { HOURS: 'sky', PINA: 'amber', LIBRE: 'emerald', NONE: 'slate' };
+                                const color = modeColors[seat.gameMode] || 'slate';
+                                const bgClasses = {
+                                    sky: 'bg-sky-50 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900/40',
+                                    amber: 'bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40',
+                                    emerald: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
+                                    slate: 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/60',
+                                };
+                                const headerColors = {
+                                    sky: 'text-sky-600 dark:text-sky-400',
+                                    amber: 'text-amber-600 dark:text-amber-400',
+                                    emerald: 'text-emerald-600 dark:text-emerald-400',
+                                    slate: 'text-slate-500 dark:text-slate-400',
+                                };
+                                return (
+                                    <div key={seat.id} className={`border rounded-2xl overflow-hidden ${bgClasses[color]} ${seat.paid ? 'opacity-50' : ''}`}>
+                                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-inherit">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${headerColors[color]}`}>
+                                                    {seat.label || `Persona ${seats.indexOf(seat) + 1}`}
+                                                </span>
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${seat.paid ? 'bg-emerald-200 text-emerald-700' : `bg-${color}-200/60 ${headerColors[color]}`}`}>
+                                                    {seat.paid ? 'PAGADO' : modeLabels[seat.gameMode]}
+                                                </span>
+                                            </div>
+                                            <span className="text-sm font-black text-slate-800 dark:text-white">${sb.subtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="px-4 py-2 space-y-1 text-xs">
+                                            {sb.timeCost.total > 0 && (
+                                                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                                                    <span>{seat.gameMode === 'PINA' ? `${seat.pinas || 1} piña(s)` : seat.gameMode === 'HOURS' ? `${formatHoursPaid(seat.hoursPaid)}` : 'Tiempo'}</span>
+                                                    <span className="font-bold">${sb.timeCost.total.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {sb.consumption > 0 && (
+                                                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                                                    <span>Consumo ({sb.items.length} {sb.items.length === 1 ? 'item' : 'items'})</span>
+                                                    <span className="font-bold">${sb.consumption.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {sb.sharedPortion > 0 && (
+                                                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                                                    <span>Compartido (÷{seatBreakdown.seats.filter(s => !s.seat.paid).length})</span>
+                                                    <span className="font-bold">${sb.sharedPortion.toFixed(2)}</span>
+                                                </div>
+                                            )}
+                                            {sb.timeCost.total === 0 && sb.consumption === 0 && sb.sharedPortion === 0 && !seat.paid && (
+                                                <p className="text-slate-400 py-1">Sin cargos</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Shared items section */}
+                            {seatBreakdown.sharedItems.length > 0 && (
+                                <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+                                    <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+                                        <Users size={12} className="text-slate-400" />
+                                        <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                            Consumo Compartido · ${seatBreakdown.sharedTotal.toFixed(2)}
+                                        </p>
+                                    </div>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {seatBreakdown.sharedItems.map((item, i) => (
+                                            <div key={i} className="flex items-center justify-between px-4 py-2">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="w-5 h-5 bg-slate-200 dark:bg-slate-700 rounded text-[10px] font-black text-slate-500 flex items-center justify-center">{item.qty}</span>
+                                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate">{item.product_name}</span>
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-700 dark:text-white">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-slate-400">
+                                        ÷{seatBreakdown.seats.filter(s => !s.seat.paid).length} personas = ${seatBreakdown.sharedPerSeat.toFixed(2)} c/u
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* ═══ CLASSIC MODE: Session-level breakdown (when no seats) ═══ */}
+                    {!hasSeats && (<>
 
                     {/* Piñas — visible si la sesión tiene piñas */}
                     {fullBreakdown.hasPinas && (
@@ -381,12 +477,15 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     )}
 
                     {/* Sin consumos */}
-                    {(!currentItems || currentItems.length === 0) && timeCost === 0 && (
+                    {(!currentItems || currentItems.length === 0) && timeCost === 0 && !hasSeats && (
                         <div className="py-8 text-center text-slate-400">
                             <Coffee size={28} className="mx-auto mb-2 opacity-40" />
                             <p className="text-sm">Sin consumos registrados</p>
                         </div>
                     )}
+
+                    </>)}
+                    {/* ═══ END CLASSIC MODE ═══ */}
 
                     {/* Descuento general */}
                     {discountAmountUsd > 0 && (
@@ -406,14 +505,20 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     >
                         <div>
                             <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Total a Cobrar</p>
-                            {isMixed && (
+                            {hasSeats && seatBreakdown && (
+                                <p className="text-[10px] text-white/60 mt-0.5">
+                                    {seatBreakdown.seats.filter(s => !s.seat.paid).length} persona(s) activa(s)
+                                    {discountAmountUsd > 0 ? ` − Desc $${discountAmountUsd.toFixed(2)}` : ''}
+                                </p>
+                            )}
+                            {!hasSeats && isMixed && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
                                     Piñas ${fullBreakdown.pinaCost.toFixed(2)} + Tiempo ${fullBreakdown.hourCost.toFixed(2)}{adjustedConsumption > 0 ? ` + Consumos $${adjustedConsumption.toFixed(2)}` : ''}
                                     {(roundsOffset > 0 || hoursOffset > 0) ? ` − Pagado $${(roundsOffset * (config.pricePina || 0) + hoursOffset * (config.pricePerHour || 0)).toFixed(2)}` : ''}
                                     {discountAmountUsd > 0 ? ` − Desc $${discountAmountUsd.toFixed(2)}` : ''}
                                 </p>
                             )}
-                            {!isMixed && (timeCost > 0 || adjustedConsumption > 0 || discountAmountUsd > 0) && (
+                            {!hasSeats && !isMixed && (timeCost > 0 || adjustedConsumption > 0 || discountAmountUsd > 0) && (
                                 <p className="text-[10px] text-white/60 mt-0.5">
                                     {timeCost > 0 ? `Tiempo $${timeCost.toFixed(2)}` : ''}
                                     {timeCost > 0 && adjustedConsumption > 0 ? ' + ' : ''}
@@ -423,37 +528,91 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             )}
                         </div>
                         <div className="text-right">
-                            <p className="text-2xl font-black text-white">${finalTotal.toFixed(2)}</p>
-                            <p className="text-xs font-bold text-white/70">Bs {formatBs(finalTotalBs)}</p>
+                            <p className="text-2xl font-black text-white">
+                                ${hasSeats && seatBreakdown ? (seatBreakdown.grandTotal - discountAmountUsd).toFixed(2) : finalTotal.toFixed(2)}
+                            </p>
+                            <p className="text-xs font-bold text-white/70">
+                                Bs {formatBs((hasSeats && seatBreakdown ? (seatBreakdown.grandTotal - discountAmountUsd) : finalTotal) * tasaUSD)}
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 {/* ── Footer ─────────────────────────────────── */}
-                <div className="shrink-0 px-4 pb-6 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-3">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-3.5 rounded-xl text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
-                    >
-                        Cerrar
-                    </button>
-                    {canDiscount && (
-                        <button
-                            onClick={() => setShowDiscountModal(true)}
-                            className={`py-3.5 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 active:scale-95 transition-all ${discountAmountUsd > 0 ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}
-                        >
-                            <Percent size={14} />
-                            {discountAmountUsd > 0 ? `${discount.type === 'percentage' ? discount.value + '%' : '$' + discount.value}` : 'Desc'}
-                        </button>
+                <div className="shrink-0 px-4 pb-6 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    {/* Individual seat payment selector */}
+                    {hasSeats && payingSeatId === null && (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3.5 rounded-xl text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                            >
+                                Cerrar
+                            </button>
+                            {canDiscount && (
+                                <button
+                                    onClick={() => setShowDiscountModal(true)}
+                                    className={`py-3.5 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 active:scale-95 transition-all ${discountAmountUsd > 0 ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}
+                                >
+                                    <Percent size={14} />
+                                </button>
+                            )}
+                            <button
+                                onClick={() => onProceedToPayment(discount, itemDiscounts)}
+                                className="flex-[2] py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-500/25"
+                                style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)' }}
+                            >
+                                Cobrar Todo
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
                     )}
-                    <button
-                        onClick={() => onProceedToPayment(discount, itemDiscounts)}
-                        className="flex-[2] py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-500/25"
-                        style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)' }}
-                    >
-                        Cobrar ${finalTotal.toFixed(2)}
-                        <ChevronRight size={16} />
-                    </button>
+                    {hasSeats && payingSeatId === null && (
+                        <div className="flex flex-wrap gap-1.5">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider py-1.5 mr-1">Cobrar individual:</span>
+                            {seats.filter(s => !s.paid).map(seat => {
+                                const sb = seatBreakdown?.seats.find(s => s.seat.id === seat.id);
+                                return (
+                                    <button
+                                        key={seat.id}
+                                        onClick={() => onProceedToPayment(discount, itemDiscounts, seat.id)}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-700/40 hover:bg-sky-100 dark:hover:bg-sky-900/30 active:scale-95 transition-all"
+                                    >
+                                        {seat.label || `P${seats.indexOf(seat) + 1}`} · ${sb ? sb.subtotal.toFixed(2) : '0.00'}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Classic footer (no seats) */}
+                    {!hasSeats && (
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3.5 rounded-xl text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                            >
+                                Cerrar
+                            </button>
+                            {canDiscount && (
+                                <button
+                                    onClick={() => setShowDiscountModal(true)}
+                                    className={`py-3.5 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 active:scale-95 transition-all ${discountAmountUsd > 0 ? 'bg-rose-100 text-rose-600 hover:bg-rose-200' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}
+                                >
+                                    <Percent size={14} />
+                                    {discountAmountUsd > 0 ? `${discount.type === 'percentage' ? discount.value + '%' : '$' + discount.value}` : 'Desc'}
+                                </button>
+                            )}
+                            <button
+                                onClick={() => onProceedToPayment(discount, itemDiscounts)}
+                                className="flex-[2] py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-500/25"
+                                style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)' }}
+                            >
+                                Cobrar ${finalTotal.toFixed(2)}
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Discount Modal */}

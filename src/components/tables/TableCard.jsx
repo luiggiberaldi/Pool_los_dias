@@ -8,6 +8,7 @@ import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useCustomersStore } from '../../hooks/store/useCustomersStore';
 import { OrderPanel } from './OrderPanel';
+import { SeatEditor } from './SeatEditor';
 
 import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
 import { showToast } from '../Toast';
@@ -282,7 +283,7 @@ function useBcvRate() {
 }
 
 export default function TableCard({ table, session }) {
-    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionTime, addPinaToSession, addHoursToSession, pauseSession, resumeSession } = useTablesStore();
+    const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionSeats, updateSessionTime, addPinaToSession, addHoursToSession, pauseSession, resumeSession } = useTablesStore();
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const pausedData = useTablesStore(state => session ? state.pausedSessions[session.id] : null);
@@ -325,6 +326,7 @@ export default function TableCard({ table, session }) {
     const [sessionClientName, setSessionClientName] = useState('');
     const [sessionGuestCount, setSessionGuestCount] = useState('');
     const [sessionClientId, setSessionClientId] = useState(null);
+    const [sessionSeats, setSessionSeats] = useState([]);
     const [showCustomerSheet, setShowCustomerSheet] = useState(false);
     const { customers: allCustomers, fetchCustomers, createCustomer, refresh: refreshCustomers } = useCustomersStore();
 
@@ -334,6 +336,7 @@ export default function TableCard({ table, session }) {
     const [editGuestCount, setEditGuestCount] = useState('');
     const [editClientId, setEditClientId] = useState(null);
     const [editNotes, setEditNotes] = useState('');
+    const [editSeats, setEditSeats] = useState([]);
     const [showEditCustomerSheet, setShowEditCustomerSheet] = useState(false);
 
 
@@ -406,7 +409,7 @@ export default function TableCard({ table, session }) {
         await resumeSession(session.id);
     };
 
-    const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null, includePina = false) => {
+    const handleStartNormal = async (hours = 0, clientName = '', guestCount = 0, clientId = null, includePina = false, seats = []) => {
         if (!currentUser) return;
         const parts = [];
         if (includePina) parts.push('Piña');
@@ -416,22 +419,22 @@ export default function TableCard({ table, session }) {
         const modeLabel = parts.join(' + ');
         const ok = await confirm({ title: `Abrir ${table.name}`, message: `¿Confirmar apertura en modo ${modeLabel}?`, confirmText: 'Abrir Mesa', cancelText: 'Cancelar', variant: 'warning' });
         if (!ok) return;
-        await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount, clientId, includePina);
+        await openSession(table.id, currentUser.id, 'NORMAL', hours, clientName, guestCount, clientId, includePina, seats);
         setShowModeModal(false);
     };
 
-    const handleStartPina = async (clientName = '', guestCount = 0, clientId = null) => {
+    const handleStartPina = async (clientName = '', guestCount = 0, clientId = null, seats = []) => {
         if (!currentUser) return;
         const ok = await confirm({ title: `Abrir ${table.name}`, message: '¿Confirmar apertura en modo La Piña?', confirmText: 'Abrir Mesa', cancelText: 'Cancelar', variant: 'warning' });
         if (!ok) return;
-        await openSession(table.id, currentUser.id, 'PINA', 0, clientName, guestCount, clientId);
+        await openSession(table.id, currentUser.id, 'PINA', 0, clientName, guestCount, clientId, false, seats);
     };
 
-    const handleStartConsumption = async (clientName = '', guestCount = 0, clientId = null) => {
+    const handleStartConsumption = async (clientName = '', guestCount = 0, clientId = null, seats = []) => {
         if (!currentUser) return;
         const ok = await confirm({ title: `Ocupar ${table.name}`, message: '¿Confirmar apertura de mesa?', confirmText: 'Ocupar Mesa', cancelText: 'Cancelar', variant: 'warning' });
         if (!ok) return;
-        await openSession(table.id, currentUser.id, 'NORMAL', 0, clientName, guestCount, clientId);
+        await openSession(table.id, currentUser.id, 'NORMAL', 0, clientName, guestCount, clientId, false, seats);
     };
 
     // Abre el modal de nombre/personas y guarda la acción pendiente
@@ -439,6 +442,7 @@ export default function TableCard({ table, session }) {
         setSessionClientName('');
         setSessionGuestCount('');
         setSessionClientId(null);
+        setSessionSeats([]);
         setModePina(false);
         setModeHora(false);
         setSelectedHours(0);
@@ -458,15 +462,16 @@ export default function TableCard({ table, session }) {
         const name = sessionClientId
             ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim())
             : sessionClientName.trim();
-        const guests = parseInt(sessionGuestCount) || 0;
+        const guests = sessionSeats.length > 0 ? sessionSeats.length : (parseInt(sessionGuestCount) || 0);
+        const seats = sessionSeats.length > 0 ? sessionSeats : [];
         const { mode, hours } = pendingOpen;
-        if (mode === 'PINA') await handleStartPina(name, guests, sessionClientId);
-        else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests, sessionClientId);
+        if (mode === 'PINA') await handleStartPina(name, guests, sessionClientId, seats);
+        else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests, sessionClientId, seats);
         else if (mode === 'SHOW_MODE') {
             // Para mesas de pool: mostrar modal unificado de modo
             setShowModeModal(true);
         }
-        else await handleStartNormal(hours, name, guests, sessionClientId);
+        else await handleStartNormal(hours, name, guests, sessionClientId, false, seats);
         if (mode !== 'SHOW_MODE') setPendingOpen(null);
     };
 
@@ -477,17 +482,15 @@ export default function TableCard({ table, session }) {
         const name = sessionClientId
             ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim())
             : sessionClientName.trim();
-        const guests = parseInt(sessionGuestCount) || 0;
+        const guests = sessionSeats.length > 0 ? sessionSeats.length : (parseInt(sessionGuestCount) || 0);
+        const seats = sessionSeats.length > 0 ? sessionSeats : [];
 
         if (modePina && !modeHora) {
-            // Solo piña
-            await handleStartPina(name, guests, sessionClientId);
+            await handleStartPina(name, guests, sessionClientId, seats);
         } else if (!modePina && modeHora) {
-            // Solo hora
-            await handleStartNormal(selectedHours, name, guests, sessionClientId);
+            await handleStartNormal(selectedHours, name, guests, sessionClientId, false, seats);
         } else {
-            // Ambos: piña + hora → NORMAL con piña incluida
-            await handleStartNormal(selectedHours, name, guests, sessionClientId, true);
+            await handleStartNormal(selectedHours, name, guests, sessionClientId, true, seats);
         }
         setPendingOpen(null);
     };
@@ -610,7 +613,7 @@ export default function TableCard({ table, session }) {
                             </div>
                         ) : (
                         <button
-                            onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setEditClientId(session.client_id || null); setEditNotes(session.notes || ''); setShowEditMetaModal(true); }}
+                            onClick={() => { setEditClientName(session.client_name || ''); setEditGuestCount(session.guest_count > 0 ? String(session.guest_count) : ''); setEditClientId(session.client_id || null); setEditNotes(session.notes || ''); setEditSeats(session.seats || []); setShowEditMetaModal(true); }}
                             className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md self-start transition-colors ${session.client_id ? 'bg-sky-400/30 hover:bg-sky-400/50 opacity-100' : 'opacity-80 bg-white/15 hover:bg-white/30'}`}
                             title="Editar nombre y personas"
                         >
@@ -623,7 +626,7 @@ export default function TableCard({ table, session }) {
                     )}
                     {isPlaying && !session?.client_name && !(session?.guest_count > 0) && !isLockedForMe && (
                         <button
-                            onClick={() => { setEditClientName(''); setEditGuestCount(''); setEditClientId(null); setEditNotes(session?.notes || ''); setShowEditMetaModal(true); }}
+                            onClick={() => { setEditClientName(''); setEditGuestCount(''); setEditClientId(null); setEditNotes(session?.notes || ''); setEditSeats(session?.seats || []); setShowEditMetaModal(true); }}
                             className="text-[10px] font-bold opacity-50 hover:opacity-80 bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded-md self-start transition-colors flex items-center gap-1"
                             title="Añadir nombre y personas"
                         >
@@ -1145,14 +1148,10 @@ export default function TableCard({ table, session }) {
                     )}
                 </div>
                 <div>
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Número de personas (opcional)</label>
-                    <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={sessionGuestCount}
-                        onChange={e => setSessionGuestCount(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    <SeatEditor
+                        seats={sessionSeats}
+                        onSeatsChange={setSessionSeats}
+                        isPoolTable={table.type !== 'NORMAL'}
                     />
                 </div>
                 <button
@@ -1210,14 +1209,10 @@ export default function TableCard({ table, session }) {
                     )}
                 </div>
                 <div>
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Número de personas</label>
-                    <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={editGuestCount}
-                        onChange={e => setEditGuestCount(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    <SeatEditor
+                        seats={editSeats}
+                        onSeatsChange={setEditSeats}
+                        isPoolTable={table.type !== 'NORMAL'}
                     />
                 </div>
                 <div>
@@ -1237,7 +1232,9 @@ export default function TableCard({ table, session }) {
                 <button
                     onClick={async () => {
                         const name = editClientId ? (allCustomers.find(c => c.id === editClientId)?.name || editClientName) : editClientName.trim();
-                        await updateSessionMetadata(session.id, name, parseInt(editGuestCount) || 0, editClientId, editNotes.trim());
+                        const guestCount = editSeats.length > 0 ? editSeats.length : (parseInt(editGuestCount) || 0);
+                        await updateSessionMetadata(session.id, name, guestCount, editClientId, editNotes.trim());
+                        await updateSessionSeats(session.id, editSeats);
                         setShowEditMetaModal(false);
                         showToast('Información actualizada', 'success');
                     }}
