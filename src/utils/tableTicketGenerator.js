@@ -10,25 +10,28 @@ import { round2 } from './dinero';
  * - Sin impresora térmica: genera PDF via jsPDF + iframe.
  */
 export async function generatePartialSessionTicketPDF({ table, session, elapsed, timeCost, totalConsumption, currentItems, grandTotal, tasaUSD, config, hoursOffset = 0, roundsOffset = 0 }) {
-    // Intentar ESC/POS directo si hay impresora configurada o puerto disponible.
+    // Intentar ESC/POS directo si hay impresora térmica configurada.
+    // Si es 'system', saltar ESC/POS e ir directo a PDF (igual que printThermalTicket).
     const cfg = getWebSerialConfig();
-    const hasWebSerialConfigured = cfg.printerType && cfg.printerType !== 'system';
-    if (hasWebSerialConfigured) {
-        try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
-            if (printed) return;
-            throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
-        } catch (err) {
-            throw err;
+    if (cfg.printerType !== 'system') {
+        const hasWebSerialConfigured = cfg.printerType && cfg.printerType !== 'system';
+        if (hasWebSerialConfigured) {
+            try {
+                const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
+                if (printed) return;
+                throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
+            } catch (err) {
+                throw err;
+            }
         }
-    }
-    const tryEscPos = 'serial' in navigator;
-    if (tryEscPos) {
-        try {
-            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
-            if (printed) return;
-        } catch (err) {
-            console.warn('[PreCuenta] ESC/POS falló, usando fallback PDF:', err.message);
+        const tryEscPos = 'serial' in navigator;
+        if (tryEscPos) {
+            try {
+                const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
+                if (printed) return;
+            } catch (err) {
+                console.warn('[PreCuenta] ESC/POS falló, usando fallback PDF:', err.message);
+            }
         }
     }
     const WIDTH = 58;
