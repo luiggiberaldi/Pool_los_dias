@@ -192,11 +192,17 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // ── Cierre de caja ──
     const handleDailyClose = () => { triggerHaptic && triggerHaptic(); setIsCashReconOpen(true); };
     const handleConfirmCashRecon = async (reconData) => {
+        const sessionOpenedAt = activeCashSession?.opened_at || null;
+        const isInSession = (s) => {
+            if (sessionOpenedAt) return s.timestamp >= sessionOpenedAt;
+            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
+            return saleLocalDay === today;
+        };
+
         if (todayCashFlow.length > 0 || todaySales.length > 0) {
-            const allTodayForReport = sales.filter(s => {
-                const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-                return saleLocalDay === today && !s.cajaCerrada && s.tipo !== 'APERTURA_CAJA';
-            });
+            const allTodayForReport = sales.filter(s =>
+                !s.cajaCerrada && s.tipo !== 'APERTURA_CAJA' && isInSession(s)
+            );
             await generateDailyClosePDF({
                 sales: todayCashFlow.filter(s => s.tipo !== 'APERTURA_CAJA'),
                 allSales: allTodayForReport,
@@ -208,7 +214,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         const currentCierreId = Date.now();
         const validTipos = ['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'];
         const updatedSales = sales.map(s =>
-            !s.cajaCerrada && validTipos.includes(s.tipo || 'VENTA')
+            !s.cajaCerrada && validTipos.includes(s.tipo || 'VENTA') && isInSession(s)
                 ? { ...s, cajaCerrada: true, cierreId: currentCierreId }
                 : s
         );
