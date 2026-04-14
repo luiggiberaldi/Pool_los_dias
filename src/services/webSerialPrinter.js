@@ -10,7 +10,7 @@
 
 import { capitalizeName } from '../utils/calculatorUtils';
 import { lookupPrinter } from './printerDatabase';
-import { calculateTimeCostBs, formatHoursPaid } from '../utils/tableBillingEngine';
+import { calculateTimeCostBs, formatHoursPaid, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
 import { round2 } from '../utils/dinero';
 
 let activePort = null;
@@ -237,6 +237,9 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     }
     p.line('-', W);
 
+    const seats = session?.seats || [];
+    const isMultiClient = seats.length > 1;
+
     const isPina = session.game_mode === 'PINA';
     const pinaCount = isPina ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
     const hasPinas = isPina || pinaCount > 0;
@@ -244,48 +247,128 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     const hasHours = totalHours > 0;
     const hasPaidBefore = roundsOffset > 0 || hoursOffset > 0;
 
-    if (hasPinas) {
-        const pricePerPina = config?.pricePina || 0;
-        const fullCost = round2(pinaCount * pricePerPina);
-        const paidCost = round2(roundsOffset * pricePerPina);
+    if (isMultiClient) {
+        // ═══ MULTI-CLIENT BREAKDOWN ═══
+        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
 
-        p.bold(true).text('Partidas (La Pina)').newline().bold(false);
-        p.row(`${pinaCount} pina${pinaCount !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
-        const fullBs = calculateTimeCostBs(fullCost, 'PINA', config || {}, tasaUSD);
-        p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+        if (breakdown) {
+            // Shared section
+            if (breakdown.sharedTotal > 0) {
+                p.bold(true).text('--- COMPARTIDO ---').bold(false).newline();
 
-        if (roundsOffset > 0) {
-            p.row(`Pagado (${roundsOffset} pina${roundsOffset !== 1 ? 's' : ''})`, `-$${paidCost.toFixed(2)}`, W);
+                if (hasPinas) {
+                    const pp = config?.pricePina || 0;
+                    const pinaCost = round2(pinaCount * pp);
+                    p.row(`${pinaCount} pina${pinaCount !== 1 ? 's' : ''} x $${pp.toFixed(2)}`, `$${pinaCost.toFixed(2)}`, W);
+                }
+                if (hasHours) {
+                    const ph = config?.pricePerHour || 0;
+                    const hourCost = round2(totalHours * ph);
+                    p.row(`${formatHoursPaid(totalHours)} x $${ph.toFixed(2)}`, `$${hourCost.toFixed(2)}`, W);
+                }
+                if (breakdown.sharedItems.length > 0) {
+                    breakdown.sharedItems.forEach(i => {
+                        const t = i.qty * i.unit_price_usd;
+                        p.row(`${i.qty}x ${(i.product_name || '').substring(0, Math.floor(W * 0.55))}`, `$${t.toFixed(2)}`, W);
+                    });
+                }
+                const unpaid = seats.filter(s => !s.paid).length;
+                p.text(`Total: $${breakdown.sharedTotal.toFixed(2)} (/${unpaid})`).newline();
+                p.line('-', W);
+            }
+
+            // Per-seat sections
+            breakdown.seats.forEach((sb) => {
+                const label = sb.seat.label || `Cliente ${seats.indexOf(sb.seat) + 1}`;
+                p.bold(true).text(`--- ${label.toUpperCase()} ---`).bold(false).newline();
+
+                if (sb.seat.paid) {
+                    p.text('** PAGADO **').newline();
+                }
+
+                if (sb.timeCost.total > 0) {
+                    if (sb.timeCost.hasPinas) {
+                        const tc = (sb.seat.timeCharges || []).filter(tc => tc.type === 'pina');
+                        const pp = config?.pricePina || 0;
+                        p.row(`${tc.length} pina${tc.length !== 1 ? 's' : ''} x $${pp.toFixed(2)}`, `$${sb.timeCost.pinaCost.toFixed(2)}`, W);
+                    }
+                    if (sb.timeCost.hasHours) {
+                        const tc = (sb.seat.timeCharges || []).filter(tc => tc.type === 'hora');
+                        const totalH = tc.reduce((sum, c) => sum + (c.hours || 0), 0);
+                        const ph = config?.pricePerHour || 0;
+                        p.row(`${formatHoursPaid(totalH)} x $${ph.toFixed(2)}`, `$${sb.timeCost.hourCost.toFixed(2)}`, W);
+                    }
+                }
+
+                if (sb.items.length > 0) {
+                    sb.items.forEach(i => {
+                        const t = i.qty * i.unit_price_usd;
+                        p.row(`${i.qty}x ${(i.product_name || '').substring(0, Math.floor(W * 0.55))}`, `$${t.toFixed(2)}`, W);
+                    });
+                }
+
+                if (sb.sharedPortion > 0 && !sb.seat.paid) {
+                    p.row('Parte compartida', `$${sb.sharedPortion.toFixed(2)}`, W);
+                }
+
+                p.bold(true).row('Subtotal:', `$${sb.subtotal.toFixed(2)}`, W).bold(false);
+                const subBs = sb.subtotal * (tasaUSD || 1);
+                p.row('', `Bs ${subBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+                p.line('-', W);
+            });
         }
-        p.newline();
-    }
+    } else {
+        // ═══ SINGLE CLIENT / LEGACY ═══
+        const seatHasPinas = seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
+        const seatHasHours = seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
 
-    if (hasHours) {
-        const pricePerHour = config?.pricePerHour || 0;
-        const fullCost = round2(totalHours * pricePerHour);
-        const paidCost = round2(hoursOffset * pricePerHour);
+        if (hasPinas || seatHasPinas) {
+            const pricePerPina = config?.pricePina || 0;
+            const seatPinas = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').length, 0);
+            const totalPinas = pinaCount + seatPinas;
+            const fullCost = round2(totalPinas * pricePerPina);
+            const paidCost = round2(roundsOffset * pricePerPina);
 
-        p.bold(true).text('Tiempo de Mesa').newline().bold(false);
-        p.row(`${formatHoursPaid(totalHours)} x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
-        const fullBs = calculateTimeCostBs(fullCost, 'NORMAL', config || {}, tasaUSD);
-        p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+            p.bold(true).text('Partidas (La Pina)').newline().bold(false);
+            p.row(`${totalPinas} pina${totalPinas !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+            const fullBs = calculateTimeCostBs(fullCost, 'PINA', config || {}, tasaUSD);
+            p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
 
-        if (hoursOffset > 0) {
-            p.row(`Pagado (${formatHoursPaid(hoursOffset)})`, `-$${paidCost.toFixed(2)}`, W);
+            if (roundsOffset > 0) {
+                p.row(`Pagado (${roundsOffset} pina${roundsOffset !== 1 ? 's' : ''})`, `-$${paidCost.toFixed(2)}`, W);
+            }
+            p.newline();
         }
-        p.newline();
-    }
 
-    if (currentItems && currentItems.length > 0) {
-        p.bold(true).text('Consumo Bar').newline().bold(false);
-        currentItems.forEach(i => {
-            const t = i.qty * i.unit_price_usd;
-            const name = (i.product_name || '').substring(0, Math.floor(W * 0.55));
-            p.row(`${i.qty}x ${name}`, `$${t.toFixed(2)}`, W);
-            const itemBs = t * (tasaUSD || 1);
-            p.row('', `Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
-        });
-        p.newline();
+        if (hasHours || seatHasHours) {
+            const pricePerHour = config?.pricePerHour || 0;
+            const seatHoursTotal = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (tc.hours || 0), 0), 0);
+            const combinedHours = totalHours + seatHoursTotal;
+            const fullCost = round2(combinedHours * pricePerHour);
+            const paidCost = round2(hoursOffset * pricePerHour);
+
+            p.bold(true).text('Tiempo de Mesa').newline().bold(false);
+            p.row(`${formatHoursPaid(combinedHours)} x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
+            const fullBs = calculateTimeCostBs(fullCost, 'NORMAL', config || {}, tasaUSD);
+            p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+
+            if (hoursOffset > 0) {
+                p.row(`Pagado (${formatHoursPaid(hoursOffset)})`, `-$${paidCost.toFixed(2)}`, W);
+            }
+            p.newline();
+        }
+
+        if (currentItems && currentItems.length > 0) {
+            p.bold(true).text('Consumo Bar').newline().bold(false);
+            currentItems.forEach(i => {
+                const t = i.qty * i.unit_price_usd;
+                const name = (i.product_name || '').substring(0, Math.floor(W * 0.55));
+                p.row(`${i.qty}x ${name}`, `$${t.toFixed(2)}`, W);
+                const itemBs = t * (tasaUSD || 1);
+                p.row('', `Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
+            });
+            p.newline();
+        }
     }
 
     p.line('=', W);
