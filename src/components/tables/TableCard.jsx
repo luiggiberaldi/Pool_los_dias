@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock, MessageSquare } from 'lucide-react';
+import { Play, Square, Timer, DollarSign, Activity, ShoppingBag, Edit2, Printer, X, AlertTriangle, CreditCard, Clock, Eye, Users, Search, UserCheck, UserPlus, Check, Phone, Pause, Lock, MessageSquare, ChevronLeft } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, calculateSessionCostBreakdown, formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -319,16 +319,27 @@ export default function TableCard({ table, session }) {
     // Modal para agregar hora a sesión activa (piña → mixto)
     const [showAddHoursModal, setShowAddHoursModal] = useState(false);
 
-    // Modal de nombre + personas al abrir mesa
+    // Modal de nombre + personas al abrir mesa — wizard steps
     const [showOpenModal, setShowOpenModal] = useState(false);
     const [pendingOpen, setPendingOpen] = useState(null);
+    const [wizardStep, setWizardStep] = useState(1); // 1=clients, 2=mode, 3=attribution, 4=confirm
+    const [initialChargeTarget, setInitialChargeTarget] = useState(null); // seatId or null (shared)
     const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
     const [sessionClientName, setSessionClientName] = useState('');
     const [sessionGuestCount, setSessionGuestCount] = useState('');
     const [sessionClientId, setSessionClientId] = useState(null);
     const [sessionSeats, setSessionSeats] = useState([]);
     const [showCustomerSheet, setShowCustomerSheet] = useState(false);
+    const [searchingSeatIndex, setSearchingSeatIndex] = useState(null); // qué seat está buscando cliente
     const { customers: allCustomers, fetchCustomers, createCustomer, refresh: refreshCustomers } = useCustomersStore();
+
+    // Validación de nombres al abrir mesa
+    const [seatValidationError, setSeatValidationError] = useState(false);
+
+    // Modal de atribución de tiempo (+Hora / +Piña) a cliente específico o compartido
+    const [showAttributeModal, setShowAttributeModal] = useState(false);
+    const [pendingCharge, setPendingCharge] = useState(null); // { type: 'hora'|'pina', hoursValue? }
+    const [isProcessingCharge, setIsProcessingCharge] = useState(false);
 
     // Modal de edición de nombre + personas en sesión activa
     const [showEditMetaModal, setShowEditMetaModal] = useState(false);
@@ -446,6 +457,8 @@ export default function TableCard({ table, session }) {
         setModePina(false);
         setModeHora(false);
         setSelectedHours(0);
+        setInitialChargeTarget(null);
+        setWizardStep(1);
         refreshCustomers();
         setPendingOpen({ mode, hours });
         setShowOpenModal(true);
@@ -456,22 +469,154 @@ export default function TableCard({ table, session }) {
         return newCustomer;
     };
 
+    // Selección de cliente en la búsqueda para un seat del modal de apertura
+    const handleSelectCustomerForSeat = (customer) => {
+        if (searchingSeatIndex !== null) {
+            const updated = sessionSeats.map((s, i) =>
+                i === searchingSeatIndex
+                    ? { ...s, customerId: customer.id, label: s.label || customer.name }
+                    : s
+            );
+            setSessionSeats(updated);
+            setSearchingSeatIndex(null);
+        } else {
+            setSessionClientId(customer.id);
+            setSessionClientName(customer.name);
+        }
+        setShowCustomerSheet(false);
+    };
+
+    // Helper: if only 1 active seat, charge directly to them; if 2+, show attribution modal
+    const requestAttribution = (charge) => {
+        const seats = session?.seats || [];
+        const activeSeats = seats.filter(s => !s.paid);
+        if (activeSeats.length === 1) {
+            // Single client — charge directly, no modal needed
+            setPendingCharge(charge);
+            // Use setTimeout to let pendingCharge state settle before calling handler
+            setTimeout(() => handleAttributeCharge(activeSeats[0].id, charge), 0);
+        } else if (activeSeats.length > 1) {
+            setPendingCharge(charge);
+            setShowAttributeModal(true);
+        }
+    };
+
+    // Atribuir +Hora a cliente específico o compartido
+    const handleAttributeCharge = async (seatId, chargeOverride) => {
+        const charge = chargeOverride || pendingCharge;
+        if (!charge || isProcessingCharge) return;
+        setIsProcessingCharge(true);
+        try {
+            if (charge.type === 'hora') {
+                await addHoursToSession(session.id, charge.hoursValue, seatId || null);
+                showToast(`${charge.hoursValue === 0.5 ? '30 min' : charge.hoursValue + 'h'} agregadas`, 'success');
+            } else if (charge.type === 'pina') {
+                const { addRoundToSession } = useTablesStore.getState();
+                await addRoundToSession(session.id, seatId || null);
+            }
+        } catch (e) {
+            console.error('Error al atribuir cargo:', e);
+            showToast('Error al agregar cargo', 'error');
+        } finally {
+            setShowAttributeModal(false);
+            setPendingCharge(null);
+            setIsProcessingCharge(false);
+        }
+    };
+
+    // Wizard final step: open the session and apply initial charge attribution
+    const handleWizardFinish = async () => {
+        if (!pendingOpen) return;
+        const firstSeat = sessionSeats.length > 0 ? sessionSeats[0] : null;
+        const firstSeatClientId = firstSeat?.customerId || sessionClientId;
+        const name = firstSeat
+            ? (firstSeat.label || allCustomers.find(c => c.id === firstSeat.customerId)?.name || '')
+            : (sessionClientId ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim()) : sessionClientName.trim());
+        const guests = sessionSeats.length > 0 ? sessionSeats.length : (parseInt(sessionGuestCount) || 0);
+        const seats = sessionSeats.length > 0 ? sessionSeats : [];
+        const isMultiSeat = seats.length > 1;
+        const { mode } = pendingOpen;
+
+        // For pool tables (SHOW_MODE) use the selected mode
+        if (mode === 'SHOW_MODE') {
+            if (!modePina && !modeHora) return;
+            if (modePina && !modeHora) {
+                await openSession(table.id, currentUser.id, 'PINA', 0, name, guests, firstSeatClientId, false, seats);
+                // Apply initial piña attribution
+                if (isMultiSeat && initialChargeTarget !== undefined) {
+                    // Wait briefly for session to be created
+                    setTimeout(async () => {
+                        try {
+                            const { addRoundToSession } = useTablesStore.getState();
+                            const newSession = useTablesStore.getState().activeSessions.find(s => s.table_id === table.id);
+                            if (newSession) await addRoundToSession(newSession.id, initialChargeTarget);
+                        } catch (e) { console.error(e); }
+                    }, 500);
+                }
+            } else if (!modePina && modeHora) {
+                if (isMultiSeat && initialChargeTarget !== undefined) {
+                    // Open with 0 hours, then attribute
+                    await openSession(table.id, currentUser.id, 'NORMAL', 0, name, guests, firstSeatClientId, false, seats);
+                    setTimeout(async () => {
+                        try {
+                            const newSession = useTablesStore.getState().activeSessions.find(s => s.table_id === table.id);
+                            if (newSession) await addHoursToSession(newSession.id, selectedHours, initialChargeTarget);
+                        } catch (e) { console.error(e); }
+                    }, 500);
+                } else {
+                    await openSession(table.id, currentUser.id, 'NORMAL', selectedHours, name, guests, firstSeatClientId, false, seats);
+                }
+            } else {
+                // Mixed mode
+                await openSession(table.id, currentUser.id, 'NORMAL', selectedHours, name, guests, firstSeatClientId, true, seats);
+            }
+        } else if (mode === 'PINA') {
+            await openSession(table.id, currentUser.id, 'PINA', 0, name, guests, firstSeatClientId, false, seats);
+            if (isMultiSeat && initialChargeTarget !== undefined) {
+                setTimeout(async () => {
+                    try {
+                        const { addRoundToSession } = useTablesStore.getState();
+                        const newSession = useTablesStore.getState().activeSessions.find(s => s.table_id === table.id);
+                        if (newSession) await addRoundToSession(newSession.id, initialChargeTarget);
+                    } catch (e) { console.error(e); }
+                }, 500);
+            }
+        } else if (mode === 'CONSUMPTION') {
+            await openSession(table.id, currentUser.id, 'NORMAL', 0, name, guests, firstSeatClientId, false, seats);
+        } else {
+            await openSession(table.id, currentUser.id, 'NORMAL', pendingOpen.hours, name, guests, firstSeatClientId, false, seats);
+        }
+
+        setShowOpenModal(false);
+        setPendingOpen(null);
+        setWizardStep(1);
+    };
+
     const handleConfirmOpen = async () => {
         if (!pendingOpen) return;
         setShowOpenModal(false);
-        const name = sessionClientId
-            ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim())
-            : sessionClientName.trim();
+        // Tomar nombre del primer seat si hay clientes, si no del campo de cliente clásico
+        const firstSeat = sessionSeats.length > 0 ? sessionSeats[0] : null;
+        const firstSeatCustomerId = firstSeat?.customerId || null;
+        const firstSeatClientId = firstSeatCustomerId || sessionClientId;
+        const name = firstSeat
+            ? (firstSeat.label || allCustomers.find(c => c.id === firstSeat.customerId)?.name || '')
+            : (sessionClientId ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim()) : sessionClientName.trim());
         const guests = sessionSeats.length > 0 ? sessionSeats.length : (parseInt(sessionGuestCount) || 0);
         const seats = sessionSeats.length > 0 ? sessionSeats : [];
         const { mode, hours } = pendingOpen;
-        if (mode === 'PINA') await handleStartPina(name, guests, sessionClientId, seats);
-        else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests, sessionClientId, seats);
+        if (mode === 'PINA') {
+            await handleStartPina(name, guests, firstSeatClientId, seats);
+            if (seats.length > 1) {
+                requestAttribution({ type: 'pina' });
+            }
+        }
+        else if (mode === 'CONSUMPTION') await handleStartConsumption(name, guests, firstSeatClientId, seats);
         else if (mode === 'SHOW_MODE') {
             // Para mesas de pool: mostrar modal unificado de modo
             setShowModeModal(true);
         }
-        else await handleStartNormal(hours, name, guests, sessionClientId, false, seats);
+        else await handleStartNormal(hours, name, guests, firstSeatClientId, false, seats);
         if (mode !== 'SHOW_MODE') setPendingOpen(null);
     };
 
@@ -479,18 +624,44 @@ export default function TableCard({ table, session }) {
     const handleConfirmMode = async () => {
         if (!modePina && !modeHora) return;
         setShowModeModal(false);
-        const name = sessionClientId
-            ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim())
-            : sessionClientName.trim();
+        // Derivar nombre del primer asiento si hay multi-cliente (igual que handleConfirmOpen)
+        const firstSeat = sessionSeats.length > 0 ? sessionSeats[0] : null;
+        const firstSeatClientId = firstSeat?.customerId || sessionClientId;
+        const name = firstSeat
+            ? (firstSeat.label || allCustomers.find(c => c.id === firstSeat.customerId)?.name || '')
+            : (sessionClientId ? (allCustomers.find(c => c.id === sessionClientId)?.name || sessionClientName.trim()) : sessionClientName.trim());
         const guests = sessionSeats.length > 0 ? sessionSeats.length : (parseInt(sessionGuestCount) || 0);
         const seats = sessionSeats.length > 0 ? sessionSeats : [];
 
+        const isMultiSeat = seats.length > 1;
+        const hasSeatClients = seats.length > 0;
+
         if (modePina && !modeHora) {
-            await handleStartPina(name, guests, sessionClientId, seats);
+            // Session opens with extended_times=-1 (neutralized for multi-seat),
+            // then attribute first piña to a client
+            await handleStartPina(name, guests, firstSeatClientId, seats);
+            if (hasSeatClients) {
+                if (isMultiSeat) {
+                    setPendingCharge({ type: 'pina' });
+                    setShowAttributeModal(true);
+                } else {
+                    // Single client — attribute directly (no modal)
+                    // Need to wait for session to be created, then charge to single seat
+                    // For single seat PINA, extended_times stays 0 (no -1 compensation needed)
+                }
+            }
         } else if (!modePina && modeHora) {
-            await handleStartNormal(selectedHours, name, guests, sessionClientId, false, seats);
+            if (isMultiSeat) {
+                // Multi-seat HORA: open with 0 hours, then attribute via modal
+                await handleStartNormal(0, name, guests, firstSeatClientId, false, seats);
+                setPendingCharge({ type: 'hora', hoursValue: selectedHours });
+                setShowAttributeModal(true);
+            } else {
+                await handleStartNormal(selectedHours, name, guests, firstSeatClientId, false, seats);
+            }
         } else {
-            await handleStartNormal(selectedHours, name, guests, sessionClientId, true, seats);
+            // Mixed mode (piña + hora): keep shared for simplicity
+            await handleStartNormal(selectedHours, name, guests, firstSeatClientId, true, seats);
         }
         setPendingOpen(null);
     };
@@ -531,8 +702,10 @@ export default function TableCard({ table, session }) {
     const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
     const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset) : null;
     const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
-    const hasPinas = costBreakdown ? costBreakdown.hasPinas : (session?.game_mode === 'PINA');
-    const hasHoursActive = costBreakdown ? costBreakdown.hasHours : (session?.hours_paid > 0);
+    const seatHasPinas = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
+    const seatHasHours = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
+    const hasPinas = (costBreakdown ? costBreakdown.hasPinas : (session?.game_mode === 'PINA')) || seatHasPinas;
+    const hasHoursActive = (costBreakdown ? costBreakdown.hasHours : (session?.hours_paid > 0)) || seatHasHours;
     const grandTotal = timeCost + totalConsumption;
     
     // Countdown logic
@@ -707,7 +880,9 @@ export default function TableCard({ table, session }) {
                                         )}
                                         {/* Piñas (compacto) */}
                                         {(() => {
-                                            const totalRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                                            const sharedRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                                            const seatRounds = (session?.seats || []).reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').length, 0);
+                                            const totalRounds = sharedRounds + seatRounds;
                                             const paidRounds = roundsOffset || 0;
                                             return (
                                                 <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full text-center flex items-center gap-1.5">
@@ -800,7 +975,9 @@ export default function TableCard({ table, session }) {
                             </button>
                         </div>
                         {hasPinas && !isMixedMode && (() => {
-                            const totalRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                            const sharedRounds = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                            const seatRounds = (session?.seats || []).reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').length, 0);
+                            const totalRounds = sharedRounds + seatRounds;
                             const paidRounds = roundsOffset || 0;
                             return (
                             <div className="text-[10px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full mt-1 text-center">
@@ -846,10 +1023,17 @@ export default function TableCard({ table, session }) {
                         {hasPinas && !isCheckoutPending && (
                             <div className="flex flex-col gap-1">
                                 <button
+                                    disabled={isProcessingCharge}
                                     onClick={async () => {
-                                        await useTablesStore.getState().addRoundToSession(session.id);
+                                        const seats = session?.seats || [];
+                                        const activeSeats = seats.filter(s => !s.paid);
+                                        if (activeSeats.length > 0) {
+                                            requestAttribution({ type: 'pina' });
+                                        } else {
+                                            await useTablesStore.getState().addRoundToSession(session.id);
+                                        }
                                     }}
-                                    className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs py-3 rounded-xl shadow-md transition-all whitespace-nowrap"
+                                    className="w-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs py-3 rounded-xl shadow-md transition-all whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none"
                                 >
                                     + Nueva Piña
                                 </button>
@@ -870,8 +1054,17 @@ export default function TableCard({ table, session }) {
                                 {/* Agregar Piña a sesión que no tiene piñas */}
                                 {!hasPinas && (
                                     <button
-                                        onClick={async () => { await addPinaToSession(session.id); }}
-                                        className="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
+                                        disabled={isProcessingCharge}
+                                        onClick={async () => {
+                                            const seats = session?.seats || [];
+                                            const activeSeats = seats.filter(s => !s.paid);
+                                            if (activeSeats.length > 0) {
+                                                requestAttribution({ type: 'pina' });
+                                            } else {
+                                                await addPinaToSession(session.id);
+                                            }
+                                        }}
+                                        className="flex-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         <TargetIcon size={10} /> + Piña
                                     </button>
@@ -990,189 +1183,322 @@ export default function TableCard({ table, session }) {
         </Modal>
 
         {/* Modal Unificado de Modo de Juego — Piña / Hora / Ambos */}
-        <Modal isOpen={showModeModal} onClose={() => setShowModeModal(false)} title="Modo de Juego">
+        {/* ═══ WIZARD: Abrir Mesa ═══ */}
+        <Modal isOpen={showOpenModal} onClose={() => { setShowOpenModal(false); setWizardStep(1); }} title={
+            wizardStep === 1 ? 'Abrir Mesa' :
+            wizardStep === 2 ? 'Modo de Juego' :
+            wizardStep === 3 ? '¿A quién cobrar?' :
+            'Confirmar Apertura'
+        }>
             <div className="flex flex-col gap-4 py-2">
-                {/* Toggles de modo */}
-                <div className="flex flex-col gap-2.5">
-                    {/* Toggle Piña */}
-                    <button
-                        onClick={() => setModePina(!modePina)}
-                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
-                            modePina
-                                ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-400 shadow-sm shadow-amber-200/50'
-                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-amber-300'
-                        }`}
-                    >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                            modePina ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
-                        }`}>
-                            <TargetIcon size={20} />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <div className={`font-black text-sm ${modePina ? 'text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                                La Piña
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                ${config.pricePina || 0} por partida
-                            </div>
-                        </div>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                            modePina ? 'bg-amber-500 border-amber-500' : 'border-slate-300 dark:border-slate-600'
-                        }`}>
-                            {modePina && <Check size={14} className="text-white" />}
-                        </div>
-                    </button>
 
-                    {/* Toggle Hora */}
-                    <button
-                        onClick={() => { setModeHora(!modeHora); if (!modeHora) setSelectedHours(0); }}
-                        className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
-                            modeHora
-                                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 shadow-sm shadow-emerald-200/50'
-                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
-                        }`}
-                    >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                            modeHora ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
-                        }`}>
-                            <Clock size={20} />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <div className={`font-black text-sm ${modeHora ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                                Por Hora
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                ${config.pricePerHour || 0}/hora · Prepago o libre
-                            </div>
-                        </div>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                            modeHora ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-600'
-                        }`}>
-                            {modeHora && <Check size={14} className="text-white" />}
-                        </div>
-                    </button>
-                </div>
-
-                {/* Selector de tiempo (solo si hora está activo) */}
-                {modeHora && (
-                    <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 duration-200">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seleccionar tiempo</span>
+                {/* ── Step 1: Clientes ── */}
+                {wizardStep === 1 && (
+                    <>
+                        <SeatEditor
+                            seats={sessionSeats}
+                            onSeatsChange={(s) => { setSeatValidationError(false); setSessionSeats(s); }}
+                            onSearchCustomerForSeat={(idx) => { setSearchingSeatIndex(idx); setShowCustomerSheet(true); }}
+                        />
+                        {seatValidationError && (
+                            <p className="text-xs font-bold text-red-500 animate-pulse px-1 -mt-2">
+                                Cada cliente debe tener un nombre
+                            </p>
+                        )}
                         <button
-                            onClick={() => setSelectedHours(0)}
-                            className={`w-full text-left p-3 rounded-xl border transition-all ${
-                                selectedHours === 0
-                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 text-emerald-700 dark:text-emerald-400'
-                                    : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 text-slate-600 dark:text-slate-300'
-                            }`}
+                            onClick={() => {
+                                if (sessionSeats.length > 0 && sessionSeats.some(s => !s.label?.trim())) {
+                                    setSeatValidationError(true);
+                                    return;
+                                }
+                                if (pendingOpen?.mode === 'SHOW_MODE') {
+                                    setWizardStep(2);
+                                } else {
+                                    // Non-pool tables skip mode selection
+                                    handleWizardFinish();
+                                }
+                            }}
+                            className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
                         >
-                            <div className="font-black text-sm">Abierta (Libre)</div>
-                            <div className="text-xs opacity-70">Sin límite, cobro al final</div>
+                            {pendingOpen?.mode === 'SHOW_MODE' ? 'Continuar' : (pendingOpen?.mode === 'CONSUMPTION' ? 'Ocupar Mesa' : 'Abrir Mesa')}
                         </button>
-                        <div className="grid grid-cols-3 gap-2">
-                            {[0.5, 1, 2, 3, 4].map(h => (
-                                <button
-                                    key={h}
-                                    onClick={() => setSelectedHours(h)}
-                                    className={`p-2.5 rounded-xl font-black transition-colors flex flex-col items-center justify-center ${
-                                        selectedHours === h
-                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
-                                    }`}
-                                >
-                                    <span className="text-lg">{h === 0.5 ? '30' : h}</span>
-                                    <span className="text-[10px] font-semibold opacity-70">{h === 0.5 ? 'MIN' : 'HRS'}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    </>
                 )}
 
-                {/* Resumen de selección */}
-                {(modePina || modeHora) && (
-                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-                        <span>Modo:</span>
-                        <div className="flex gap-1.5">
-                            {modePina && <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">Piña</span>}
-                            {modePina && modeHora && <span>+</span>}
-                            {modeHora && <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full">{selectedHours === 0 ? 'Libre' : selectedHours === 0.5 ? '30 min' : `${selectedHours}h`}</span>}
-                        </div>
-                    </div>
-                )}
-
-                {/* Botón confirmar */}
-                <button
-                    onClick={handleConfirmMode}
-                    disabled={!modePina && !modeHora}
-                    className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-400 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95 disabled:active:scale-100"
-                >
-                    {!modePina && !modeHora ? 'Selecciona un modo' : 'Abrir Mesa'}
-                </button>
-            </div>
-        </Modal>
-
-        {/* Modal de Nombre + Personas al abrir mesa */}
-        <Modal isOpen={showOpenModal} onClose={() => setShowOpenModal(false)} title="Abrir Mesa">            <div className="flex flex-col gap-4 py-2">
-                <div>
-                    <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Cliente (opcional)</label>
-                    {sessionClientId ? (
-                        <div className="flex items-center justify-between p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-700/40 rounded-xl">
-                            <div className="flex items-center gap-2">
-                                <UserCheck size={16} className="text-sky-600" />
-                                <div>
-                                    <p className="text-sm font-bold text-sky-800 dark:text-sky-300">
-                                        {allCustomers.find(c => c.id === sessionClientId)?.name || 'Cliente'}
-                                    </p>
-                                    {allCustomers.find(c => c.id === sessionClientId)?.documentId && (
-                                        <p className="text-[11px] text-sky-500">{allCustomers.find(c => c.id === sessionClientId).documentId}</p>
-                                    )}
+                {/* ── Step 2: Modo de Juego (pool tables) ── */}
+                {wizardStep === 2 && (
+                    <>
+                        {/* Toggles de modo */}
+                        <div className="flex flex-col gap-2.5">
+                            {/* Toggle Piña */}
+                            <button
+                                onClick={() => setModePina(!modePina)}
+                                className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                                    modePina
+                                        ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-400 shadow-sm shadow-amber-200/50'
+                                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-amber-300'
+                                }`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                    modePina ? 'bg-amber-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                }`}>
+                                    <TargetIcon size={20} />
                                 </div>
-                            </div>
-                            <button onClick={() => setSessionClientId(null)} className="p-1 rounded-full text-sky-500 hover:bg-sky-200 dark:hover:bg-sky-800 transition-colors">
-                                <X size={14} />
+                                <div className="flex-1 text-left">
+                                    <div className={`font-black text-sm ${modePina ? 'text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                        La Piña
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                        ${config.pricePina || 0} por partida
+                                    </div>
+                                </div>
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                    modePina ? 'bg-amber-500 border-amber-500' : 'border-slate-300 dark:border-slate-600'
+                                }`}>
+                                    {modePina && <Check size={14} className="text-white" />}
+                                </div>
+                            </button>
+
+                            {/* Toggle Hora */}
+                            <button
+                                onClick={() => { setModeHora(!modeHora); if (!modeHora) setSelectedHours(0); }}
+                                className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                                    modeHora
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-400 shadow-sm shadow-emerald-200/50'
+                                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
+                                }`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                    modeHora ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                                }`}>
+                                    <Clock size={20} />
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className={`font-black text-sm ${modeHora ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                                        Por Hora
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                        ${config.pricePerHour || 0}/hora · Prepago o libre
+                                    </div>
+                                </div>
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                    modeHora ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-600'
+                                }`}>
+                                    {modeHora && <Check size={14} className="text-white" />}
+                                </div>
                             </button>
                         </div>
-                    ) : (
+
+                        {/* Selector de tiempo (solo si hora está activo) */}
+                        {modeHora && (
+                            <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 duration-200">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seleccionar tiempo</span>
+                                <button
+                                    onClick={() => setSelectedHours(0)}
+                                    className={`w-full text-left p-3 rounded-xl border transition-all ${
+                                        selectedHours === 0
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 text-emerald-700 dark:text-emerald-400'
+                                            : 'border-slate-200 dark:border-slate-700 hover:border-emerald-300 text-slate-600 dark:text-slate-300'
+                                    }`}
+                                >
+                                    <div className="font-black text-sm">Abierta (Libre)</div>
+                                    <div className="text-xs opacity-70">Sin límite, cobro al final</div>
+                                </button>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[0.5, 1, 2, 3, 4].map(h => (
+                                        <button
+                                            key={h}
+                                            onClick={() => setSelectedHours(h)}
+                                            className={`p-2.5 rounded-xl font-black transition-colors flex flex-col items-center justify-center ${
+                                                selectedHours === h
+                                                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                                    : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800'
+                                            }`}
+                                        >
+                                            <span className="text-lg">{h === 0.5 ? '30' : h}</span>
+                                            <span className="text-[10px] font-semibold opacity-70">{h === 0.5 ? 'MIN' : 'HRS'}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Resumen de selección */}
+                        {(modePina || modeHora) && (
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                                <span>Modo:</span>
+                                <div className="flex gap-1.5">
+                                    {modePina && <span className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">Piña</span>}
+                                    {modePina && modeHora && <span>+</span>}
+                                    {modeHora && <span className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full">{selectedHours === 0 ? 'Libre' : selectedHours === 0.5 ? '30 min' : `${selectedHours}h`}</span>}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Botones Volver / Continuar */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setWizardStep(1)}
+                                className="flex items-center justify-center gap-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all active:scale-95"
+                            >
+                                <ChevronLeft size={16} /> Volver
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!modePina && !modeHora) return;
+                                    // If 2+ clients and not mixed mode → go to attribution step
+                                    const needsAttribution = sessionSeats.length > 1 && !(modePina && modeHora);
+                                    if (needsAttribution) {
+                                        setInitialChargeTarget(null);
+                                        setWizardStep(3);
+                                    } else {
+                                        // Skip to confirm
+                                        setWizardStep(4);
+                                    }
+                                }}
+                                disabled={!modePina && !modeHora}
+                                className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-400 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95 disabled:active:scale-100"
+                            >
+                                {!modePina && !modeHora ? 'Selecciona un modo' : 'Continuar'}
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* ── Step 3: Atribución (¿A quién cobrar?) ── */}
+                {wizardStep === 3 && (
+                    <>
+                        <p className="text-xs text-slate-500">
+                            {modePina && !modeHora
+                                ? '¿Quién paga la primera piña?'
+                                : '¿Quién paga las primeras horas?'
+                            }
+                        </p>
+                        {sessionSeats.map(seat => (
+                            <button
+                                key={seat.id || seat.label}
+                                onClick={() => setInitialChargeTarget(seat.id || seat.label)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left active:scale-95 ${
+                                    initialChargeTarget === (seat.id || seat.label)
+                                        ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-400 shadow-sm'
+                                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-sky-300'
+                                }`}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                                    initialChargeTarget === (seat.id || seat.label) ? 'bg-sky-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                                }`}>
+                                    {(seat.label || 'C').charAt(0).toUpperCase()}
+                                </div>
+                                <span className={`font-bold text-sm ${
+                                    initialChargeTarget === (seat.id || seat.label) ? 'text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300'
+                                }`}>{seat.label || `Cliente ${sessionSeats.indexOf(seat) + 1}`}</span>
+                                {initialChargeTarget === (seat.id || seat.label) && <Check size={16} className="text-sky-500 ml-auto" />}
+                            </button>
+                        ))}
                         <button
-                            onClick={() => setShowCustomerSheet(true)}
-                            className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/10 transition-all text-left"
+                            onClick={() => setInitialChargeTarget(null)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all text-left active:scale-95 ${
+                                initialChargeTarget === null
+                                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-400'
+                                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600 hover:border-slate-400'
+                            }`}
                         >
-                            <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0">
-                                <Users size={16} className="text-slate-400" />
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
+                                initialChargeTarget === null ? 'bg-slate-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
+                            }`}>
+                                <Users size={14} />
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Sin cliente asignado</p>
-                                <p className="text-xs text-slate-400">Toca para buscar o crear</p>
+                            <div>
+                                <p className={`font-bold text-sm ${initialChargeTarget === null ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500'}`}>Compartido</p>
+                                <p className="text-[10px] text-slate-400">Se divide entre todos al cobrar</p>
                             </div>
-                            <Search size={14} className="text-slate-400 shrink-0" />
+                            {initialChargeTarget === null && <Check size={16} className="text-slate-500 ml-auto" />}
                         </button>
-                    )}
-                </div>
-                <div>
-                    <SeatEditor
-                        seats={sessionSeats}
-                        onSeatsChange={setSessionSeats}
-                        isPoolTable={table.type !== 'NORMAL'}
-                    />
-                </div>
-                <button
-                    onClick={() => {
-                        if (pendingOpen?.mode === 'SHOW_MODE') {
-                            setShowOpenModal(false);
-                            setShowModeModal(true);
-                        } else {
-                            handleConfirmOpen();
-                        }
-                    }}
-                    className="w-full bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
-                >
-                    Continuar
-                </button>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setWizardStep(2)}
+                                className="flex items-center justify-center gap-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all active:scale-95"
+                            >
+                                <ChevronLeft size={16} /> Volver
+                            </button>
+                            <button
+                                onClick={() => setWizardStep(4)}
+                                className="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-black py-3 rounded-xl shadow-md transition-all active:scale-95"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* ── Step 4: Confirmar Apertura ── */}
+                {wizardStep === 4 && (() => {
+                    const modeLabel = modePina && modeHora
+                        ? `Piña + ${selectedHours === 0 ? 'Libre' : selectedHours === 0.5 ? '30 min' : `${selectedHours}h`}`
+                        : modePina ? 'La Piña'
+                        : selectedHours === 0 ? 'Libre'
+                        : selectedHours === 0.5 ? 'Prepago 30 min'
+                        : `Prepago ${selectedHours}h`;
+                    const clientsLabel = sessionSeats.length > 0
+                        ? sessionSeats.map(s => s.label).join(', ')
+                        : 'Sin registrar';
+                    const chargeLabel = initialChargeTarget === null
+                        ? 'Compartido'
+                        : sessionSeats.find(s => (s.id || s.label) === initialChargeTarget)?.label || '?';
+                    const showChargeInfo = sessionSeats.length > 1 && !(modePina && modeHora);
+
+                    return (
+                        <>
+                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mesa</span>
+                                    <span className="font-black text-slate-700 dark:text-white">{table.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Modo</span>
+                                    <span className="font-black text-slate-700 dark:text-white">{modeLabel}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clientes</span>
+                                    <span className="font-bold text-slate-600 dark:text-slate-300 text-sm text-right max-w-[60%] truncate">{clientsLabel}</span>
+                                </div>
+                                {showChargeInfo && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Primer cobro</span>
+                                        <span className="font-bold text-sky-600 dark:text-sky-400 text-sm">{chargeLabel}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        const needsAttribution = sessionSeats.length > 1 && !(modePina && modeHora);
+                                        setWizardStep(needsAttribution ? 3 : 2);
+                                    }}
+                                    className="flex items-center justify-center gap-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all active:scale-95"
+                                >
+                                    <ChevronLeft size={16} /> Volver
+                                </button>
+                                <button
+                                    onClick={handleWizardFinish}
+                                    className="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-black py-3.5 rounded-xl shadow-md transition-all active:scale-95"
+                                >
+                                    Abrir Mesa
+                                </button>
+                            </div>
+                        </>
+                    );
+                })()}
             </div>
         </Modal>
 
         {/* Modal Editar nombre y personas de sesión activa */}
         <Modal isOpen={showEditMetaModal} onClose={() => setShowEditMetaModal(false)} title="Editar Información de Mesa">
             <div className="flex flex-col gap-4 py-2">
+                {/* Cliente clásico — solo si NO hay asientos multi-cliente */}
+                {editSeats.length === 0 && (
                 <div>
                     <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1.5">Cliente</label>
                     {editClientId ? (
@@ -1208,6 +1534,7 @@ export default function TableCard({ table, session }) {
                         </button>
                     )}
                 </div>
+                )}
                 <div>
                     <SeatEditor
                         seats={editSeats}
@@ -1251,8 +1578,19 @@ export default function TableCard({ table, session }) {
                 {/* Sección Piñas — solo visible en modo PINA puro (mixto usa botón dedicado "+ Nueva Piña") */}
                 {(hasPinas && !isMixedMode) && (
                     <button
-                        onClick={async () => { await useTablesStore.getState().addRoundToSession(session.id); setShowAdjustModal(false); }}
-                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg"
+                        disabled={isProcessingCharge}
+                        onClick={async () => {
+                            const seats = session?.seats || [];
+                            const activeSeats = seats.filter(s => !s.paid);
+                            if (activeSeats.length > 0) {
+                                setShowAdjustModal(false);
+                                requestAttribution({ type: 'pina' });
+                            } else {
+                                await useTablesStore.getState().addRoundToSession(session.id);
+                                setShowAdjustModal(false);
+                            }
+                        }}
+                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 font-black py-4 rounded-xl border border-amber-500/20 shadow-sm flex items-center justify-center gap-2 text-lg disabled:opacity-50 disabled:pointer-events-none"
                     >
                         <TargetIcon size={20} /> + 1 Piña
                     </button>
@@ -1268,10 +1606,21 @@ export default function TableCard({ table, session }) {
                         )}
                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar</span>
                         <div className="grid grid-cols-2 gap-2">
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 0.5); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 30 Min</button>
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 1); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 1 Hora</button>
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 2); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 2 Horas</button>
-                            <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, 3); setShowAdjustModal(false); }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl">+ 3 Horas</button>
+                            {[0.5, 1, 2, 3].map(h => (
+                                <button key={h} disabled={isProcessingCharge} onClick={async () => {
+                                    const seats = session?.seats || [];
+                                    const activeSeats = seats.filter(s => !s.paid);
+                                    if (activeSeats.length > 0) {
+                                        setShowAdjustModal(false);
+                                        requestAttribution({ type: 'hora', hoursValue: h });
+                                    } else {
+                                        await useTablesStore.getState().addHoursToSession(session.id, h);
+                                        setShowAdjustModal(false);
+                                    }
+                                }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl disabled:opacity-50 disabled:pointer-events-none">
+                                    + {h === 0.5 ? '30 Min' : h === 1 ? '1 Hora' : `${h} Horas`}
+                                </button>
+                            ))}
                         </div>
                         {(currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO') && (
                             <>
@@ -1320,7 +1669,18 @@ export default function TableCard({ table, session }) {
                     {[0.5, 1, 2, 3, 4].map(h => (
                         <button
                             key={h}
-                            onClick={async () => { await addHoursToSession(session?.id, h); setShowAddHoursModal(false); showToast(`${h === 0.5 ? '30 min' : h + 'h'} agregadas`, 'success'); }}
+                            disabled={isProcessingCharge}
+                            onClick={async () => {
+                                setShowAddHoursModal(false);
+                                const seats = session?.seats || [];
+                                const activeSeats = seats.filter(s => !s.paid);
+                                if (activeSeats.length > 0) {
+                                    requestAttribution({ type: 'hora', hoursValue: h });
+                                } else {
+                                    await addHoursToSession(session?.id, h);
+                                    showToast(`${h === 0.5 ? '30 min' : h + 'h'} agregadas`, 'success');
+                                }
+                            }}
                             className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center"
                         >
                             <span className="text-xl">{h === 0.5 ? '30' : h}</span>
@@ -1328,6 +1688,39 @@ export default function TableCard({ table, session }) {
                         </button>
                     ))}
                 </div>
+            </div>
+        </Modal>
+
+        {/* Modal: Atribución de tiempo a cliente */}
+        <Modal isOpen={showAttributeModal} onClose={() => { if (!isProcessingCharge) { setShowAttributeModal(false); setPendingCharge(null); } }} title={pendingCharge?.type === 'hora' ? 'Agregar Hora — ¿A quién cobrar?' : 'Nueva Piña — ¿A quién cobrar?'}>
+            <div className="flex flex-col gap-2 py-2">
+                <p className="text-xs text-slate-500 mb-1">Selecciona el cliente que paga este tiempo, o elige Compartido para dividirlo entre todos.</p>
+                {(session?.seats || []).filter(s => !s.paid).map(seat => (
+                    <button
+                        key={seat.id}
+                        disabled={isProcessingCharge}
+                        onClick={() => handleAttributeCharge(seat.id)}
+                        className="w-full flex items-center gap-3 p-3 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/40 rounded-xl hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-all text-left active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-black shrink-0">
+                            {(seat.label || 'C').charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-sky-700 dark:text-sky-300 text-sm">{seat.label || `Cliente ${(session?.seats || []).indexOf(seat) + 1}`}</span>
+                    </button>
+                ))}
+                <button
+                    disabled={isProcessingCharge}
+                    onClick={() => handleAttributeCharge(null)}
+                    className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all text-left active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                >
+                    <div className="w-8 h-8 rounded-full bg-slate-400 text-white flex items-center justify-center text-xs font-black shrink-0">
+                        <Users size={14} />
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">Compartido</p>
+                        <p className="text-[10px] text-slate-400">Se divide entre todos al cobrar</p>
+                    </div>
+                </button>
             </div>
         </Modal>
 
@@ -1476,13 +1869,26 @@ export default function TableCard({ table, session }) {
             </div>
         </Modal>
 
-        {/* CustomerSheet para Abrir Mesa */}
+        {/* CustomerSheet para Abrir Mesa (y buscar cliente por seat) */}
         {showCustomerSheet && (
             <CustomerSheet
                 customers={allCustomers}
-                selectedId={sessionClientId}
-                onSelect={id => setSessionClientId(id)}
-                onClose={() => setShowCustomerSheet(false)}
+                selectedId={searchingSeatIndex !== null ? sessionSeats[searchingSeatIndex]?.customerId : sessionClientId}
+                onSelect={id => {
+                    if (searchingSeatIndex !== null) {
+                        const customer = allCustomers.find(c => c.id === id);
+                        const updated = sessionSeats.map((s, i) =>
+                            i === searchingSeatIndex
+                                ? { ...s, customerId: id, label: s.label || customer?.name || '' }
+                                : s
+                        );
+                        setSessionSeats(updated);
+                        setSearchingSeatIndex(null);
+                    } else {
+                        setSessionClientId(id);
+                    }
+                }}
+                onClose={() => { setShowCustomerSheet(false); setSearchingSeatIndex(null); }}
                 onCreateCustomer={handleCreateCustomer}
             />
         )}

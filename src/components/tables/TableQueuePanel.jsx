@@ -68,7 +68,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     return (
                         <button
                             key={session.id}
-                            onClick={() => onCheckoutTable({ table, session, elapsed, timeCost, totalConsumption, currentItems: items, grandTotal })}
+                            onClick={() => onCheckoutTable({ table, session, elapsed, timeCost, totalConsumption, currentItems: items, grandTotal, frozenDivisor: (session?.seats || []).filter(s => !s.paid).length || null })}
                             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-orange-100/70 dark:hover:bg-orange-900/20 active:scale-[0.99] transition-all text-left"
                         >
                             {/* Table name badge */}

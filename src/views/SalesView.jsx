@@ -434,7 +434,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
             {tableCheckoutData && !showTablePayment && (
                 <TableBillModal data={tableCheckoutData} onClose={() => { setTableCheckoutData(null); }}
-                    onProceedToPayment={(disc, itemDiscs, seatId) => {
+                    onProceedToPayment={(disc, itemDiscs, seatId, seatTotal) => {
                         // Calculate discount amounts and attach to checkout data
                         const _itemDiscs = itemDiscs || {};
                         const _itemDiscAmt = (tableCheckoutData.currentItems || []).reduce((acc, item) => {
@@ -444,14 +444,18 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                             return acc + (d.type === 'percentage' ? lt * (d.value / 100) : Math.min(d.value * Number(item.qty), lt));
                         }, 0);
 
-                        // If per-seat, use seat subtotal instead of table grandTotal
+                        // If per-seat, use seatTotal (already includes shared division) or recalculate
                         let baseTotal = tableCheckoutData.grandTotal;
                         if (seatId) {
-                            const seats = tableCheckoutData.session?.seats || [];
-                            const config = useTablesStore.getState().config;
-                            const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || []);
-                            const seatBd = fb?.seats.find(s => s.seat.id === seatId);
-                            if (seatBd) baseTotal = seatBd.subtotal;
+                            if (seatTotal != null) {
+                                baseTotal = seatTotal;
+                            } else {
+                                const seats = tableCheckoutData.session?.seats || [];
+                                const config = useTablesStore.getState().config;
+                                const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
+                                const seatBd = fb?.seats.find(s => s.seat.id === seatId);
+                                if (seatBd) baseTotal = seatBd.subtotal;
+                            }
                         }
 
                         const _sub = baseTotal - _itemDiscAmt;
@@ -464,7 +468,10 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                             ...(seatId ? { seatId } : {}),
                         }));
                         setShowTablePayment(true);
-                        if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id);
+                        // Si el seat tiene customerId, pre-seleccionarlo en el checkout
+                        const seatCustomer = seatId ? tableCheckoutData.session?.seats?.find(s => s.id === seatId)?.customerId : null;
+                        if (seatCustomer) setSelectedCustomerId(seatCustomer);
+                        else if (tableCheckoutData?.session?.client_id) setSelectedCustomerId(tableCheckoutData.session.client_id);
                     }} />
             )}
 
@@ -482,9 +489,21 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     onConfirmSale={(payments, change, splitMeta) => {
                         const sessionId = tableCheckoutData.session?.id;
                         const tableName = tableCheckoutData.table?.name || 'Mesa';
+                        const isSeatPayment = !!tableCheckoutData.seatId;
                         handleTableCheckout(payments, change, selectedCustomerId, null, splitMeta).then(() => {
                             setShowTablePayment(false);
-                            setPostPaymentSession({ sessionId, tableName });
+                            // Solo mostrar diálogo liberar/mantener cuando es cobro completo o todos los asientos pagados
+                            // Para pagos per-seat parciales, el bill modal se reabre automáticamente via setTableCheckoutData refresh
+                            if (!isSeatPayment) {
+                                setPostPaymentSession({ sessionId, tableName });
+                            } else {
+                                // Verificar si todos quedaron pagados (allPaid triggers postPayment from useSalesCheckout)
+                                const updatedSeats = tableCheckoutData.session?.seats || [];
+                                const allPaid = updatedSeats.every(s => s.paid || s.id === tableCheckoutData.seatId);
+                                if (allPaid) {
+                                    setPostPaymentSession({ sessionId, tableName });
+                                }
+                            }
                         });
                     }}
                     onCreateCustomer={handleCreateCustomer} triggerHaptic={triggerHaptic}

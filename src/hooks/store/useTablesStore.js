@@ -515,6 +515,8 @@ export const useTablesStore = create((set, get) => ({
             ...(guestCount > 0 ? { guest_count: guestCount } : {}),
             ...(clientId ? { client_id: clientId } : {}),
             ...((includePina && gameMode !== 'PINA') ? { extended_times: 1 } : {}),
+            // Multi-seat PINA: compensar la piña implícita del game_mode para atribuirla después
+            ...(gameMode === 'PINA' && seats && seats.length > 1 ? { extended_times: -1 } : {}),
             ...(seats && seats.length > 0 ? { seats, guest_count: seats.length } : {}),
         };
         if (userId) sessionPayload.user_id = userId;
@@ -712,10 +714,9 @@ export const useTablesStore = create((set, get) => ({
         });
     },
 
-    addHoursToSession: async (sessionId, additionalHours) => {
+    addHoursToSession: async (sessionId, additionalHours, seatId = null) => {
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
-        const newHours = Math.max(0, (Number(session.hours_paid) || 0) + additionalHours);
 
         // Si la sesión estaba "cobrada sin liberar", limpiar paid_at para reactivar billing del tiempo nuevo
         if (session.paid_at) {
@@ -724,17 +725,38 @@ export const useTablesStore = create((set, get) => ({
             await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
         }
 
-        const newSessions = get().activeSessions.map(s =>
-            s.id === sessionId ? { ...s, hours_paid: newHours, paid_at: null } : s
-        );
-        set({ activeSessions: newSessions });
-        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
-
-        try {
-            const { error } = await supabaseCloud.from('table_sessions').update({ hours_paid: newHours }).eq('id', sessionId);
-            if (error) throw error;
-        } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { hours_paid: newHours } });
+        if (seatId) {
+            // Atribuir tiempo a un cliente específico
+            const newSeats = (session.seats || []).map(s =>
+                s.id === seatId
+                    ? { ...s, timeCharges: [...(s.timeCharges || []), { type: 'hora', amount: additionalHours, id: 'tc-' + Date.now() }] }
+                    : s
+            );
+            const newSessions = get().activeSessions.map(s =>
+                s.id === sessionId ? { ...s, seats: newSeats, paid_at: null } : s
+            );
+            set({ activeSessions: newSessions });
+            await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+            try {
+                const { error } = await supabaseCloud.from('table_sessions').update({ seats: newSeats }).eq('id', sessionId);
+                if (error) throw error;
+            } catch (e) {
+                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { seats: newSeats } });
+            }
+        } else {
+            // Tiempo compartido: agregar a session.hours_paid
+            const newHours = Math.max(0, (Number(session.hours_paid) || 0) + additionalHours);
+            const newSessions = get().activeSessions.map(s =>
+                s.id === sessionId ? { ...s, hours_paid: newHours, paid_at: null } : s
+            );
+            set({ activeSessions: newSessions });
+            await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+            try {
+                const { error } = await supabaseCloud.from('table_sessions').update({ hours_paid: newHours }).eq('id', sessionId);
+                if (error) throw error;
+            } catch (e) {
+                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { hours_paid: newHours } });
+            }
         }
     },
 
@@ -804,40 +826,65 @@ export const useTablesStore = create((set, get) => ({
         });
     },
 
-    addRoundToSession: async (sessionId) => {
+    addRoundToSession: async (sessionId, seatId = null) => {
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
-        const newRounds = (Number(session.extended_times) || 0) + 1;
         const tableName = get().tables.find(t => t.id === session.table_id)?.name ?? session.table_id;
 
-        // Si estaba marcada como "ya cobrada", limpiar paid_at del cache al agregar nueva piña
+        // Si la sesión estaba "cobrada sin liberar", limpiar paid_at del cache al agregar nueva piña
         if (session.paid_at) {
             const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
             delete paidCache[sessionId];
             await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
         }
 
-        const newSessions = get().activeSessions.map(s =>
-            s.id === sessionId ? { ...s, extended_times: newRounds, paid_at: null } : s
-        );
-        set({ activeSessions: newSessions });
-        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
-
-        logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Piña añadida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
-
-        try {
-            const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
-            if (error) throw error;
-        } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newRounds } });
+        if (seatId) {
+            // Atribuir piña a un cliente específico
+            const newSeats = (session.seats || []).map(s =>
+                s.id === seatId
+                    ? { ...s, timeCharges: [...(s.timeCharges || []), { type: 'pina', amount: 1, id: 'tc-' + Date.now() }] }
+                    : s
+            );
+            const newSessions = get().activeSessions.map(s =>
+                s.id === sessionId ? { ...s, seats: newSeats, paid_at: null } : s
+            );
+            set({ activeSessions: newSessions });
+            await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+            logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Piña añadida a cliente`, getUser(), { sessionId, seatId });
+            try {
+                const { error } = await supabaseCloud.from('table_sessions').update({ seats: newSeats }).eq('id', sessionId);
+                if (error) throw error;
+            } catch (e) {
+                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { seats: newSeats } });
+            }
+        } else {
+            // Piña compartida: agregar a extended_times
+            const newRounds = (Number(session.extended_times) || 0) + 1;
+            const newSessions = get().activeSessions.map(s =>
+                s.id === sessionId ? { ...s, extended_times: newRounds, paid_at: null } : s
+            );
+            set({ activeSessions: newSessions });
+            await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+            logEvent('MESAS', 'MESA_PIÑA_AGREGADA', `Mesa ${tableName} · Piña añadida (total: ${newRounds})`, getUser(), { sessionId, newRounds });
+            try {
+                const { error } = await supabaseCloud.from('table_sessions').update({ extended_times: newRounds }).eq('id', sessionId);
+                if (error) throw error;
+            } catch (e) {
+                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newRounds } });
+            }
         }
     },
 
     // Agregar piña a una sesión que NO empezó como PINA (modo mixto).
     // Para PINA puro o sesiones que ya tienen piñas, delega a addRoundToSession.
-    addPinaToSession: async (sessionId) => {
+    addPinaToSession: async (sessionId, seatId = null) => {
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
+
+        // Si hay seatId: siempre atribuir directamente al cliente
+        if (seatId) {
+            return get().addRoundToSession(sessionId, seatId);
+        }
 
         // Si ya tiene piñas (PINA o piñas previas con extended_times > 0), agregar otra
         if (session.game_mode === 'PINA' || Number(session.extended_times) > 0) {
@@ -869,6 +916,27 @@ export const useTablesStore = create((set, get) => ({
         } catch (e) {
             await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { extended_times: newExtendedTimes } });
         }
+    },
+
+    // Marca un seat (cliente) como pagado. Si todos están pagados, cierra la sesión.
+    markSeatAsPaid: async (sessionId, seatId) => {
+        const session = get().activeSessions.find(s => s.id === sessionId);
+        if (!session) return;
+        const newSeats = (session.seats || []).map(s =>
+            s.id === seatId ? { ...s, paid: true } : s
+        );
+        const allPaid = newSeats.every(s => s.paid);
+        const newSessions = get().activeSessions.map(s =>
+            s.id === sessionId ? { ...s, seats: newSeats } : s
+        );
+        set({ activeSessions: newSessions });
+        await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
+        try {
+            await supabaseCloud.from('table_sessions').update({ seats: newSeats }).eq('id', sessionId);
+        } catch (e) {
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { seats: newSeats } });
+        }
+        return allPaid;
     },
 
     removeRoundFromSession: async (sessionId) => {

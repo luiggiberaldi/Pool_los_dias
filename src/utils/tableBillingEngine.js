@@ -179,11 +179,43 @@ export function formatHoursPaid(hours) {
 }
 
 /**
+ * Calcula el costo de timeCharges individuales de un seat.
+ * timeCharges: [{ type: 'hora'|'pina', amount: number }]
+ */
+export function calculateSeatTimeChargesCost(timeCharges, config) {
+    if (!timeCharges || timeCharges.length === 0) {
+        return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
+    }
+    const totalHours = timeCharges.filter(tc => tc.type === 'hora').reduce((sum, tc) => sum + (Number(tc.amount) || 0), 0);
+    const totalPinas = timeCharges.filter(tc => tc.type === 'pina').reduce((sum, tc) => sum + (Number(tc.amount) || 0), 0);
+    const hourCost = round2(totalHours * (config.pricePerHour || 0));
+    const pinaCost = round2(totalPinas * (config.pricePina || 0));
+    return {
+        pinaCost,
+        hourCost,
+        libreCost: 0,
+        hasPinas: totalPinas > 0,
+        hasHours: totalHours > 0,
+        isLibre: false,
+        total: round2(hourCost + pinaCost)
+    };
+}
+
+/**
  * Calcula el costo de UN seat según su gameMode individual.
- * seat: { gameMode: 'HOURS'|'PINA'|'LIBRE'|'NONE', hoursPaid, pinas }
+ * Soporta nuevo estilo (timeCharges) y legacy (gameMode/hoursPaid/pinas).
+ * seat: { timeCharges?, gameMode?, hoursPaid?, pinas? }
  */
 export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
-    if (!seat || seat.gameMode === 'NONE') {
+    if (!seat) {
+        return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
+    }
+    // Nuevo estilo: usa timeCharges si existen
+    if (seat.timeCharges && seat.timeCharges.length > 0) {
+        return calculateSeatTimeChargesCost(seat.timeCharges, config);
+    }
+    // Legacy: usa gameMode/hoursPaid/pinas
+    if (!seat.gameMode || seat.gameMode === 'NONE') {
         return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
     }
     if (seat.gameMode === 'PINA') {
@@ -201,24 +233,48 @@ export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
 }
 
 /**
- * Calcula el desglose completo de una mesa con seats.
+ * Calcula el desglose completo de una mesa con seats/clientes.
  * Si seats está vacío, retorna null (usar cálculo legacy de sesión).
  * orderItems: array de items con seat_id (null = compartido).
+ * sharedTimeOverride: si se pasa, es el monto compartido de tiempo ya calculado externamente.
+ * sharedDivision: { type: 'equal' } | { type: 'custom', amounts: { [seatId]: number } }
  */
-export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = []) {
+export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = [], sharedDivision = null, frozenDivisor = null) {
     if (!seats || seats.length === 0) return null;
 
     const activeSeats = seats.filter(s => !s.paid);
     const allSeats = seats;
     const sharedItems = orderItems.filter(i => !i.seat_id);
-    const sharedTotal = sharedItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
-    const sharedPerSeat = activeSeats.length > 0 ? round2(sharedTotal / activeSeats.length) : 0;
+    const sharedConsumptionTotal = sharedItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
+
+    // Costo de tiempo compartido (session-level: piñas + horas sin seatId)
+    const sessionTimeCost = calculateSessionCostBreakdown(
+        elapsedMinutes,
+        session.game_mode,
+        config,
+        session.hours_paid || 0,
+        session.extended_times || 0
+    );
+    const sharedTimeTotal = sessionTimeCost.total;
+    const sharedTotal = round2(sharedConsumptionTotal + sharedTimeTotal);
+    const activeCount = frozenDivisor || activeSeats.length;
+
+    const getSharedPortion = (seat) => {
+        if (seat.paid) return 0;
+        if (!sharedDivision || sharedDivision.type === 'equal') {
+            return activeCount > 0 ? round2(sharedTotal / activeCount) : 0;
+        }
+        if (sharedDivision.type === 'custom') {
+            return round2(sharedDivision.amounts?.[seat.id] || 0);
+        }
+        return activeCount > 0 ? round2(sharedTotal / activeCount) : 0;
+    };
 
     const seatBreakdowns = allSeats.map(seat => {
         const timeCost = calculateSeatCostBreakdown(seat, elapsedMinutes, config);
         const seatItems = orderItems.filter(i => i.seat_id === seat.id);
         const consumption = seatItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
-        const sharedPortion = seat.paid ? 0 : sharedPerSeat;
+        const sharedPortion = getSharedPortion(seat);
         return {
             seat,
             timeCost,
@@ -234,8 +290,11 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
     return {
         seats: seatBreakdowns,
         sharedItems,
+        sharedConsumptionTotal: round2(sharedConsumptionTotal),
+        sharedTimeTotal: round2(sharedTimeTotal),
         sharedTotal: round2(sharedTotal),
-        sharedPerSeat,
+        sharedPerSeat: activeCount > 0 ? round2(sharedTotal / activeCount) : 0,
+        sessionTimeCost,
         grandTotal: round2(grandTotal)
     };
 }

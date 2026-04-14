@@ -93,19 +93,25 @@ export function useSalesCheckout({
             const seatTimeCost = calculateSeatCostBreakdown(seat, tableCheckoutData.elapsed, config);
             const tableName = `${tableCheckoutData.table?.name || 'Mesa'} (${seat.label || 'Persona'})`;
 
-            // Time cost for this seat
+            // Time cost for this seat (soporta timeCharges nuevo estilo y legacy)
             if (seatTimeCost.pinaCost > 0) {
+                const pinaQty = seat.timeCharges
+                    ? seat.timeCharges.filter(tc => tc.type === 'pina').reduce((s, tc) => s + (tc.amount || 1), 0)
+                    : (seat.pinas || 1);
                 syntheticCart.push({
                     id: crypto.randomUUID(),
                     name: `Piña ${tableName}`,
                     priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
-                    qty: seat.pinas || 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                    qty: pinaQty, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                 });
             }
             if (seatTimeCost.hourCost > 0) {
+                const horasQty = seat.timeCharges
+                    ? seat.timeCharges.filter(tc => tc.type === 'hora').reduce((s, tc) => s + (tc.amount || 0), 0)
+                    : (seat.hoursPaid || 0);
                 syntheticCart.push({
                     id: crypto.randomUUID(),
-                    name: `Tiempo ${tableName} (${formatHoursPaid(seat.hoursPaid || 0)})`,
+                    name: `Tiempo ${tableName} (${formatHoursPaid(horasQty)})`,
                     priceUsdt: round2(seatTimeCost.hourCost), priceUsd: round2(seatTimeCost.hourCost),
                     qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                 });
@@ -130,7 +136,8 @@ export function useSalesCheckout({
             });
 
             // Shared portion
-            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || []);
+            const frozenDivisor = tableCheckoutData.frozenDivisor || null;
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor);
             if (fullBreakdown) {
                 const seatBd = fullBreakdown.seats.find(s => s.seat.id === seatId);
                 if (seatBd && seatBd.sharedPortion > 0) {
@@ -237,8 +244,12 @@ export function useSalesCheckout({
                     // All seats paid — show release dialog (shouldRelease = null lets caller decide)
                     // Don't auto-release — let post-payment dialog handle it
                 } else {
-                    // More seats to pay — close checkout, go back to bill modal
-                    setTableCheckoutData(null);
+                    // More seats to pay — refresh checkout data with updated seats so bill modal reopens
+                    setTableCheckoutData(prev => prev ? ({
+                        ...prev,
+                        session: { ...prev.session, seats: updatedSeats },
+                        seatId: undefined, // clear seat selection so bill modal shows (not checkout)
+                    }) : null);
                     showToast(`${seats.find(s => s.id === seatId)?.label || 'Persona'} pagado`, 'success');
                 }
             } catch (e) {

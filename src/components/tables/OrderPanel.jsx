@@ -39,13 +39,19 @@ export function OrderPanel({ session, table, onClose }) {
 
     // Seats support
     const seats = session?.seats || [];
-    const hasSeats = seats.length > 0;
-    const [selectedSeatId, setSelectedSeatId] = useState(null);
+    const hasSeats = seats.length > 1; // Only show seat UI when 2+ clients
+    const [selectedSeatId, setSelectedSeatId] = useState(() => seats.length === 1 ? seats[0].id : null);
 
     // Derive order and items
     const order = allOrders.find(o => o.table_session_id === session.id) || null;
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
     const totalConsumed = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
+
+    // Items filtered by selected seat (null = show all)
+    const visibleItems = hasSeats && selectedSeatId !== null
+        ? currentItems.filter(i => i.seat_id === selectedSeatId)
+        : currentItems;
+    const visibleTotal = visibleItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
 
     // Categories derived from products
     const categories = ['Todos', ...new Set(products.map(p => p.category).filter(Boolean))];
@@ -125,22 +131,38 @@ export function OrderPanel({ session, table, onClose }) {
                         >
                             <Users size={11} /> Compartido
                         </button>
-                        {seats.map(seat => (
+                        {seats.map(seat => {
+                            const seatItemCount = currentItems.filter(i => i.seat_id === seat.id).length;
+                            return (
                             <button
                                 key={seat.id}
-                                onClick={() => setSelectedSeatId(seat.id)}
-                                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                onClick={() => !seat.paid && setSelectedSeatId(seat.id)}
+                                disabled={seat.paid}
+                                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                                     selectedSeatId === seat.id
                                         ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/30'
                                         : seat.paid
-                                            ? 'bg-emerald-50 text-emerald-400 line-through'
+                                            ? 'bg-emerald-50 text-emerald-400 line-through opacity-50 cursor-not-allowed'
                                             : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-500'
                                 }`}
                             >
                                 {seat.label || `Persona ${seats.indexOf(seat) + 1}`}
+                                {seatItemCount > 0 && (
+                                    <span className={`text-[9px] px-1 py-0.5 rounded-full leading-none ${
+                                        selectedSeatId === seat.id ? 'bg-white/20' : 'bg-indigo-100 text-indigo-500'
+                                    }`}>{seatItemCount}</span>
+                                )}
                             </button>
-                        ))}
+                            );
+                        })}
                     </div>
+                    {/* Active target indicator */}
+                    {selectedSeatId !== null && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-indigo-500">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                            Agregando a: {seats.find(s => s.id === selectedSeatId)?.label || 'Cliente'}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -148,25 +170,28 @@ export function OrderPanel({ session, table, onClose }) {
             <div className="px-5 mb-3 shrink-0">
                 <div className="flex items-center justify-between mb-3">
                     <span className="text-[11px] uppercase tracking-widest font-bold text-slate-500">
-                        En la mesa · {currentItems.length} {currentItems.length === 1 ? 'item' : 'items'}
+                        {hasSeats && selectedSeatId !== null
+                            ? `${seats.find(s => s.id === selectedSeatId)?.label || 'Cliente'} · ${visibleItems.length} ${visibleItems.length === 1 ? 'item' : 'items'}`
+                            : `En la mesa · ${currentItems.length} ${currentItems.length === 1 ? 'item' : 'items'}`
+                        }
                     </span>
-                    {totalConsumed > 0 && (
+                    {(hasSeats && selectedSeatId !== null ? visibleTotal : totalConsumed) > 0 && (
                         <span className="text-emerald-400 font-black text-lg tabular-nums">
-                            ${totalConsumed.toFixed(2)}
+                            ${(hasSeats && selectedSeatId !== null ? visibleTotal : totalConsumed).toFixed(2)}
                         </span>
                     )}
                 </div>
 
-                {currentItems.length === 0 ? (
+                {visibleItems.length === 0 ? (
                     <div className="flex items-center gap-3 py-4 px-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
                         <UtensilsCrossed size={20} className="text-slate-400 shrink-0" />
                         <p className="text-sm text-slate-500 font-medium">Sin productos aún. Añade del menú abajo.</p>
                     </div>
                 ) : (
                     <div className="space-y-2 max-h-44 overflow-y-auto pr-1 custom-scrollbar">
-                        {currentItems.map(item => {
+                        {visibleItems.map(item => {
                             const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
-                            const seatLabel = hasSeats ? (item.seat_id ? (seats.find(s => s.id === item.seat_id)?.label || '?') : 'Compartido') : null;
+                            const seatLabel = (hasSeats && selectedSeatId === null) ? (item.seat_id ? (seats.find(s => s.id === item.seat_id)?.label || '?') : 'Compartido') : null;
                             return (
                             <div key={item.id}
                                 className={`flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl px-4 py-3 transition-all duration-300 ${removingItem === item.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
@@ -263,7 +288,12 @@ export function OrderPanel({ session, table, onClose }) {
                     ) : (
                         <div className="grid grid-cols-2 gap-2.5 pb-4">
                             {filteredProducts.map(p => {
-                                const inOrder = currentItems.find(i => i.product_id === p.id);
+                                // Seat-aware: when a seat is selected, only match items for that seat
+                                const inOrder = hasSeats && selectedSeatId !== null
+                                    ? currentItems.find(i => i.product_id === p.id && i.seat_id === selectedSeatId)
+                                    : hasSeats && selectedSeatId === null
+                                        ? currentItems.find(i => i.product_id === p.id && !i.seat_id)
+                                        : currentItems.find(i => i.product_id === p.id);
                                 const isAdding = addingItem === p.id;
                                 return (
                                     <div key={p.id}
