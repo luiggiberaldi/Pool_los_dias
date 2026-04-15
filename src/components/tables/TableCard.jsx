@@ -349,6 +349,7 @@ export default function TableCard({ table, session }) {
     const [editNotes, setEditNotes] = useState('');
     const [editSeats, setEditSeats] = useState([]);
     const [showEditCustomerSheet, setShowEditCustomerSheet] = useState(false);
+    const [searchingEditSeatIndex, setSearchingEditSeatIndex] = useState(null);
 
 
     // Fetch customers from Supabase once on mount
@@ -1569,6 +1570,7 @@ export default function TableCard({ table, session }) {
                     <SeatEditor
                         seats={editSeats}
                         onSeatsChange={setEditSeats}
+                        onSearchCustomerForSeat={(idx) => { setSearchingEditSeatIndex(idx); setShowEditCustomerSheet(true); }}
                         isPoolTable={table.type !== 'NORMAL'}
                     />
                 </div>
@@ -1927,12 +1929,23 @@ export default function TableCard({ table, session }) {
         {showEditCustomerSheet && (
             <CustomerSheet
                 customers={allCustomers}
-                selectedId={editClientId}
+                selectedId={searchingEditSeatIndex !== null ? editSeats[searchingEditSeatIndex]?.customerId : editClientId}
                 onSelect={id => {
-                    setEditClientId(id);
-                    setEditClientName(allCustomers.find(c => c.id === id)?.name || '');
+                    if (searchingEditSeatIndex !== null) {
+                        const customer = allCustomers.find(c => c.id === id);
+                        const updated = editSeats.map((s, i) =>
+                            i === searchingEditSeatIndex
+                                ? { ...s, customerId: id, label: s.label || customer?.name || '' }
+                                : s
+                        );
+                        setEditSeats(updated);
+                        setSearchingEditSeatIndex(null);
+                    } else {
+                        setEditClientId(id);
+                        setEditClientName(allCustomers.find(c => c.id === id)?.name || '');
+                    }
                 }}
-                onClose={() => setShowEditCustomerSheet(false)}
+                onClose={() => { setShowEditCustomerSheet(false); setSearchingEditSeatIndex(null); }}
                 onCreateCustomer={handleCreateCustomer}
             />
         )}
