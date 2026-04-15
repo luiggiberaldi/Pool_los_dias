@@ -291,7 +291,7 @@ export default function TableCard({ table, session }) {
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
     const confirm = useConfirm();
-    const { notifyMesaCobrar, notifyTiempoExcedido } = useNotifications();
+    const { notifyMesaCobrar, notifyTiempoExcedido, notifyMesaPagadaOciosa } = useNotifications();
 
     const isAvailable = !session || session.status === 'CLOSED';
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
@@ -700,6 +700,8 @@ export default function TableCard({ table, session }) {
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
+    // Mesa pagada sin cerrar y sin cargos nuevos agregados
+    const isPaidIdle = isPlaying && !!session?.paid_at && timeCost === 0;
     const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset) : null;
     const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
     const seatHasPinas = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
@@ -725,6 +727,24 @@ export default function TableCard({ table, session }) {
             exceededNotifiedRef.current = false;
         }
     }, [isExceeded, table.name, notifyTiempoExcedido]);
+
+    // Alerta: mesa pagada sin actividad por 15+ minutos
+    const paidIdleNotifiedRef = useRef(false);
+    useEffect(() => {
+        if (isPaidIdle && session?.paid_at) {
+            const paidTime = new Date(session.paid_at);
+            const msSincePaid = Date.now() - paidTime.getTime();
+            const minsSincePaid = msSincePaid / 60000;
+            if (minsSincePaid >= 15 && !paidIdleNotifiedRef.current) {
+                paidIdleNotifiedRef.current = true;
+                notifyMesaPagadaOciosa(table.name);
+                showToast(`${table.name} lleva 15+ min pagada sin actividad`, 'warning', 8000);
+            }
+        }
+        if (!isPaidIdle) {
+            paidIdleNotifiedRef.current = false;
+        }
+    }, [isPaidIdle, elapsed, session?.paid_at, table.name, notifyMesaPagadaOciosa]);
 
     return (
         <>
@@ -814,9 +834,9 @@ export default function TableCard({ table, session }) {
                     )}
                 </div>
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
-                    isAvailable ? 'bg-emerald-100 text-emerald-700' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
+                    isAvailable ? 'bg-emerald-100 text-emerald-700' : isPaidIdle ? 'bg-emerald-400 text-white' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : hasPinas ? 'LA PIÑA' : costBreakdown?.isLibre ? 'ABIERTA' : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : isPaidIdle ? 'PAGADO' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : isTimeFree ? 'BAR' : hasLimit ? (session.hours_paid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${Number(session.hours_paid)}h`) : hasPinas ? 'LA PIÑA' : costBreakdown?.isLibre ? 'ABIERTA' : 'JUG.'}
                 </div>
             </div>
 
@@ -847,6 +867,16 @@ export default function TableCard({ table, session }) {
                                 <div className="text-xs font-medium opacity-80">Acumulando Consumo</div>
                                 <div className="text-[10px] sm:text-xs font-bold opacity-60 text-slate-200 bg-white/10 px-2 py-0.5 rounded-full mt-0.5">
                                     Tiempo en mesa: {formatElapsedTime(elapsed)}
+                                </div>
+                            </div>
+                        ) : isPaidIdle ? (
+                            <div className="flex flex-col items-center gap-2 mt-2">
+                                <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                                    <Check size={20} className="text-emerald-400" />
+                                </div>
+                                <div className="text-sm font-black text-emerald-400 uppercase tracking-wider">Pagado · $0</div>
+                                <div className="text-[10px] font-bold text-white/50 bg-white/10 px-2 py-0.5 rounded-full">
+                                    {formatElapsedTime(elapsed)} en mesa
                                 </div>
                             </div>
                         ) : (

@@ -122,6 +122,15 @@ export function useNotifications() {
         );
     }, [send]);
 
+    /** Mesa pagada ociosa: lleva 15+ min pagada sin cerrar ni agregar cargos */
+    const notifyMesaPagadaOciosa = useCallback((tableName) => {
+        send(
+            '💤 Mesa pagada sin actividad',
+            `${tableName} lleva 15+ min pagada. ¿Liberar mesa o agregar más tiempo?`,
+            `pagada-ociosa-${tableName}`
+        );
+    }, [send]);
+
     return {
         requestPermission,
         notifyLowStock,
@@ -129,5 +138,6 @@ export function useNotifications() {
         notifyCierrePendiente,
         notifyMesaCobrar,
         notifyTiempoExcedido,
+        notifyMesaPagadaOciosa,
     };
 }

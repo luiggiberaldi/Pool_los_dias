@@ -37,17 +37,17 @@ function ClientRow({ seat, index, onUpdate, onRemove, onSearchCustomer, duplicat
                 ) : (
                     <button
                         onClick={() => onSearchCustomer(index)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-sky-500 hover:bg-sky-100 dark:hover:bg-sky-900/20 transition-colors"
+                        className="p-2 -m-1 rounded-lg text-slate-400 hover:text-sky-500 hover:bg-sky-100 dark:hover:bg-sky-900/20 transition-colors"
                         title="Vincular a cliente"
                     >
-                        <Search size={13} />
+                        <Search size={16} />
                     </button>
                 )}
                 <button
                     onClick={onRemove}
-                    className="p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                    className="p-2 -m-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                 >
-                    <X size={14} />
+                    <X size={16} />
                 </button>
             </div>
         </div>
