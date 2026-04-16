@@ -21,7 +21,11 @@ export function getWebSerialConfig() {
     try {
         const saved = localStorage.getItem('web_serial_config');
         const defaults = { autoOpenDrawer: false, baudRate: 9600, printerType: 'system', printerBrand: 'Impresora del Sistema', printerModel: 'Driver del Sistema', paperWidth: 58 };
-        return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+        if (!saved) return defaults;
+        const parsed = JSON.parse(saved);
+        // Si no hay tipo guardado, forzar sistema
+        if (!parsed.printerType) return { ...defaults, ...parsed, printerType: 'system', printerBrand: 'Impresora del Sistema', printerModel: 'Driver del Sistema' };
+        return { ...defaults, ...parsed };
     } catch {
         return { autoOpenDrawer: false, baudRate: 9600, printerType: 'system', printerBrand: 'Impresora del Sistema', printerModel: 'Driver del Sistema', paperWidth: 58 };
     }

@@ -71,11 +71,30 @@ function PrinterCard({ config, connected }) {
             </div>
 
             {isSystem && (
-                <div className="mt-3 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40 flex items-start gap-2">
-                    <Info size={12} className="text-indigo-500 shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                        Imprime via diálogo del sistema. Para impresión <strong>directa sin diálogo</strong>, conecta una impresora térmica USB y usa "Detectar impresora".
-                    </p>
+                <div className="mt-3 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40 space-y-2">
+                    <div className="flex items-start gap-2">
+                        <Info size={12} className="text-indigo-500 shrink-0 mt-0.5" />
+                        <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                            Imprime via diálogo del sistema. Para <strong>eliminar el diálogo permanentemente</strong>, sigue los pasos de abajo.
+                        </p>
+                    </div>
+                    <div className="bg-indigo-100/60 dark:bg-indigo-900/30 rounded-xl p-3 space-y-2">
+                        <p className="text-[10px] font-black text-indigo-800 dark:text-indigo-200">Cómo imprimir sin diálogo en Chrome/Edge:</p>
+                        <div className="space-y-1.5">
+                            {[
+                                'Establece la térmica como impresora predeterminada en Windows',
+                                'Haz clic derecho en el acceso directo de Chrome → Propiedades',
+                                'En "Destino" agrega al final: --kiosk-printing',
+                                'Guarda y abre Chrome desde ese acceso directo',
+                            ].map((step, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                    <span className="text-[10px] font-black text-indigo-500 shrink-0 mt-px">{i + 1}.</span>
+                                    <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">{step}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-indigo-500 dark:text-indigo-400 italic">Con ese flag Chrome imprime directo sin mostrar ningún diálogo.</p>
+                    </div>
                 </div>
             )}
 
