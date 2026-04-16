@@ -121,7 +121,7 @@ function _printThermalHTML(sale, bcvRate) {
         width: ${cssBodyWidth};
         max-width: ${cssBodyWidth};
         margin: 0 auto;
-        padding: 4mm 2mm;
+        padding: 2mm 2mm;
         color: #000;
         background: #fff;
         -webkit-print-color-adjust: exact;
@@ -132,20 +132,20 @@ function _printThermalHTML(sale, bcvRate) {
     .dash {
         border: none;
         border-top: 1px dashed #555;
-        margin: 6px 0;
+        margin: 3px 0;
     }
     .total-usd {
         font-size: ${fTotalU};
         font-weight: 900;
         color: #107c41;
         text-align: center;
-        margin: 4px 0;
+        margin: 2px 0;
     }
     .total-bs {
         font-size: ${fTotalB};
         font-weight: bold;
         text-align: center;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
     }
     table { width: 100%; border-collapse: collapse; }
     @media print {
