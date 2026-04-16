@@ -1,6 +1,5 @@
-import { jsPDF } from 'jspdf';
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
-import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown, calculateSeatCostBreakdown, formatHoursPaid, calculateFullTableBreakdown } from './tableBillingEngine';
+import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown } from './tableBillingEngine';
 import { round2 } from './dinero';
 
 /**
@@ -56,276 +55,85 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
 
     const itemCount = currentItems?.length || 0;
 
-    // ── Pre-calcular altura exacta del ticket ──────────────────────────────
-    // Cada sección suma exactamente lo que el render dibuja (en mm).
-    let H = 8; // y inicial
-    H += 6; // título "PRE-CUENTA MESA"
-    H += 6; // nombre de mesa
-    H += 5; // dash + gap
-    H += 5; // fecha
-    if (session?.client_name) H += 5;
-    if (session?.notes) H += 4;
-    H += 6; // dash + gap
+    // ── Generar HTML para impresión directa ────────────────────────────────
+    // Usar HTML + @page CSS en vez de PDF para que el navegador respete
+    // el tamaño de página y no use el largo fijo del driver (3276mm).
+    const lines = [];
+    const push = (html) => lines.push(html);
 
-    if (isMultiClient) {
-        // Estimar altura multi-cliente: shared section + per-seat
-        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
-        if (breakdown) {
-            if (breakdown.sharedTotal > 0) {
-                H += 4; // "COMPARTIDO" header
-                if (hasPinas) H += 4;
-                if (hasHours) H += 4;
-                H += breakdown.sharedItems.length * 4;
-                H += 5; // total compartido
-                H += 5; // dash
-            }
-            breakdown.seats.forEach((sb) => {
-                H += 4; // seat label
-                if (sb.timeCost.total > 0) {
-                    if (sb.timeCost.hasPinas) H += 4;
-                    if (sb.timeCost.hasHours) H += 4;
-                }
-                H += sb.items.length * 4;
-                if (sb.sharedPortion > 0 && !sb.seat.paid) H += 4;
-                H += 4; // subtotal
-                H += 5; // bs ref
-                H += 5; // dash
-            });
-        }
-    } else {
-        // Piñas
-        if (hasPinas || seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'))) {
-            H += 4 + 4 + 5 + 1; // header + line + bs + gap
-            if (roundsOffset > 0) H += 5;
-        }
-        // Horas
-        if (hasHours || seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'))) {
-            H += 4 + 4 + 5 + 1;
-            if (hoursOffset > 0) H += 5;
-        }
-        // Consumo
-        if (itemCount > 0) {
-            H += 5; // "Consumo Bar" header
-            H += itemCount * 9; // cada item: 4 (nombre) + 5 (bs)
-            H += 2; // gap
-        }
-    }
-
-    H += 6; // dash
-    H += 6; // TOTAL
-    H += 8; // ref Bs + gap
-    H += 5; // disclaimer + margen inferior
-
-    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
-    const INK = [33, 37, 41];
-    const RULE = [206, 212, 218];
-    const PAID_CLR = [120, 120, 120];
-    const ACCENT = [29, 78, 137];
-
-    let y = 8;
-    const dash = (yy) => {
-        doc.setDrawColor(...RULE);
-        doc.setLineWidth(0.3);
-        doc.setLineDashPattern([1, 1], 0);
-        doc.line(M, yy, RIGHT, yy);
-        doc.setLineDashPattern([], 0);
-    };
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...INK);
-    doc.setFontSize(14);
-    doc.text("PRE-CUENTA MESA", CX, y, { align: 'center' });
-    y += 6;
-    doc.setFontSize(10);
-    doc.text(table.name.toUpperCase(), CX, y, { align: 'center' });
-    y += 6;
-
-    dash(y);
-    y += 5;
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
+    push(`<div class="title">PRE-CUENTA MESA</div>`);
+    push(`<div class="subtitle">${table.name.toUpperCase()}</div>`);
+    push(`<hr>`);
     const d = new Date();
-    doc.text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`, M, y);
-    y += 5;
+    push(`<div class="small">Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}</div>`);
+    if (session?.client_name) push(`<div class="bold">Cliente: ${session.client_name}</div>`);
+    if (session?.notes) push(`<div class="note">Nota: ${session.notes.substring(0, 60)}</div>`);
+    push(`<hr>`);
 
-    if (session?.client_name) {
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Cliente: ${session.client_name}`, M, y);
-        doc.setFont('helvetica', 'normal');
-        y += 5;
-    }
-
-    if (session?.notes) {
-        doc.setFontSize(7);
-        doc.text(`Nota: ${session.notes.substring(0, 60)}`, M, y);
-        doc.setFontSize(8);
-        y += 4;
-    }
-
-    dash(y);
-    y += 6;
-
-    // ═══ MULTI-CLIENT: show per-seat breakdown ═══
     if (isMultiClient) {
         const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
-
         if (breakdown) {
-            // ── Shared section ──
             if (breakdown.sharedTotal > 0) {
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...ACCENT);
-                doc.text("COMPARTIDO", M, y);
-                doc.setTextColor(...INK);
-                y += 4;
-                doc.setFont('helvetica', 'normal');
-
-                // Shared piñas
+                push(`<div class="bold accent">COMPARTIDO</div>`);
                 if (hasPinas) {
-                    const pricePerPina = config?.pricePina || 0;
-                    doc.text(`${pinaCount} piña${pinaCount !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, M, y);
-                    const pinaCost = round2(pinaCount * pricePerPina);
-                    doc.text(`$${pinaCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                    y += 4;
+                    const pp = config?.pricePina || 0;
+                    push(`<div class="row"><span>${pinaCount} piña${pinaCount !== 1 ? 's' : ''} x $${pp.toFixed(2)}</span><span>$${round2(pinaCount * pp).toFixed(2)}</span></div>`);
                 }
-
-                // Shared hours
                 if (hasHours) {
-                    const pricePerHour = config?.pricePerHour || 0;
-                    const hourCost = round2(totalHours * pricePerHour);
-                    doc.text(`${formatHoursPaid(totalHours)} x $${pricePerHour.toFixed(2)}`, M, y);
-                    doc.text(`$${hourCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                    y += 4;
+                    const ph = config?.pricePerHour || 0;
+                    push(`<div class="row"><span>${formatHoursPaid(totalHours)} x $${ph.toFixed(2)}</span><span>$${round2(totalHours * ph).toFixed(2)}</span></div>`);
                 }
-
-                // Shared consumption items
-                if (breakdown.sharedItems.length > 0) {
-                    breakdown.sharedItems.forEach(i => {
-                        const t = i.qty * i.unit_price_usd;
-                        doc.text(`${i.qty}x ${(i.product_name || '').substring(0, 16)}`, M, y);
-                        doc.text(`$${t.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                        y += 4;
-                    });
-                }
-
-                doc.setFontSize(7);
-                doc.setTextColor(...PAID_CLR);
-                doc.text(`Total compartido: $${breakdown.sharedTotal.toFixed(2)} (÷${seats.filter(s => !s.paid).length})`, M, y);
-                doc.setFontSize(8);
-                doc.setTextColor(...INK);
-                y += 5;
-                dash(y);
-                y += 5;
+                breakdown.sharedItems.forEach(i => {
+                    const t = i.qty * i.unit_price_usd;
+                    push(`<div class="row"><span>${i.qty}x ${(i.product_name || '').substring(0, 16)}</span><span>$${t.toFixed(2)}</span></div>`);
+                });
+                push(`<div class="muted small">Total compartido: $${breakdown.sharedTotal.toFixed(2)} (÷${seats.filter(s => !s.paid).length})</div>`);
+                push(`<hr>`);
             }
-
-            // ── Per-seat sections ──
             breakdown.seats.forEach((sb) => {
                 const seatLabel = sb.seat.label || `Cliente ${seats.indexOf(sb.seat) + 1}`;
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...ACCENT);
-                doc.text(seatLabel.toUpperCase(), M, y);
-                if (sb.seat.paid) {
-                    doc.setTextColor(...PAID_CLR);
-                    doc.text('PAGADO', RIGHT, y, { align: 'right' });
-                }
-                doc.setTextColor(...INK);
-                y += 4;
-                doc.setFont('helvetica', 'normal');
-
-                // Seat time charges
+                push(`<div class="row"><span class="bold accent">${seatLabel.toUpperCase()}</span>${sb.seat.paid ? '<span class="muted">PAGADO</span>' : ''}</div>`);
                 if (sb.timeCost.total > 0) {
                     if (sb.timeCost.hasPinas) {
                         const tc = sb.seat.timeCharges?.filter(tc => tc.type === 'pina') || [];
-                        const pCount = tc.length;
                         const pp = config?.pricePina || 0;
-                        doc.text(`${pCount} piña${pCount !== 1 ? 's' : ''} x $${pp.toFixed(2)}`, M, y);
-                        doc.text(`$${sb.timeCost.pinaCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                        y += 4;
+                        push(`<div class="row"><span>${tc.length} piña${tc.length !== 1 ? 's' : ''} x $${pp.toFixed(2)}</span><span>$${sb.timeCost.pinaCost.toFixed(2)}</span></div>`);
                     }
                     if (sb.timeCost.hasHours) {
                         const tc = sb.seat.timeCharges?.filter(tc => tc.type === 'hora') || [];
                         const totalH = tc.reduce((sum, c) => sum + (c.hours || 0), 0);
                         const ph = config?.pricePerHour || 0;
-                        doc.text(`${formatHoursPaid(totalH)} x $${ph.toFixed(2)}`, M, y);
-                        doc.text(`$${sb.timeCost.hourCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                        y += 4;
+                        push(`<div class="row"><span>${formatHoursPaid(totalH)} x $${ph.toFixed(2)}</span><span>$${sb.timeCost.hourCost.toFixed(2)}</span></div>`);
                     }
                 }
-
-                // Seat consumption
-                if (sb.items.length > 0) {
-                    sb.items.forEach(i => {
-                        const t = i.qty * i.unit_price_usd;
-                        doc.text(`${i.qty}x ${(i.product_name || '').substring(0, 16)}`, M, y);
-                        doc.text(`$${t.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                        y += 4;
-                    });
-                }
-
-                // Shared portion
+                sb.items.forEach(i => {
+                    const t = i.qty * i.unit_price_usd;
+                    push(`<div class="row"><span>${i.qty}x ${(i.product_name || '').substring(0, 16)}</span><span>$${t.toFixed(2)}</span></div>`);
+                });
                 if (sb.sharedPortion > 0 && !sb.seat.paid) {
-                    doc.setFontSize(7);
-                    doc.setTextColor(...PAID_CLR);
-                    doc.text(`Parte compartida`, M, y);
-                    doc.text(`$${sb.sharedPortion.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                    doc.setFontSize(8);
-                    doc.setTextColor(...INK);
-                    y += 4;
+                    push(`<div class="row muted small"><span>Parte compartida</span><span>$${sb.sharedPortion.toFixed(2)}</span></div>`);
                 }
-
-                // Seat subtotal
-                doc.setFont('helvetica', 'bold');
-                doc.text(`Subtotal:`, M, y);
-                doc.text(`$${sb.subtotal.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                y += 4;
+                push(`<div class="row bold"><span>Subtotal:</span><span>$${sb.subtotal.toFixed(2)}</span></div>`);
                 const subBs = sb.subtotal * (tasaUSD || 1);
-                doc.setFontSize(7);
-                doc.setTextColor(...PAID_CLR);
-                doc.text(`Bs ${subBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
-                doc.setFontSize(8);
-                doc.setTextColor(...INK);
-                doc.setFont('helvetica', 'normal');
-                y += 5;
-                dash(y);
-                y += 5;
+                push(`<div class="right muted small">Bs ${subBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>`);
+                push(`<hr>`);
             });
         }
     } else {
-        // ═══ SINGLE CLIENT / LEGACY: original format ═══
-
         // PIÑAS
         if (hasPinas || seatHasPinas) {
             const pricePerPina = config?.pricePina || 0;
-            // Include seat-level piñas
             const seatPinas = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').length, 0);
             const totalPinas = pinaCount + seatPinas;
             const fullCost = round2(totalPinas * pricePerPina);
             const paidCost = round2(roundsOffset * pricePerPina);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text("Partidas (La Piña)", M, y);
-            y += 4;
-            doc.setFont('helvetica', 'normal');
-
-            doc.text(`${totalPinas} piña${totalPinas !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, M, y);
-            doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-            y += 4;
+            push(`<div class="bold">Partidas (La Piña)</div>`);
+            push(`<div class="row"><span>${totalPinas} piña${totalPinas !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}</span><span>$${fullCost.toFixed(2)}</span></div>`);
             const fullBs = config ? calculateTimeCostBs(fullCost, 'PINA', config, tasaUSD) : (fullCost * (tasaUSD || 1));
-            doc.setFontSize(7);
-            doc.setTextColor(...PAID_CLR);
-            doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
-            doc.setFontSize(8);
-            doc.setTextColor(...INK);
-            y += 5;
-
+            push(`<div class="right muted small">Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>`);
             if (roundsOffset > 0) {
-                doc.setTextColor(...PAID_CLR);
-                doc.text(`Pagado (${roundsOffset} piña${roundsOffset !== 1 ? 's' : ''})`, M, y);
-                doc.text(`-$${paidCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                doc.setTextColor(...INK);
-                y += 5;
+                push(`<div class="row muted"><span>Pagado (${roundsOffset} piña${roundsOffset !== 1 ? 's' : ''})</span><span>-$${paidCost.toFixed(2)}</span></div>`);
             }
-            y += 1;
         }
 
         // HORAS
@@ -335,90 +143,65 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
             const combinedHours = totalHours + seatHoursTotal;
             const fullCost = round2(combinedHours * pricePerHour);
             const paidCost = round2(hoursOffset * pricePerHour);
-
-            doc.setFont('helvetica', 'bold');
-            doc.text("Tiempo de Mesa", M, y);
-            y += 4;
-            doc.setFont('helvetica', 'normal');
-
-            doc.text(`${formatHoursPaid(combinedHours)} x $${pricePerHour.toFixed(2)}`, M, y);
-            doc.text(`$${fullCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-            y += 4;
+            push(`<div class="bold">Tiempo de Mesa</div>`);
+            push(`<div class="row"><span>${formatHoursPaid(combinedHours)} x $${pricePerHour.toFixed(2)}</span><span>$${fullCost.toFixed(2)}</span></div>`);
             const fullBs = config ? calculateTimeCostBs(fullCost, 'NORMAL', config, tasaUSD) : (fullCost * (tasaUSD || 1));
-            doc.setFontSize(7);
-            doc.setTextColor(...PAID_CLR);
-            doc.text(`Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
-            doc.setFontSize(8);
-            doc.setTextColor(...INK);
-            y += 5;
-
+            push(`<div class="right muted small">Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>`);
             if (hoursOffset > 0) {
-                doc.setTextColor(...PAID_CLR);
-                doc.text(`Pagado (${formatHoursPaid(hoursOffset)})`, M, y);
-                doc.text(`-$${paidCost.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                doc.setTextColor(...INK);
-                y += 5;
+                push(`<div class="row muted"><span>Pagado (${formatHoursPaid(hoursOffset)})</span><span>-$${paidCost.toFixed(2)}</span></div>`);
             }
-            y += 1;
         }
 
         // CONSUMO
         if (currentItems.length > 0) {
-            doc.setFont('helvetica', 'bold');
-            doc.text("Consumo Bar", M, y);
-            y += 5;
-
-            doc.setFont('helvetica', 'normal');
+            push(`<div class="bold">Consumo Bar</div>`);
             currentItems.forEach(i => {
-                doc.text(`${i.qty}x ${i.product_name.substring(0, 16)}`, M, y);
                 const t = i.qty * i.unit_price_usd;
-                doc.text(`$${t.toFixed(2)}`, RIGHT, y, { align: 'right' });
-                y += 4;
+                push(`<div class="row"><span>${i.qty}x ${i.product_name.substring(0, 16)}</span><span>$${t.toFixed(2)}</span></div>`);
                 const itemBs = t * (tasaUSD || 1);
-                doc.setFontSize(7);
-                doc.setTextColor(...PAID_CLR);
-                doc.text(`Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, RIGHT, y, { align: 'right' });
-                doc.setFontSize(8);
-                doc.setTextColor(...INK);
-                y += 5;
+                push(`<div class="right muted small">Bs ${itemBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>`);
             });
-            y += 2;
         }
     }
 
-    dash(y);
-    y += 6;
+    push(`<hr>`);
+    const totalLabel = hasPaidBefore ? "TOTAL PENDIENTE:" : "TOTAL ESTIMADO:";
+    push(`<div class="row total"><span>${totalLabel}</span><span>$${grandTotal.toFixed(2)}</span></div>`);
+    const bkdn = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
+    const refBs = config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, bkdn).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2);
+    push(`<div class="right small">Ref: BS. ${refBs}</div>`);
+    push(`<div class="center disclaimer">*** NO ES RECIBO DE PAGO ***</div>`);
 
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(hasPaidBefore ? "TOTAL PENDIENTE:" : "TOTAL ESTIMADO:", M, y);
-    doc.text(`$${grandTotal.toFixed(2)}`, RIGHT, y, { align: 'right' });
-    y += 6;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+@page { size: 58mm auto; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 58mm; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #212529; padding: 3mm; }
+.title { text-align: center; font-weight: bold; font-size: 12pt; }
+.subtitle { text-align: center; font-weight: bold; font-size: 9pt; margin-bottom: 2mm; }
+hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
+.row { display: flex; justify-content: space-between; line-height: 1.6; }
+.bold { font-weight: bold; }
+.small { font-size: 7pt; }
+.note { font-size: 7pt; }
+.muted { color: #787878; }
+.accent { color: #1d4e89; }
+.right { text-align: right; }
+.center { text-align: center; }
+.total { font-size: 10pt; font-weight: bold; margin-top: 1mm; }
+.disclaimer { margin-top: 3mm; font-size: 7pt; }
+</style></head><body>${lines.join('')}</body></html>`;
 
-    doc.setFontSize(8);
-    const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
-    doc.text(`Ref: BS. ${config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2)}`, RIGHT, y, { align: 'right' });
-
-    y += 8;
-    doc.setFont('helvetica', 'normal');
-    doc.text("*** NO ES RECIBO DE PAGO ***", CX, y, { align: 'center' });
-
-    // Print
-    doc.autoPrint();
-    const blobUrl = doc.output('bloburl');
+    // Imprimir via iframe HTML — el navegador respeta @page size
     const iframe = document.createElement('iframe');
     Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
-    iframe.src = blobUrl;
     document.body.appendChild(iframe);
-    iframe.onload = () => {
-        try {
-            const style = iframe.contentDocument.createElement('style');
-            style.textContent = '@page { margin: 0; } body { margin: 0; }';
-            iframe.contentDocument.head.appendChild(style);
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-        } catch (e) {
-            window.open(blobUrl, '_blank');
-        }
-    };
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    // Esperar a que renderice antes de imprimir
+    setTimeout(() => {
+        iframe.contentWindow.print();
+        setTimeout(() => iframe.remove(), 5000);
+    }, 300);
 }
