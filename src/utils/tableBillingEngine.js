@@ -260,7 +260,7 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
         );
     const sharedTimeTotal = sessionTimeCost.total;
     const sharedTotal = round2(sharedConsumptionTotal + sharedTimeTotal);
-    const activeCount = frozenDivisor || activeSeats.length;
+    const activeCount = (frozenDivisor !== null && frozenDivisor !== undefined && frozenDivisor > 0) ? frozenDivisor : activeSeats.length;
 
     const getSharedPortion = (seat) => {
         if (seat.paid) return 0;

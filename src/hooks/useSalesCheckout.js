@@ -6,7 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
-import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../utils/tableBillingEngine';
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -233,9 +233,15 @@ export function useSalesCheckout({
         const opts = {
             cart: syntheticCart,
             cartTotalUsd: tableCheckoutData.grandTotal,
-            cartTotalBs: seats.length > 0
-                ? round2(tableCheckoutData.grandTotal * effectiveRate)
-                : calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate),
+            cartTotalBs: (() => {
+                const cfg = useTablesStore.getState().config;
+                if (seats.length > 0) {
+                    const itf = tableCheckoutData.table?.type === 'NORMAL';
+                    const fb = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, cfg, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, itf);
+                    return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate)) : round2(tableCheckoutData.grandTotal * effectiveRate);
+                }
+                return calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate);
+            })(),
             cartSubtotalUsd: tableCheckoutData.grandTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
