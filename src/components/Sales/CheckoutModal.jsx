@@ -212,7 +212,18 @@ export default function CheckoutModal({
                             <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center shrink-0">
                                 <Layers size={13} className="text-white" />
                             </div>
-                            <p className="text-xs font-black text-orange-700 dark:text-orange-400">{tableContext.table.name}</p>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-orange-700 dark:text-orange-400">{tableContext.table.name}</p>
+                                {tableContext.seatId && (() => {
+                                    const seat = (tableContext.session?.seats || []).find(s => s.id === tableContext.seatId);
+                                    const allUnpaid = (tableContext.session?.seats || []).filter(s => !s.paid).length;
+                                    return (
+                                        <p className="text-[10px] text-orange-500 dark:text-orange-400/70 font-bold mt-0.5">
+                                            Cobro individual: {seat?.label || 'Persona'} · porción de {allUnpaid} persona{allUnpaid !== 1 ? 's' : ''}
+                                        </p>
+                                    );
+                                })()}
+                            </div>
                         </div>
                         <div className="divide-y divide-orange-100 dark:divide-orange-800/20">
                             {tableContext.timeCost > 0 && (
@@ -235,7 +246,11 @@ export default function CheckoutModal({
                                             </span>
                                         );
                                     })()}
-                                    <span className="text-xs font-black text-slate-700 dark:text-white">${tableContext.timeCost.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-slate-700 dark:text-white">
+                                        {splitPeople > 1 ? (
+                                            <><span className="text-slate-400 line-through mr-1">${tableContext.timeCost.toFixed(2)}</span>${divR(tableContext.timeCost, splitPeople).toFixed(2)}<span className="text-[9px] font-bold text-violet-500 ml-0.5">÷{splitPeople}</span></>
+                                        ) : `$${tableContext.timeCost.toFixed(2)}`}
+                                    </span>
                                 </div>
                             )}
                             {tableContext.currentItems?.map((item, i) => (
@@ -244,7 +259,15 @@ export default function CheckoutModal({
                                         <Coffee size={11} className="text-amber-400 shrink-0" />
                                         <span className="font-bold text-slate-600">{item.qty}x</span> {item.product_name || item.name}
                                     </span>
-                                    <span className="text-xs font-black text-slate-700 dark:text-white shrink-0">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {splitPeople > 1 && (
+                                            <span className="text-[10px] text-slate-400 line-through">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
+                                        )}
+                                        <span className="text-xs font-black text-slate-700 dark:text-white">
+                                            ${splitPeople > 1 ? divR(Number(item.unit_price_usd) * Number(item.qty), splitPeople).toFixed(2) : (Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}
+                                            {splitPeople > 1 && <span className="text-[9px] font-bold text-violet-500 ml-0.5">÷{splitPeople}</span>}
+                                        </span>
+                                    </div>
                                 </div>
                             ))}
                         </div>

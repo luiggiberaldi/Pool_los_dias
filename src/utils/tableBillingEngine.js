@@ -265,7 +265,7 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
             return activeCount > 0 ? round2(sharedTotal / activeCount) : 0;
         }
         if (sharedDivision.type === 'custom') {
-            return round2(sharedDivision.amounts?.[seat.id] || 0);
+            return round2(parseFloat(sharedDivision.amounts?.[seat.id]) || 0);
         }
         return activeCount > 0 ? round2(sharedTotal / activeCount) : 0;
     };

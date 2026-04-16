@@ -76,7 +76,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, sharedDivision, frozenActiveCount) : null;
     // H: Bloquear cobro si división manual no suma correctamente
     const customDivisionMismatch = seatBreakdown && sharedDivisionType === 'custom' &&
-        Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + v, 0) - seatBreakdown.sharedTotal) >= 0.01;
+        Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) - seatBreakdown.sharedTotal) >= 0.01;
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);

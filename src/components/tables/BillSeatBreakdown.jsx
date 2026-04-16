@@ -135,32 +135,71 @@ export function BillSeatBreakdown({
                     )}
                     {/* División manual: inputs por cliente */}
                     {sharedDivisionType === 'custom' && (
-                        <div className="px-4 py-3 space-y-2 border-t border-slate-200 dark:border-slate-700">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Asignar monto compartido</p>
-                            {seatBreakdown.seats.filter(s => !s.seat.paid).map(sb => (
-                                <div key={sb.seat.id} className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 w-24 truncate">{sb.seat.label || `Cliente`}</span>
-                                    <div className="flex-1 flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1">
-                                        <span className="text-slate-400 text-xs mr-1">$</span>
-                                        <input
-                                            type="number"
-                                            inputMode="decimal"
-                                            min="0"
-                                            step="0.01"
-                                            placeholder={(seatBreakdown.sharedPerSeat).toFixed(2)}
-                                            value={customSharedAmounts[sb.seat.id] ?? ''}
-                                            onChange={e => setCustomSharedAmounts(prev => ({ ...prev, [sb.seat.id]: parseFloat(e.target.value) || 0 }))}
-                                            className="flex-1 bg-transparent text-xs font-bold text-slate-700 dark:text-white outline-none"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                            <div className="flex justify-between text-[10px] text-slate-400 pt-1">
-                                <span>Total asignado</span>
-                                <span className={`font-bold ${Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + v, 0) - seatBreakdown.sharedTotal) < 0.01 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    ${Object.values(customSharedAmounts).reduce((s, v) => s + v, 0).toFixed(2)} / ${seatBreakdown.sharedTotal.toFixed(2)}
-                                </span>
+                        <div className="px-4 py-3 space-y-3 border-t border-slate-200 dark:border-slate-700">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-wider">Asignar monto</p>
+                                <button
+                                    onClick={() => {
+                                        const newAmounts = {};
+                                        seatBreakdown.seats.filter(s => !s.seat.paid).forEach(sb => {
+                                            newAmounts[sb.seat.id] = seatBreakdown.sharedPerSeat.toFixed(2);
+                                        });
+                                        setCustomSharedAmounts(newAmounts);
+                                    }}
+                                    className="text-[10px] font-bold text-violet-500 hover:text-violet-600 px-2.5 py-1 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 rounded-lg transition-all active:scale-95"
+                                >
+                                    Repartir igual
+                                </button>
                             </div>
+                            {seatBreakdown.seats.filter(s => !s.seat.paid).map(sb => {
+                                const rawVal = customSharedAmounts[sb.seat.id] ?? '';
+                                const numVal = parseFloat(rawVal) || 0;
+                                return (
+                                    <div key={sb.seat.id} className="flex items-center gap-2.5">
+                                        <div className="flex items-center gap-1.5 w-20 shrink-0">
+                                            <div className="w-6 h-6 rounded-full bg-sky-500 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+                                                {(sb.seat.label || 'C').charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{sb.seat.label || 'Cliente'}</span>
+                                        </div>
+                                        <div className={`flex-1 flex items-center rounded-xl border-2 px-3 py-2 transition-all ${numVal > 0 ? 'border-sky-400 bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'}`}>
+                                            <span className="text-slate-400 text-xs font-bold mr-1">$</span>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                placeholder={seatBreakdown.sharedPerSeat.toFixed(2)}
+                                                value={rawVal}
+                                                onChange={e => {
+                                                    const v = e.target.value.replace(',', '.');
+                                                    if (!/^[0-9.]*$/.test(v)) return;
+                                                    const dots = (v.match(/\./g) || []).length;
+                                                    if (dots > 1) return;
+                                                    setCustomSharedAmounts(prev => ({ ...prev, [sb.seat.id]: v }));
+                                                }}
+                                                onBlur={e => {
+                                                    const parsed = parseFloat(e.target.value);
+                                                    if (!isNaN(parsed)) setCustomSharedAmounts(prev => ({ ...prev, [sb.seat.id]: parsed.toFixed(2) }));
+                                                    else setCustomSharedAmounts(prev => ({ ...prev, [sb.seat.id]: '' }));
+                                                }}
+                                                className="flex-1 bg-transparent text-sm font-black text-slate-700 dark:text-white outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {/* Estado de asignación */}
+                            {(() => {
+                                const assigned = Object.values(customSharedAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+                                const remaining = seatBreakdown.sharedTotal - assigned;
+                                const isMatch = Math.abs(remaining) < 0.01;
+                                const isOver = remaining < -0.01;
+                                return (
+                                    <div className={`flex justify-between items-center text-xs font-bold px-3 py-2.5 rounded-xl ${isMatch ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600' : isOver ? 'bg-red-50 dark:bg-red-950/20 text-red-500' : 'bg-amber-50 dark:bg-amber-950/20 text-amber-600'}`}>
+                                        <span>{isMatch ? '✓ Completo' : isOver ? '⚠ Excede el total' : `Falta asignar`}</span>
+                                        <span className="font-black text-sm">{isMatch ? `$${seatBreakdown.sharedTotal.toFixed(2)}` : isOver ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`}</span>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
                     {sharedDivisionType === 'equal' && (
