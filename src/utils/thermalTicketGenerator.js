@@ -32,7 +32,7 @@ function _printThermalHTML(sale, bcvRate) {
     // ── CONFIGURACIÓN DE TAMAÑOS (58mm) ──
     // Usa 58mm auto — el navegador calcula el largo automáticamente.
     const cssPageSize = '58mm auto';
-    const cssBodyWidth = '54mm';
+    const cssBodyWidth = '48mm';
     const cssLogoW = '44mm';
     const fDisclaimer = '7.5px';
     const fTiny = '9px';     // Secundaria (detalles, RIF, c/u)
@@ -121,7 +121,7 @@ function _printThermalHTML(sale, bcvRate) {
         width: ${cssBodyWidth};
         max-width: ${cssBodyWidth};
         margin: 0 auto;
-        padding: 2mm 0mm;
+        padding: 4mm 2mm;
         color: #000;
         background: #fff;
         -webkit-print-color-adjust: exact;
@@ -149,7 +149,7 @@ function _printThermalHTML(sale, bcvRate) {
     }
     table { width: 100%; border-collapse: collapse; }
     @media print {
-        body { width: 54mm; max-width: 54mm; }
+        body { width: ${cssBodyWidth}; max-width: ${cssBodyWidth}; }
     }
     @media screen {
         body {
