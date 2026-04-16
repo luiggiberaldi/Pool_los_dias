@@ -1,31 +1,32 @@
 import { formatBs, capitalizeName } from './calculatorUtils';
 import { printReceiptEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
+import { showToast } from '../components/Toast';
 
 /**
  * Imprime un ticket de venta.
- * - Impresora del sistema (inkjet/laser): va directo a window.print()
+ * - Impresora del sistema: va directo a window.print()
  * - Impresora térmica configurada: ESC/POS directo, sin diálogo
- * - Sin configuración: intenta ESC/POS y si falla usa window.print()
  */
 export async function printThermalTicket(sale, bcvRate) {
     const cfg = getWebSerialConfig();
 
-    // Impresora del sistema → ir directo a window.print()
+    // Impresora del sistema → diálogo del sistema
     if (cfg.printerType === 'system') {
         _printThermalHTML(sale, bcvRate);
         return;
     }
 
-    // Impresora térmica → intentar ESC/POS
+    // Impresora térmica → ESC/POS directo
     try {
         const printed = await printReceiptEscPos(sale, bcvRate);
         if (printed) return;
+        // printReceiptEscPos retornó false → no hay puerto autorizado
+        showToast('Sin impresora conectada. Ve a Configuración → Impresora y pulsa Detectar.', 'error');
     } catch (err) {
-        console.warn('[Ticket] ESC/POS falló, usando fallback HTML:', err.message);
+        // Mostrar el error real al usuario en lugar de fallar silenciosamente
+        showToast(`Error de impresora: ${err.message}`, 'error');
+        console.error('[Ticket] ESC/POS error:', err);
     }
-
-    // Fallback: HTML + window.print()
-    _printThermalHTML(sale, bcvRate);
 }
 
 function _printThermalHTML(sale, bcvRate) {

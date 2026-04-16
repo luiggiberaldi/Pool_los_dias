@@ -153,33 +153,36 @@ export async function detectAndAutoConfig() {
 // ── ESC/POS commands ──────────────────────────────────────────────────────────
 
 export async function sendEscPosCommand(commandArray) {
+    // Recuperar puerto activo
     if (!activePort) {
         const port = await getConnectedPrinter();
         if (!port) throw new Error('No hay impresora conectada. Ve a Configuración → Impresora y pulsa "Detectar".');
     }
 
     const cfg = getWebSerialConfig();
+    const baud = cfg.baudRate || 9600;
 
-    // Helper: abrir, escribir y cerrar para asegurar flush completo
     const writeToPort = async (port) => {
-        const needsOpen = !port.writable;
-        if (needsOpen) {
-            await port.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
+        // Asegurar puerto abierto
+        if (!port.writable) {
+            await port.open({ baudRate: baud, bufferSize: 8192 });
         }
 
         const writer = port.writable.getWriter();
         const data = new Uint8Array(commandArray);
-        await writer.write(data);
-        writer.releaseLock();
+        try {
+            await writer.write(data);
+            // Esperar a que el stream confirme el flush antes de cerrar
+            await writer.ready;
+        } finally {
+            writer.releaseLock();
+        }
 
-        // Cerrar y reabrir fuerza flush del buffer USB al dispositivo
-        try {
-            await port.close();
-        } catch (_) {}
-        // Reabrir para mantener el puerto listo para el siguiente comando
-        try {
-            await port.open({ baudRate: cfg.baudRate || 9600, bufferSize: 4096 });
-        } catch (_) {}
+        // Pequeña espera para que el adaptador USB-serial vacíe su buffer UART
+        await new Promise(r => setTimeout(r, 150));
+
+        // Cerrar para liberar el puerto limpiamente
+        try { await port.close(); } catch (_) {}
 
         return true;
     };
@@ -187,17 +190,14 @@ export async function sendEscPosCommand(commandArray) {
     try {
         return await writeToPort(activePort);
     } catch (err) {
-        // Si el puerto estaba en estado roto, intentar reconectar
-        if (err.message?.includes('already') || err.message?.includes('closed') || err.message?.includes('lost') || err.message?.includes('failed')) {
-            try { await activePort.close(); } catch (_) {}
-            try {
-                return await writeToPort(activePort);
-            } catch (retryErr) {
-                console.error('Web Serial Retry Error:', retryErr);
-            }
+        // Puerto en estado roto → forzar cierre y reintentar una vez
+        try { await activePort.close(); } catch (_) {}
+        await new Promise(r => setTimeout(r, 200));
+        try {
+            return await writeToPort(activePort);
+        } catch (retryErr) {
+            throw new Error(`Error de impresión: ${retryErr.message}. Intenta cambiar el Baud Rate en Ajustes avanzados.`);
         }
-        console.error('Web Serial Error:', err);
-        throw new Error(`Error de impresión: ${err.message}`);
     }
 }
 
