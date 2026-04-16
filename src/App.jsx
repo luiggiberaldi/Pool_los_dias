@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from 'react';
-import { Home, ShoppingCart, Store, Users, Download, FlaskConical, Moon, Sun, BarChart3, WifiOff, X, Settings, Layers } from 'lucide-react';
+import { Home, ShoppingCart, Store, Users, Download, FlaskConical, BarChart3, WifiOff, X, Settings, Layers } from 'lucide-react';
 
 import SalesView from './views/SalesView';
 import DashboardView from './views/DashboardView';
@@ -34,11 +34,9 @@ import { AnyStaffRoute, CashierRoute, AdminRoute } from './components/security/G
 import { useAutoLock } from './hooks/useAutoLock';
 import { purgeOldEntries } from './services/auditService';
 import { useCloudSync } from './hooks/useCloudSync';
-import { supabaseCloud } from './config/supabaseCloud';
 import { useConfirm } from './hooks/useConfirm.jsx';
-import { useTablesStore } from './hooks/store/useTablesStore';
-import { useOrdersStore } from './hooks/store/useOrdersStore';
-import { useCashStore } from './hooks/store/cashStore';
+import { useAppInit } from './hooks/useAppInit';
+import { useInstallPrompt } from './hooks/useInstallPrompt';
 
 // Nombre del negocio fijo para todos los dispositivos (module-level, runs once on import)
 if (!localStorage.getItem('business_name')) {
@@ -47,170 +45,21 @@ if (!localStorage.getItem('business_name')) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('inicio');
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [showIOSInstall, setShowIOSInstall] = useState(false);
 
   // Inicializar Sincronización Realtime con Supabase
   useCloudSync();
 
-  // Detectar iOS Safari (no standalone) para mostrar instrucciones manuales
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  const showIOSButton = isIOS && !isStandalone && !localStorage.getItem('ios_install_dismissed');
+  // Cloud Auth Session + Realtime Subscriptions
+  const { cloudSession, checkingSession, showPasswordRecovery, setShowPasswordRecovery, setCloudSession } = useAppInit();
+
+  // PWA Install Prompt
+  const { installPrompt, showIOSInstall, setShowIOSInstall, showIOSButton, handleInstall, dismissIOSInstall } = useInstallPrompt();
 
   // Admin Panel States
   const [adminClicks, setAdminClicks] = useState(0);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showTester, setShowTester] = useState(false);
-  
-  // Cloud Auth Session State
-  const [cloudSession, setCloudSession] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
 
-  // ── Suscripción Realtime Global (activa en TODAS las pantallas) ──────────
-  const subscribeToTablesRealtime = useTablesStore(s => s.subscribeToRealtime);
-  const subscribeToOrdersRealtime = useOrdersStore(s => s.subscribeToRealtime);
-  const unsubscribeFromTablesRealtime = useTablesStore(s => s.unsubscribeFromRealtime);
-  const unsubscribeFromOrdersRealtime = useOrdersStore(s => s.unsubscribeFromRealtime);
-  const syncTablesAndSessionsGlobal = useTablesStore(s => s.syncTablesAndSessions);
-
-  useEffect(() => {
-    if (!cloudSession) return;
-    // Sync inicial + suscripciones activas para TODAS las vistas
-    syncTablesAndSessionsGlobal();
-    subscribeToTablesRealtime();
-    subscribeToOrdersRealtime();
-    return () => {
-      unsubscribeFromTablesRealtime();
-      unsubscribeFromOrdersRealtime();
-    };
-  }, [cloudSession, syncTablesAndSessionsGlobal, subscribeToTablesRealtime, subscribeToOrdersRealtime, unsubscribeFromTablesRealtime, unsubscribeFromOrdersRealtime]);
-
-  // ── Sesión Supabase + límite de dispositivos vía RPC ─────────────────────
-  useEffect(() => {
-    let mounted = true;
-
-    const applySession = async (session) => {
-      if (!mounted) return;
-
-      if (!session?.user?.email) {
-        // Sin sesión cloud → limpiar email de cuenta
-        setCloudEmail(null);
-        // Offline: si hay usuarios cacheados, ir directo al PIN screen.
-        // Los cachedUsers solo existen si alguien hizo login cloud antes.
-        if (!navigator.onLine) {
-          try {
-            const { default: lf } = await import('localforage');
-            const email = localStorage.getItem('poolbar_cloud_email') || '';
-            const cacheKey = email ? `poolbar_users_cache_${email}` : 'poolbar_users_cache';
-            const users = await lf.getItem(cacheKey);
-            if (Array.isArray(users) && users.length > 0) {
-              setCloudSession({ offline: true });
-              setCheckingSession(false);
-              return;
-            }
-          } catch { /* sin caché → pide login */ }
-        }
-        setCloudSession(null);
-        setCheckingSession(false);
-        return;
-      }
-
-      const email = session.user.email.toLowerCase();
-      setCloudEmail(email);
-
-      // Reinicializar stores con las claves scopeadas de esta cuenta
-      useCashStore.getState().init();
-      useTablesStore.getState().init();
-      useOrdersStore.getState().init();
-      const deviceId = localStorage.getItem('pda_device_id') || 'UNKNOWN';
-
-      try {
-        const savedAlias = localStorage.getItem('pda_device_alias');
-        const defaultAlias = `Dispositivo ${navigator.platform || 'Web'}`;
-        const finalAlias = savedAlias && savedAlias.trim() !== '' ? savedAlias.trim() : defaultAlias;
-
-        const isExplicitLogin = localStorage.getItem('pda_explicit_login') === 'true';
-
-        // Si el login NO es explícito (es un auto-login normal),
-        // checamos si este dispositivo ya fue expulsado.
-        if (!isExplicitLogin) {
-            const { data: existingDevice, error: selectErr } = await supabaseCloud
-               .from('account_devices')
-               .select('id')
-               .eq('device_id', deviceId)
-               .eq('email', email)
-               .maybeSingle();
-
-            // Tumbamos la sesión SOLO si la conexión funcionó (sin errores) y NO se encontró el dispositivo
-            if (!selectErr && existingDevice === null) {
-                // Fue expulsado o no existe. Tumbamos sesión.
-                await supabaseCloud.auth.signOut();
-                if (mounted) { setCloudSession(null); setCheckingSession(false); }
-                return;
-            }
-        } else {
-            localStorage.removeItem('pda_explicit_login');
-        }
-
-        const { data: result, error } = await supabaseCloud.rpc('register_and_check_device', {
-          p_email: email,
-          p_device_id: deviceId,
-          p_device_alias: finalAlias,
-        });
-
-        if (!error) {
-          if (result === 'license_inactive' || result === 'license_expired') {
-            await supabaseCloud.auth.signOut();
-            if (mounted) { setCloudSession(null); setCheckingSession(false); }
-            return;
-          }
-        }
-        // Si la RPC no existe aún (error), deja pasar sin bloquear
-      } catch {
-        // Sin conexión o RPC pendiente — dejar pasar
-      }
-
-      if (mounted) {
-        localStorage.setItem('pool_had_cloud_session', 'true');
-        setCloudSession(session);
-        setCheckingSession(false);
-      }
-    };
-
-    supabaseCloud.auth.getSession().then(({ data: { session } }) => {
-      applySession(session);
-    });
-
-    const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-      if (event === 'PASSWORD_RECOVERY') {
-        setShowPasswordRecovery(true);
-        setCheckingSession(false);
-      } else if (event === 'SIGNED_IN') applySession(session);
-      else if (event === 'SIGNED_OUT') {
-        // Limpiar caché de usuarios para evitar cruce entre cuentas
-        clearUsersCache();
-        // Pasar por applySession para que el fallback offline funcione también acá.
-        // Si estamos online y fue un logout explícito → applySession(null) mostrará CloudAuthModal.
-        // Si estamos offline y fue un fallo de refresh → applySession(null) mostrará el PIN screen.
-        if (navigator.onLine) {
-          localStorage.removeItem('pool_had_cloud_session');
-          setCloudSession(null);
-          setCheckingSession(false);
-        } else {
-          applySession(null);
-        }
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-  
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const { rates } = useRates();
@@ -224,19 +73,6 @@ export default function App() {
 
   // Cache rates whenever they update
   useEffect(() => { if (rates) cacheRates(rates); }, [rates, cacheRates]);
-
-  useEffect(() => {
-    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  const handleInstall = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') setInstallPrompt(null);
-  };
 
   // Theme
   const [theme, setTheme] = useState(() => {
@@ -313,8 +149,6 @@ export default function App() {
 
   // === Auth Local via PIN ===
   const { isAuthenticated, role } = useAuthStore();
-  const clearUsersCache = useAuthStore(s => s.clearUsersCache);
-  const setCloudEmail = useAuthStore(s => s.setCloudEmail);
 
   // ── T&C — el tour no debe dispararse hasta que el usuario acepte ───────────
   const [termsAccepted, setTermsAccepted] = useState(
@@ -566,7 +400,7 @@ export default function App() {
                 <h3 className="text-lg font-black text-slate-800 dark:text-white">Instalar App</h3>
                 <p className="text-xs text-slate-400 mt-1">Sigue estos pasos en Safari</p>
               </div>
-              <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500">
+              <button onClick={dismissIOSInstall} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500">
                 <X size={18} />
               </button>
             </div>
@@ -584,7 +418,7 @@ export default function App() {
                 <p className="text-sm text-slate-600 dark:text-slate-300">¡Pool Los Diaz! La app aparecerá como un ícono en tu teléfono</p>
               </div>
             </div>
-            <button onClick={() => { setShowIOSInstall(false); localStorage.setItem('ios_install_dismissed', '1'); }} className="w-full mt-6 py-3 bg-brand text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
+            <button onClick={dismissIOSInstall} className="w-full mt-6 py-3 bg-brand text-white font-bold rounded-xl shadow-lg active:scale-95 transition-transform">
               Entendido
             </button>
           </div>

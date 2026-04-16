@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { X, Receipt, Zap, ArrowLeftRight, AlertTriangle, Clock, Coffee, Layers, Users } from 'lucide-react';
+import { X, Receipt, Zap, Clock, Coffee, Layers, Users } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { PAYMENT_ICONS, ICON_COMPONENTS } from '../../config/paymentMethods';
-import { mulR, subR, divR } from '../../utils/dinero';
+import { divR } from '../../utils/dinero';
 import { useCheckoutPayments, EPSILON } from '../../hooks/useCheckoutPayments';
 import CustomerPickerSection from './CustomerPickerSection';
+import CheckoutChangeBreakdown from './CheckoutChangeBreakdown';
+import { FiarConfirmModal, OverpayAlertModal } from './CheckoutConfirmModals';
 import SpotlightTour from '../SpotlightTour';
 
 const CHECKOUT_TOUR_KEY = 'pda_checkout_tour_done';
@@ -394,95 +396,15 @@ export default function CheckoutModal({
                 )}
 
                 {/* -- BANNER VUELTO / RESTANTE -- */}
-                <div data-tour="checkout-remaining" className="px-3 py-2">
-                    <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
-                        ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
-                        : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
-                        }`}>
-                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                            {isPaid ? 'Vuelto' : 'Resta por Cobrar'}
-                        </p>
-                        <div className="flex items-end justify-between md:flex-col md:items-start md:gap-0.5">
-                            <span className={`text-2xl font-black ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                                ${isPaid ? changeUsd.toFixed(2) : remainingUsd.toFixed(2)}
-                            </span>
-                            <div className="flex flex-col text-right md:text-left">
-                                <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                                    Bs {formatBs(isPaid ? changeBs : remainingBs)}
-                                </span>
-                                {copEnabled && (
-                                    <span className={`text-sm font-bold ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                                        COP {isPaid ? (changeUsd * (tasaCop || 0)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (remainingUsd * (tasaCop || 0)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* DESGLOSE DE VUELTO */}
-                        {isPaid && changeUsd >= EPSILON && (
-                            <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800 space-y-2">
-                                <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-                                    <ArrowLeftRight size={10} /> Desglosar vuelto
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="number" inputMode="decimal" placeholder="0.00"
-                                            value={changeUsdGiven}
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                const usd = Math.min(Math.max(0, parseFloat(v) || 0), changeUsd);
-                                                setChangeUsdGiven(v);
-                                                setChangeBsGiven(Math.max(0, mulR(subR(changeUsd, usd), effectiveRate)).toFixed(0));
-                                            }}
-                                            className="w-full py-2 px-3 pr-10 rounded-lg border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                        />
-                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1 py-0.5 rounded">USD</span>
-                                    </div>
-                                    <span className="text-slate-400 font-black text-xs shrink-0">+</span>
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="number" inputMode="decimal" placeholder="0"
-                                            value={changeBsGiven}
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                const bsTotal = mulR(changeUsd, effectiveRate);
-                                                const bs = Math.min(Math.max(0, parseFloat(v) || 0), bsTotal);
-                                                setChangeBsGiven(v);
-                                                setChangeUsdGiven(Math.max(0, subR(changeUsd, divR(bs, effectiveRate))).toFixed(2));
-                                            }}
-                                            className="w-full py-2 px-3 pr-8 rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
-                                        />
-                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 rounded">Bs</span>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => { setChangeUsdGiven(changeUsd.toFixed(2)); setChangeBsGiven('0'); }}
-                                        className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 active:scale-95 transition-all border border-emerald-200 dark:border-emerald-800">
-                                        Todo $
-                                    </button>
-                                    <button onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven(mulR(changeUsd, effectiveRate).toFixed(0)); }}
-                                        className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:scale-95 transition-all border border-blue-200 dark:border-blue-800">
-                                        Todo Bs
-                                    </button>
-                                </div>
-                                {(parseFloat(changeUsdGiven) > currentFloatUsd + 0.05 || parseFloat(changeBsGiven) > currentFloatBs + 1) && (
-                                    <div className="mt-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 flex items-start gap-1.5">
-                                        <AlertTriangle size={12} className="text-orange-500 shrink-0 mt-0.5" />
-                                        <div className="flex-1">
-                                            <p className="text-[10px] font-bold text-orange-600 dark:text-orange-400 leading-tight">
-                                                Precaución: El vuelto excede el fondo de caja registrado.
-                                            </p>
-                                            <p className="text-[9px] font-medium text-orange-500 leading-tight mt-0.5">
-                                                Fondo actual: <span className="font-bold ml-1">${currentFloatUsd.toFixed(2)}</span> y <span className="font-bold ml-1">Bs {formatBs(currentFloatBs)}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <CheckoutChangeBreakdown
+                    isPaid={isPaid} changeUsd={changeUsd} changeBs={changeBs}
+                    remainingUsd={remainingUsd} remainingBs={remainingBs}
+                    copEnabled={copEnabled} tasaCop={tasaCop}
+                    changeUsdGiven={changeUsdGiven} setChangeUsdGiven={setChangeUsdGiven}
+                    changeBsGiven={changeBsGiven} setChangeBsGiven={setChangeBsGiven}
+                    effectiveRate={effectiveRate}
+                    currentFloatUsd={currentFloatUsd} currentFloatBs={currentFloatBs}
+                />
 
                 {/* -- CLIENTE -- */}
                 <CustomerPickerSection
@@ -528,137 +450,18 @@ export default function CheckoutModal({
                 </button>
             </div>
 
-            {/* --- MODAL CONFIRMACIÓN FIAR --- */}
-            {confirmFiar && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setConfirmFiar(false)}>
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm md:max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-4 mb-5">
-                            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center shrink-0">
-                                <AlertTriangle size={24} className="text-amber-600 sm:w-7 sm:h-7" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white">Confirmar Fiado</h3>
-                                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">Revisa los detalles antes de continuar</p>
-                            </div>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-2xl p-4 sm:p-5 mb-5">
-                            <div className="text-center mb-3">
-                                <p className="text-[11px] sm:text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Monto a fiar</p>
-                                <p className="text-3xl sm:text-4xl font-black text-amber-600">${remainingUsd.toFixed(2)}</p>
-                                <p className="text-sm sm:text-base font-bold text-amber-500/70 mt-0.5">{formatBs(remainingBs)} Bs</p>
-                            </div>
-                            <div className="border-t border-amber-200/50 dark:border-amber-800/20 pt-3 space-y-2">
-                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
-                                    Se registrara como deuda a nombre de <span className="font-black text-slate-800 dark:text-white">{selectedCustomer?.name}</span>.
-                                </p>
-                                {totalPaidUsd > EPSILON && (
-                                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-                                        El cliente abona <span className="font-bold text-emerald-600">${totalPaidUsd.toFixed(2)}</span> ahora y el restante queda pendiente.
-                                    </p>
-                                )}
-                                {totalPaidUsd <= EPSILON && (
-                                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-                                        El monto total de la venta quedara como deuda del cliente.
-                                    </p>
-                                )}
-                                {selectedCustomer && (selectedCustomer.deuda || 0) > EPSILON && (
-                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-2.5 mt-2">
-                                        <p className="text-[11px] sm:text-xs font-bold text-red-600 dark:text-red-400">
-                                            Este cliente ya tiene una deuda de ${(selectedCustomer.deuda || 0).toFixed(2)}. La deuda total pasara a ser ${((selectedCustomer.deuda || 0) + remainingUsd).toFixed(2)}.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => setConfirmFiar(false)}
-                                className="flex-1 py-3.5 sm:py-4 font-bold text-sm sm:text-base text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all">
-                                Cancelar
-                            </button>
-                            <button onClick={() => { setConfirmFiar(false); handleConfirm(); }}
-                                className="flex-1 py-3.5 sm:py-4 font-black text-sm sm:text-base text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition-all">
-                                Confirmar fiado
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- MODAL ALERTA PAGO SOSPECHOSO --- */}
-            {overpayAlertData && (() => {
-                const d = overpayAlertData;
-                const isCurrency = d.type === 'currency';
-                const isRound    = d.type === 'round';
-
-                const title    = isCurrency ? '¿Te equivocaste de campo?' : isRound ? '¿Número por error?' : '¿Monto correcto?';
-                const subtitle = isCurrency
-                    ? `Parece que ingresaste bolívares en el campo de ${d.methodLabel}`
-                    : isRound
-                    ? 'El monto parece un número redondeado por error'
-                    : `El pago es ${d.ratio}× el total de la compra`;
-
-                return (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setOverpayAlertData(null)}>
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-sm md:max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center gap-4 mb-5">
-                                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center shrink-0">
-                                    <AlertTriangle size={24} className="text-red-600 sm:w-7 sm:h-7" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg sm:text-xl font-black text-slate-800 dark:text-white">{title}</h3>
-                                    <p className="text-xs sm:text-sm text-slate-400 mt-0.5">{subtitle}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-2xl p-4 sm:p-5 mb-5 space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-500 dark:text-slate-400">Total de la compra</span>
-                                    <span className="text-base font-black text-slate-800 dark:text-white">${cartTotalUsd.toFixed(2)}</span>
-                                </div>
-                                {isCurrency && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-500 dark:text-slate-400">Total en Bs</span>
-                                        <span className="text-base font-black text-slate-800 dark:text-white">{formatBs(d.expectedBs)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-slate-500 dark:text-slate-400">Monto ingresado</span>
-                                    <span className="text-base font-black text-red-600">
-                                        {isCurrency ? formatBs(d.enteredAmount) : `$${totalPaidUsd.toFixed(2)}`}
-                                    </span>
-                                </div>
-                                <div className="border-t border-red-200/50 dark:border-red-800/20 pt-3">
-                                    {isCurrency ? (
-                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">
-                                            Ingresaste <span className="font-black text-red-600">{formatBs(d.enteredAmount)}</span> en el campo de dólares.
-                                            El total en Bs sería <span className="font-black text-slate-800 dark:text-white">{formatBs(d.expectedBs)}</span>.
-                                        </p>
-                                    ) : isRound ? (
-                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">
-                                            ¿Seguro que el cliente pagó <span className="font-black text-red-600">${totalPaidUsd.toFixed(2)}</span> por una compra de <span className="font-black text-slate-800 dark:text-white">${cartTotalUsd.toFixed(2)}</span>?
-                                        </p>
-                                    ) : (
-                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">
-                                            ¿Seguro que el cliente pagó <span className="font-black text-red-600">${totalPaidUsd.toFixed(2)}</span> por una compra de <span className="font-black text-slate-800 dark:text-white">${cartTotalUsd.toFixed(2)}</span>?
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button onClick={() => setOverpayAlertData(null)}
-                                    className="flex-1 py-3.5 sm:py-4 font-bold text-sm sm:text-base text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all">
-                                    Corregir monto
-                                </button>
-                                <button onClick={confirmOverpay}
-                                    className="flex-1 py-3.5 sm:py-4 font-black text-sm sm:text-base text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg shadow-red-500/25 active:scale-95 transition-all">
-                                    Sí, confirmar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
+            {/* --- MODALES DE CONFIRMACIÓN --- */}
+            <FiarConfirmModal
+                confirmFiar={confirmFiar} setConfirmFiar={setConfirmFiar}
+                remainingUsd={remainingUsd} remainingBs={remainingBs}
+                selectedCustomer={selectedCustomer} totalPaidUsd={totalPaidUsd}
+                handleConfirm={handleConfirm}
+            />
+            <OverpayAlertModal
+                overpayAlertData={overpayAlertData} setOverpayAlertData={setOverpayAlertData}
+                confirmOverpay={confirmOverpay} cartTotalUsd={cartTotalUsd}
+                totalPaidUsd={totalPaidUsd}
+            />
         </div>
         </>
     );
