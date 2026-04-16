@@ -191,17 +191,31 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
 .disclaimer { margin-top: 3mm; font-size: 7pt; }
 </style></head><body>${lines.join('')}</body></html>`;
 
-    // Imprimir via iframe HTML — el navegador respeta @page size
-    const iframe = document.createElement('iframe');
-    Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
-    document.body.appendChild(iframe);
-    iframe.contentDocument.open();
-    iframe.contentDocument.write(html);
-    iframe.contentDocument.close();
-    iframe.contentWindow.focus();
-    // Esperar a que renderice antes de imprimir
+    // Imprimir via window.open — mismo método que el ticket de venta
+    // (Chrome respeta @page size en ventanas nuevas, no en iframes)
+    const printWindow = window.open('', '_blank', 'width=350,height=600');
+    if (!printWindow) {
+        // Fallback: iframe oculto
+        const iframe = document.createElement('iframe');
+        Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+        document.body.appendChild(iframe);
+        iframe.contentDocument.open();
+        iframe.contentDocument.write(html);
+        iframe.contentDocument.close();
+        setTimeout(() => {
+            iframe.contentWindow.print();
+            setTimeout(() => iframe.remove(), 5000);
+        }, 300);
+        return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+        setTimeout(() => printWindow.print(), 400);
+    };
     setTimeout(() => {
-        iframe.contentWindow.print();
-        setTimeout(() => iframe.remove(), 5000);
-    }, 300);
+        try { printWindow.print(); } catch(_) {}
+    }, 1500);
 }
