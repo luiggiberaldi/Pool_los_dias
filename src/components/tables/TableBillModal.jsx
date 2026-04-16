@@ -80,9 +80,10 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
         Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) - seatBreakdown.sharedTotal) >= 0.01;
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
-    const breakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
+    const zeroBreakdown = { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
+    const breakdown = isTimeFree ? zeroBreakdown : calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
     // Full breakdown (sin offsets) para mostrar totales completos
-    const fullBreakdown = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
+    const fullBreakdown = isTimeFree ? zeroBreakdown : calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
     const isMixed = fullBreakdown.hasPinas && fullBreakdown.hasHours;
 
     const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown);
