@@ -228,9 +228,9 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     p.newline();
 
     const d = new Date();
-    p.bold(false).align(0).text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`).newline();
+    p.bold(true).align(0).text(`Fecha: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`).newline();
     if (session?.client_name) {
-        p.bold(true).text(`Cliente: ${session.client_name}`).bold(false).newline();
+        p.bold(true).text(`Cliente: ${session.client_name}`).bold(true).newline();
     }
     if (session?.notes) {
         p.text(`Nota: ${session.notes.substring(0, W - 6)}`).newline();
@@ -254,7 +254,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
         if (breakdown) {
             // Shared section
             if (breakdown.sharedTotal > 0) {
-                p.bold(true).text('--- COMPARTIDO ---').bold(false).newline();
+                p.bold(true).text('--- COMPARTIDO ---').bold(true).newline();
 
                 if (hasPinas) {
                     const pp = config?.pricePina || 0;
@@ -280,7 +280,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
             // Per-seat sections
             breakdown.seats.forEach((sb) => {
                 const label = sb.seat.label || `Cliente ${seats.indexOf(sb.seat) + 1}`;
-                p.bold(true).text(`--- ${label.toUpperCase()} ---`).bold(false).newline();
+                p.bold(true).text(`--- ${label.toUpperCase()} ---`).bold(true).newline();
 
                 if (sb.seat.paid) {
                     p.text('** PAGADO **').newline();
@@ -311,7 +311,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
                     p.row('Parte compartida', `$${sb.sharedPortion.toFixed(2)}`, W);
                 }
 
-                p.bold(true).row('Subtotal:', `$${sb.subtotal.toFixed(2)}`, W).bold(false);
+                p.bold(true).row('Subtotal:', `$${sb.subtotal.toFixed(2)}`, W).bold(true);
                 const subBs = sb.subtotal * (tasaUSD || 1);
                 p.row('', `Bs ${subBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
                 p.line('-', W);
@@ -329,7 +329,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
             const fullCost = round2(totalPinas * pricePerPina);
             const paidCost = round2(roundsOffset * pricePerPina);
 
-            p.bold(true).text('Partidas (La Pina)').newline().bold(false);
+            p.bold(true).text('Partidas (La Pina)').newline().bold(true);
             p.row(`${totalPinas} pina${totalPinas !== 1 ? 's' : ''} x $${pricePerPina.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
             const fullBs = calculateTimeCostBs(fullCost, 'PINA', config || {}, tasaUSD);
             p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
@@ -347,7 +347,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
             const fullCost = round2(combinedHours * pricePerHour);
             const paidCost = round2(hoursOffset * pricePerHour);
 
-            p.bold(true).text('Tiempo de Mesa').newline().bold(false);
+            p.bold(true).text('Tiempo de Mesa').newline().bold(true);
             p.row(`${formatHoursPaid(combinedHours)} x $${pricePerHour.toFixed(2)}`, `$${fullCost.toFixed(2)}`, W);
             const fullBs = calculateTimeCostBs(fullCost, 'NORMAL', config || {}, tasaUSD);
             p.row('', `Bs ${fullBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W);
@@ -359,7 +359,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
         }
 
         if (currentItems && currentItems.length > 0) {
-            p.bold(true).text('Consumo Bar').newline().bold(false);
+            p.bold(true).text('Consumo Bar').newline().bold(true);
             currentItems.forEach(i => {
                 const t = i.qty * i.unit_price_usd;
                 const name = (i.product_name || '').substring(0, Math.floor(W * 0.55));
@@ -374,7 +374,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
     p.line('=', W);
     p.align(1).bold(true).text(hasPaidBefore ? 'TOTAL PENDIENTE:' : 'TOTAL ESTIMADO:').newline();
     p.text(`$${grandTotal.toFixed(2)}`).newline();
-    p.bold(false);
+    p.bold(true);
     if (tasaUSD && tasaUSD > 1) {
         const consumo = Math.max(0, grandTotal - timeCost);
         const totalBs = calculateTimeCostBs(timeCost, session?.game_mode, config || {}, tasaUSD)
@@ -488,17 +488,17 @@ export async function printReceiptEscPos(sale, bcvRate) {
     // Header
     p.align(1).bold(true).doubleHeight(true).text(settings.name).newline();
     p.doubleHeight(false);
-    if (settings.rif)   p.bold(false).text('RIF: ' + settings.rif).newline();
+    if (settings.rif)   p.bold(true).text('RIF: ' + settings.rif).newline();
     if (settings.phone) p.text('Tel: ' + settings.phone).newline();
     p.newline();
 
     // Nro venta + fecha
     p.bold(true).text('Venta #' + saleNum).newline();
-    p.bold(false).text(new Date(sale.timestamp).toLocaleString('es-VE')).newline();
+    p.bold(true).text(new Date(sale.timestamp).toLocaleString('es-VE')).newline();
 
     if (sale.tableName) {
         p.bold(true).text('Mesa: ' + sale.tableName).newline();
-        p.bold(false);
+        p.bold(true);
     }
     p.text('Cliente: ' + (capitalizeName(sale.customerName) || 'Consumidor Final')).newline();
     if (sale.meseroNombre) p.text('Atendido: ' + capitalizeName(sale.meseroNombre)).newline();
@@ -515,7 +515,7 @@ export async function printReceiptEscPos(sale, bcvRate) {
         const name = item.name.length > W ? item.name.substring(0, W - 1) + '…' : item.name;
         p.bold(true).text(name).newline();
         // Detalle: font pequeña para aprovechar los 42 chars
-        p.bold(false).smallFont(true).row(detail, subtotal, WS);
+        p.bold(true).smallFont(true).row(detail, subtotal, WS);
         p.smallFont(false);
     });
 
@@ -524,7 +524,7 @@ export async function printReceiptEscPos(sale, bcvRate) {
     // Totales
     p.align(1).bigText(true).bold(true);
     p.text('$' + (sale.totalUsd || 0).toFixed(2)).newline();
-    p.bigText(false).bold(false);
+    p.bigText(false).bold(true);
     p.text(formatBsSimple(sale.totalBs) + ' Bs').newline();
     if (sale.copEnabled && sale.tasaCop > 0) {
         const cop = sale.totalCop || (sale.totalUsd * sale.tasaCop);
@@ -547,19 +547,19 @@ export async function printReceiptEscPos(sale, bcvRate) {
     if (sale.changeUsd > 0) {
         p.line('-', W);
         p.bold(true).row('Vuelto:', '$' + sale.changeUsd.toFixed(2) + ' / ' + formatBsSimple(sale.changeBs) + ' Bs', W);
-        p.bold(false);
+        p.bold(true);
     }
     if (sale.fiadoUsd > 0) {
         p.line('-', W);
         p.bold(true).row('Fiado:', '$' + sale.fiadoUsd.toFixed(2), W);
-        p.bold(false);
+        p.bold(true);
     }
 
     p.line('-', W);
     p.align(0).text('Tasa BCV: ' + formatBsSimple(rate) + ' Bs/$').newline();
     p.newline();
     p.align(1).bold(true).text('Gracias por tu compra!').newline();
-    p.bold(false).text('Comprobante de control interno').newline();
+    p.bold(true).text('Comprobante de control interno').newline();
 
     p.feed(4).cut();
 

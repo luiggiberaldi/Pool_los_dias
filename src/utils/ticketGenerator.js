@@ -74,7 +74,7 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setFontSize(8);
     doc.setTextColor(...INK);
     doc.text('N°:', M, y);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.text(`#${saleNum}`, M + 8, y);
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
@@ -85,7 +85,7 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.setFontSize(8);
     doc.setTextColor(...INK);
     doc.text('Cliente:', M, y);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(...BODY);
     doc.text(sale.customerName || 'Consumidor Final', M + 14, y);
     y += 6;
@@ -95,7 +95,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         doc.setFontSize(8);
         doc.setTextColor(...INK);
         doc.text('Mesa:', M, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...BODY);
         doc.text(sale.tableName, M + 14, y);
         y += 6;
@@ -106,7 +106,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         doc.setFontSize(8);
         doc.setTextColor(...INK);
         doc.text('C.I/RIF:', M, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...BODY);
         doc.text(sale.customerDocument, M + 14, y);
         y += 6;
@@ -118,7 +118,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         doc.setFontSize(8);
         doc.setTextColor(...INK);
         doc.text('Atendido:', M, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'bold');
         doc.setTextColor(...BODY);
         doc.text(staffName, M + 14, y);
         y += 6;
@@ -148,7 +148,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             const subBs = sub * rate;
             const name = item.name.length > 20 ? item.name.substring(0, 20) + '…' : item.name;
 
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7.5);
             doc.setTextColor(...INK);
             doc.text(`${qty}${unit}`, M, y);
@@ -157,7 +157,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.text('$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
             y += 4;
 
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
             doc.text('$' + item.priceUsd.toFixed(2) + ' c/u  ·  Bs ' + formatBs(subBs), M + 10, y);
@@ -171,7 +171,7 @@ export async function generateTicketPDF(sale, bcvRate) {
     // ════════════════════════════════════
     //  TASA DE CAMBIO (centrada, sola)
     // ════════════════════════════════════
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
     doc.text('Tasa BCV: Bs ' + formatBs(rate) + ' por $1', CX, y, { align: 'center' });
@@ -246,7 +246,7 @@ export async function generateTicketPDF(sale, bcvRate) {
                     ? 'Bs ' + formatBs(p.amountBs || (p.amountUsd * rate))
                     : '$' + (p.amountUsd || 0).toFixed(2);
 
-                doc.setFont('helvetica', 'normal');
+                doc.setFont('helvetica', 'bold');
                 doc.setFontSize(7.5);
                 doc.setTextColor(...BODY);
                 doc.text(p.methodLabel || 'Pago', M, y);
@@ -266,7 +266,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             doc.text('Deuda pendiente:', M, y);
             doc.text('$' + sale.fiadoUsd.toFixed(2), RIGHT, y, { align: 'right' });
             y += 4;
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(6.5);
             doc.text('Bs ' + formatBs(sale.fiadoUsd * fiadoRate) + ' (tasa actual)', RIGHT, y, { align: 'right' });
             y += 6;
@@ -287,7 +287,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         y += 5;
 
         if (sale.changeUsd > 0) {
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7.5);
             doc.setTextColor(...BODY);
             doc.text('En Dólares', M, y);
@@ -297,7 +297,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             y += 5;
         }
         if (sale.changeBs > 0) {
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7.5);
             doc.setTextColor(...BODY);
             doc.text('En Bolívares', M, y);
@@ -320,7 +320,7 @@ export async function generateTicketPDF(sale, bcvRate) {
     doc.text('¡Gracias por tu compra!', CX, y, { align: 'center' });
     y += 6;
 
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(5.5);
     doc.setTextColor(...MUTED);
     doc.text('Este documento no constituye factura', CX, y, { align: 'center' });
@@ -394,7 +394,7 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
         safeY += (26 * 0.3527 * 0.8) + 2;
 
         // --- 3. PRECIOS SECUNDARIOS (BS / COP) ---
-        doc.setFont("helvetica", "normal");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(12);
 
         const priceBsRaw = priceUsdRaw * effectiveRate;
@@ -411,7 +411,7 @@ export const generarEtiquetas = async (productos, effectiveRate, copEnabled, tas
 
         // --- 4. FOOTER (Fecha y Unidad) ---
         const footerY = height - marginY - 1;
-        doc.setFont("helvetica", "normal");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(7);
         doc.setTextColor(80);
 

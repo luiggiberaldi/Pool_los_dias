@@ -89,7 +89,7 @@ export async function generateDailyClosePDF({
     y += 5;
 
     const now = new Date();
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
     doc.text(now.toLocaleDateString('es-VE', {
@@ -117,7 +117,7 @@ export async function generateDailyClosePDF({
     ];
 
     statsRows.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(...BODY);
         doc.text(label, M, y);
@@ -144,7 +144,7 @@ export async function generateDailyClosePDF({
                 ? `COP ${data.total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : `Bs ${formatBs(data.total)}`;
 
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7);
             doc.setTextColor(...BODY);
             doc.text(label, M, y);
@@ -172,7 +172,7 @@ export async function generateDailyClosePDF({
         ];
 
         reconRows.forEach(([label, value], i) => {
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7);
             doc.setTextColor(...BODY);
             doc.text(label, M, y);
@@ -209,7 +209,7 @@ export async function generateDailyClosePDF({
         if (apertura.sellerName) aperturaRows.push(['Cajero apertura', apertura.sellerName]);
 
         aperturaRows.forEach(([label, value]) => {
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(7);
             doc.setTextColor(...BODY);
             doc.text(label, M, y);
@@ -236,7 +236,7 @@ export async function generateDailyClosePDF({
             doc.setFontSize(7);
             doc.setTextColor(...INK);
             doc.text(rank, M, y);
-            doc.setFont('helvetica', 'normal');
+            doc.setFont('helvetica', 'bold');
             doc.setTextColor(...BODY);
             doc.text(name, M + 5, y);
             y += 4;
@@ -267,7 +267,7 @@ export async function generateDailyClosePDF({
         doc.setFontSize(7);
         if (isCanceled) { doc.setTextColor(...RED); } else { doc.setTextColor(...INK); }
         doc.text(`${hora}`, M, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('helvetica', 'bold');
         if (isCanceled) { doc.setTextColor(...RED); } else { doc.setTextColor(...BODY); }
         const clienteStr = cliente.length > 18 ? cliente.substring(0, 18) + '…' : cliente;
         doc.text(clienteStr, M + 12, y);
@@ -283,7 +283,7 @@ export async function generateDailyClosePDF({
             s.items.forEach(item => {
                 const qty = item.isWeight ? `${item.qty.toFixed(2)}kg` : `${item.qty}u`;
                 const name = item.name.length > 22 ? item.name.substring(0, 22) + '…' : item.name;
-                doc.setFont('helvetica', 'normal');
+                doc.setFont('helvetica', 'bold');
                 doc.setFontSize(6);
                 doc.setTextColor(...MUTED);
                 doc.text(`  ${qty} ${name}`, M, y);
@@ -358,7 +358,7 @@ export async function generateDailyClosePDF({
     doc.setTextColor(...INK);
     doc.text('Pool Los Diaz', CX, y, { align: 'center' });
     y += 4;
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(6);
     doc.setTextColor(...MUTED);
     doc.text('Reporte generado automáticamente · Sin valor fiscal', CX, y, { align: 'center' });

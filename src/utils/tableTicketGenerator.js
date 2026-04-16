@@ -175,7 +175,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 @page { size: 58mm auto; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { width: 58mm; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #212529; padding: 3mm; }
+body { width: 58mm; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; font-weight: bold; color: #212529; padding: 3mm; }
 .title { text-align: center; font-weight: bold; font-size: 12pt; }
 .subtitle { text-align: center; font-weight: bold; font-size: 9pt; margin-bottom: 2mm; }
 hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
