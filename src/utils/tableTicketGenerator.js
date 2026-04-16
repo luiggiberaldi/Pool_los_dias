@@ -56,9 +56,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
 
     const itemCount = currentItems?.length || 0;
     const seatExtraLines = isMultiClient ? (seats.length * 30) : 0;
-    const H = 120 + (itemCount * 18) + (hasPaidBefore ? 16 : 0) + (hasPinas && hasHours ? 30 : 0) + seatExtraLines;
+    // Altura generosa inicial — se recorta al final al contenido real
+    const H_MAX = 120 + (itemCount * 18) + (hasPaidBefore ? 16 : 0) + (hasPinas && hasHours ? 30 : 0) + seatExtraLines;
 
-    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
+    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H_MAX] });
     const INK = [33, 37, 41];
     const RULE = [206, 212, 218];
     const PAID_CLR = [120, 120, 120];
@@ -344,6 +345,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     y += 8;
     doc.setFont('helvetica', 'normal');
     doc.text("*** NO ES RECIBO DE PAGO ***", CX, y, { align: 'center' });
+
+    // Recortar la página al contenido real para evitar espacio en blanco
+    const finalHeight = y + 5;
+    doc.internal.pageSize.setHeight(finalHeight);
 
     // Print
     doc.autoPrint();
