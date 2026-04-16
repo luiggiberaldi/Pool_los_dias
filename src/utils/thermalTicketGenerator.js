@@ -251,42 +251,9 @@ function _printThermalHTML(sale, bcvRate) {
 </body>
 </html>`;
 
-    _measureAndPrint(html, cssBodyWidth);
-}
-
-/**
- * Mide el contenido en un div oculto, genera HTML con @page exacto, e imprime.
- * Paso 1: Renderizar en div oculto para medir scrollHeight
- * Paso 2: Reemplazar @page con la altura medida
- * Paso 3: Abrir ventana e imprimir
- */
-function _measureAndPrint(html, bodyWidth) {
-    // Paso 1: medir contenido en un contenedor oculto con el mismo ancho
-    const measure = document.createElement('div');
-    measure.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${bodyWidth};padding:4mm 2mm;font-family:'Courier New','Lucida Console',monospace;font-size:11px;`;
-    measure.innerHTML = html.replace(/.*<body[^>]*>/s, '').replace(/<\/body>.*/s, '');
-    document.body.appendChild(measure);
-
-    // Esperar un frame para que el browser calcule el layout
-    requestAnimationFrame(() => {
-        const contentH = measure.scrollHeight;
-        document.body.removeChild(measure);
-
-        // Convertir px a mm (96 DPI: 1mm ≈ 3.7795px)
-        const heightMm = Math.ceil(contentH / 3.7795) + 5; // +5mm margen
-        // Reemplazar @page size en el HTML original
-        const finalHtml = html.replace(
-            /@page\s*\{[^}]*\}/,
-            `@page { size: 58mm ${heightMm}mm; margin: 0; }`
-        );
-
-        _openPrintWindow(finalHtml);
-    });
-}
-
-function _openPrintWindow(html) {
     const printWindow = window.open('', '_blank', 'width=350,height=600');
     if (!printWindow) {
+        // Fallback: iframe oculto
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:58mm;height:auto;';
         document.body.appendChild(iframe);
@@ -306,11 +273,15 @@ function _openPrintWindow(html) {
     printWindow.document.write(html);
     printWindow.document.close();
 
+    // Esperar a que cargue la imagen del logo antes de imprimir
     printWindow.onload = () => {
-        setTimeout(() => printWindow.print(), 400);
+        setTimeout(() => {
+            printWindow.print();
+        }, 400);
     };
 
+    // Fallback si onload no dispara
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) {}
+        try { printWindow.print(); } catch(_) { /* ignore */ }
     }, 1500);
 }
