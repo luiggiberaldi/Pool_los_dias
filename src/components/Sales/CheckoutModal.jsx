@@ -226,7 +226,48 @@ export default function CheckoutModal({
                             </div>
                         </div>
                         <div className="divide-y divide-orange-100 dark:divide-orange-800/20">
-                            {tableContext.timeCost > 0 && (
+                            {/* Per-seat breakdown: show only this seat's items */}
+                            {tableContext.seatDisplayInfo ? (() => {
+                                const di = tableContext.seatDisplayInfo;
+                                return (
+                                    <>
+                                        {di.timeCost.total > 0 && (
+                                            <div className="flex items-center justify-between px-3 py-2">
+                                                <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                    <Clock size={11} className="text-blue-400" />
+                                                    {di.timeCost.pinaCost > 0 && di.timeCost.hourCost > 0 ? 'Tiempo + Piñas' : di.timeCost.pinaCost > 0 ? 'Piñas' : `Tiempo · ${tableContext.elapsed || 0} min`}
+                                                </span>
+                                                <span className="text-xs font-black text-slate-700 dark:text-white">${di.timeCost.total.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                        {di.items.map((item, i) => (
+                                            <div key={i} className="flex items-center justify-between px-3 py-1.5">
+                                                <span className="flex items-center gap-1.5 text-xs text-slate-500 truncate pr-2">
+                                                    <Coffee size={11} className="text-amber-400 shrink-0" />
+                                                    <span className="font-bold text-slate-600">{item.qty}x</span> {item.product_name || item.name}
+                                                </span>
+                                                <span className="text-xs font-black text-slate-700 dark:text-white shrink-0">${(Number(item.unit_price_usd) * Number(item.qty)).toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                        {di.sharedPortion > 0 && (
+                                            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-slate-900/30">
+                                                <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                                                    <Users size={11} className="text-slate-400 shrink-0" />
+                                                    Compartido ÷{di.divisor}
+                                                    {(di.sharedItems?.length > 0 || di.sharedTimeTotal > 0) && (
+                                                        <span className="text-[10px] text-slate-300">
+                                                            ({[di.sharedTimeTotal > 0 && 'tiempo', di.sharedItems?.length > 0 && `${di.sharedItems.length} ítem${di.sharedItems.length !== 1 ? 's' : ''}`].filter(Boolean).join(' + ')})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="text-xs font-black text-slate-600 dark:text-slate-300 shrink-0">${di.sharedPortion.toFixed(2)}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })() : (
+                                <>
+                                    {tableContext.timeCost > 0 && (
                                 <div className="flex items-center justify-between px-3 py-2">
                                     {tableContext.session?.game_mode === 'PINA' ? (() => {
                                         const count = 1 + (Number(tableContext.session?.extended_times) || 0);
@@ -270,6 +311,8 @@ export default function CheckoutModal({
                                     </div>
                                 </div>
                             ))}
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

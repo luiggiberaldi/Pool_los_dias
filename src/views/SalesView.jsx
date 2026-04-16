@@ -446,15 +446,24 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
 
                         // If per-seat, use seatTotal (already includes shared division) or recalculate
                         let baseTotal = tableCheckoutData.grandTotal;
+                        let seatDisplayInfo = null;
                         if (seatId) {
-                            if (seatTotal != null) {
+                            const seats = tableCheckoutData.session?.seats || [];
+                            const config = useTablesStore.getState().config;
+                            const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
+                            const seatBd = fb?.seats.find(s => s.seat.id === seatId);
+                            if (seatBd) {
+                                baseTotal = seatTotal != null ? seatTotal : seatBd.subtotal;
+                                seatDisplayInfo = {
+                                    timeCost: seatBd.timeCost,
+                                    items: seatBd.items,
+                                    sharedPortion: seatBd.sharedPortion,
+                                    sharedItems: fb.sharedItems,
+                                    sharedTimeTotal: fb.sharedTimeTotal,
+                                    divisor: fb.seats.filter(s => !s.seat.paid).length,
+                                };
+                            } else if (seatTotal != null) {
                                 baseTotal = seatTotal;
-                            } else {
-                                const seats = tableCheckoutData.session?.seats || [];
-                                const config = useTablesStore.getState().config;
-                                const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
-                                const seatBd = fb?.seats.find(s => s.seat.id === seatId);
-                                if (seatBd) baseTotal = seatBd.subtotal;
                             }
                         } else {
                             // "Cobrar Todo" con cuantas divididas: usar grandTotal del seat breakdown (solo asientos no pagados)
@@ -474,6 +483,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                             discountData: { active: totalDiscAmt > 0, amountUsd: totalDiscAmt, amountBs: totalDiscAmt * effectiveRate, type: disc?.type || 'percentage', value: disc?.value || 0 },
                             grandTotal: baseTotal - totalDiscAmt,
                             ...(seatId ? { seatId } : {}),
+                            ...(seatDisplayInfo ? { seatDisplayInfo } : { seatDisplayInfo: null }),
                         }));
                         setShowTablePayment(true);
                         // Si el seat tiene customerId, pre-seleccionarlo en el checkout
