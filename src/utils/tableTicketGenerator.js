@@ -55,11 +55,68 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const seatHasHours = seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
 
     const itemCount = currentItems?.length || 0;
-    const seatExtraLines = isMultiClient ? (seats.length * 30) : 0;
-    // Altura generosa inicial — se recorta al final al contenido real
-    const H_MAX = 120 + (itemCount * 18) + (hasPaidBefore ? 16 : 0) + (hasPinas && hasHours ? 30 : 0) + seatExtraLines;
 
-    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H_MAX] });
+    // ── Pre-calcular altura exacta del ticket ──────────────────────────────
+    // Cada sección suma exactamente lo que el render dibuja (en mm).
+    let H = 8; // y inicial
+    H += 6; // título "PRE-CUENTA MESA"
+    H += 6; // nombre de mesa
+    H += 5; // dash + gap
+    H += 5; // fecha
+    if (session?.client_name) H += 5;
+    if (session?.notes) H += 4;
+    H += 6; // dash + gap
+
+    if (isMultiClient) {
+        // Estimar altura multi-cliente: shared section + per-seat
+        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
+        if (breakdown) {
+            if (breakdown.sharedTotal > 0) {
+                H += 4; // "COMPARTIDO" header
+                if (hasPinas) H += 4;
+                if (hasHours) H += 4;
+                H += breakdown.sharedItems.length * 4;
+                H += 5; // total compartido
+                H += 5; // dash
+            }
+            breakdown.seats.forEach((sb) => {
+                H += 4; // seat label
+                if (sb.timeCost.total > 0) {
+                    if (sb.timeCost.hasPinas) H += 4;
+                    if (sb.timeCost.hasHours) H += 4;
+                }
+                H += sb.items.length * 4;
+                if (sb.sharedPortion > 0 && !sb.seat.paid) H += 4;
+                H += 4; // subtotal
+                H += 5; // bs ref
+                H += 5; // dash
+            });
+        }
+    } else {
+        // Piñas
+        if (hasPinas || seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'))) {
+            H += 4 + 4 + 5 + 1; // header + line + bs + gap
+            if (roundsOffset > 0) H += 5;
+        }
+        // Horas
+        if (hasHours || seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'))) {
+            H += 4 + 4 + 5 + 1;
+            if (hoursOffset > 0) H += 5;
+        }
+        // Consumo
+        if (itemCount > 0) {
+            H += 5; // "Consumo Bar" header
+            H += itemCount * 9; // cada item: 4 (nombre) + 5 (bs)
+            H += 2; // gap
+        }
+    }
+
+    H += 6; // dash
+    H += 6; // TOTAL
+    H += 8; // ref Bs + gap
+    H += 5; // disclaimer + margen inferior
+
+    const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
     const INK = [33, 37, 41];
     const RULE = [206, 212, 218];
     const PAID_CLR = [120, 120, 120];
@@ -345,10 +402,6 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     y += 8;
     doc.setFont('helvetica', 'normal');
     doc.text("*** NO ES RECIBO DE PAGO ***", CX, y, { align: 'center' });
-
-    // Recortar la página al contenido real para evitar espacio en blanco
-    const finalHeight = y + 5;
-    doc.internal.pageSize.setHeight(finalHeight);
 
     // Print
     doc.autoPrint();
