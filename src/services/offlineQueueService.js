@@ -172,19 +172,37 @@ export const offlineQueueService = {
                 }
             } catch (e) { /* no bloquear el sync si esto falla */ }
           } catch (err) {
-            console.error('[Offline Sync] Fallo al sincronizar venta offline:', err);
-            const attempts = item.attempts + 1;
+            const errMsg = err?.message || 'Unknown error';
             const errCode = err?.code;
+            const errDetails = err?.details || err?.hint || '';
+            console.error(`[Offline Sync] Fallo al sincronizar venta offline:`, {
+                message: errMsg,
+                code: errCode,
+                details: errDetails,
+                hint: err?.hint,
+                itemId: item.id,
+                idempotencyKey: item.payload?.idempotency_key,
+                attempts: item.attempts + 1,
+                payloadTotal: item.payload?.total,
+                cartLength: item.payload?.cart?.length,
+                paymentsLength: item.payload?.payments?.length,
+                fiadoUsd: item.payload?.fiadoUsd
+            });
+            const attempts = item.attempts + 1;
             const isTimeout = err?.message === 'SYNC_TIMEOUT';
 
             // Errores irrecuperables — no reintentar jamás
-            if (UNRECOVERABLE_CODES.has(errCode)) {
-                console.warn(`[Offline Sync] Venta marcada como fallida (error irreparable ${errCode}): ${err.message}`);
-                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), last_error: `${errCode}: ${err.message}` } : q);
+            // Incluye: códigos PG conocidos, o errores HTTP 400 sin código PG (payload inválido)
+            const isUnrecoverable = UNRECOVERABLE_CODES.has(errCode) ||
+                (!isTimeout && !errCode && err?.message?.includes('400'));
+            if (isUnrecoverable) {
+                const errorDetail = `${errCode || 'HTTP_400'}: ${errMsg}${errDetails ? ' | ' + errDetails : ''}`;
+                console.warn(`[Offline Sync] Venta marcada como fallida (error irreparable): ${errorDetail}`);
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), last_error: errorDetail } : q);
                 failed++;
             } else if (attempts >= 10) {
-                console.warn(`[Offline Sync] Venta marcada como fallida tras ${attempts} intentos: ${err.message}`);
-                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), attempts, last_error: err.message } : q);
+                console.warn(`[Offline Sync] Venta marcada como fallida tras ${attempts} intentos: ${errMsg}${errDetails ? ' | ' + errDetails : ''}`);
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, sync_status: 'failed', failed_at: Date.now(), attempts, last_error: `${errMsg}${errDetails ? ' | ' + errDetails : ''}` } : q);
                 failed++;
             } else {
                 // Backoff exponencial: 2s, 4s, 8s, 16s... hasta max 5 min

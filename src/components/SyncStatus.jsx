@@ -108,11 +108,21 @@ export default function SyncStatus() {
         }
     }, [isSyncing, checkHealth, checkQueue]);
 
-    // Auto-sync: cuando hay pendientes y hay internet, sincronizar sin que el usuario haga nada
+    // Auto-sync: cuando hay pendientes y hay internet, sincronizar sin que el usuario haga nada.
+    // Usa backoff progresivo para no crear un loop infinito cuando las ventas fallan con 400.
+    const autoSyncAttemptRef = React.useRef(0);
     useEffect(() => {
         if (pendingCount > 0 && isOnline && !isSyncing) {
-            const timer = setTimeout(() => handleForceSync(), 2500);
+            // Backoff: 3s, 6s, 12s, 24s, 48s... hasta max 5 min
+            const delay = Math.min(300_000, 3000 * Math.pow(2, autoSyncAttemptRef.current));
+            const timer = setTimeout(() => {
+                autoSyncAttemptRef.current++;
+                handleForceSync();
+            }, delay);
             return () => clearTimeout(timer);
+        }
+        if (pendingCount === 0) {
+            autoSyncAttemptRef.current = 0; // Reset cuando ya no hay pendientes
         }
     }, [pendingCount, isOnline, isSyncing, handleForceSync]);
 
