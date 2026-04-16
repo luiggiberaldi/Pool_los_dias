@@ -337,7 +337,7 @@ export default function TableCard({ table, session }) {
                 }, 500);
             }
         } else if (mode === 'CONSUMPTION') {
-            await openSession(table.id, currentUser.id, 'NORMAL', 0, name, guests, firstSeatClientId, false, seats);
+            await openSession(table.id, currentUser.id, 'CONSUMO', 0, name, guests, firstSeatClientId, false, seats);
         } else {
             await openSession(table.id, currentUser.id, 'NORMAL', pendingOpen.hours, name, guests, firstSeatClientId, false, seats);
         }
