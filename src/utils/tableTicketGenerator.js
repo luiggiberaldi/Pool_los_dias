@@ -172,37 +172,10 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     push(`<div class="right small">Ref: BS. ${refBs}</div>`);
     push(`<div class="center disclaimer">*** NO ES RECIBO DE PAGO ***</div>`);
 
-    // Calcular altura explícita del ticket (mm).
-    // @page { size: 58mm auto } no funciona con drivers POS-58 de tamaño fijo.
-    let ticketH = 30; // header: título, mesa, fecha
-    if (session?.client_name) ticketH += 4;
-    if (session?.notes) ticketH += 3;
-    if (isMultiClient) {
-        // Estimación multi-cliente
-        const bk = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
-        if (bk) {
-            if (bk.sharedTotal > 0) {
-                ticketH += 4 + (hasPinas ? 4 : 0) + (hasHours ? 4 : 0) + bk.sharedItems.length * 4 + 8;
-            }
-            bk.seats.forEach(sb => {
-                ticketH += 4; // label
-                if (sb.timeCost.total > 0) ticketH += (sb.timeCost.hasPinas ? 4 : 0) + (sb.timeCost.hasHours ? 4 : 0);
-                ticketH += sb.items.length * 4;
-                if (sb.sharedPortion > 0 && !sb.seat.paid) ticketH += 4;
-                ticketH += 12; // subtotal + bs + dash
-            });
-        }
-    } else {
-        if (hasPinas || seatHasPinas) ticketH += 12 + (roundsOffset > 0 ? 4 : 0);
-        if (hasHours || seatHasHours) ticketH += 12 + (hoursOffset > 0 ? 4 : 0);
-        if (currentItems.length > 0) ticketH += 4 + currentItems.length * 7;
-    }
-    ticketH += 18; // total, ref bs, disclaimer
-
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-@page { size: 58mm ${ticketH}mm; margin: 0; }
+@page { size: 58mm auto; margin: 0; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { width: 58mm; font-family: Arial, Helvetica, sans-serif; font-size: 8pt; font-weight: bold; color: #212529; padding: 3mm; }
+body { width: 48mm; max-width: 48mm; margin: 0 auto; font-family: 'Courier New', 'Lucida Console', monospace; font-size: 8pt; color: #212529; padding: 4mm 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .title { text-align: center; font-weight: bold; font-size: 12pt; }
 .subtitle { text-align: center; font-weight: bold; font-size: 9pt; margin-bottom: 2mm; }
 hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
@@ -216,6 +189,8 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
 .center { text-align: center; }
 .total { font-size: 10pt; font-weight: bold; margin-top: 1mm; }
 .disclaimer { margin-top: 3mm; font-size: 7pt; }
+@media print { body { width: 48mm; max-width: 48mm; } }
+@media screen { body { border: 1px solid #ccc; margin-top: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); } }
 </style></head><body>${lines.join('')}</body></html>`;
 
     // Imprimir via window.open — mismo método que el ticket de venta

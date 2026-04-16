@@ -29,25 +29,9 @@ export async function printThermalTicket(sale, bcvRate) {
 }
 
 function _printThermalHTML(sale, bcvRate) {
-    // ── CONFIGURACIÓN DE TAMAÑOS (Fija en 58mm) ──
-    // Calcular altura explícita del ticket basado en contenido.
-    // @page { size: 58mm auto } no funciona con drivers de POS-58 que
-    // solo ofrecen tamaños fijos (210mm, 297mm, 3276mm).
-    const itemCount = (sale.items || []).length;
-    const payCount = (sale.payments || []).length;
-    const hasFiado = (sale.fiadoUsd || 0) > 0;
-    const hasDiscount = (sale.discountAmountUsd || 0) > 0;
-    const hasCop = sale.copEnabled && sale.tasaCop > 0;
-    let ticketH = 65; // base: logo, negocio, info, tasa, totales, pie
-    ticketH += itemCount * 8;  // cada item: nombre + detalle
-    ticketH += payCount * 4;   // cada pago
-    if (hasFiado) ticketH += 10;
-    if (hasDiscount) ticketH += 8;
-    if (hasCop) ticketH += 5;
-    if (sale.tableName) ticketH += 4;
-    if (sale.customerDocument) ticketH += 4;
-    if (sale.meseroNombre || sale.vendedorNombre) ticketH += 4;
-    const cssPageSize = `58mm ${ticketH}mm`;
+    // ── CONFIGURACIÓN DE TAMAÑOS (58mm) ──
+    // Usa 58mm auto — el navegador calcula el largo automáticamente.
+    const cssPageSize = '58mm auto';
     const cssBodyWidth = '48mm';
     const cssLogoW = '44mm';
     const fDisclaimer = '7.5px';
@@ -57,6 +41,7 @@ function _printThermalHTML(sale, bcvRate) {
     const fTitle = '14px';   // Nombre negocio
     const fTotalU = '24px';  // Total $
     const fTotalB = '14px';  // Total Bs
+    const hasFiado = (sale.fiadoUsd || 0) > 0;
 
     // ── OBTENER CONFIGURACIÓN DEL NEGOCIO ──
     const settings = {
@@ -133,7 +118,6 @@ function _printThermalHTML(sale, bcvRate) {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
         font-family: 'Courier New', 'Lucida Console', monospace;
-        font-weight: bold;
         width: ${cssBodyWidth};
         max-width: ${cssBodyWidth};
         margin: 0 auto;
