@@ -124,6 +124,7 @@ function _printThermalHTML(sale, bcvRate) {
         padding: 4mm 2mm;
         color: #000;
         background: #fff;
+        font-weight: 900;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -277,12 +278,22 @@ function _printThermalHTML(sale, bcvRate) {
     // Esperar a que cargue la imagen del logo antes de imprimir
     printWindow.onload = () => {
         setTimeout(() => {
-            if (!printed) { printed = true; printWindow.print(); }
+            if (!printed) {
+                printed = true;
+                printWindow.onafterprint = () => printWindow.close();
+                printWindow.print();
+            }
         }, 400);
     };
 
     // Fallback si onload no dispara
     setTimeout(() => {
-        if (!printed) { printed = true; try { printWindow.print(); } catch(_) {} }
+        if (!printed) {
+            printed = true;
+            try {
+                printWindow.onafterprint = () => printWindow.close();
+                printWindow.print();
+            } catch(_) {}
+        }
     }, 1500);
 }
