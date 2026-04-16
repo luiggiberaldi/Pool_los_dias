@@ -153,52 +153,67 @@ export async function detectAndAutoConfig() {
 // ── ESC/POS commands ──────────────────────────────────────────────────────────
 
 export async function sendEscPosCommand(commandArray) {
-    // Recuperar puerto activo
-    if (!activePort) {
-        const port = await getConnectedPrinter();
-        if (!port) throw new Error('No hay impresora conectada. Ve a Configuración → Impresora y pulsa "Detectar".');
-    }
-
-    const cfg = getWebSerialConfig();
+    const cfg  = getWebSerialConfig();
     const baud = cfg.baudRate || 9600;
 
-    const writeToPort = async (port) => {
-        // Asegurar puerto abierto
-        if (!port.writable) {
-            await port.open({ baudRate: baud, bufferSize: 8192 });
-        }
+    console.log('[ESC/POS] ▶ sendEscPosCommand', commandArray.length, 'bytes | baud:', baud);
 
-        const writer = port.writable.getWriter();
-        const data = new Uint8Array(commandArray);
+    // Recuperar o reutilizar puerto activo
+    if (!activePort) {
+        console.log('[ESC/POS] activePort=null → buscando puertos autorizados...');
+        const ports = await navigator.serial.getPorts();
+        console.log('[ESC/POS] getPorts():', ports.length, 'puerto(s)');
+        if (ports.length === 0) {
+            throw new Error('Sin puerto autorizado. Pulsa "Detectar impresora" para reconectar.');
+        }
+        activePort = ports[0];
+        console.log('[ESC/POS] Puerto asignado:', JSON.stringify(activePort.getInfo()));
+    } else {
+        console.log('[ESC/POS] Reutilizando activePort:', JSON.stringify(activePort.getInfo()));
+    }
+
+    const port = activePort;
+
+    // Cerrar si quedó abierto de una sesión anterior
+    if (port.readable || port.writable) {
+        console.log('[ESC/POS] Puerto estaba abierto → cerrando antes de reabrir...');
         try {
-            await writer.write(data);
-            // Esperar a que el stream confirme el flush antes de cerrar
-            await writer.ready;
-        } finally {
-            writer.releaseLock();
+            if (port.readable?.locked === false) port.readable.cancel().catch(() => {});
+            await port.close();
+            console.log('[ESC/POS] Puerto cerrado OK');
+        } catch (e) {
+            console.warn('[ESC/POS] Error cerrando:', e.message);
         }
+        await new Promise(r => setTimeout(r, 80));
+    }
 
-        // Pequeña espera para que el adaptador USB-serial vacíe su buffer UART
-        await new Promise(r => setTimeout(r, 150));
+    // Abrir
+    console.log('[ESC/POS] Abriendo puerto baud=' + baud + '...');
+    await port.open({ baudRate: baud, bufferSize: 8192 });
+    console.log('[ESC/POS] Puerto abierto ✓');
 
-        // Cerrar para liberar el puerto limpiamente
-        try { await port.close(); } catch (_) {}
+    // Escribir
+    const writer = port.writable.getWriter();
+    try {
+        console.log('[ESC/POS] Escribiendo', commandArray.length, 'bytes...');
+        await writer.write(new Uint8Array(commandArray));
+        console.log('[ESC/POS] Escritura ✓');
+    } finally {
+        writer.releaseLock();
+    }
 
-        return true;
-    };
+    // Esperar que el adaptador USB-serial vacíe su buffer UART
+    console.log('[ESC/POS] Esperando flush (200ms)...');
+    await new Promise(r => setTimeout(r, 200));
 
     try {
-        return await writeToPort(activePort);
-    } catch (err) {
-        // Puerto en estado roto → forzar cierre y reintentar una vez
-        try { await activePort.close(); } catch (_) {}
-        await new Promise(r => setTimeout(r, 200));
-        try {
-            return await writeToPort(activePort);
-        } catch (retryErr) {
-            throw new Error(`Error de impresión: ${retryErr.message}. Intenta cambiar el Baud Rate en Ajustes avanzados.`);
-        }
+        await port.close();
+        console.log('[ESC/POS] Puerto cerrado ✓ → impresión completada');
+    } catch (e) {
+        console.warn('[ESC/POS] Error cerrando tras escritura:', e.message);
     }
+
+    return true;
 }
 
 export async function openCashDrawerWebSerial() {

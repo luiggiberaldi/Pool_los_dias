@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Printer, Usb, AlertTriangle, CheckCircle, RefreshCw,
     SmartphoneNfc, Scan, RotateCcw, Monitor, Zap,
-    Wifi, WifiOff, ChevronRight, Info, Settings2
+    WifiOff, ChevronRight, Info, Settings2, PlugZap
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../SettingsShared';
 import {
@@ -147,6 +147,7 @@ export default function WebSerialPanel() {
     const [drawerBusy, setDrawerBusy] = useState(false);
     const [error, setError]         = useState('');
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [reconnecting, setReconnecting] = useState(false);
 
     const isConfigured = !!config.printerType;
     const isThermal    = config.printerType === 'thermal' || config.printerType === 'thermal_serial';
@@ -157,6 +158,26 @@ export default function WebSerialPanel() {
         getConnectedPrinter().then(port => setConnected(!!port));
         setConfig(getWebSerialConfig());
     }, []);
+
+    // ── Reconectar (re-pedir permiso al puerto) ────────────────────────────
+    const handleReconnect = async () => {
+        setReconnecting(true);
+        setError('');
+        try {
+            // Forzar al usuario a seleccionar el puerto otra vez
+            const port = await navigator.serial.requestPort();
+            if (port) {
+                setConnected(true);
+                showToast('Puerto reconectado', 'success');
+            }
+        } catch (err) {
+            if (!err.message?.includes('cancel') && !err.name?.includes('NotFound')) {
+                setError('No se pudo reconectar. Verifica que la impresora esté encendida y conectada por USB.');
+            }
+        } finally {
+            setReconnecting(false);
+        }
+    };
 
     // ── Detectar ───────────────────────────────────────────────────────────
     const handleDetect = async () => {
@@ -328,6 +349,20 @@ export default function WebSerialPanel() {
                         </button>
                     )}
                 </div>
+
+                {/* ── Reconectar puerto (térmica sin señal) ── */}
+                {isThermal && (
+                    <button
+                        onClick={handleReconnect}
+                        disabled={reconnecting}
+                        className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                    >
+                        {reconnecting
+                            ? <><RefreshCw size={12} className="animate-spin" /> Reconectando...</>
+                            : <><PlugZap size={12} /> Reconectar puerto USB</>
+                        }
+                    </button>
+                )}
 
                 {/* ── Usar sistema (si no está configurado o si es térmica) ── */}
                 {(!isConfigured || isThermal) && (
