@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../../SettingsShared';
 import AuditLogViewer from '../AuditLogViewer';
+import WebSerialPanel from '../WebSerialPanel';
 
 import { useAudit } from '../../../hooks/useAudit';
 
@@ -90,7 +91,8 @@ export default function SettingsTabSistema({
             </SectionCard>
             </div>
 
-
+            {/* Impresora */}
+            <WebSerialPanel />
 
             {/* Zona de Peligro */}
             {(
