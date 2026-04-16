@@ -30,7 +30,24 @@ export async function printThermalTicket(sale, bcvRate) {
 
 function _printThermalHTML(sale, bcvRate) {
     // ── CONFIGURACIÓN DE TAMAÑOS (Fija en 58mm) ──
-    const cssPageSize = '58mm auto';
+    // Calcular altura explícita del ticket basado en contenido.
+    // @page { size: 58mm auto } no funciona con drivers de POS-58 que
+    // solo ofrecen tamaños fijos (210mm, 297mm, 3276mm).
+    const itemCount = (sale.items || []).length;
+    const payCount = (sale.payments || []).length;
+    const hasFiado = (sale.fiadoUsd || 0) > 0;
+    const hasDiscount = (sale.discountAmountUsd || 0) > 0;
+    const hasCop = sale.copEnabled && sale.tasaCop > 0;
+    let ticketH = 65; // base: logo, negocio, info, tasa, totales, pie
+    ticketH += itemCount * 8;  // cada item: nombre + detalle
+    ticketH += payCount * 4;   // cada pago
+    if (hasFiado) ticketH += 10;
+    if (hasDiscount) ticketH += 8;
+    if (hasCop) ticketH += 5;
+    if (sale.tableName) ticketH += 4;
+    if (sale.customerDocument) ticketH += 4;
+    if (sale.meseroNombre || sale.vendedorNombre) ticketH += 4;
+    const cssPageSize = `58mm ${ticketH}mm`;
     const cssBodyWidth = '48mm';
     const cssLogoW = '44mm';
     const fDisclaimer = '7.5px';
@@ -55,7 +72,6 @@ function _printThermalHTML(sale, bcvRate) {
     const d = new Date(sale.timestamp);
     const fecha = d.toLocaleDateString('es-VE');
     const hora = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-    const hasFiado = sale.fiadoUsd > 0;
 
     // Generar filas de productos
     const itemsHtml = (sale.items || []).map(item => {
