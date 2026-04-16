@@ -238,8 +238,9 @@ export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
  * orderItems: array de items con seat_id (null = compartido).
  * sharedTimeOverride: si se pasa, es el monto compartido de tiempo ya calculado externamente.
  * sharedDivision: { type: 'equal' } | { type: 'custom', amounts: { [seatId]: number } }
+ * isTimeFree: si true, no cobra tiempo de sesión (mesas tipo NORMAL/BAR).
  */
-export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = [], sharedDivision = null, frozenDivisor = null) {
+export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = [], sharedDivision = null, frozenDivisor = null, isTimeFree = false) {
     if (!seats || seats.length === 0) return null;
 
     const activeSeats = seats.filter(s => !s.paid);
@@ -248,13 +249,15 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
     const sharedConsumptionTotal = sharedItems.reduce((acc, i) => acc + (Number(i.unit_price_usd) * Number(i.qty)), 0);
 
     // Costo de tiempo compartido (session-level: piñas + horas sin seatId)
-    const sessionTimeCost = calculateSessionCostBreakdown(
-        elapsedMinutes,
-        session.game_mode,
-        config,
-        session.hours_paid || 0,
-        session.extended_times || 0
-    );
+    const sessionTimeCost = isTimeFree
+        ? { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 }
+        : calculateSessionCostBreakdown(
+            elapsedMinutes,
+            session.game_mode,
+            config,
+            session.hours_paid || 0,
+            session.extended_times || 0
+        );
     const sharedTimeTotal = sessionTimeCost.total;
     const sharedTotal = round2(sharedConsumptionTotal + sharedTimeTotal);
     const activeCount = frozenDivisor || activeSeats.length;
@@ -297,4 +300,41 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
         sessionTimeCost,
         grandTotal: round2(grandTotal)
     };
+}
+
+/**
+ * Calcula el total en Bs de un full table breakdown usando la tasa implícita
+ * de la configuración para el tiempo y la tasa BCV para el consumo.
+ * Esto evita usar solo tasa BCV para todo (que da montos incorrectos en mesas).
+ */
+export function calculateBreakdownTotalBs(seatBreakdown, config, tasaBCV) {
+    if (!seatBreakdown) return 0;
+
+    // Shared time cost en Bs (usa tasa implícita de config)
+    const sharedTimeBs = calculateTimeCostBsBreakdown(
+        seatBreakdown.sessionTimeCost.pinaCost,
+        seatBreakdown.sessionTimeCost.hourCost,
+        config, tasaBCV,
+        seatBreakdown.sessionTimeCost.libreCost
+    ).totalBs;
+
+    // Per-seat time costs en Bs (usa tasa implícita de config)
+    const seatTimeBs = seatBreakdown.seats
+        .filter(sb => !sb.seat.paid)
+        .reduce((acc, sb) => {
+            const bs = calculateTimeCostBsBreakdown(
+                sb.timeCost.pinaCost || 0,
+                sb.timeCost.hourCost || 0,
+                config, tasaBCV,
+                sb.timeCost.libreCost || 0
+            );
+            return acc + bs.totalBs;
+        }, 0);
+
+    // Consumption en Bs (usa tasa BCV)
+    const consumptionUsd = seatBreakdown.sharedConsumptionTotal +
+        seatBreakdown.seats.filter(sb => !sb.seat.paid).reduce((acc, sb) => acc + sb.consumption, 0);
+    const consumptionBs = round2(consumptionUsd * (tasaBCV || 1));
+
+    return round2(sharedTimeBs + seatTimeBs + consumptionBs);
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent, Tag, Trash2, Users, Target } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
@@ -73,7 +73,8 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const sharedDivision = sharedDivisionType === 'equal'
         ? { type: 'equal' }
         : { type: 'custom', amounts: customSharedAmounts };
-    const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, sharedDivision, frozenActiveCount) : null;
+    const isTimeFree = table.type === 'NORMAL';
+    const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, sharedDivision, frozenActiveCount, isTimeFree) : null;
     // H: Bloquear cobro si división manual no suma correctamente
     const customDivisionMismatch = seatBreakdown && sharedDivisionType === 'custom' &&
         Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) - seatBreakdown.sharedTotal) >= 0.01;
@@ -233,7 +234,9 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                                 ${hasSeats && seatBreakdown ? (seatBreakdown.grandTotal - discountAmountUsd).toFixed(2) : finalTotal.toFixed(2)}
                             </p>
                             <p className="text-xs font-bold text-white/70">
-                                Bs {formatBs((hasSeats && seatBreakdown ? (seatBreakdown.grandTotal - discountAmountUsd) : finalTotal) * tasaUSD)}
+                                Bs {formatBs(hasSeats && seatBreakdown
+                                    ? calculateBreakdownTotalBs(seatBreakdown, config, tasaUSD) - (discountAmountUsd * tasaUSD)
+                                    : grandTotalBs - (discountAmountUsd * tasaUSD))}
                             </p>
                         </div>
                     </div>

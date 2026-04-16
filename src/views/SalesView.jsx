@@ -4,7 +4,7 @@ import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useTablesStore } from '../hooks/store/useTablesStore';
-import { calculateGrandTotalBs, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../utils/tableBillingEngine';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -450,7 +450,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                         if (seatId) {
                             const seats = tableCheckoutData.session?.seats || [];
                             const config = useTablesStore.getState().config;
-                            const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
+                            const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, tableCheckoutData.table?.type === 'NORMAL');
                             const seatBd = fb?.seats.find(s => s.seat.id === seatId);
                             if (seatBd) {
                                 baseTotal = seatTotal != null ? seatTotal : seatBd.subtotal;
@@ -470,7 +470,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                             const seats = tableCheckoutData.session?.seats || [];
                             if (seats.length > 0) {
                                 const config = useTablesStore.getState().config;
-                                const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
+                                const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, tableCheckoutData.table?.type === 'NORMAL');
                                 if (fb && fb.grandTotal > 0) baseTotal = fb.grandTotal;
                             }
                         }
@@ -496,7 +496,24 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             {tableCheckoutData && showTablePayment && (() => {
                 const discData = tableCheckoutData.discountData || { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 };
                 const finalTotal = tableCheckoutData.grandTotal;
-                const finalTotalBs = finalTotal * effectiveRate;
+                // Calcular Bs usando tasa implícita de mesas para tiempo + tasa BCV para consumo
+                const config = useTablesStore.getState().config;
+                const seats = tableCheckoutData.session?.seats || [];
+                const isTimeFree = tableCheckoutData.table?.type === 'NORMAL';
+                let finalTotalBs;
+                if (seats.length > 0) {
+                    const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, isTimeFree);
+                    finalTotalBs = fb ? calculateBreakdownTotalBs(fb, config, effectiveRate) : finalTotal * effectiveRate;
+                    // Ajustar por descuento si aplica
+                    if (discData.active && discData.amountUsd > 0) {
+                        finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
+                    }
+                } else {
+                    finalTotalBs = calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, config, effectiveRate);
+                    if (discData.active && discData.amountUsd > 0) {
+                        finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
+                    }
+                }
                 return (
                 <CheckoutModal onClose={() => { setTableCheckoutData(null); setShowTablePayment(false); setSelectedCustomerId(''); }}
                     cartSubtotalUsd={finalTotal} cartSubtotalBs={finalTotalBs}

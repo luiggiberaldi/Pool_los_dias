@@ -58,7 +58,8 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     const items = order ? orderItems.filter(i => i.order_id === order.id) : [];
                     const totalConsumption = items.reduce((a, i) => a + Number(i.unit_price_usd) * Number(i.qty), 0);
                     const elapsed = session.started_at ? calculateElapsedTime(session.started_at) : 0;
-                    const timeCost = calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, session.paid_at, (paidHoursOffsets || {})[session.id] || 0, (paidRoundsOffsets || {})[session.id] || 0);
+                    const isTimeFree = table.type === 'NORMAL';
+                    const timeCost = isTimeFree ? 0 : calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, session.paid_at, (paidHoursOffsets || {})[session.id] || 0, (paidRoundsOffsets || {})[session.id] || 0);
                     const grandTotal = timeCost + totalConsumption;
                     const mesero = session.opened_by && cachedUsers?.length
                         ? cachedUsers.find(u => u.id === session.opened_by)

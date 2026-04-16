@@ -71,7 +71,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     push(`<hr>`);
 
     if (isMultiClient) {
-        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
+        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, null, null, table.type === 'NORMAL');
         if (breakdown) {
             if (breakdown.sharedTotal > 0) {
                 push(`<div class="bold accent">COMPARTIDO</div>`);

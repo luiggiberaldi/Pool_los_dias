@@ -271,7 +271,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
 
     if (isMultiClient) {
         // ═══ MULTI-CLIENT BREAKDOWN ═══
-        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems);
+        const breakdown = calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, null, null, table.type === 'NORMAL');
 
         if (breakdown) {
             // Shared section

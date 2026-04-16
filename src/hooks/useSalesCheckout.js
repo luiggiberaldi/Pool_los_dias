@@ -137,7 +137,8 @@ export function useSalesCheckout({
 
             // Shared portion
             const frozenDivisor = tableCheckoutData.frozenDivisor || null;
-            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor);
+            const isTimeFree = tableCheckoutData.table?.type === 'NORMAL';
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFree);
             if (fullBreakdown) {
                 const seatBd = fullBreakdown.seats.find(s => s.seat.id === seatId);
                 if (seatBd && seatBd.sharedPortion > 0) {
@@ -152,7 +153,8 @@ export function useSalesCheckout({
         } else if (!seatId && seats.length > 0) {
             // ═══ COBRAR TODO CON CUANTAS DIVIDIDAS ═══
             const frozenDivisor = tableCheckoutData.frozenDivisor || null;
-            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor);
+            const isTimeFreeAll = tableCheckoutData.table?.type === 'NORMAL';
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFreeAll);
             if (fullBreakdown) {
                 const unpaidSeatBds = fullBreakdown.seats.filter(sb => !sb.seat.paid);
                 const divisorLabel = unpaidSeatBds.length;
