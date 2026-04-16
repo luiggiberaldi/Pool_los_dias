@@ -4,6 +4,7 @@ import { storageService } from '../utils/storageService';
 import { setImportGuard } from '../hooks/useCloudSync';
 import { showToast } from '../components/Toast';
 import PaymentMethodsManager from './Settings/PaymentMethodsManager';
+import WebSerialPanel from './Settings/WebSerialPanel';
 
 import { useSecurity } from '../hooks/useSecurity';
 import { useProductContext } from '../context/ProductContext';
@@ -198,12 +199,7 @@ export default function SettingsModal({ isOpen, onClose, products, onImport, tri
                             />
                         </div>
 
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Impresora Térmica</label>
-                            <div className="py-2 px-3 text-xs font-bold rounded-lg border bg-indigo-50 dark:bg-indigo-900/30 border-indigo-500 text-indigo-700 dark:text-indigo-300 text-center">
-                                58 mm — Configuración fija
-                            </div>
-                        </div>
+                        <WebSerialPanel />
 
                         <button
                             onClick={handleSaveBusinessData}
