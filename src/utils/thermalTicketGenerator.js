@@ -73,7 +73,7 @@ function _printThermalHTML(sale, bcvRate) {
             </tr>
             <tr>
                 <td></td>
-                <td colspan="2" style="font-size:${fTiny};color:#888;padding:0 0 4px;">$${item.priceUsd.toFixed(2)} c/u - Bs ${formatBs(subBs)}</td>
+                <td colspan="2" style="font-size:${fTiny};color:#000;padding:0 0 4px;">$${item.priceUsd.toFixed(2)} c/u - Bs ${formatBs(subBs)}</td>
             </tr>`;
     }).join('');
 
@@ -182,21 +182,21 @@ function _printThermalHTML(sale, bcvRate) {
     <table>
         <tr>
             <td style="font-size:${fSmall};font-weight:bold;">N: #${saleNum}</td>
-            <td style="font-size:${fTiny};color:#555;text-align:right;">${fecha} ${hora}</td>
+            <td style="font-size:${fTiny};color:#000;text-align:right;">${fecha} ${hora}</td>
         </tr>
     </table>
     <div style="font-size:${fSmall};margin:3px 0 2px;">
         <span style="font-weight:bold;">Cliente:</span> ${capitalizeName(sale.customerName) || 'Consumidor Final'}
     </div>
     ${sale.tableName ? `<div style="font-size:${fSmall};margin:2px 0;"><span style="font-weight:bold;">Mesa:</span> ${sale.tableName}</div>` : ''}
-    ${sale.customerDocument ? `<div style="font-size:${fTiny};color:#555;">C.I/RIF: ${sale.customerDocument}</div>` : ''}
-    ${(sale.meseroNombre || sale.vendedorNombre) && (sale.meseroNombre || sale.vendedorNombre) !== 'Sistema' ? `<div style="font-size:${fTiny};color:#555;"><span style="font-weight:bold;">Atendido:</span> ${capitalizeName(sale.meseroNombre || sale.vendedorNombre)}</div>` : ''}
+    ${sale.customerDocument ? `<div style="font-size:${fTiny};color:#000;">C.I/RIF: ${sale.customerDocument}</div>` : ''}
+    ${(sale.meseroNombre || sale.vendedorNombre) && (sale.meseroNombre || sale.vendedorNombre) !== 'Sistema' ? `<div style="font-size:${fTiny};color:#000;"><span style="font-weight:bold;">Atendido:</span> ${capitalizeName(sale.meseroNombre || sale.vendedorNombre)}</div>` : ''}
 
     <hr class="dash">
 
     <!-- Productos Header -->
     <table style="margin-bottom:4px;">
-        <tr style="font-size:${fTiny};color:#777;font-weight:bold;">
+        <tr style="font-size:${fTiny};color:#000;font-weight:bold;">
             <td style="text-align:left;">CANT</td>
             <td style="text-align:left;">DESCRIPCION</td>
             <td style="text-align:right;">IMPORTE</td>
@@ -209,7 +209,7 @@ function _printThermalHTML(sale, bcvRate) {
     <hr class="dash">
 
     <!-- Tasa -->
-    <div class="center" style="font-size:${fTiny};color:#555;margin:4px 0;">
+    <div class="center" style="font-size:${fTiny};color:#000;margin:4px 0;">
         <div style="margin-bottom:2px;">Tasa BCV: Bs ${formatBs(rate)} por $1</div>
         ${sale.tasaCop > 0 ? `<div>Tasa COP: ${sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por $1</div>` : ''}
     </div>
@@ -219,8 +219,8 @@ function _printThermalHTML(sale, bcvRate) {
         ${sale.discountAmountUsd > 0 ? `
         <table style="margin-bottom:6px; font-size:${fTiny}; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
             <tr>
-                <td style="text-align:left; color:#555; font-weight:bold;">SUBTOTAL:</td>
-                <td style="text-align:right; color:#555; font-weight:bold;">$${sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)}</td>
+                <td style="text-align:left; color:#000; font-weight:bold;">SUBTOTAL:</td>
+                <td style="text-align:right; color:#000; font-weight:bold;">$${sale.cartSubtotalUsd?.toFixed(2) || (sale.totalUsd + sale.discountAmountUsd).toFixed(2)}</td>
             </tr>
             <tr>
                 <td style="text-align:left; color:#dc3545; font-weight:bold;">${sale.discountType === 'percentage' ? `DESCUENTO (${sale.discountValue}%):` : 'DESCUENTO:'}</td>
@@ -228,7 +228,7 @@ function _printThermalHTML(sale, bcvRate) {
             </tr>
         </table>
         ` : ''}
-        <div class="center bold" style="font-size:${fSmall};color:#555;margin-bottom:4px;">TOTAL A PAGAR</div>
+        <div class="center bold" style="font-size:${fSmall};color:#000;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
         <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
         ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:13px;">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
@@ -239,7 +239,7 @@ function _printThermalHTML(sale, bcvRate) {
     <!-- Pagos -->
     ${(sale.payments && sale.payments.length > 0) || hasFiado ? `
     <div style="margin:4px 0;">
-        <div style="font-size:${fTiny};color:#777;font-weight:bold;margin-bottom:4px;">PAGOS REALIZADOS</div>
+        <div style="font-size:${fTiny};color:#000;font-weight:bold;margin-bottom:4px;">PAGOS REALIZADOS</div>
         <table>${paymentsHtml}</table>
         ${fiadoHtml}
     </div>
@@ -248,7 +248,7 @@ function _printThermalHTML(sale, bcvRate) {
 
     <!-- Pie -->
     <div class="center bold" style="font-size:${fBase};margin:8px 0 4px;">Gracias por tu compra!</div>
-    <div class="center" style="font-size:${fDisclaimer};color:#888;margin-top:4px;line-height:1.4;">Este documento no constituye factura fiscal.<br>Comprobante de control interno sin validez tributaria.</div>
+    <div class="center" style="font-size:${fDisclaimer};color:#000;margin-top:4px;line-height:1.4;">Este documento no constituye factura fiscal.<br>Comprobante de control interno sin validez tributaria.</div>
 </body>
 </html>`;
 
