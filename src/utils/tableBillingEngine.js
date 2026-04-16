@@ -285,7 +285,7 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
         };
     });
 
-    const grandTotal = seatBreakdowns.reduce((acc, sb) => acc + sb.subtotal, 0);
+    const grandTotal = seatBreakdowns.filter(sb => !sb.seat.paid).reduce((acc, sb) => acc + sb.subtotal, 0);
 
     return {
         seats: seatBreakdowns,

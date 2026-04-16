@@ -149,6 +149,43 @@ export function useSalesCheckout({
                     });
                 }
             }
+        } else if (!seatId && seats.length > 0) {
+            // ═══ COBRAR TODO CON CUANTAS DIVIDIDAS ═══
+            const frozenDivisor = tableCheckoutData.frozenDivisor || null;
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor);
+            if (fullBreakdown) {
+                const unpaidSeatBds = fullBreakdown.seats.filter(sb => !sb.seat.paid);
+                const divisorLabel = unpaidSeatBds.length;
+                unpaidSeatBds.forEach(seatBd => {
+                    const seat = seatBd.seat;
+                    const seatLabel = `${tableCheckoutData.table?.name || 'Mesa'} (${seat.label || 'Persona'})`;
+                    if (seatBd.timeCost.pinaCost > 0) {
+                        const pinaQty = seat.timeCharges
+                            ? seat.timeCharges.filter(tc => tc.type === 'pina').reduce((s, tc) => s + (tc.amount || 1), 0)
+                            : (seat.pinas || 1);
+                        syntheticCart.push({ id: crypto.randomUUID(), name: `Piña ${seatLabel}`, priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0), qty: pinaQty, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
+                    }
+                    if (seatBd.timeCost.hourCost > 0) {
+                        const horasQty = seat.timeCharges
+                            ? seat.timeCharges.filter(tc => tc.type === 'hora').reduce((s, tc) => s + (tc.amount || 0), 0)
+                            : (seat.hoursPaid || 0);
+                        syntheticCart.push({ id: crypto.randomUUID(), name: `Tiempo ${seatLabel} (${formatHoursPaid(horasQty)})`, priceUsdt: round2(seatBd.timeCost.hourCost), priceUsd: round2(seatBd.timeCost.hourCost), qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
+                    }
+                    if (seatBd.timeCost.libreCost > 0) {
+                        syntheticCart.push({ id: crypto.randomUUID(), name: `Tiempo libre ${seatLabel}`, priceUsdt: round2(seatBd.timeCost.libreCost), priceUsd: round2(seatBd.timeCost.libreCost), qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
+                    }
+                    seatBd.items.forEach(item => {
+                        const p = products.find(p => p.id === item.product_id);
+                        syntheticCart.push(p
+                            ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 }
+                            : { id: item.product_id, name: item.product_name || 'Producto', priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: 0, costUsd: 0, unit: 'unidad', category: 'otros', stock: 9999 }
+                        );
+                    });
+                    if (seatBd.sharedPortion > 0) {
+                        syntheticCart.push({ id: crypto.randomUUID(), name: `Compartido ${tableCheckoutData.table?.name || 'Mesa'} (÷${divisorLabel})`, priceUsdt: round2(seatBd.sharedPortion), priceUsd: round2(seatBd.sharedPortion), qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
+                    }
+                });
+            }
         } else {
             // ═══ CLASSIC (FULL TABLE) CHECKOUT ═══
             if (tableCheckoutData.timeCost > 0) {
@@ -194,7 +231,9 @@ export function useSalesCheckout({
         const opts = {
             cart: syntheticCart,
             cartTotalUsd: tableCheckoutData.grandTotal,
-            cartTotalBs: calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate),
+            cartTotalBs: seats.length > 0
+                ? round2(tableCheckoutData.grandTotal * effectiveRate)
+                : calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, useTablesStore.getState().config, effectiveRate),
             cartSubtotalUsd: tableCheckoutData.grandTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,

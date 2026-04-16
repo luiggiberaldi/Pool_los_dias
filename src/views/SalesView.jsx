@@ -456,6 +456,14 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                                 const seatBd = fb?.seats.find(s => s.seat.id === seatId);
                                 if (seatBd) baseTotal = seatBd.subtotal;
                             }
+                        } else {
+                            // "Cobrar Todo" con cuantas divididas: usar grandTotal del seat breakdown (solo asientos no pagados)
+                            const seats = tableCheckoutData.session?.seats || [];
+                            if (seats.length > 0) {
+                                const config = useTablesStore.getState().config;
+                                const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null);
+                                if (fb && fb.grandTotal > 0) baseTotal = fb.grandTotal;
+                            }
                         }
 
                         const _sub = baseTotal - _itemDiscAmt;
