@@ -88,6 +88,11 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
         if ((s.customerName || 'consumidor final').toLowerCase().includes(q)) return true;
         if (s.items && s.items.some(i => i.name.toLowerCase().includes(q))) return true;
         if (s.id.toLowerCase().includes(q)) return true;
+        // Búsqueda por número de factura (ej: "73", "#73", "0000073")
+        if (s.saleNumber !== undefined && String(s.saleNumber).includes(q.replace('#', ''))) return true;
+        if (s.saleNumber !== undefined && String(s.saleNumber).padStart(7, '0').includes(q.replace('#', ''))) return true;
+        // Búsqueda por nombre de mesa
+        if (s.tableName && s.tableName.toLowerCase().includes(q)) return true;
         return false;
     }), [historySales, historyFilter, historySearch]);
 
@@ -269,8 +274,8 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                                         <Clock size={16} className="text-indigo-600 dark:text-indigo-400" />
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-xs font-bold text-slate-700 dark:text-white">Listado de Transacciones</p>
-                                        <p className="text-[10px] text-slate-400">{historySales.length} {historySales.length === 1 ? 'transacción' : 'transacciones'} en este periodo</p>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-white">Historial de Ventas</p>
+                                        <p className="text-[10px] text-slate-400">{historySales.length} {historySales.length === 1 ? 'venta' : 'ventas'} en este periodo</p>
                                     </div>
                                 </div>
                                 {showHistory ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
@@ -286,7 +291,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                                                 type="text"
                                                 value={historySearch}
                                                 onChange={e => { setHistorySearch(e.target.value); setVisibleCount(30); }}
-                                                placeholder="Buscar por cliente, producto u orden..."
+                                                placeholder="Buscar por N° factura, mesa, cliente o producto..."
                                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-8 text-xs font-medium text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
                                             />
                                             {historySearch && (
