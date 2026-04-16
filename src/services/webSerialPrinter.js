@@ -119,14 +119,17 @@ export async function detectAndAutoConfig() {
             usbProductId: usbProductId ? `0x${usbProductId.toString(16).toUpperCase().padStart(4,'0')}` : null,
         };
     } else if (!usbVendorId) {
-        // Sin datos USB → puerto COM físico o Bluetooth virtual.
-        // Impresoras como FC-58S conectadas por USB NO aparecen aquí (usan clase USB Printer, no serial).
-        // Si el usuario llegó acá con una FC-58S, debe usar modo "Impresora del Sistema".
+        // Sin datos USB → puerto COM físico, adaptador USB-Serial genérico (CH340, PL2303, CP210x)
+        // o impresora con firmware que no expone VID/PID vía WebSerial.
+        // El usuario YA seleccionó el puerto → es un dispositivo serial. Tratar como térmica genérica
+        // para imprimir directo via ESC/POS sin diálogo del sistema.
         detected = {
             ...currentCfg,
-            printerType:  'system',
-            printerBrand: 'Impresora del Sistema',
-            printerModel: 'Sin datos USB — usar driver de Windows',
+            baudRate:     currentCfg.baudRate || 9600,
+            paperWidth:   currentCfg.paperWidth || 58,
+            printerType:  'thermal_serial',
+            printerBrand: 'Térmica',
+            printerModel: 'Puerto serial (sin VID/PID)',
             noVidPid: true,
             usbVendorId:  null,
             usbProductId: null,

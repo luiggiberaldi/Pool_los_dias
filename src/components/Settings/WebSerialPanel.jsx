@@ -83,7 +83,7 @@ function PrinterCard({ config, connected }) {
                 <div className="mt-3 pt-3 border-t border-amber-200/60 dark:border-amber-800/40 flex items-start gap-2">
                     <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-[10px] text-amber-700 dark:text-amber-300 leading-relaxed">
-                        Impresora no detectada en este momento. Conecta el cable USB y pulsa <strong>"Detectar"</strong> para reconectar.
+                        Impresora no detectada. Conecta el cable USB y pulsa <strong>"Redetectar"</strong>. Si no imprime, ajusta el <strong>Baud Rate</strong> en ajustes avanzados (prueba 9600 → 115200).
                     </p>
                 </div>
             )}
