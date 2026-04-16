@@ -273,15 +273,16 @@ function _printThermalHTML(sale, bcvRate) {
     printWindow.document.write(html);
     printWindow.document.close();
 
+    let printed = false;
     // Esperar a que cargue la imagen del logo antes de imprimir
     printWindow.onload = () => {
         setTimeout(() => {
-            printWindow.print();
+            if (!printed) { printed = true; printWindow.print(); }
         }, 400);
     };
 
     // Fallback si onload no dispara
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) { /* ignore */ }
+        if (!printed) { printed = true; try { printWindow.print(); } catch(_) {} }
     }, 1500);
 }

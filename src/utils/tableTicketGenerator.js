@@ -211,10 +211,11 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
     printWindow.document.open();
     printWindow.document.write(html);
     printWindow.document.close();
+    let printed = false;
     printWindow.onload = () => {
-        setTimeout(() => printWindow.print(), 400);
+        setTimeout(() => { if (!printed) { printed = true; printWindow.print(); } }, 400);
     };
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) {}
+        if (!printed) { printed = true; try { printWindow.print(); } catch(_) {} }
     }, 1500);
 }
