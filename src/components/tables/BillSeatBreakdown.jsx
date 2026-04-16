@@ -50,10 +50,17 @@ export function BillSeatBreakdown({
                                     <span className="font-bold">${sb.timeCost.total.toFixed(2)}</span>
                                 </div>
                             )}
-                            {sb.consumption > 0 && (
-                                <div className="flex justify-between text-slate-600 dark:text-slate-300">
-                                    <span>Consumo ({sb.items.length} {sb.items.length === 1 ? 'item' : 'items'})</span>
-                                    <span className="font-bold">${sb.consumption.toFixed(2)}</span>
+                            {sb.items.length > 0 && (
+                                <div className="space-y-0.5">
+                                    {sb.items.map((item, i) => {
+                                        const lineTotal = Number(item.unit_price_usd) * Number(item.qty);
+                                        return (
+                                            <div key={i} className="flex justify-between text-slate-600 dark:text-slate-300">
+                                                <span>{Number(item.qty)}x {item.product_name || 'Producto'}</span>
+                                                <span className="font-bold">${lineTotal.toFixed(2)}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                             {sb.sharedPortion > 0 && (
