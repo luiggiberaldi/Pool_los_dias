@@ -251,17 +251,42 @@ function _printThermalHTML(sale, bcvRate) {
 </body>
 </html>`;
 
-    _openAndPrint(html);
+    _measureAndPrint(html, cssBodyWidth);
 }
 
 /**
- * Abre ventana de impresión, mide el contenido real y ajusta @page antes de imprimir.
- * Esto evita el papel en blanco extra que genera el driver POS-58 con tamaños fijos.
+ * Mide el contenido en un div oculto, genera HTML con @page exacto, e imprime.
+ * Paso 1: Renderizar en div oculto para medir scrollHeight
+ * Paso 2: Reemplazar @page con la altura medida
+ * Paso 3: Abrir ventana e imprimir
  */
-function _openAndPrint(html) {
+function _measureAndPrint(html, bodyWidth) {
+    // Paso 1: medir contenido en un contenedor oculto con el mismo ancho
+    const measure = document.createElement('div');
+    measure.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${bodyWidth};padding:4mm 2mm;font-family:'Courier New','Lucida Console',monospace;font-size:11px;`;
+    measure.innerHTML = html.replace(/.*<body[^>]*>/s, '').replace(/<\/body>.*/s, '');
+    document.body.appendChild(measure);
+
+    // Esperar un frame para que el browser calcule el layout
+    requestAnimationFrame(() => {
+        const contentH = measure.scrollHeight;
+        document.body.removeChild(measure);
+
+        // Convertir px a mm (96 DPI: 1mm ≈ 3.7795px)
+        const heightMm = Math.ceil(contentH / 3.7795) + 5; // +5mm margen
+        // Reemplazar @page size en el HTML original
+        const finalHtml = html.replace(
+            /@page\s*\{[^}]*\}/,
+            `@page { size: 58mm ${heightMm}mm; margin: 0; }`
+        );
+
+        _openPrintWindow(finalHtml);
+    });
+}
+
+function _openPrintWindow(html) {
     const printWindow = window.open('', '_blank', 'width=350,height=600');
     if (!printWindow) {
-        // Fallback: iframe oculto
         const iframe = document.createElement('iframe');
         iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:58mm;height:auto;';
         document.body.appendChild(iframe);
@@ -270,7 +295,7 @@ function _openAndPrint(html) {
         iframe.contentDocument.close();
         iframe.onload = () => {
             setTimeout(() => {
-                _adjustPageSizeAndPrint(iframe.contentWindow, iframe.contentDocument);
+                iframe.contentWindow.print();
                 setTimeout(() => document.body.removeChild(iframe), 2000);
             }, 300);
         };
@@ -282,31 +307,10 @@ function _openAndPrint(html) {
     printWindow.document.close();
 
     printWindow.onload = () => {
-        setTimeout(() => {
-            _adjustPageSizeAndPrint(printWindow, printWindow.document);
-        }, 400);
+        setTimeout(() => printWindow.print(), 400);
     };
 
-    // Fallback si onload no dispara
     setTimeout(() => {
-        try {
-            _adjustPageSizeAndPrint(printWindow, printWindow.document);
-        } catch(_) { /* ignore */ }
+        try { printWindow.print(); } catch(_) {}
     }, 1500);
-}
-
-/**
- * Mide la altura real del contenido y reescribe @page con esa altura exacta.
- */
-function _adjustPageSizeAndPrint(win, doc) {
-    try {
-        const body = doc.body;
-        const contentH = body.scrollHeight;
-        // Convertir px a mm (96 DPI: 1mm ≈ 3.7795px)
-        const heightMm = Math.ceil(contentH / 3.7795) + 2; // +2mm margen de seguridad
-        const style = doc.createElement('style');
-        style.textContent = `@page { size: 58mm ${heightMm}mm !important; margin: 0 !important; }`;
-        doc.head.appendChild(style);
-    } catch(_) { /* si falla la medición, imprime con auto */ }
-    win.print();
 }

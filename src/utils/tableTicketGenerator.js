@@ -193,50 +193,52 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
 @media screen { body { border: 1px solid #ccc; margin-top: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); } }
 </style></head><body>${lines.join('')}</body></html>`;
 
-    // Imprimir midiendo el contenido real para evitar papel en blanco extra
-    _openAndPrintPreCuenta(html);
+    // Medir contenido real y generar HTML con @page exacto
+    _measureAndPrintPreCuenta(html);
 }
 
 /**
- * Abre ventana de impresión, mide el contenido real y ajusta @page antes de imprimir.
+ * Mide el contenido en un div oculto, genera HTML con @page exacto, e imprime.
  */
-function _openAndPrintPreCuenta(html) {
-    const printWindow = window.open('', '_blank', 'width=350,height=600');
-    if (!printWindow) {
-        const iframe = document.createElement('iframe');
-        Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
-        document.body.appendChild(iframe);
-        iframe.contentDocument.open();
-        iframe.contentDocument.write(html);
-        iframe.contentDocument.close();
+function _measureAndPrintPreCuenta(html) {
+    const measure = document.createElement('div');
+    measure.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:48mm;padding:4mm 2mm;font-family:'Courier New','Lucida Console',monospace;font-size:8pt;`;
+    measure.innerHTML = html.replace(/.*<body[^>]*>/s, '').replace(/<\/body>.*/s, '');
+    document.body.appendChild(measure);
+
+    requestAnimationFrame(() => {
+        const contentH = measure.scrollHeight;
+        document.body.removeChild(measure);
+
+        const heightMm = Math.ceil(contentH / 3.7795) + 5;
+        const finalHtml = html.replace(
+            /@page\s*\{[^}]*\}/,
+            `@page { size: 58mm ${heightMm}mm; margin: 0; }`
+        );
+
+        const printWindow = window.open('', '_blank', 'width=350,height=600');
+        if (!printWindow) {
+            const iframe = document.createElement('iframe');
+            Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+            document.body.appendChild(iframe);
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(finalHtml);
+            iframe.contentDocument.close();
+            setTimeout(() => {
+                iframe.contentWindow.print();
+                setTimeout(() => iframe.remove(), 5000);
+            }, 300);
+            return;
+        }
+
+        printWindow.document.open();
+        printWindow.document.write(finalHtml);
+        printWindow.document.close();
+        printWindow.onload = () => {
+            setTimeout(() => printWindow.print(), 400);
+        };
         setTimeout(() => {
-            _adjustAndPrint(iframe.contentWindow, iframe.contentDocument);
-            setTimeout(() => iframe.remove(), 5000);
-        }, 300);
-        return;
-    }
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.onload = () => {
-        setTimeout(() => _adjustAndPrint(printWindow, printWindow.document), 400);
-    };
-    setTimeout(() => {
-        try { _adjustAndPrint(printWindow, printWindow.document); } catch(_) {}
-    }, 1500);
-}
-
-/**
- * Mide la altura real del contenido y reescribe @page con esa altura exacta.
- */
-function _adjustAndPrint(win, doc) {
-    try {
-        const contentH = doc.body.scrollHeight;
-        const heightMm = Math.ceil(contentH / 3.7795) + 2;
-        const style = doc.createElement('style');
-        style.textContent = `@page { size: 58mm ${heightMm}mm !important; margin: 0 !important; }`;
-        doc.head.appendChild(style);
-    } catch(_) {}
-    win.print();
+            try { printWindow.print(); } catch(_) {}
+        }, 1500);
+    });
 }
