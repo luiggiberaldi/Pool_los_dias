@@ -73,9 +73,27 @@ export async function processSaleTransaction({
     const cartForRpc = cart.filter(i => isValidUUID(i._originalId || i.id));
     const hasRpcCompatibleItems = cartForRpc.length > 0;
 
+    // Calcular el total EXACTO desde los items del carrito que se envían al RPC.
+    // El servidor recalcula sum(qty * priceUsd) y lo compara con sum(pagos) + fiado.
+    // Si usamos cartTotalUsd (redondeado) puede diferir del cálculo del servidor.
+    const rpcCartItems = cartForRpc.map(i => ({
+        id: i._originalId || i.id,
+        qty: i.qty,
+        priceUsd: i.priceUsd,
+        isCombo: i.isCombo || false,
+        linkedProductId: i.linkedProductId || null,
+        linkedQty: i.linkedQty || 1,
+        comboItems: i.comboItems || null
+    }));
+    const rpcTotal = round2(rpcCartItems.reduce((s, ci) => s + ci.qty * ci.priceUsd, 0));
+
+    // Ajustar fiado proporcionalmente si el total RPC difiere del original
+    const rpcFiadoUsd = rpcTotal !== cartTotalUsd && fiadoAmountUsd > 0
+        ? round2(Math.max(0, rpcTotal - round2(cartTotalUsd - fiadoAmountUsd)))
+        : fiadoAmountUsd;
+
     // Ajustar pagos para el RPC: descontar el vuelto para que Débito == Crédito
-    // El cliente puede pagar $10 por una venta de $2 y recibir $8 de vuelto.
-    // El RPC espera que la suma de pagos == total de la venta.
+    // El RPC espera que sum(pagos) + fiado == sum(qty*priceUsd) exactamente.
     let rpcPayments = payments.map(p => ({
       methodId: p.methodId,
       amountUsd: p.amountUsd,
@@ -83,8 +101,10 @@ export async function processSaleTransaction({
       methodLabel: p.methodLabel || p.methodId
     }));
 
-    if (changeUsd > EPSILON && rpcPayments.length > 0) {
-      let remaining = changeUsd;
+    const rpcPayTotal = rpcPayments.reduce((s, p) => s + (p.amountUsd || 0), 0);
+    const rpcExcess = round2(rpcPayTotal + rpcFiadoUsd - rpcTotal);
+    if (rpcExcess > EPSILON && rpcPayments.length > 0) {
+      let remaining = rpcExcess;
       for (let i = rpcPayments.length - 1; i >= 0 && remaining > EPSILON; i--) {
         const reduction = Math.min(remaining, rpcPayments[i].amountUsd);
         rpcPayments[i] = { ...rpcPayments[i], amountUsd: round2(rpcPayments[i].amountUsd - reduction) };
@@ -93,19 +113,21 @@ export async function processSaleTransaction({
       rpcPayments = rpcPayments.filter(p => p.amountUsd > EPSILON);
     }
 
+    // Forzar que el último pago absorba cualquier diferencia residual de redondeo
+    const finalPaySum = round2(rpcPayments.reduce((s, p) => s + p.amountUsd, 0));
+    const residual = round2(rpcTotal - finalPaySum - rpcFiadoUsd);
+    if (Math.abs(residual) > 0.001 && rpcPayments.length > 0) {
+      rpcPayments[rpcPayments.length - 1] = {
+        ...rpcPayments[rpcPayments.length - 1],
+        amountUsd: round2(rpcPayments[rpcPayments.length - 1].amountUsd + residual)
+      };
+    }
+
     const rpcPayload = {
-      total: cartTotalUsd,
-      cart: cartForRpc.map(i => ({
-          id: i._originalId || i.id,
-          qty: i.qty,
-          priceUsd: i.priceUsd,
-          isCombo: i.isCombo || false,
-          linkedProductId: i.linkedProductId || null,
-          linkedQty: i.linkedQty || 1,
-          comboItems: i.comboItems || null
-      })),
+      total: rpcTotal,
+      cart: rpcCartItems,
       payments: rpcPayments,
-      fiadoUsd: fiadoAmountUsd
+      fiadoUsd: rpcFiadoUsd
     };
 
     let saleMode = 'online';

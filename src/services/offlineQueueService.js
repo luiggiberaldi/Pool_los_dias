@@ -19,6 +19,7 @@ const UNRECOVERABLE_CODES = new Set([
   '23502', // not_null_violation
   '23503', // foreign_key_violation
   '42501', // insufficient_privilege
+  'P0001', // raise_exception (ej: double entry validation failed)
 ]);
 
 // ─── Lock Multi-Tab ────────────────────────────────────────────────────────
@@ -120,14 +121,19 @@ export const offlineQueueService = {
 
         for (const item of pending) {
           try {
-            // Ajustar pagos: si la suma de pagos > total, hay vuelto que no
-            // fue descontado (payloads creados antes del fix). Restar el exceso
-            // del último pago para que Débito == Crédito en doble partida.
+            // Recalcular total EXACTO desde los items del carrito.
+            // El RPC del servidor calcula sum(qty * priceUsd) y compara con sum(pagos) + fiado.
+            // Si usamos el total original (redondeado), puede haber diferencias de centésimas.
+            const cart = item.payload.cart || [];
+            const recalcTotal = Math.round(cart.reduce((s, ci) => s + (ci.qty * ci.priceUsd), 0) * 100) / 100;
+            const originalTotal = item.payload.total || 0;
+            const saleTotal = cart.length > 0 ? recalcTotal : originalTotal;
+
+            // Ajustar pagos para que sum(pagos) + fiado == saleTotal exactamente
             let adjustedPayments = [...(item.payload.payments || [])];
             const payTotal = adjustedPayments.reduce((s, p) => s + (p.amountUsd || 0), 0);
-            const saleTotal = item.payload.total || 0;
             const fiado = item.payload.fiadoUsd || 0;
-            const excess = payTotal + fiado - saleTotal;
+            const excess = Math.round((payTotal + fiado - saleTotal) * 100) / 100;
             if (excess > 0.01 && adjustedPayments.length > 0) {
               let rem = excess;
               for (let i = adjustedPayments.length - 1; i >= 0 && rem > 0.01; i--) {
@@ -138,8 +144,20 @@ export const offlineQueueService = {
               adjustedPayments = adjustedPayments.filter(p => p.amountUsd > 0.01);
             }
 
+            // Forzar último pago para absorber cualquier residuo de redondeo
+            const finalPaySum = Math.round(adjustedPayments.reduce((s, p) => s + p.amountUsd, 0) * 100) / 100;
+            const residual = Math.round((saleTotal - finalPaySum - fiado) * 100) / 100;
+            if (Math.abs(residual) > 0.001 && adjustedPayments.length > 0) {
+              const lastIdx = adjustedPayments.length - 1;
+              adjustedPayments[lastIdx] = {
+                ...adjustedPayments[lastIdx],
+                amountUsd: Math.round((adjustedPayments[lastIdx].amountUsd + residual) * 100) / 100
+              };
+            }
+
             const payloadWithOrigin = {
               ...item.payload,
+              total: saleTotal,
               payments: adjustedPayments,
               sync_origin: 'offline_sync',
               original_created_at: item.created_at
