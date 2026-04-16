@@ -419,22 +419,24 @@ export default function WebSerialPanel() {
                         </button>
                         {showAdvanced && (
                             <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Velocidad (Baud Rate)</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Ajusta si no imprime correctamente</p>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">Velocidad (Baud Rate)</p>
+                                    <p className="text-[10px] text-slate-400 mb-2">Si nada imprime, prueba cada valor y haz Test después de cada cambio.</p>
+                                    <div className="grid grid-cols-5 gap-1">
+                                        {[9600, 19200, 38400, 57600, 115200].map(b => (
+                                            <button
+                                                key={b}
+                                                onClick={() => handleBaudRate(b)}
+                                                className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                                                    (config.baudRate || 9600) === b
+                                                        ? 'bg-indigo-500 text-white border-indigo-500'
+                                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                                                }`}
+                                            >
+                                                {b >= 1000 ? (b/1000)+'k' : b}
+                                            </button>
+                                        ))}
                                     </div>
-                                    <select
-                                        value={config.baudRate || 9600}
-                                        onChange={e => handleBaudRate(e.target.value)}
-                                        className="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-                                    >
-                                        <option value={9600}>9600</option>
-                                        <option value={19200}>19200</option>
-                                        <option value={38400}>38400</option>
-                                        <option value={57600}>57600</option>
-                                        <option value={115200}>115200</option>
-                                    </select>
                                 </div>
                             </div>
                         )}
