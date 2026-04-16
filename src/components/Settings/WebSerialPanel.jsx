@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
     Printer, Usb, AlertTriangle, CheckCircle, RefreshCw,
-    SmartphoneNfc, Scan, RotateCcw, Wifi, Monitor
+    SmartphoneNfc, Scan, RotateCcw, Monitor, Zap,
+    Wifi, WifiOff, ChevronRight, Info, Settings2
 } from 'lucide-react';
 import { SectionCard, Toggle } from '../SettingsShared';
 import {
@@ -11,133 +12,221 @@ import {
 import { TYPE_LABELS } from '../../services/printerDatabase';
 import { showToast } from '../Toast';
 
-// ── Íconos por tipo ───────────────────────────────────────────────────────────
-const TYPE_ICON = {
-    thermal:        Usb,
-    thermal_serial: Usb,
-    system:         Printer,
-};
+// ── Badge de estado ────────────────────────────────────────────────────────────
+function StatusBadge({ connected, printerType }) {
+    if (printerType === 'system') {
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                <Monitor size={9} /> Sistema
+            </span>
+        );
+    }
+    return connected ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Conectada
+        </span>
+    ) : (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            <WifiOff size={9} /> Sin señal
+        </span>
+    );
+}
 
-// ── Colores por tipo ──────────────────────────────────────────────────────────
-const TYPE_COLOR = {
-    thermal:        'emerald',
-    thermal_serial: 'emerald',
-    system:         'indigo',
-};
-
-function PrinterChip({ brand, model, type }) {
-    const color = TYPE_COLOR[type] || 'slate';
-    const Icon  = TYPE_ICON[type] || Printer;
-    const label = TYPE_LABELS[type]?.label || type;
-
-    const colorMap = {
-        emerald: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
-        indigo:  'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40',
-        slate:   'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
-    };
+// ── Tarjeta de impresora configurada ──────────────────────────────────────────
+function PrinterCard({ config, connected }) {
+    const isThermal = config.printerType === 'thermal' || config.printerType === 'thermal_serial';
+    const isSystem  = config.printerType === 'system';
+    const label     = TYPE_LABELS[config.printerType]?.label || config.printerType;
 
     return (
-        <div className={`flex items-center gap-2.5 p-3 rounded-xl border ${colorMap[color]}`}>
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0
-                ${color === 'emerald' ? 'bg-emerald-100 dark:bg-emerald-900/40' :
-                  color === 'indigo'  ? 'bg-indigo-100 dark:bg-indigo-900/40' :
-                                        'bg-slate-100 dark:bg-slate-800'}`}>
-                <Icon size={18} />
+        <div className={`rounded-2xl border-2 p-4 ${
+            isSystem
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800/50'
+                : connected
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
+        }`}>
+            <div className="flex items-start gap-3">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                    isSystem ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'
+                    : connected ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400'
+                }`}>
+                    {isSystem ? <Monitor size={20} /> : <Usb size={20} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-black text-slate-800 dark:text-white truncate">
+                            {config.printerBrand}
+                        </p>
+                        <StatusBadge connected={connected} printerType={config.printerType} />
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{config.printerModel}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{label}{isThermal && config.baudRate ? ` · ${config.baudRate} baud` : ''}</p>
+                </div>
+                <CheckCircle size={18} className={`shrink-0 mt-0.5 ${
+                    isSystem ? 'text-indigo-500' : connected ? 'text-emerald-500' : 'text-amber-500'
+                }`} />
             </div>
-            <div className="min-w-0">
-                <p className="text-sm font-black truncate">{brand} <span className="font-medium opacity-80">{model}</span></p>
-                <p className="text-[10px] font-medium opacity-70 mt-0.5">{label}</p>
-            </div>
-            <CheckCircle size={16} className="ml-auto shrink-0 opacity-70" />
+
+            {isSystem && (
+                <div className="mt-3 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40 flex items-start gap-2">
+                    <Info size={12} className="text-indigo-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                        Imprime via diálogo del sistema. Para impresión <strong>directa sin diálogo</strong>, conecta una impresora térmica USB y usa "Detectar impresora".
+                    </p>
+                </div>
+            )}
+
+            {!isSystem && !connected && (
+                <div className="mt-3 pt-3 border-t border-amber-200/60 dark:border-amber-800/40 flex items-start gap-2">
+                    <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                        Impresora no detectada en este momento. Conecta el cable USB y pulsa <strong>"Detectar"</strong> para reconectar.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
 
+// ── Panel de primeros pasos (sin configurar) ───────────────────────────────────
+function SetupGuide() {
+    const steps = [
+        { num: 1, text: 'Conecta la impresora por USB' },
+        { num: 2, text: 'Pulsa "Detectar impresora"' },
+        { num: 3, text: 'Selecciona el puerto en el navegador' },
+    ];
+    return (
+        <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+                <Printer size={18} className="text-slate-400" />
+                <p className="text-sm font-black text-slate-600 dark:text-slate-300">Sin impresora configurada</p>
+            </div>
+            <div className="space-y-2">
+                {steps.map(s => (
+                    <div key={s.num} className="flex items-center gap-3">
+                        <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-black">{s.num}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{s.text}</p>
+                    </div>
+                ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex items-start gap-2">
+                <Info size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Requiere <strong>Chrome o Edge</strong> en escritorio. La impresión directa sin diálogo funciona solo con impresoras térmicas USB.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ── Error display ──────────────────────────────────────────────────────────────
+function ErrorBox({ message, onDismiss }) {
+    return (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl p-3 flex items-start gap-2.5">
+            <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-red-700 dark:text-red-400">Error</p>
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-0.5 leading-relaxed">{message}</p>
+            </div>
+            <button onClick={onDismiss} className="text-red-400 hover:text-red-600 transition-colors text-[10px] font-bold shrink-0">✕</button>
+        </div>
+    );
+}
+
+// ── Componente principal ───────────────────────────────────────────────────────
 export default function WebSerialPanel() {
-    const [config, setConfig]     = useState(getWebSerialConfig());
+    const [config, setConfig]       = useState(getWebSerialConfig);
     const [connected, setConnected] = useState(false);
     const [detecting, setDetecting] = useState(false);
-    const [testing, setTesting]   = useState(false);
-    const [error, setError]       = useState('');
+    const [testing, setTesting]     = useState(false);
+    const [drawerBusy, setDrawerBusy] = useState(false);
+    const [error, setError]         = useState('');
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     const isConfigured = !!config.printerType;
     const isThermal    = config.printerType === 'thermal' || config.printerType === 'thermal_serial';
     const isSystem     = config.printerType === 'system';
     const isSupported  = 'serial' in navigator;
 
-    // Verificar si ya hay un puerto conectado al montar
     useEffect(() => {
         getConnectedPrinter().then(port => setConnected(!!port));
         setConfig(getWebSerialConfig());
     }, []);
 
-    // ── Detectar impresora ──────────────────────────────────────────────────
+    // ── Detectar ───────────────────────────────────────────────────────────
     const handleDetect = async () => {
         setDetecting(true);
         setError('');
         try {
             const detected = await detectAndAutoConfig();
             setConfig(detected);
-
-            // Para térmicas: marcar como conectada
             if (detected.printerType !== 'system') setConnected(true);
-
-            showToast(`Detectado: ${detected.printerBrand} ${detected.printerModel}`, 'success');
+            showToast(`✓ ${detected.printerBrand} ${detected.printerModel} detectada`, 'success');
         } catch (err) {
-            if (!err.message.includes('Cancelaste')) {
-                setError(err.message);
+            if (!err.message?.includes('Cancelaste')) {
+                setError(err.message || 'No se pudo detectar la impresora. Verifica la conexión USB.');
             }
         } finally {
             setDetecting(false);
         }
     };
 
-    // ── Resetear configuración ─────────────────────────────────────────────
-    const handleReset = () => {
-        clearPrinterConfig();
-        setConfig(getWebSerialConfig());
+    // ── Usar sistema ───────────────────────────────────────────────────────
+    const handleUseSystem = () => {
+        const newCfg = {
+            ...getWebSerialConfig(),
+            printerType:  'system',
+            printerBrand: 'Impresora del Sistema',
+            printerModel: 'Driver del Sistema',
+            noVidPid: false,
+        };
+        saveWebSerialConfig(newCfg);
+        setConfig(newCfg);
         setConnected(false);
-        setError('');
-        showToast('Configuración de impresora eliminada', 'success');
+        showToast('Configurado: Impresora del sistema', 'success');
     };
 
-    // ── Test de impresión ──────────────────────────────────────────────────
+    // ── Test ───────────────────────────────────────────────────────────────
     const handleTestPrint = async () => {
         setTesting(true);
         setError('');
         try {
             if (isSystem) {
-                // Abrir diálogo de impresión del sistema
                 window.print();
                 showToast('Diálogo de impresión abierto', 'success');
             } else {
                 await printTestWebSerial();
-                showToast('Ticket enviado a la impresora', 'success');
+                showToast('Ticket de prueba enviado', 'success');
             }
         } catch (err) {
-            setError(err.message);
+            setError(err.message || 'Error al imprimir. Reconecta la impresora.');
             showToast('Error al imprimir', 'error');
         } finally {
             setTesting(false);
         }
     };
 
-    // ── Abrir cajón ────────────────────────────────────────────────────────
+    // ── Cajón ──────────────────────────────────────────────────────────────
     const handleOpenDrawer = async () => {
-        setTesting(true);
+        setDrawerBusy(true);
         setError('');
         try {
             await openCashDrawerWebSerial();
-            showToast('Cajón abriendo', 'success');
+            showToast('Pulso enviado al cajón', 'success');
         } catch (err) {
-            setError(err.message);
+            setError(err.message || 'No se pudo abrir el cajón. Verifica la conexión.');
             showToast('Error al abrir cajón', 'error');
         } finally {
-            setTesting(false);
+            setDrawerBusy(false);
         }
     };
 
-    // ── Baud rate manual (override) ────────────────────────────────────────
+    // ── Baud rate ──────────────────────────────────────────────────────────
     const handleBaudRate = (baud) => {
         const newCfg = { ...config, baudRate: Number(baud) };
         setConfig(newCfg);
@@ -149,181 +238,182 @@ export default function WebSerialPanel() {
         const newCfg = { ...config, autoOpenDrawer: !config.autoOpenDrawer };
         setConfig(newCfg);
         saveWebSerialConfig(newCfg);
+        showToast(newCfg.autoOpenDrawer ? 'Cajón automático activado' : 'Cajón automático desactivado', 'success');
     };
 
-    // ── Usar impresora del sistema (para FC-58S y similares por USB) ───────
-    const handleUseSystem = () => {
-        const newCfg = {
-            ...getWebSerialConfig(),
-            printerType:  'system',
-            printerBrand: 'Impresora del Sistema',
-            printerModel: 'Driver de Windows/Mac',
-            noVidPid: false,
-        };
-        saveWebSerialConfig(newCfg);
-        setConfig(newCfg);
+    // ── Reset ──────────────────────────────────────────────────────────────
+    const handleReset = () => {
+        clearPrinterConfig();
+        setConfig(getWebSerialConfig());
         setConnected(false);
-        showToast('Configurado como impresora del sistema', 'success');
+        setError('');
+        showToast('Configuración eliminada', 'success');
     };
 
-    // ── Render ─────────────────────────────────────────────────────────────
+    // ── Navegador no soportado ─────────────────────────────────────────────
     if (!isSupported) {
         return (
-            <SectionCard icon={Printer} title="Impresora" subtitle="Detección automática" iconColor="text-indigo-500">
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-xl flex items-start gap-3 border border-red-200 dark:border-red-800/40">
-                    <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <SectionCard icon={Printer} title="Impresora" subtitle="Impresión directa" iconColor="text-indigo-500">
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl flex items-start gap-3 border border-red-200 dark:border-red-800/40">
+                    <AlertTriangle size={20} className="mt-0.5 shrink-0" />
                     <div>
-                        <p className="text-sm font-bold mb-1">Navegador No Soportado</p>
-                        <p className="text-xs opacity-90 leading-relaxed">
-                            Usá Chrome, Edge o un navegador Chromium en Windows/Mac/Android.
+                        <p className="text-sm font-black mb-1">Navegador no compatible</p>
+                        <p className="text-xs leading-relaxed opacity-90">
+                            La impresión directa sin diálogo requiere <strong>Chrome o Edge</strong> en escritorio (Windows/Mac/Linux). Los dispositivos iOS no son compatibles.
+                        </p>
+                        <p className="text-xs mt-2 opacity-90">
+                            Puedes usar <strong>"Impresora del Sistema"</strong> para imprimir con diálogo desde cualquier navegador.
                         </p>
                     </div>
                 </div>
+                <button
+                    onClick={handleUseSystem}
+                    className="w-full mt-3 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                >
+                    <Monitor size={15} /> Usar impresora del sistema
+                </button>
             </SectionCard>
         );
     }
 
     return (
-        <SectionCard icon={Printer} title="Impresora" subtitle="Detección automática" iconColor="text-indigo-500">
-            <div className="space-y-4">
+        <SectionCard icon={Printer} title="Impresora" subtitle="Impresión directa sin diálogo" iconColor="text-indigo-500">
+            <div className="space-y-3">
 
-                {/* ── Estado / Chip de impresora ── */}
-                {isConfigured ? (
-                    <PrinterChip
-                        brand={config.printerBrand}
-                        model={config.printerModel}
-                        type={config.printerType}
-                    />
-                ) : (
-                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center">
-                        <Printer size={28} className="mx-auto mb-2 text-slate-300 dark:text-slate-600" />
-                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Sin impresora configurada</p>
-                        <p className="text-[10px] text-slate-400 mt-1">Conectá la impresora por USB y pulsá Detectar</p>
-                    </div>
-                )}
+                {/* ── Estado actual ── */}
+                {isConfigured
+                    ? <PrinterCard config={config} connected={connected} />
+                    : <SetupGuide />
+                }
 
-                {/* ── Nota si es impresora del sistema ── */}
-                {isSystem && (
-                    <div className="flex items-start gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800/40">
-                        <Wifi size={14} className="text-indigo-500 mt-0.5 shrink-0" />
-                        <div>
-                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed font-bold mb-0.5">Impresora del Sistema (Windows/Mac)</p>
-                            <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
-                                La pre-cuenta se imprime via diálogo del sistema. Si el cajón se abre al imprimir, desactivarlo en: <strong>Panel de Control → Dispositivos → FC-58S → Propiedades → Cajón</strong>
-                            </p>
-                        </div>
-                    </div>
-                )}
+                {/* ── Error ── */}
+                {error && <ErrorBox message={error} onDismiss={() => setError('')} />}
 
-                {/* ── Errores ── */}
-                {error && (
-                    <p className="text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1.5 px-1">
-                        <AlertTriangle size={12} /> {error}
-                    </p>
-                )}
+                {/* ── Botones principales ── */}
+                <div className={`grid gap-2 ${isConfigured && !isSystem ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <button
+                        onClick={handleDetect}
+                        disabled={detecting}
+                        className="py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 bg-indigo-500 hover:bg-indigo-600 text-white shadow-sm"
+                    >
+                        {detecting
+                            ? <><RefreshCw size={14} className="animate-spin" /> Detectando...</>
+                            : <><Scan size={14} /> {isConfigured ? 'Redetectar' : 'Detectar impresora'}</>
+                        }
+                    </button>
 
-                {/* ── Botón principal: Detectar / Reconfigurar ── */}
-                <button
-                    onClick={handleDetect}
-                    disabled={detecting}
-                    className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60
-                        bg-indigo-500 hover:bg-indigo-600 text-white"
-                >
-                    {detecting
-                        ? <><RefreshCw size={15} className="animate-spin" /> Detectando...</>
-                        : <><Scan size={15} /> {isConfigured ? 'Volver a detectar' : 'Detectar impresora'}</>
-                    }
-                </button>
+                    {isConfigured && !isSystem && (
+                        <button
+                            onClick={handleTestPrint}
+                            disabled={testing}
+                            className="py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm"
+                        >
+                            {testing
+                                ? <><RefreshCw size={14} className="animate-spin" /> Imprimiendo...</>
+                                : <><Zap size={14} /> Test</>
+                            }
+                        </button>
+                    )}
 
-                {/* ── Botón secundario: Usar impresora del sistema ── */}
-                {(!isConfigured || (isConfigured && !isSystem)) && (
+                    {isConfigured && isSystem && (
+                        <button
+                            onClick={handleTestPrint}
+                            disabled={testing}
+                            className="py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                        >
+                            {testing
+                                ? <><RefreshCw size={14} className="animate-spin" /> Abriendo...</>
+                                : <><Printer size={14} /> Test de impresión</>
+                            }
+                        </button>
+                    )}
+                </div>
+
+                {/* ── Usar sistema (si no está configurado o si es térmica) ── */}
+                {(!isConfigured || isThermal) && (
                     <button
                         onClick={handleUseSystem}
-                        className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95
-                            bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                        className="w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     >
-                        <Monitor size={15} /> Usar impresora del sistema (FC-58S / USB)
+                        <Monitor size={13} /> Usar impresora del sistema (con diálogo)
                     </button>
                 )}
 
-                {/* ── Acciones (solo si está configurada) ── */}
-                {isConfigured && (
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-4">
-
-                        {/* Baud rate (solo para térmicas) */}
-                        {isThermal && (
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Velocidad (Baud Rate)</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">Auto-detectado · ajustá si no imprime</p>
-                                </div>
-                                <select
-                                    value={config.baudRate || 9600}
-                                    onChange={e => handleBaudRate(e.target.value)}
-                                    className="text-xs font-bold px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
-                                >
-                                    <option value={9600}>9600</option>
-                                    <option value={19200}>19200</option>
-                                    <option value={38400}>38400</option>
-                                    <option value={57600}>57600</option>
-                                    <option value={115200}>115200</option>
-                                </select>
-                            </div>
-                        )}
-
-                        {/* Test de impresión */}
-                        <div className="flex items-center justify-between">
+                {/* ── Cajón (solo térmicas) ── */}
+                {isThermal && (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/50">
                             <div>
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Test de Impresión</p>
-                                <p className="text-[10px] text-slate-400 mt-0.5">
-                                    {isSystem ? 'Abre el diálogo del sistema' : 'Comando bruto ESC/POS'}
-                                </p>
+                                <p className="text-xs font-black text-slate-700 dark:text-slate-200">Cajón de Dinero</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Puerto RJ11 de la impresora</p>
                             </div>
                             <button
-                                onClick={handleTestPrint}
-                                disabled={testing}
-                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 flex items-center gap-1.5"
+                                onClick={handleOpenDrawer}
+                                disabled={drawerBusy}
+                                className="px-3 py-1.5 bg-white dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-50 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all active:scale-95 flex items-center gap-1.5 border border-slate-200 dark:border-slate-600 shadow-sm"
                             >
-                                {testing ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                                Imprimir
+                                {drawerBusy
+                                    ? <RefreshCw size={13} className="animate-spin" />
+                                    : <SmartphoneNfc size={13} />
+                                }
+                                Abrir
                             </button>
                         </div>
-
-                        {/* Cajón (solo para térmicas) */}
-                        {isThermal && (
-                            <>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Prueba de Cajón</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Enviar pulso 24v a la impresora</p>
-                                    </div>
-                                    <button
-                                        onClick={handleOpenDrawer}
-                                        disabled={testing}
-                                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 disabled:opacity-50 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg transition-all active:scale-95 flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800"
-                                    >
-                                        <SmartphoneNfc size={14} /> Abrir
-                                    </button>
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Apertura Automática</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Al cobrar una mesa</p>
-                                    </div>
-                                    <Toggle enabled={config.autoOpenDrawer} onChange={toggleAutoOpen} color="indigo" />
-                                </div>
-                            </>
-                        )}
-
-                        {/* Resetear */}
-                        <button
-                            onClick={handleReset}
-                            className="w-full py-2 rounded-xl text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                            <RotateCcw size={12} /> Eliminar configuración
-                        </button>
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-700">
+                            <div>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Apertura automática</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Al completar una venta</p>
+                            </div>
+                            <Toggle enabled={!!config.autoOpenDrawer} onChange={toggleAutoOpen} color="indigo" />
+                        </div>
                     </div>
+                )}
+
+                {/* ── Ajustes avanzados (solo térmicas) ── */}
+                {isThermal && (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <button
+                            onClick={() => setShowAdvanced(v => !v)}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Settings2 size={13} className="text-slate-400" />
+                                <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Ajustes avanzados</p>
+                            </div>
+                            <ChevronRight size={14} className={`text-slate-400 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+                        </button>
+                        {showAdvanced && (
+                            <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">Velocidad (Baud Rate)</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Ajusta si no imprime correctamente</p>
+                                    </div>
+                                    <select
+                                        value={config.baudRate || 9600}
+                                        onChange={e => handleBaudRate(e.target.value)}
+                                        className="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                                    >
+                                        <option value={9600}>9600</option>
+                                        <option value={19200}>19200</option>
+                                        <option value={38400}>38400</option>
+                                        <option value={57600}>57600</option>
+                                        <option value={115200}>115200</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Eliminar configuración ── */}
+                {isConfigured && (
+                    <button
+                        onClick={handleReset}
+                        className="w-full py-2 rounded-xl text-[11px] font-bold text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                        <RotateCcw size={11} /> Eliminar configuración
+                    </button>
                 )}
             </div>
         </SectionCard>
