@@ -200,7 +200,7 @@ export default function TableCard({ table, session }) {
         if (!currentUser) return;
         const ok = await confirm({ title: `Ocupar ${table.name}`, message: '¿Confirmar apertura de mesa?', confirmText: 'Ocupar Mesa', cancelText: 'Cancelar', variant: 'warning' });
         if (!ok) return;
-        await openSession(table.id, currentUser.id, 'CONSUMO', 0, clientName, guestCount, clientId, false, seats);
+        await openSession(table.id, currentUser.id, 'NORMAL', 0, clientName, guestCount, clientId, false, seats);
     };
 
     // Abre el modal de nombre/personas y guarda la acción pendiente
@@ -337,7 +337,7 @@ export default function TableCard({ table, session }) {
                 }, 500);
             }
         } else if (mode === 'CONSUMPTION') {
-            await openSession(table.id, currentUser.id, 'CONSUMO', 0, name, guests, firstSeatClientId, false, seats);
+            await openSession(table.id, currentUser.id, 'NORMAL', 0, name, guests, firstSeatClientId, false, seats);
         } else {
             await openSession(table.id, currentUser.id, 'NORMAL', pendingOpen.hours, name, guests, firstSeatClientId, false, seats);
         }
