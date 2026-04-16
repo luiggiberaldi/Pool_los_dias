@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { scopedKey } from './accountScope';
+import { useTablesStore } from './useTablesStore';
 
 // Helper: obtener user_id del usuario Supabase autenticado
 const getAuthUserId = async () => {
@@ -10,6 +11,30 @@ const getAuthUserId = async () => {
         return session?.user?.id || null;
     } catch { return null; }
 };
+
+// Espera hasta que la sesión con tempId sea reemplazada por una con UUID real.
+// Devuelve el UUID real, o lanza si se acaba el tiempo.
+async function waitForRealSessionId(tempId, timeoutMs = 8000) {
+    // Captura el table_id de la sesión temp para poder re-encontrarla después del swap
+    const tempSession = useTablesStore.getState().activeSessions.find(s => s.id === tempId);
+    if (!tempSession) throw new Error(`Sesión ${tempId} no encontrada`);
+    const tableId = tempSession.table_id;
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        await new Promise(r => setTimeout(r, 200));
+        const sessions = useTablesStore.getState().activeSessions;
+        // Si el temp ya no existe, buscar la sesión real por table_id sin temp
+        const stillTemp = sessions.find(s => s.id === tempId);
+        if (!stillTemp) {
+            const real = sessions.find(s => s.table_id === tableId && !s.id.startsWith('temp-'));
+            if (real) return real.id;
+        } else if (!stillTemp.id.startsWith('temp-')) {
+            return stillTemp.id;
+        }
+    }
+    throw new Error(`Timeout esperando sync de sesión temporal ${tempId}`);
+}
 
 const ordersCache = localforage.createInstance({
     name: "PoolLosDiaz",
@@ -134,6 +159,16 @@ export const useOrdersStore = create((set, get) => ({
 
     // Añade un ítem a la sesión (crea la orden si no existe)
     addItemToSession: async (tableId, sessionId, creatorId, productInfo, exchangeRate = 1, seatId = null) => {
+        // Si la sesión aún tiene ID temporal, esperar a que sincronice con Supabase
+        if (typeof sessionId === 'string' && sessionId.startsWith('temp-')) {
+            try {
+                sessionId = await waitForRealSessionId(sessionId);
+            } catch (e) {
+                console.error('Error esperando sync de sesión:', e);
+                throw e;
+            }
+        }
+
         let order = get().getOrderBySessionId(sessionId);
         const userId = await getAuthUserId();
 
