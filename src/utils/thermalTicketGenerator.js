@@ -251,6 +251,14 @@ function _printThermalHTML(sale, bcvRate) {
 </body>
 </html>`;
 
+    _openAndPrint(html);
+}
+
+/**
+ * Abre ventana de impresión, mide el contenido real y ajusta @page antes de imprimir.
+ * Esto evita el papel en blanco extra que genera el driver POS-58 con tamaños fijos.
+ */
+function _openAndPrint(html) {
     const printWindow = window.open('', '_blank', 'width=350,height=600');
     if (!printWindow) {
         // Fallback: iframe oculto
@@ -262,7 +270,7 @@ function _printThermalHTML(sale, bcvRate) {
         iframe.contentDocument.close();
         iframe.onload = () => {
             setTimeout(() => {
-                iframe.contentWindow.print();
+                _adjustPageSizeAndPrint(iframe.contentWindow, iframe.contentDocument);
                 setTimeout(() => document.body.removeChild(iframe), 2000);
             }, 300);
         };
@@ -273,15 +281,32 @@ function _printThermalHTML(sale, bcvRate) {
     printWindow.document.write(html);
     printWindow.document.close();
 
-    // Esperar a que cargue la imagen del logo antes de imprimir
     printWindow.onload = () => {
         setTimeout(() => {
-            printWindow.print();
+            _adjustPageSizeAndPrint(printWindow, printWindow.document);
         }, 400);
     };
 
     // Fallback si onload no dispara
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) { /* ignore */ }
+        try {
+            _adjustPageSizeAndPrint(printWindow, printWindow.document);
+        } catch(_) { /* ignore */ }
     }, 1500);
+}
+
+/**
+ * Mide la altura real del contenido y reescribe @page con esa altura exacta.
+ */
+function _adjustPageSizeAndPrint(win, doc) {
+    try {
+        const body = doc.body;
+        const contentH = body.scrollHeight;
+        // Convertir px a mm (96 DPI: 1mm ≈ 3.7795px)
+        const heightMm = Math.ceil(contentH / 3.7795) + 2; // +2mm margen de seguridad
+        const style = doc.createElement('style');
+        style.textContent = `@page { size: 58mm ${heightMm}mm !important; margin: 0 !important; }`;
+        doc.head.appendChild(style);
+    } catch(_) { /* si falla la medición, imprime con auto */ }
+    win.print();
 }

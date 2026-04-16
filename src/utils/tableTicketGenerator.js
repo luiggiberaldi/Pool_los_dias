@@ -193,11 +193,16 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
 @media screen { body { border: 1px solid #ccc; margin-top: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); } }
 </style></head><body>${lines.join('')}</body></html>`;
 
-    // Imprimir via window.open — mismo método que el ticket de venta
-    // (Chrome respeta @page size en ventanas nuevas, no en iframes)
+    // Imprimir midiendo el contenido real para evitar papel en blanco extra
+    _openAndPrintPreCuenta(html);
+}
+
+/**
+ * Abre ventana de impresión, mide el contenido real y ajusta @page antes de imprimir.
+ */
+function _openAndPrintPreCuenta(html) {
     const printWindow = window.open('', '_blank', 'width=350,height=600');
     if (!printWindow) {
-        // Fallback: iframe oculto
         const iframe = document.createElement('iframe');
         Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
         document.body.appendChild(iframe);
@@ -205,7 +210,7 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
         iframe.contentDocument.write(html);
         iframe.contentDocument.close();
         setTimeout(() => {
-            iframe.contentWindow.print();
+            _adjustAndPrint(iframe.contentWindow, iframe.contentDocument);
             setTimeout(() => iframe.remove(), 5000);
         }, 300);
         return;
@@ -215,9 +220,23 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.onload = () => {
-        setTimeout(() => printWindow.print(), 400);
+        setTimeout(() => _adjustAndPrint(printWindow, printWindow.document), 400);
     };
     setTimeout(() => {
-        try { printWindow.print(); } catch(_) {}
+        try { _adjustAndPrint(printWindow, printWindow.document); } catch(_) {}
     }, 1500);
+}
+
+/**
+ * Mide la altura real del contenido y reescribe @page con esa altura exacta.
+ */
+function _adjustAndPrint(win, doc) {
+    try {
+        const contentH = doc.body.scrollHeight;
+        const heightMm = Math.ceil(contentH / 3.7795) + 2;
+        const style = doc.createElement('style');
+        style.textContent = `@page { size: 58mm ${heightMm}mm !important; margin: 0 !important; }`;
+        doc.head.appendChild(style);
+    } catch(_) {}
+    win.print();
 }
