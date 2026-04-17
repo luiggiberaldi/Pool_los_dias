@@ -1,12 +1,14 @@
 import React from 'react';
 import { Trash2, KeyRound, Edit2, Crown, ToggleLeft, ToggleRight } from 'lucide-react';
 import { ROLE_CONFIG } from './UserPinInput';
+import { useDebtsStore } from '../../hooks/store/useDebtsStore';
 
 export default function UserCard({ user, currentUserId, onChangePin, onDelete, onEditName, onToggleActive, triggerHaptic }) {
     const roleString = user.role || user.rol || 'CAJERO';
     const rawName = user.name || user.nombre || 'Desconocido';
     const nameString = rawName.charAt(0).toUpperCase() + rawName.slice(1);
     const isActive = user.active !== false;
+    const debtTotal = useDebtsStore(s => s.getTotalByStaff(user.id));
 
     const roleConf = ROLE_CONFIG[roleString] || ROLE_CONFIG.CAJERO;
     const RoleIcon = roleConf.icon;
@@ -47,6 +49,11 @@ export default function UserCard({ user, currentUserId, onChangePin, onDelete, o
                     <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? roleConf.text : 'text-slate-400'}`}>
                         {roleConf.label}
                     </span>
+                    {debtTotal > 0 && (
+                        <span className="text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full ml-1">
+                            Debe ${debtTotal.toFixed(2)}
+                        </span>
+                    )}
                 </div>
             </div>
 

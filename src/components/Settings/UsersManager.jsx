@@ -8,6 +8,7 @@ import UserCard from './UserCard';
 import { ChangePinModal, DeleteUserModal, EditNameModal } from './UserModals';
 
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { useDebtsStore } from '../../hooks/store/useDebtsStore';
 
 // Helper: obtener user_id del usuario Supabase autenticado
 const getAuthUserId = async () => {
@@ -21,6 +22,9 @@ const getAuthUserId = async () => {
 export default function UsersManager({ triggerHaptic }) {
     const { cachedUsers: usuarios, currentUser: usuarioActivo, syncUsers } = useAuthStore();
     const { log } = useAudit();
+    const fetchDebts = useDebtsStore(s => s.fetchDebts);
+
+    useEffect(() => { fetchDebts(); }, []);
 
     // Also load inactive users to allow re-activation
     const [inactiveUsers, setInactiveUsers] = useState([]);
