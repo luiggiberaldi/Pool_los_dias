@@ -75,7 +75,7 @@ const TABS = [
     { id: 'mesas',     label: 'Mesas',     icon: Layers,       color: 'sky',    adminOnly: true },
     { id: 'ventas',    label: 'Ventas',     icon: CreditCard,   color: 'emerald' },
     { id: 'usuarios',  label: 'Usuarios',   icon: Users,        color: 'violet', adminOnly: true },
-    { id: 'deudas',    label: 'Deudas',     icon: Receipt,      color: 'rose',   adminOnly: true },
+    { id: 'deudas',    label: 'Empleados',  icon: Receipt,      color: 'rose',   adminOnly: true },
     { id: 'bitacora',  label: 'Bitácora',   icon: FileText,     color: 'indigo', adminOnly: true },
     { id: 'sistema',   label: 'Sistema',    icon: Database,     color: 'amber' },
 ];

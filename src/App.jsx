@@ -182,7 +182,7 @@ export default function App() {
     { id: 'mesas', label: 'Mesas', icon: Layers, hiddenForCajero: true },
     { id: 'ventas', label: 'Vender', icon: ShoppingCart, hiddenForMesero: true },
     { id: 'catalogo', label: 'Inventario', icon: Store, adminOnly: true },
-    { id: 'clientes', label: 'Contactos', icon: Users, adminOrCashier: true },
+    { id: 'clientes', label: 'Cuentas', icon: Users, adminOrCashier: true },
     { id: 'reportes', label: 'Reportes', icon: BarChart3, adminOnly: true },
     { id: 'ajustes', label: 'Config.', icon: Settings, adminOnly: true },
   ];
