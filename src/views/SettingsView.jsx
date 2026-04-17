@@ -115,7 +115,22 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
         });
     }, []);
 
-    const [activeTab, setActiveTab] = useState('ventas');
+    const [activeTab, setActiveTab] = useState(() => {
+        const pending = localStorage.getItem('settings_open_tab');
+        if (pending) { localStorage.removeItem('settings_open_tab'); return pending; }
+        return 'ventas';
+    });
+
+    // Listen for tab changes from outside (e.g. dashboard quick action)
+    useEffect(() => {
+        const handler = () => {
+            const pending = localStorage.getItem('settings_open_tab');
+            if (pending) { localStorage.removeItem('settings_open_tab'); setActiveTab(pending); }
+        };
+        window.addEventListener('focus', handler);
+        const interval = setInterval(handler, 500);
+        return () => { window.removeEventListener('focus', handler); clearInterval(interval); };
+    }, []);
     const [idCopied, setIdCopied] = useState(false);
 
     // ── Tour de configuración ──────────────────────────────────────────────────

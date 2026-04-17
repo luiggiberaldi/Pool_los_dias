@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { BarChart3, TrendingUp, Package, AlertTriangle, ArrowUpRight, Users, ChevronDown, ChevronUp, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, LogOut, Award, LineChart, ListChecks, RotateCcw, Bell, Clock, Wallet, X } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertTriangle, ArrowUpRight, Users, ChevronDown, ChevronUp, Phone, FileText, Recycle, Key, Settings, LockIcon, Unlock, LogOut, Award, LineChart, ListChecks, RotateCcw, Bell, Clock, Wallet, X, Receipt } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import SalesHistory from '../components/Dashboard/SalesHistory';
 import SalesChart from '../components/Dashboard/SalesChart';
@@ -452,6 +452,14 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             style={{ background: 'linear-gradient(135deg, #334155, #1E293B)', boxShadow: '0 4px 12px rgba(51,65,85,0.15)' }}>
                             <LineChart size={22} className="text-white" />
                             <span className="text-[11px] font-black text-white">Reportes</span>
+                        </button>
+                    )}
+                    {isAdmin && (
+                        <button onClick={() => { if (onNavigate) { triggerHaptic(); localStorage.setItem('settings_open_tab', 'deudas'); onNavigate('ajustes'); } }}
+                            className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
+                            style={{ background: 'linear-gradient(135deg, #F43F5E, #E11D48)', boxShadow: '0 4px 12px rgba(244,63,94,0.25)' }}>
+                            <Receipt size={22} className="text-white" />
+                            <span className="text-[11px] font-black text-white">Deudas</span>
                         </button>
                     )}
                     {role !== 'MESERO' && role !== 'BARRA' && (
