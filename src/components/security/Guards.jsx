@@ -39,7 +39,7 @@ export function AnyStaffRoute({ children }) {
         return <UnauthMessage message="Debe iniciar sesión." />;
     }
 
-    // If role is CAJERO or MESERO and NO box is open: Block them (unless cajero has open-caja permission).
+    // If role is CAJERO, MESERO or BARRA and NO box is open: Block them (unless cajero has open-caja permission).
     if (role !== 'ADMIN' && !activeCashSession && !(role === 'CAJERO' && cajeroAbreCaja)) {
          return <CashClosedLockScreen />;
     }

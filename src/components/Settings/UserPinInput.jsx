@@ -25,6 +25,14 @@ export const ROLE_CONFIG = {
         text: 'text-orange-600 dark:text-orange-400',
         border: 'border-orange-200 dark:border-orange-800/40',
         icon: Coffee,
+    },
+    BARRA: {
+        label: 'Barra',
+        gradient: 'from-violet-400 to-purple-500',
+        bg: 'bg-violet-50 dark:bg-violet-900/20',
+        text: 'text-violet-600 dark:text-violet-400',
+        border: 'border-violet-200 dark:border-violet-800/40',
+        icon: Coffee,
     }
 };
 

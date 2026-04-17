@@ -273,7 +273,7 @@ export default function UsersManager({ triggerHaptic }) {
                     {/* Role Selector */}
                     <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Rol</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                             {Object.entries(ROLE_CONFIG).map(([key, conf]) => {
                                 const Icon = conf.icon;
                                 return (

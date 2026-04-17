@@ -17,7 +17,7 @@ export default function SalesHeader({
 }) {
     const role = useAuthStore(s => s.role);
     const userRole = (role || '').toUpperCase();
-    const isLocked = userRole === 'CAJERO' || userRole === 'MESERO';
+    const isLocked = userRole === 'CAJERO' || userRole === 'MESERO' || userRole === 'BARRA';
 
     const handleRateToggle = () => {
         if (isLocked) return;

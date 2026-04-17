@@ -98,6 +98,30 @@ export const ROLE_WELCOME_STEPS = {
             text: 'También puedes hacer cobros rápidos desde aquí cuando sea necesario.'
         },
     ],
+
+    BARRA: [
+        {
+            target: null,
+            title: '¡Bienvenido, Barra!',
+            text: 'Tu rol es atender las mesas de pool. Abre mesas, registra consumos y envía a cobro.',
+            emoji: '🎱'
+        },
+        {
+            target: '[data-tour="tab-mesas"]',
+            title: 'Tus Mesas',
+            text: 'Toca una mesa libre para abrirla. El tiempo corre automáticamente. Agrega bebidas o snacks al pedido.'
+        },
+        {
+            target: '[data-tour="tab-inicio"]',
+            title: 'Tu Ranking',
+            text: 'Ve cuántas mesas atendiste hoy y tu posición en el ranking del equipo. ¡A vender!'
+        },
+        {
+            target: '[data-tour="tab-ventas"]',
+            title: 'Ventas Directas',
+            text: 'También puedes hacer cobros rápidos desde aquí cuando sea necesario.'
+        },
+    ],
 };
 
 // ── Mini-tours por Pestaña ─────────────────────────────────────
@@ -141,6 +165,13 @@ export const TAB_STEPS = {
                 text: 'Ve el resumen del día y tu posición en el ranking de meseros del equipo.'
             },
         ],
+        BARRA: [
+            {
+                target: null,
+                title: 'Tu Inicio',
+                text: 'Ve el resumen del día y tu posición en el ranking del equipo.'
+            },
+        ],
     },
 
     mesas: {
@@ -167,6 +198,28 @@ export const TAB_STEPS = {
             },
         ],
         MESERO: [
+            {
+                target: null,
+                title: 'Tus Mesas',
+                text: 'Toca una mesa LIBRE para abrirla. El temporizador arranca automáticamente.'
+            },
+            {
+                target: '[data-tour="mesa-btn-normal"]',
+                title: 'Modo Normal',
+                text: 'Abre la mesa por tiempo. Al final, el sistema calcula el total según las horas jugadas.'
+            },
+            {
+                target: '[data-tour="mesa-btn-pina"]',
+                title: 'La Piña',
+                text: 'Precio fijo por partida. Cada vez que el grupo quiera otra ronda, toca "+ Nueva Piña" para agregarla.'
+            },
+            {
+                target: null,
+                title: 'Consumo y Cobrar',
+                text: 'Con la mesa abierta usa "Consumo" para añadir productos al pedido. Cuando terminen, toca "Cobrar" para enviar el ticket al cajero.'
+            },
+        ],
+        BARRA: [
             {
                 target: null,
                 title: 'Tus Mesas',
@@ -226,6 +279,13 @@ export const TAB_STEPS = {
             },
         ],
         MESERO: [
+            {
+                target: null,
+                title: 'Ventas Directas',
+                text: 'Cobra productos directamente desde aquí cuando no están asociados a una mesa de pool.'
+            },
+        ],
+        BARRA: [
             {
                 target: null,
                 title: 'Ventas Directas',

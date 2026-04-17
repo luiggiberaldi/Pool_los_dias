@@ -309,7 +309,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     {usuarioActivo && (() => {
                         const r = usuarioActivo.role || usuarioActivo.rol;
                         const c = r === 'ADMIN' ? {bg:'bg-sky-50',border:'border-sky-100/50',ping:'bg-sky-400',dot:'bg-sky-500',text:'text-sky-800',btn:'text-sky-500 hover:bg-sky-100 hover:text-sky-700'}
-                                : r === 'MESERO' ? {bg:'bg-orange-50',border:'border-orange-100/50',ping:'bg-orange-400',dot:'bg-orange-500',text:'text-orange-800',btn:'text-orange-500 hover:bg-orange-100 hover:text-orange-700'}
+                                : r === 'MESERO' || r === 'BARRA' ? {bg:'bg-orange-50',border:'border-orange-100/50',ping:'bg-orange-400',dot:'bg-orange-500',text:'text-orange-800',btn:'text-orange-500 hover:bg-orange-100 hover:text-orange-700'}
                                 : {bg:'bg-teal-50',border:'border-teal-100/50',ping:'bg-teal-400',dot:'bg-teal-500',text:'text-teal-800',btn:'text-teal-500 hover:bg-teal-100 hover:text-teal-700'};
                         return (
                             <div className={`flex items-center gap-1.5 ${c.bg} ${c.border} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
@@ -432,7 +432,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── ACCIONES RÁPIDAS ── */}
-            {role !== 'MESERO' && (
+            {role !== 'MESERO' && role !== 'BARRA' && (
             <div className={`bg-white rounded-2xl p-3 border border-slate-100 shadow-sm ${!isAdmin ? 'mt-3' : ''}`}>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Acciones Rápidas</p>
                 <div className="flex gap-2">
@@ -452,7 +452,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                             <span className="text-[11px] font-black text-white">Reportes</span>
                         </button>
                     )}
-                    {role !== 'MESERO' && (
+                    {role !== 'MESERO' && role !== 'BARRA' && (
                         <button onClick={() => { if (onNavigate) { triggerHaptic(); onNavigate('clientes'); } }}
                             className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
                             style={{ background: 'linear-gradient(135deg, #10B981, #059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
@@ -519,7 +519,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── REPORTE DE TURNO (cajero) ── */}
-            {!isAdmin && role !== 'MESERO' && activeCashSession && (
+            {!isAdmin && role !== 'MESERO' && role !== 'BARRA' && activeCashSession && (
                 <button
                     data-tour="cierre-turno"
                     onClick={() => setIsReporteTurnoOpen(true)}

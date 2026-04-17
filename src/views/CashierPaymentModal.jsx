@@ -193,7 +193,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                         if (data) openerUser = data;
                     } catch (_) {}
                 }
-                if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO') {
+                if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO' || openerUser?.role === 'BARRA' || openerUser?.rol === 'BARRA') {
                     meseroUser = openerUser;
                 }
             }

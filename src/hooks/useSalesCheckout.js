@@ -264,7 +264,7 @@ export function useSalesCheckout({
                 } catch (_) {}
             }
             const openerRole = (openerUser?.role || openerUser?.rol || '').toUpperCase();
-            if (openerRole === 'MESERO') {
+            if (openerRole === 'MESERO' || openerRole === 'BARRA') {
                 opts.meseroId = openerUser.id;
                 opts.meseroNombre = openerUser.name || openerUser.nombre || null;
             }

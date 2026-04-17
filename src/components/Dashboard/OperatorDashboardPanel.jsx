@@ -30,7 +30,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const cachedUsers = useAuthStore(s => s.cachedUsers);
     const confirm = useConfirm();
     const role = currentUser?.role || currentUser?.rol;
-    const isMesero = role === 'MESERO';
+    const isMesero = role === 'MESERO' || role === 'BARRA';
     const [now, setNow] = useState(new Date());
     const [myStats, setMyStats] = useState({ cobros: 0, mesas: 0, pedidos: 0 });
     const [lastSale, setLastSale] = useState(null);

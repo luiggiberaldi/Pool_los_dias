@@ -52,7 +52,7 @@ export default function TableCard({ table, session }) {
     const isCheckoutPending = session?.status === 'CHECKOUT';
 
     // Bloqueo de mesa: si un mesero abrió la mesa, otros meseros no pueden interactuar
-    const isLockedForMe = currentUser?.role === 'MESERO' && isPlaying && session?.opened_by && session.opened_by !== currentUser?.id;
+    const isLockedForMe = (currentUser?.role === 'MESERO' || currentUser?.role === 'BARRA') && isPlaying && session?.opened_by && session.opened_by !== currentUser?.id;
 
     const [elapsed, setElapsed] = useState(() =>
         isPlaying && session?.started_at ? calculateElapsedTime(session.started_at) : 0

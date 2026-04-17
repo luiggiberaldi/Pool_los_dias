@@ -33,7 +33,7 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
     const [statusFilter, setStatusFilter] = useState('Todas');
     const [ownerFilter, setOwnerFilter]   = useState('Todas');
 
-    const isMesero = role === 'MESERO';
+    const isMesero = role === 'MESERO' || role === 'BARRA';
 
     // Detectar si hay alguna sesión pausada (para el botón global)
     const pausableSessions = useMemo(() =>
