@@ -228,7 +228,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                 <button
                     onClick={() => onNavigate?.('mesas')}
                     className="w-full rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all group"
-                    style={{ background: 'linear-gradient(135deg, #F97316, #EA580C)', boxShadow: '0 6px 20px rgba(249,115,22,0.3)' }}>
+                    style={{ background: `linear-gradient(135deg, ${accent.from}, ${accent.to})`, boxShadow: `0 6px 20px ${accent.glow}` }}>
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
                             <UtensilsCrossed size={22} className="text-white" />
@@ -348,7 +348,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
             {isMesero && topMeseros.length > 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <h3 className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${isBarra ? 'text-violet-500' : 'text-orange-500'}`}>
                             <Trophy size={12} /> Ranking Meseros
                         </h3>
                     </div>
@@ -358,20 +358,20 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                             const pct = Math.round((m.revenue / maxRev) * 100);
                             const isMe = m.id === currentUser?.id;
                             return (
-                                <div key={m.id} className={`${isMe ? 'bg-orange-50 border border-orange-200 rounded-xl p-2.5 -mx-1' : ''}`}>
+                                <div key={m.id} className={`${isMe ? (isBarra ? 'bg-violet-50 border border-violet-200' : 'bg-orange-50 border border-orange-200') + ' rounded-xl p-2.5 -mx-1' : ''}`}>
                                     <div className="flex items-center justify-between mb-1">
                                         <div className="flex items-center gap-2.5 min-w-0">
                                             <span className={`text-sm font-black w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-orange-400' : 'text-slate-300'}`}>
                                                 {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
                                             </span>
                                             <div className="min-w-0">
-                                                <p className={`text-xs font-black truncate ${isMe ? 'text-orange-700' : 'text-slate-700'}`}>
+                                                <p className={`text-xs font-black truncate ${isMe ? (isBarra ? 'text-violet-700' : 'text-orange-700') : 'text-slate-700'}`}>
                                                     {m.name}{isMe ? ' (Tú)' : ''}
                                                 </p>
                                                 <p className="text-[10px] text-slate-400">{m.ventas} {m.ventas === 1 ? 'venta' : 'ventas'}</p>
                                             </div>
                                         </div>
-                                        <span className={`text-sm font-black shrink-0 pl-2 ${isMe ? 'text-orange-600' : 'text-emerald-600'}`}>${m.revenue.toFixed(2)}</span>
+                                        <span className={`text-sm font-black shrink-0 pl-2 ${isMe ? (isBarra ? 'text-violet-600' : 'text-orange-600') : 'text-emerald-600'}`}>${m.revenue.toFixed(2)}</span>
                                     </div>
                                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                         <div className={`h-1.5 rounded-full transition-all ${i === 0 ? 'bg-amber-400' : i === 1 ? 'bg-slate-300' : i === 2 ? 'bg-orange-300' : 'bg-slate-200'}`}
@@ -389,7 +389,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
 
             {isMesero && topMeseros.length === 0 && (
                 <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                    <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <h3 className={`text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5 ${isBarra ? 'text-violet-500' : 'text-orange-500'}`}>
                         <Trophy size={12} /> Ranking Meseros
                     </h3>
                     <div className="flex flex-col items-center justify-center py-3 gap-1.5">
