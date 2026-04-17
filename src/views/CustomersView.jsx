@@ -240,27 +240,27 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     // ── SEGMENTED CONTROL (compartido) ──
     const TabControl = () => (
         <div className="px-3 sm:px-6 pt-3 sm:pt-6 shrink-0 z-10 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1.5 rounded-2xl shadow-inner">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl shadow-inner">
                 <button
                     onClick={() => { setActiveTab('clientes'); triggerHaptic && triggerHaptic(); }}
-                    className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                    className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
                 >
-                    <Users size={18} /> Clientes
+                    <Users size={16} /> Clientes
                 </button>
                 {isAdmin && (
                     <button
                         onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
-                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                        className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
                     >
-                        <Truck size={18} /> Proveedores
+                        <Truck size={16} /> <span className="hidden xs:inline">Proveedor</span><span className="xs:hidden">Proveed.</span>
                     </button>
                 )}
                 {isAdmin && (
                     <button
                         onClick={() => { setActiveTab('empleados'); triggerHaptic && triggerHaptic(); }}
-                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'empleados' ? 'bg-white dark:bg-slate-900 shadow-sm text-rose-600 dark:text-rose-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                        className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'empleados' ? 'bg-white dark:bg-slate-900 shadow-sm text-rose-600 dark:text-rose-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
                     >
-                        <Receipt size={18} /> Empleados
+                        <Receipt size={16} /> Empleados
                     </button>
                 )}
             </div>
