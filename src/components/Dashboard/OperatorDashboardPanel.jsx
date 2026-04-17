@@ -31,6 +31,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const confirm = useConfirm();
     const role = currentUser?.role || currentUser?.rol;
     const isMesero = role === 'MESERO' || role === 'BARRA';
+    const isBarra = role === 'BARRA';
     const [now, setNow] = useState(new Date());
     const [myStats, setMyStats] = useState({ cobros: 0, mesas: 0, pedidos: 0 });
     const [lastSale, setLastSale] = useState(null);
@@ -173,7 +174,9 @@ export default function OperatorDashboardPanel({ onNavigate }) {
     const firstName = currentUser?.name?.split(' ')[0] || (isMesero ? 'Mesero' : 'Cajero');
 
     // ── Colores por rol ──
-    const accent = isMesero
+    const accent = isBarra
+        ? { from: '#7C3AED', to: '#8B5CF6', glow: 'rgba(139,92,246,0.15)', text: 'text-violet-400', badge: 'bg-violet-500/80', badgeText: 'text-violet-100' }
+        : isMesero
         ? { from: '#F97316', to: '#EA580C', glow: 'rgba(249,115,22,0.15)', text: 'text-orange-400', badge: 'bg-orange-500/80', badgeText: 'text-orange-100' }
         : { from: '#0D9488', to: '#14B8A6', glow: 'rgba(20,184,166,0.2)', text: 'text-teal-100', badge: 'bg-teal-800/60', badgeText: 'text-teal-100' };
 

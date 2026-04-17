@@ -309,7 +309,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     {usuarioActivo && (() => {
                         const r = usuarioActivo.role || usuarioActivo.rol;
                         const c = r === 'ADMIN' ? {bg:'bg-sky-50',border:'border-sky-100/50',ping:'bg-sky-400',dot:'bg-sky-500',text:'text-sky-800',btn:'text-sky-500 hover:bg-sky-100 hover:text-sky-700'}
-                                : r === 'MESERO' || r === 'BARRA' ? {bg:'bg-orange-50',border:'border-orange-100/50',ping:'bg-orange-400',dot:'bg-orange-500',text:'text-orange-800',btn:'text-orange-500 hover:bg-orange-100 hover:text-orange-700'}
+                                : r === 'MESERO' || r === 'BARRA' ? (r === 'BARRA'
+                                    ? {bg:'bg-violet-50',border:'border-violet-100/50',ping:'bg-violet-400',dot:'bg-violet-500',text:'text-violet-800',btn:'text-violet-500 hover:bg-violet-100 hover:text-violet-700'}
+                                    : {bg:'bg-orange-50',border:'border-orange-100/50',ping:'bg-orange-400',dot:'bg-orange-500',text:'text-orange-800',btn:'text-orange-500 hover:bg-orange-100 hover:text-orange-700'})
                                 : {bg:'bg-teal-50',border:'border-teal-100/50',ping:'bg-teal-400',dot:'bg-teal-500',text:'text-teal-800',btn:'text-teal-500 hover:bg-teal-100 hover:text-teal-700'};
                         return (
                             <div className={`flex items-center gap-1.5 ${c.bg} ${c.border} border rounded-full pl-2 pr-1 sm:pl-3 sm:pr-1.5 py-1 sm:py-1.5 shadow-sm`}>
