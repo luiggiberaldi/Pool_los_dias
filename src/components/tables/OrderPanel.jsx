@@ -195,7 +195,8 @@ export function OrderPanel({ session, table, onClose }) {
                             return (
                             <div key={item.id}
                                 className={`flex items-center gap-3 bg-white border border-slate-200 shadow-sm rounded-2xl px-4 py-3 transition-all duration-300 ${removingItem === item.id ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                                {/* Editable Qty badge */}
+                                {/* Editable Qty badge — solo admin/cajero pueden editar */}
+                                {currentUser?.role !== 'MESERO' ? (
                                 <button
                                     onClick={() => {
                                         setQtyModalItem(item);
@@ -206,6 +207,11 @@ export function OrderPanel({ session, table, onClose }) {
                                     <span className="text-indigo-700 font-black text-sm group-hover:hidden">{item.qty}</span>
                                     <span className="text-indigo-700 font-black text-lg hidden group-hover:block">#</span>
                                 </button>
+                                ) : (
+                                <div className="w-10 h-10 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center shrink-0">
+                                    <span className="text-indigo-700 font-black text-sm">{item.qty}</span>
+                                </div>
+                                )}
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="text-slate-800 font-bold text-sm truncate">{item.product_name}</div>
@@ -221,6 +227,8 @@ export function OrderPanel({ session, table, onClose }) {
                                         className="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40">
                                         <Plus size={14} />
                                     </button>
+                                    {currentUser?.role !== 'MESERO' && (
+                                    <>
                                     <button onClick={async () => {
                                             if (item.qty <= 1) { handleRemoveItem(item.id); }
                                             else { await updateItemQty(item.id, item.qty - 1); }
@@ -232,6 +240,8 @@ export function OrderPanel({ session, table, onClose }) {
                                         className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center transition-all active:scale-90">
                                         <Trash2 size={13} />
                                     </button>
+                                    </>
+                                    )}
                                 </div>
                             </div>
                             );
@@ -317,11 +327,13 @@ export function OrderPanel({ session, table, onClose }) {
                                             )}
                                             {inOrder && (
                                                 <div className="flex items-center gap-1 ml-auto">
+                                                    {currentUser?.role !== 'MESERO' && (
                                                     <button
                                                         onClick={e => { e.stopPropagation(); if (inOrder.qty <= 1) handleRemoveItem(inOrder.id); else updateItemQty(inOrder.id, inOrder.qty - 1); }}
                                                         className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center active:scale-90 transition-all">
                                                         <Minus size={10} />
                                                     </button>
+                                                    )}
                                                     <span className="text-[10px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded-full min-w-[22px] text-center">
                                                         {inOrder.qty}
                                                     </span>
