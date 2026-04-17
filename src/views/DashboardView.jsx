@@ -455,7 +455,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                         </button>
                     )}
                     {isAdmin && (
-                        <button onClick={() => { if (onNavigate) { triggerHaptic(); localStorage.setItem('settings_open_tab', 'deudas'); onNavigate('ajustes'); } }}
+                        <button onClick={() => { if (onNavigate) { triggerHaptic(); localStorage.setItem('cuentas_open_tab', 'empleados'); onNavigate('clientes'); } }}
                             className="flex-1 flex flex-col items-center gap-1.5 py-3.5 rounded-xl active:scale-95 transition-all"
                             style={{ background: 'linear-gradient(135deg, #F43F5E, #E11D48)', boxShadow: '0 4px 12px rgba(244,63,94,0.25)' }}>
                             <Receipt size={22} className="text-white" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, Truck } from 'lucide-react';
+import { Users, Plus, Search, Truck, Receipt } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { round2, mulR, divR } from '../utils/dinero';
@@ -20,6 +20,9 @@ import { CustomerDetailSheet, EditCustomerModal, AddCustomerModal } from '../com
 import SuppliersList from '../components/Suppliers/SuppliersList';
 import { AddSupplierModal, AddInvoiceModal, PayInvoiceModal, SupplierDetailsSheet } from '../components/Suppliers/SupplierModals';
 import { getActivePaymentMethods } from '../config/paymentMethods';
+
+// Componentes de Empleados (Deudas)
+import DebtsPanel from '../components/Settings/DebtsPanel';
 
 export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [customers, setCustomers] = useState([]);
@@ -72,6 +75,15 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     useEffect(() => { loadData(); }, []);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (isActive) loadData(); }, [isActive]);
+
+    // localStorage signal: dashboard quick action → auto-switch tab
+    useEffect(() => {
+        const pending = localStorage.getItem('cuentas_open_tab');
+        if (pending) {
+            setActiveTab(pending);
+            localStorage.removeItem('cuentas_open_tab');
+        }
+    }, [isActive]);
 
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);
@@ -243,9 +255,29 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
                         <Truck size={18} /> Proveedores
                     </button>
                 )}
+                {isAdmin && (
+                    <button
+                        onClick={() => { setActiveTab('empleados'); triggerHaptic && triggerHaptic(); }}
+                        className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'empleados' ? 'bg-white dark:bg-slate-900 shadow-sm text-rose-600 dark:text-rose-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                    >
+                        <Receipt size={18} /> Empleados
+                    </button>
+                )}
             </div>
         </div>
     );
+
+    // ── TAB EMPLEADOS (Deudas) ──
+    if (activeTab === 'empleados') {
+        return (
+            <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+                <TabControl />
+                <div className="flex-1 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-20">
+                    <DebtsPanel />
+                </div>
+            </div>
+        );
+    }
 
     // ── TAB PROVEEDORES ──
     if (activeTab === 'proveedores') {

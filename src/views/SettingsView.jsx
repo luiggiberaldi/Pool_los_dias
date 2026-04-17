@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    Store, CreditCard, Database, Users, FileText, Receipt,
+    Store, CreditCard, Database, Users, FileText,
     AlertTriangle, Download, Upload, Share2,
     Sun, Moon, LogOut, Trash2, Copy, Check,
     ChevronRight, ShieldCheck, Package, Printer, Layers, Settings
@@ -23,7 +23,6 @@ import SettingsTabUsuarios from '../components/Settings/tabs/SettingsTabUsuarios
 import SettingsTabSistema from '../components/Settings/tabs/SettingsTabSistema';
 import SettingsTabMesas from '../components/Settings/tabs/SettingsTabMesas';
 import SettingsTabBitacora from '../components/Settings/tabs/SettingsTabBitacora';
-import DebtsPanel from '../components/Settings/DebtsPanel';
 import { setImportGuard } from '../hooks/useCloudSync';
 import SpotlightTour from '../components/SpotlightTour';
 
@@ -75,7 +74,6 @@ const TABS = [
     { id: 'mesas',     label: 'Mesas',     icon: Layers,       color: 'sky',    adminOnly: true },
     { id: 'ventas',    label: 'Ventas',     icon: CreditCard,   color: 'emerald' },
     { id: 'usuarios',  label: 'Usuarios',   icon: Users,        color: 'violet', adminOnly: true },
-    { id: 'deudas',    label: 'Empleados',  icon: Receipt,      color: 'rose',   adminOnly: true },
     { id: 'bitacora',  label: 'Bitácora',   icon: FileText,     color: 'indigo', adminOnly: true },
     { id: 'sistema',   label: 'Sistema',    icon: Database,     color: 'amber' },
 ];
@@ -86,7 +84,6 @@ const COLOR_MAP = {
     violet:  { pill: 'bg-violet-500',  icon: 'text-violet-500',  iconBg: 'bg-violet-50 dark:bg-violet-500/10',  pillText: 'text-white' },
     sky:     { pill: 'bg-sky-500',     icon: 'text-sky-500',     iconBg: 'bg-sky-50 dark:bg-sky-500/10',       pillText: 'text-white' },
     amber:   { pill: 'bg-amber-500',   icon: 'text-amber-500',   iconBg: 'bg-amber-50 dark:bg-amber-500/10',   pillText: 'text-white' },
-    rose:    { pill: 'bg-rose-500',    icon: 'text-rose-500',    iconBg: 'bg-rose-50 dark:bg-rose-500/10',    pillText: 'text-white' },
 };
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
@@ -490,11 +487,6 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
                     {/* ═══ TAB BITÁCORA ═══ */}
                     {activeTab === 'bitacora' && isAdmin && (
                         <SettingsTabBitacora triggerHaptic={triggerHaptic} />
-                    )}
-
-                    {/* ═══ TAB DEUDAS ═══ */}
-                    {activeTab === 'deudas' && isAdmin && (
-                        <DebtsPanel />
                     )}
 
                     {/* ═══ TAB SISTEMA ═══ */}
