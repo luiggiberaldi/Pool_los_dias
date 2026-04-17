@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../Modal';
 import { useDebtsStore } from '../../hooks/store/useDebtsStore';
 import { useAuthStore } from '../../hooks/store/authStore';
+import { useProductContext } from '../../context/ProductContext';
 import { showToast } from '../Toast';
 import { DollarSign, Plus, Clock, CheckCircle, Trash2, CreditCard, ArrowLeft, Search, Loader2 } from 'lucide-react';
 import { ROLE_CONFIG } from './UserPinInput';
@@ -10,16 +11,18 @@ import { ROLE_CONFIG } from './UserPinInput';
 export function AddDebtModal({ isOpen, onClose }) {
     const { cachedUsers } = useAuthStore();
     const { createDebt } = useDebtsStore();
+    const { effectiveRate } = useProductContext();
     const [step, setStep] = useState(1); // 1 = elegir empleado, 2 = llenar datos
     const [staffId, setStaffId] = useState('');
     const [concept, setConcept] = useState('');
     const [amount, setAmount] = useState('');
+    const [currency, setCurrency] = useState('USD'); // 'USD' | 'BS'
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const conceptRef = useRef(null);
 
     useEffect(() => {
-        if (isOpen) { setStep(1); setStaffId(''); setConcept(''); setAmount(''); setSearch(''); }
+        if (isOpen) { setStep(1); setStaffId(''); setConcept(''); setAmount(''); setCurrency('USD'); setSearch(''); }
     }, [isOpen]);
 
     useEffect(() => {
@@ -42,7 +45,11 @@ export function AddDebtModal({ isOpen, onClose }) {
         if (!canSubmit) return;
         setSaving(true);
         try {
-            await createDebt(staffId, concept, Number(amount));
+            const rawAmt = Number(amount);
+            const usdAmount = currency === 'BS' && effectiveRate > 0
+                ? Math.round((rawAmt / effectiveRate) * 100) / 100
+                : rawAmt;
+            await createDebt(staffId, concept, usdAmount);
             showToast('Deuda registrada', 'success');
             onClose();
         } catch (err) {
@@ -51,7 +58,9 @@ export function AddDebtModal({ isOpen, onClose }) {
         } finally { setSaving(false); }
     };
 
-    const quickAmounts = [1, 2, 5, 10, 20];
+    const quickAmountsUSD = [1, 2, 5, 10, 20];
+    const quickAmountsBs = [10, 20, 50, 100, 200];
+    const quickAmounts = currency === 'BS' ? quickAmountsBs : quickAmountsUSD;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={step === 1 ? '¿Quién debe?' : 'Registrar Deuda'}>
@@ -128,13 +137,43 @@ export function AddDebtModal({ isOpen, onClose }) {
 
                     {/* Monto */}
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Monto (USD)</label>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Monto</label>
+                        {/* Currency toggle */}
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 mb-2">
+                            <button onClick={() => { setCurrency('USD'); setAmount(''); }}
+                                className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
+                                    currency === 'USD'
+                                        ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
+                                }`}>
+                                $ USD
+                            </button>
+                            <button onClick={() => { setCurrency('BS'); setAmount(''); }}
+                                className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
+                                    currency === 'BS'
+                                        ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-600'
+                                }`}>
+                                Bs
+                            </button>
+                        </div>
                         <div className="relative">
-                            <DollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-400" />
+                            {currency === 'USD'
+                                ? <DollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-400" />
+                                : <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-500 font-black text-sm">Bs</span>
+                            }
                             <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)}
                                 placeholder="0.00"
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3 py-3 text-lg font-black text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30" />
                         </div>
+                        {/* Conversion preview */}
+                        {currency === 'BS' && Number(amount) > 0 && effectiveRate > 0 && (
+                            <p className="text-[11px] text-slate-400 mt-1.5 text-center">
+                                ≈ <span className="font-bold text-emerald-600">${(Number(amount) / effectiveRate).toFixed(2)} USD</span>
+                                <span className="text-slate-300 mx-1">|</span>
+                                Tasa: {effectiveRate.toFixed(2)} Bs/$
+                            </p>
+                        )}
                         {/* Montos rápidos */}
                         <div className="flex gap-1.5 mt-2">
                             {quickAmounts.map(q => (
@@ -144,7 +183,7 @@ export function AddDebtModal({ isOpen, onClose }) {
                                             ? 'bg-rose-500 text-white shadow-sm'
                                             : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
                                     }`}>
-                                    ${q}
+                                    {currency === 'BS' ? `${q}` : `$${q}`}
                                 </button>
                             ))}
                         </div>
