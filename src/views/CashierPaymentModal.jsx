@@ -214,7 +214,8 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                 useAutoRate: useAutoRate || true,
                 meseroId: meseroUser?.id || null,
                 meseroNombre: meseroUser?.name || meseroUser?.nombre || null,
-                tableName: table?.name || null
+                tableName: table?.name || null,
+                skipStockDeduction: true // Stock already deducted when items were added to order
             });
 
             if (!saleResult.success) {

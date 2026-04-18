@@ -27,7 +27,7 @@ export function OrderPanel({ session, table, onClose }) {
     const allOrders = useOrdersStore(state => state.orders);
     const allItems = useOrdersStore(state => state.orderItems);
     const { currentUser } = useAuthStore();
-    const { products, isLoadingProducts: loadingProducts, effectiveRate } = useProductContext();
+    const { products, isLoadingProducts: loadingProducts, effectiveRate, adjustStock } = useProductContext();
 
     const [addingItem, setAddingItem] = useState(null);
     const [removingItem, setRemovingItem] = useState(null);
@@ -67,6 +67,24 @@ export function OrderPanel({ session, table, onClose }) {
         syncOrders();
     }, []);
 
+    // ── Stock adjustment helper (handles combos) ──
+    const adjustStockForProduct = (productId, delta) => {
+        const product = products.find(p => p.id === productId);
+        if (!product) return;
+        if (product.isCombo) {
+            // Deduct from underlying products
+            if (product.comboItems && product.comboItems.length > 0) {
+                product.comboItems.forEach(ci => {
+                    adjustStock(ci.productId, delta * (ci.qty || 1));
+                });
+            } else if (product.linkedProductId) {
+                adjustStock(product.linkedProductId, delta * (product.linkedQty || 1));
+            }
+        } else {
+            adjustStock(productId, delta);
+        }
+    };
+
     const handleAddProduct = async (product, seatIdOverride) => {
         if (!currentUser) {
             showToast('Sin sesión', 'No hay usuario activo. Vuelve a iniciar sesión.', 'error');
@@ -82,6 +100,8 @@ export function OrderPanel({ session, table, onClose }) {
         const seatId = seatIdOverride !== undefined ? seatIdOverride : selectedSeatId;
         try {
             await addItemToSession(table.id, session.id, currentUser.id, productForOrder, effectiveRate, seatId);
+            // Descontar stock al agregar al consumo
+            adjustStockForProduct(product.id, -1);
         } catch (e) {
             console.error(e);
             const msg = e?.message || e?.details || e?.hint || JSON.stringify(e) || 'Error desconocido';
@@ -92,8 +112,11 @@ export function OrderPanel({ session, table, onClose }) {
     };
 
     const handleRemoveItem = async (itemId) => {
+        const item = allItems.find(i => i.id === itemId);
         setRemovingItem(itemId);
         await deleteItem(itemId);
+        // Revertir stock al eliminar
+        if (item) adjustStockForProduct(item.product_id, item.qty);
         setRemovingItem(null);
     };
 
@@ -231,7 +254,7 @@ export function OrderPanel({ session, table, onClose }) {
                                     <>
                                     <button onClick={async () => {
                                             if (item.qty <= 1) { handleRemoveItem(item.id); }
-                                            else { await updateItemQty(item.id, item.qty - 1); }
+                                            else { adjustStockForProduct(item.product_id, 1); await updateItemQty(item.id, item.qty - 1); }
                                         }}
                                         className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-all active:scale-90">
                                         <Minus size={14} />
@@ -329,7 +352,7 @@ export function OrderPanel({ session, table, onClose }) {
                                                 <div className="flex items-center gap-1 ml-auto">
                                                     {currentUser?.role !== 'MESERO' && currentUser?.role !== 'BARRA' && (
                                                     <button
-                                                        onClick={e => { e.stopPropagation(); if (inOrder.qty <= 1) handleRemoveItem(inOrder.id); else updateItemQty(inOrder.id, inOrder.qty - 1); }}
+                                                        onClick={e => { e.stopPropagation(); if (inOrder.qty <= 1) handleRemoveItem(inOrder.id); else { adjustStockForProduct(inOrder.product_id, 1); updateItemQty(inOrder.id, inOrder.qty - 1); } }}
                                                         className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center active:scale-90 transition-all">
                                                         <Minus size={10} />
                                                     </button>
@@ -424,8 +447,12 @@ export function OrderPanel({ session, table, onClose }) {
                             <button onClick={() => setQtyModalItem(null)} className="flex-1 py-3.5 text-sm font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 transition-all active:scale-95">
                                 Cancelar
                             </button>
-                            <button 
+                            <button
                                 onClick={async () => {
+                                    const oldQty = qtyModalItem.qty;
+                                    const newQty = qtyInputValue;
+                                    const delta = oldQty - newQty; // positive = stock returned, negative = stock consumed
+                                    if (delta !== 0) adjustStockForProduct(qtyModalItem.product_id, delta);
                                     try {
                                         await updateItemQty(qtyModalItem.id, qtyInputValue);
                                     } catch(e) { /* ignore update errors */ }

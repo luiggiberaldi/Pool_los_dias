@@ -246,7 +246,8 @@ export function useSalesCheckout({
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
             discountData: tableCheckoutData.discountData || { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },
-            useAutoRate, splitMeta
+            useAutoRate, splitMeta,
+            skipStockDeduction: true // Stock already deducted when items were added to order
         };
 
         opts.tableName = seatId

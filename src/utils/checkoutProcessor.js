@@ -33,7 +33,8 @@ export async function processSaleTransaction({
     meseroId = null,
     meseroNombre = null,
     tableName = null,
-    splitMeta = null
+    splitMeta = null,
+    skipStockDeduction = false
 }) {
     if (cart.length === 0) return { success: false, error: 'Carrito vacío' };
 
@@ -234,12 +235,10 @@ export async function processSaleTransaction({
 
     // ── CLIENT-SIDE STOCK DEDUCTION ──
     // Stock is always deducted client-side regardless of sale mode.
-    // The RPC `process_checkout` does NOT modify the products table,
-    // so this is the authoritative stock update. Changes are saved to
-    // localforage and broadcast to other devices via Supabase Broadcast.
+    // Skip when items come from table orders (stock already deducted when added to order).
     let updatedProducts = products;
 
-    {
+    if (!skipStockDeduction) {
     // Calculate total deductions per product ID
     const deductions = {};
     cart.forEach(item => {
