@@ -455,8 +455,6 @@ export default function TableCard({ table, session }) {
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset, session?.seats) : 0;
-    // Mesa pagada sin cerrar y sin cargos nuevos agregados
-    const isPaidIdle = isPlaying && !!session?.paid_at && timeCost === 0;
     const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset, session?.seats) : null;
     const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
     const seatHasPinas = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
@@ -471,8 +469,8 @@ export default function TableCard({ table, session }) {
         return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
     }, 0) : 0;
     const grandTotal = timeCost + seatTimeCost + totalConsumption;
-    
-    // Countdown logic — incluye horas de session + horas de seats (timeCharges)
+    // Mesa pagada sin cerrar y sin cargos nuevos agregados (ni tiempo ni consumo)
+    const isPaidIdle = isPlaying && !!session?.paid_at && grandTotal === 0;
     const seatHoursTotal = (session?.seats || []).reduce((sum, s) =>
         sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((acc, tc) => acc + (Number(tc.amount) || 0), 0), 0);
     const totalHoursPaid = (Number(session?.hours_paid) || 0) + seatHoursTotal;
