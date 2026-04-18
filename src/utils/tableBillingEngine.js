@@ -40,14 +40,9 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
         hourCost = round2(billableHours * pricePerHour);
     }
 
-    // Libre: game_mode NORMAL sin horas prepagadas y sin seat-level hours → cobro por minuto
-    let libreCost = 0;
-    const seatHasHours = (seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
-    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0 && !seatHasHours;
-    if (isLibre && elapsedMinutes > 0) {
-        const pricePerHour = config.pricePerHour || 0;
-        libreCost = round2((elapsedMinutes / 60) * pricePerHour);
-    }
+    // Modo libre eliminado — archivado en ARCHIVED_LIBRE_MODE.md
+    const libreCost = 0;
+    const isLibre = false;
 
     return {
         pinaCost,
@@ -56,7 +51,7 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
         hasPinas,
         hasHours: hoursPaid > 0,
         isLibre,
-        total: round2(pinaCost + hourCost + libreCost)
+        total: round2(pinaCost + hourCost)
     };
 }
 
@@ -227,8 +222,9 @@ export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
         const hours = seat.hoursPaid || 0;
         return calculateSessionCostBreakdown(elapsedMinutes, 'NORMAL', config, hours, 0);
     }
+    // gameMode LIBRE eliminado — retorna $0
     if (seat.gameMode === 'LIBRE') {
-        return calculateSessionCostBreakdown(elapsedMinutes, 'NORMAL', config, 0, 0);
+        return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
     }
     return { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
 }

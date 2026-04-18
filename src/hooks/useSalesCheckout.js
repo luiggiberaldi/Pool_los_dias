@@ -116,14 +116,6 @@ export function useSalesCheckout({
                     qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
                 });
             }
-            if (seatTimeCost.libreCost > 0) {
-                syntheticCart.push({
-                    id: crypto.randomUUID(),
-                    name: `Tiempo libre ${tableName}`,
-                    priceUsdt: round2(seatTimeCost.libreCost), priceUsd: round2(seatTimeCost.libreCost),
-                    qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
-                });
-            }
 
             // Seat-specific items
             const seatItems = (tableCheckoutData.currentItems || []).filter(i => i.seat_id === seatId);
@@ -172,9 +164,6 @@ export function useSalesCheckout({
                             ? seat.timeCharges.filter(tc => tc.type === 'hora').reduce((s, tc) => s + (tc.amount || 0), 0)
                             : (seat.hoursPaid || 0);
                         syntheticCart.push({ id: crypto.randomUUID(), name: `Tiempo ${seatLabel} (${formatHoursPaid(horasQty)})`, priceUsdt: round2(seatBd.timeCost.hourCost), priceUsd: round2(seatBd.timeCost.hourCost), qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
-                    }
-                    if (seatBd.timeCost.libreCost > 0) {
-                        syntheticCart.push({ id: crypto.randomUUID(), name: `Tiempo libre ${seatLabel}`, priceUsdt: round2(seatBd.timeCost.libreCost), priceUsd: round2(seatBd.timeCost.libreCost), qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999 });
                     }
                     seatBd.items.forEach(item => {
                         const p = products.find(p => p.id === item.product_id);

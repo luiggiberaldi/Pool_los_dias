@@ -603,7 +603,7 @@ export default function TableCard({ table, session }) {
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
                     isAvailable ? 'bg-emerald-100 text-emerald-700' : isPaidIdle ? 'bg-emerald-400 text-white' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : isPaidIdle ? 'PAGADO' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : session.game_mode === 'CONSUMO' ? 'BAR' : isTimeFree ? 'BAR' : hasLimit ? (totalHoursPaid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${totalHoursPaid}h`) : hasPinas ? 'LA PIÑA' : costBreakdown?.isLibre ? 'ABIERTA' : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : isPaidIdle ? 'PAGADO' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : session.game_mode === 'CONSUMO' ? 'BAR' : isTimeFree ? 'BAR' : hasLimit ? (totalHoursPaid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${totalHoursPaid}h`) : hasPinas ? 'LA PIÑA' : 'JUG.'}
                 </div>
             </div>
 

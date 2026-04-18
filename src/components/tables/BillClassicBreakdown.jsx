@@ -83,27 +83,6 @@ export function BillClassicBreakdown({
             </div>
         )}
 
-        {/* Tiempo referencial (modo NORMAL libre, sin prepago, sin piñas) */}
-        {session.game_mode === 'NORMAL' && !breakdown.hasPinas && !breakdown.hasHours && elapsed > 0 && (
-            <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 rounded-2xl overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-800/40">
-                    <Clock size={13} className="text-slate-400" />
-                    <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        Tiempo de sesión
-                    </p>
-                </div>
-                <div className="flex items-center justify-between px-4 py-3">
-                    <div>
-                        <p className="text-sm font-bold text-slate-700 dark:text-white">{formatElapsedTime(elapsed)}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Solo referencial · Sin cargo</p>
-                    </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">
-                        Gratis
-                    </span>
-                </div>
-            </div>
-        )}
-
         {/* Fallback: PREPAGO sin breakdown (backward compat) */}
         {timeCost > 0 && !breakdown.hasPinas && !breakdown.hasHours && session.game_mode !== 'NORMAL' && (
             <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl overflow-hidden">

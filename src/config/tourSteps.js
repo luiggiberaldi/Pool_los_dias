@@ -184,7 +184,7 @@ export const TAB_STEPS = {
             {
                 target: '[data-tour="mesa-btn-normal"]',
                 title: 'Modo Normal',
-                text: 'Abre la mesa por tiempo libre. El sistema mide cuánto juegan y calcula el costo automáticamente al cobrar.'
+                text: 'Abre la mesa seleccionando el tiempo prepago. El sistema lleva el control automáticamente.'
             },
             {
                 target: '[data-tour="mesa-btn-pina"]',

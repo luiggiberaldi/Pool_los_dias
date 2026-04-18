@@ -32,7 +32,7 @@ const SETTINGS_TAB_TOURS = {
         key: 'pda_settings_tour_mesas',
         steps: [
             { target: null, title: 'Configuración de Mesas', text: 'Aquí configuras las tarifas y creas las mesas físicas de tu local.', emoji: '🎱' },
-            { target: '[data-tour="settings-mesas-rates"]', title: 'Tarifas de Juego', text: 'Define el precio por hora de juego libre ("Hora Libre") y el precio fijo por partida ("La Piña"). Toca "Guardar Tarifas" cuando termines.' },
+            { target: '[data-tour="settings-mesas-rates"]', title: 'Tarifas de Juego', text: 'Define el precio por hora prepago y el precio fijo por partida ("La Piña"). Toca "Guardar Tarifas" cuando termines.' },
             { target: '[data-tour="settings-mesas-add"]', title: 'Crear Mesas', text: 'Escribe el nombre de la mesa (ej. "Mesa 1"), elige si es Pool con tiempo o una mesa de Bar normal, y toca "+ Agregar". Repite para cada mesa de tu local.' },
         ],
     },
