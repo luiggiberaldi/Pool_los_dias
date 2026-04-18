@@ -142,8 +142,8 @@ export default function TableCardActions({
                                 )}
                             </div>
 
-                            {/* Liberar mesa — cuando ya fue cobrada (paid_at) o deuda en $0 */}
-                            {((session?.paid_at || grandTotal === 0) && isPlaying) && (
+                            {/* Liberar mesa — solo cuando no hay saldo pendiente */}
+                            {grandTotal === 0 && isPlaying && (
                                 !showReleaseConfirm ? (
                                     <button
                                         onClick={() => setShowReleaseConfirm(true)}
