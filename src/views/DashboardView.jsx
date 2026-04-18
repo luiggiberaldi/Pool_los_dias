@@ -77,6 +77,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     // Tables store for notification center
     const activeSessions = useTablesStore(s => s.activeSessions);
     const pausedSessions = useTablesStore(s => s.pausedSessions);
+    const tables = useTablesStore(s => s.tables);
 
     // ── Métricas extraídas al hook ──
     const {
@@ -102,7 +103,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
 
     // Notification center
     const { notifications, urgentCount, totalCount } = useNotificationCenter({
-        products, activeSessions, pausedSessions, activeCashSession, customers
+        products, activeSessions, pausedSessions, activeCashSession, customers, tables
     });
 
     // ── Carga de datos ──

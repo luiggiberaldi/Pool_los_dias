@@ -5,7 +5,7 @@ import { calculateElapsedTime } from '../utils/tableBillingEngine';
  * Generates in-app notification items for the bell icon.
  * Pure computation — no side effects, no browser notifications.
  */
-export function useNotificationCenter({ products, activeSessions, pausedSessions, activeCashSession, customers }) {
+export function useNotificationCenter({ products, activeSessions, pausedSessions, activeCashSession, customers, tables }) {
     const notifications = useMemo(() => {
         const items = [];
 
@@ -35,6 +35,12 @@ export function useNotificationCenter({ products, activeSessions, pausedSessions
             if (session.status !== 'ACTIVE') return;
             if (!session.hours_paid || session.hours_paid <= 0) return;
 
+            // También considerar horas en seat timeCharges
+            const seatHours = (session.seats || []).reduce((sum, s) =>
+                sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((a, tc) => a + (Number(tc.amount) || 0), 0), 0);
+            const totalHours = (Number(session.hours_paid) || 0) + seatHours;
+            if (totalHours <= 0) return;
+
             const paused = pausedSessions?.[session.id];
             let elapsedMin;
             if (paused?.isPaused) {
@@ -42,9 +48,10 @@ export function useNotificationCenter({ products, activeSessions, pausedSessions
             } else {
                 elapsedMin = calculateElapsedTime(session.started_at);
             }
-            const paidMinutes = session.hours_paid * 60;
+            const paidMinutes = totalHours * 60;
             if (elapsedMin >= paidMinutes) {
-                const tableName = session.table_name || `Mesa ${session.table_number || '?'}`;
+                const table = (tables || []).find(t => t.id === session.table_id);
+                const tableName = table?.name || `Mesa ${session.table_id?.substring(0, 4) || '?'}`;
                 expiredTables.push(tableName);
             }
         });
