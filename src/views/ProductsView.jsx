@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare, Warehouse, Gift } from 'lucide-react';
+import { Package, Plus, Trash2, X, Tag, Pencil, Search, ChevronLeft, ChevronRight, AlertTriangle, LayoutGrid, List, Minus, ArrowUpDown, Percent, Printer, CheckSquare, Warehouse, Gift, ArrowDownUp } from 'lucide-react';
 import { Modal } from '../components/Modal';
 import { ProductShareModal } from '../components/ProductShareModal';
 import ShareInventoryModal from '../components/ShareInventoryModal';
@@ -13,6 +13,7 @@ import ProductFormModal from '../components/Products/ProductFormModal';
 import ConfirmModal from '../components/ConfirmModal';
 import CategoryManagerModal from '../components/Products/CategoryManagerModal';
 import BulkPriceAdjustModal from '../components/Products/BulkPriceAdjustModal';
+import StockAdjustmentModal from '../components/Products/StockAdjustmentModal';
 import ComboFormModal from '../components/Products/ComboFormModal';
 import { useProductContext } from '../context/ProductContext';
 import EmptyState from '../components/EmptyState';
@@ -184,6 +185,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
     const [shareProduct, setShareProduct] = useState(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [isBulkPriceOpen, setIsBulkPriceOpen] = useState(false);
+    const [isStockAdjustOpen, setIsStockAdjustOpen] = useState(false);
     const { accounts } = useWallet();
     const { salesVelocityMap } = useInventoryVelocity(products.length);
 
@@ -203,6 +205,10 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                     <div className="flex items-center gap-1 shrink-0">
                         {products.length > 0 && !isCajero && (
                             <>
+                                <button onClick={() => { triggerHaptic && triggerHaptic(); setIsStockAdjustOpen(true); }}
+                                    className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 dark:text-emerald-400 rounded-xl transition-all active:scale-95" title="Ingreso / Egreso de Inventario">
+                                    <ArrowDownUp size={16} strokeWidth={2.5} />
+                                </button>
                                 <button onClick={() => { triggerHaptic && triggerHaptic(); setIsBulkPriceOpen(true); }}
                                     className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400 rounded-xl transition-all active:scale-95" title="Ajuste Masivo de Precios">
                                     <Percent size={16} strokeWidth={2.5} />
@@ -550,6 +556,9 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
                 products={products} setProducts={setProducts} categories={categories}
                 activeCategory={activeCategory} effectiveRate={effectiveRate}
                 triggerHaptic={triggerHaptic} showToast={showToast} />
+
+            <StockAdjustmentModal isOpen={isStockAdjustOpen} onClose={() => setIsStockAdjustOpen(false)}
+                products={products} adjustStock={handleConfirmStock} triggerHaptic={triggerHaptic} />
 
             <CategoryManagerModal isOpen={isCategoryManagerOpen} onClose={() => setIsCategoryManagerOpen(false)}
                 categories={categories} onAddCategory={handleAddCategory}
