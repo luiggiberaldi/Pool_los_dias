@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { useDebtsStore } from '../../hooks/store/useDebtsStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
 import { showToast } from '../Toast';
-import { DollarSign, Plus, Clock, CheckCircle, Trash2, CreditCard, ArrowLeft, Search, Loader2 } from 'lucide-react';
+import { DollarSign, Plus, Minus, Clock, CheckCircle, Trash2, CreditCard, ArrowLeft, Search, Loader2, ShoppingBag, Package, StickyNote } from 'lucide-react';
 import { ROLE_CONFIG } from './UserPinInput';
 
 const fmtBs = (usd, rate) => rate > 0 ? (usd * rate).toFixed(2) : null;
@@ -13,22 +13,27 @@ const fmtBs = (usd, rate) => rate > 0 ? (usd * rate).toFixed(2) : null;
 export function AddDebtModal({ isOpen, onClose }) {
     const { cachedUsers } = useAuthStore();
     const { createDebt } = useDebtsStore();
-    const { effectiveRate } = useProductContext();
+    const { products, effectiveRate, adjustStock } = useProductContext();
     const [step, setStep] = useState(1);
     const [staffId, setStaffId] = useState('');
-    const [concept, setConcept] = useState('');
-    const [amount, setAmount] = useState('');
-    const [currency, setCurrency] = useState('USD');
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
-    const conceptRef = useRef(null);
+
+    // Product selection
+    const [selectedProducts, setSelectedProducts] = useState([]); // [{ productId, qty, name, priceUsd }]
+    const [productSearch, setProductSearch] = useState('');
+    const [note, setNote] = useState('');
+    const productSearchRef = useRef(null);
 
     useEffect(() => {
-        if (isOpen) { setStep(1); setStaffId(''); setConcept(''); setAmount(''); setCurrency('USD'); setSearch(''); }
+        if (isOpen) {
+            setStep(1); setStaffId(''); setSearch('');
+            setSelectedProducts([]); setProductSearch(''); setNote('');
+        }
     }, [isOpen]);
 
     useEffect(() => {
-        if (step === 2 && conceptRef.current) conceptRef.current.focus();
+        if (step === 2 && productSearchRef.current) productSearchRef.current.focus();
     }, [step]);
 
     const activeUsers = cachedUsers.filter(u => u.active !== false);
@@ -36,35 +41,97 @@ export function AddDebtModal({ isOpen, onClose }) {
         ? activeUsers.filter(u => u.name?.toLowerCase().includes(search.toLowerCase()))
         : activeUsers;
     const selectedUser = activeUsers.find(u => u.id === staffId);
-    const canSubmit = staffId && concept.trim() && Number(amount) > 0 && !saving;
+
+    // Product filtering (exclude combos with no stock logic issues)
+    const availableProducts = useMemo(() => {
+        return products.filter(p => {
+            if (!productSearch) return true;
+            return p.name.toLowerCase().includes(productSearch.toLowerCase());
+        });
+    }, [products, productSearch]);
+
+    // Calculate total from selected products
+    const totalUsd = selectedProducts.reduce((sum, sp) => sum + (sp.qty * sp.priceUsd), 0);
+    const totalBs = effectiveRate > 0 ? totalUsd * effectiveRate : 0;
+
+    const canSubmit = staffId && selectedProducts.length > 0 && totalUsd > 0 && !saving;
 
     const selectUser = (id) => { setStaffId(id); setStep(2); };
+
+    const addProduct = (product) => {
+        const existing = selectedProducts.find(sp => sp.productId === product.id);
+        const currentStock = product.stock ?? 0;
+        const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
+
+        if (existing) {
+            if (!allowNeg && existing.qty + 1 > currentStock) {
+                showToast(`${product.name}: stock máximo alcanzado (${currentStock})`, 'warning');
+                return;
+            }
+            setSelectedProducts(prev => prev.map(sp =>
+                sp.productId === product.id ? { ...sp, qty: sp.qty + 1 } : sp
+            ));
+        } else {
+            if (!allowNeg && currentStock <= 0) {
+                showToast(`${product.name}: sin stock disponible`, 'warning');
+                return;
+            }
+            setSelectedProducts(prev => [...prev, {
+                productId: product.id,
+                name: product.name,
+                priceUsd: product.priceUsdt || product.priceUsd || product.price || 0,
+                qty: 1,
+            }]);
+        }
+    };
+
+    const removeProduct = (productId) => {
+        setSelectedProducts(prev => {
+            const item = prev.find(sp => sp.productId === productId);
+            if (!item) return prev;
+            if (item.qty <= 1) return prev.filter(sp => sp.productId !== productId);
+            return prev.map(sp => sp.productId === productId ? { ...sp, qty: sp.qty - 1 } : sp);
+        });
+    };
+
+    const deleteProduct = (productId) => {
+        setSelectedProducts(prev => prev.filter(sp => sp.productId !== productId));
+    };
 
     const handleSubmit = async () => {
         if (!canSubmit) return;
         setSaving(true);
         try {
-            const rawAmt = Number(amount);
-            const usdAmount = currency === 'BS' && effectiveRate > 0
-                ? Math.round((rawAmt / effectiveRate) * 100) / 100
-                : rawAmt;
-            await createDebt(staffId, concept, usdAmount);
-            showToast('Deuda registrada', 'success');
+            // Build concept string from products
+            const concept = selectedProducts.map(sp => `${sp.qty}x ${sp.name}`).join(', ');
+
+            await createDebt(staffId, concept, Math.round(totalUsd * 100) / 100, note);
+
+            // Deduct stock for each product
+            selectedProducts.forEach(sp => {
+                const product = products.find(p => p.id === sp.productId);
+                if (product) {
+                    if (product.isCombo) {
+                        if (product.comboItems && product.comboItems.length > 0) {
+                            product.comboItems.forEach(ci => {
+                                adjustStock(ci.productId, -(sp.qty * (ci.qty || 1)));
+                            });
+                        } else if (product.linkedProductId) {
+                            adjustStock(product.linkedProductId, -(sp.qty * (product.linkedQty || 1)));
+                        }
+                    } else {
+                        adjustStock(sp.productId, -sp.qty);
+                    }
+                }
+            });
+
+            showToast('Deuda registrada y stock descontado', 'success');
             onClose();
         } catch (err) {
             console.error(err);
             showToast('Error al registrar deuda', 'error');
         } finally { setSaving(false); }
     };
-
-    const quickAmountsUSD = [1, 2, 5, 10, 20];
-    const quickAmountsBs = [10, 20, 50, 100, 200];
-    const quickAmounts = currency === 'BS' ? quickAmountsBs : quickAmountsUSD;
-
-    // Preview conversion
-    const rawAmt = Number(amount) || 0;
-    const previewUsd = currency === 'BS' && effectiveRate > 0 ? rawAmt / effectiveRate : rawAmt;
-    const previewBs = currency === 'USD' && effectiveRate > 0 ? rawAmt * effectiveRate : rawAmt;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={step === 1 ? '¿Quién debe?' : 'Registrar Deuda'}>
@@ -105,10 +172,10 @@ export function AddDebtModal({ isOpen, onClose }) {
                     </div>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                     {/* Empleado seleccionado */}
                     <button onClick={() => setStep(1)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 transition-all hover:bg-rose-100">
+                        className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 transition-all hover:bg-rose-100">
                         <ArrowLeft size={14} className="text-rose-400 shrink-0" />
                         {selectedUser && (() => {
                             const conf = ROLE_CONFIG[selectedUser.role] || ROLE_CONFIG.CAJERO;
@@ -128,82 +195,115 @@ export function AddDebtModal({ isOpen, onClose }) {
                         })()}
                     </button>
 
-                    {/* Concepto */}
+                    {/* Selected products */}
+                    {selectedProducts.length > 0 && (
+                        <div className="space-y-1.5">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
+                                <ShoppingBag size={10} /> Productos seleccionados
+                            </p>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {selectedProducts.map(sp => (
+                                    <div key={sp.productId} className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{sp.name}</p>
+                                            <p className="text-[10px] text-slate-400">${sp.priceUsd.toFixed(2)} c/u · <span className="text-rose-500 font-bold">${(sp.qty * sp.priceUsd).toFixed(2)}</span></p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button onClick={() => removeProduct(sp.productId)}
+                                                className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 transition-all">
+                                                <Minus size={10} />
+                                            </button>
+                                            <span className="text-xs font-black text-indigo-600 min-w-[20px] text-center">{sp.qty}</span>
+                                            <button onClick={() => addProduct(products.find(p => p.id === sp.productId))}
+                                                className="w-6 h-6 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-600 flex items-center justify-center active:scale-90 transition-all">
+                                                <Plus size={10} />
+                                            </button>
+                                            <button onClick={() => deleteProduct(sp.productId)}
+                                                className="w-6 h-6 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-500 flex items-center justify-center active:scale-90 transition-all ml-0.5">
+                                                <Trash2 size={10} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {/* Total */}
+                            <div className="flex items-center justify-between bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/30 rounded-xl px-3 py-2">
+                                <span className="text-[10px] uppercase font-bold text-rose-400">Total deuda</span>
+                                <div className="text-right">
+                                    <span className="text-sm font-black text-rose-600">${totalUsd.toFixed(2)}</span>
+                                    {totalBs > 0 && <p className="text-[9px] text-slate-400 font-bold">Bs {totalBs.toFixed(2)}</p>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Product search */}
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">¿Qué se llevó?</label>
-                        <input ref={conceptRef} type="text" value={concept} onChange={e => setConcept(e.target.value)}
-                            placeholder="Ej: 4x Zulia, 2 horas mesa 3..."
-                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-3 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30" />
+                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex items-center gap-1">
+                            <Package size={10} /> Agregar productos
+                        </p>
+                        <div className="relative mb-2">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input ref={productSearchRef} type="text" value={productSearch} onChange={e => setProductSearch(e.target.value)}
+                                placeholder="Buscar producto..."
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto">
+                            {availableProducts.slice(0, 20).map(p => {
+                                const inSelected = selectedProducts.find(sp => sp.productId === p.id);
+                                const stock = p.stock ?? 0;
+                                const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
+                                const isOut = !allowNeg && stock <= 0 && !p.isCombo;
+                                return (
+                                    <button key={p.id}
+                                        onClick={() => !isOut && addProduct(p)}
+                                        disabled={isOut}
+                                        className={`text-left rounded-xl p-2.5 border transition-all active:scale-[0.98] relative ${
+                                            isOut
+                                                ? 'bg-slate-50 border-slate-200 opacity-40 cursor-not-allowed'
+                                                : inSelected
+                                                    ? 'bg-indigo-50 border-indigo-200'
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-rose-300'
+                                        }`}>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
+                                        <div className="flex items-center justify-between mt-1">
+                                            <span className="text-emerald-500 font-black text-xs">${Number(p.priceUsdt || p.priceUsd || p.price || 0).toFixed(2)}</span>
+                                            {!p.isCombo && (
+                                                <span className={`text-[9px] font-bold ${isOut ? 'text-red-500' : stock <= (p.lowStockAlert ?? 5) ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                    {isOut ? 'Agotado' : `${stock}`}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {inSelected && (
+                                            <span className="absolute top-1.5 right-1.5 text-[9px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded-full">
+                                                {inSelected.qty}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    {/* Monto */}
+                    {/* Notas */}
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">Monto</label>
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 mb-2">
-                            <button onClick={() => { setCurrency('USD'); setAmount(''); }}
-                                className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
-                                    currency === 'USD'
-                                        ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}>
-                                $ USD
-                            </button>
-                            <button onClick={() => { setCurrency('BS'); setAmount(''); }}
-                                className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${
-                                    currency === 'BS'
-                                        ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
-                                }`}>
-                                Bs
-                            </button>
-                        </div>
-                        <div className="relative">
-                            {currency === 'USD'
-                                ? <DollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-rose-400" />
-                                : <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-500 font-black text-sm">Bs</span>
-                            }
-                            <input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)}
-                                placeholder="0.00"
-                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3 py-3 text-lg font-black text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30" />
-                        </div>
-                        {/* Conversion preview */}
-                        {rawAmt > 0 && effectiveRate > 0 && (
-                            <div className="mt-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg px-3 py-1.5 text-center">
-                                {currency === 'BS' ? (
-                                    <p className="text-[11px] text-slate-500">
-                                        ≈ <span className="font-bold text-emerald-600">${previewUsd.toFixed(2)} USD</span>
-                                        <span className="text-slate-300 mx-1.5">·</span>
-                                        <span className="text-slate-400">Tasa: {effectiveRate.toFixed(2)} Bs/$</span>
-                                    </p>
-                                ) : (
-                                    <p className="text-[11px] text-slate-500">
-                                        ≈ <span className="font-bold text-blue-600">Bs {previewBs.toFixed(2)}</span>
-                                        <span className="text-slate-300 mx-1.5">·</span>
-                                        <span className="text-slate-400">Tasa: {effectiveRate.toFixed(2)} Bs/$</span>
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                        {/* Quick amounts */}
-                        <div className="flex gap-1.5 mt-2">
-                            {quickAmounts.map(q => (
-                                <button key={q} onClick={() => setAmount(String(q))}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 ${
-                                        Number(amount) === q
-                                            ? 'bg-rose-500 text-white shadow-sm'
-                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
-                                    }`}>
-                                    {currency === 'BS' ? `${q}` : `$${q}`}
-                                </button>
-                            ))}
-                        </div>
+                        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 flex items-center gap-1">
+                            <StickyNote size={10} /> Nota (opcional)
+                        </p>
+                        <textarea
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="Ej: Se lo llevó para el almuerzo del equipo..."
+                            rows={2}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30 resize-none"
+                        />
                     </div>
 
                     {/* Submit */}
                     <button onClick={handleSubmit} disabled={!canSubmit}
                         className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-200 dark:disabled:bg-slate-700 text-white disabled:text-slate-400 font-black text-sm uppercase tracking-wider rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-rose-500/20 disabled:shadow-none flex items-center justify-center gap-2">
                         {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} strokeWidth={3} />}
-                        {saving ? 'Guardando...' : 'Registrar Deuda'}
+                        {saving ? 'Guardando...' : `Registrar $${totalUsd.toFixed(2)}`}
                     </button>
                 </div>
             )}
@@ -285,6 +385,15 @@ export function DebtDetailModal({ debt, onClose }) {
                 {/* Info card */}
                 <div className={`rounded-2xl p-4 border ${isPaid ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30' : 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/30'}`}>
                     <p className="text-sm font-black text-slate-800 dark:text-white mb-2">{debt.concept}</p>
+
+                    {/* Nota visible */}
+                    {debt.note && (
+                        <div className="flex items-start gap-1.5 mb-2 bg-white/60 dark:bg-slate-800/40 rounded-lg px-2.5 py-2 border border-slate-200/50 dark:border-slate-700/50">
+                            <StickyNote size={11} className="text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">{debt.note}</p>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-[10px] text-slate-400 uppercase font-bold">Monto original</p>

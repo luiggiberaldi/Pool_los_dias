@@ -35,7 +35,7 @@ export const useDebtsStore = create((set, get) => ({
         }
     },
 
-    createDebt: async (staffId, concept, amountUsd) => {
+    createDebt: async (staffId, concept, amountUsd, note = '') => {
         const userId = await getAuthUserId();
         if (!userId) return null;
 
@@ -47,12 +47,21 @@ export const useDebtsStore = create((set, get) => ({
             remaining_usd: amountUsd,
             status: 'pending',
         };
+        if (note && note.trim()) payload.note = note.trim();
 
-        const { data, error } = await supabaseCloud
+        let { data, error } = await supabaseCloud
             .from('staff_debts')
             .insert(payload)
             .select()
             .single();
+
+        // If 'note' column doesn't exist yet, retry without it
+        if (error && payload.note) {
+            const { note: _, ...payloadWithoutNote } = payload;
+            const retry = await supabaseCloud.from('staff_debts').insert(payloadWithoutNote).select().single();
+            data = retry.data;
+            error = retry.error;
+        }
 
         if (error) throw error;
 

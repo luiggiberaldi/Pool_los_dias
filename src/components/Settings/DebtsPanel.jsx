@@ -4,7 +4,7 @@ import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
 import { AddDebtModal, DebtDetailModal } from './DebtModals';
 import { ROLE_CONFIG } from './UserPinInput';
-import { Plus, Receipt, ChevronDown, AlertCircle } from 'lucide-react';
+import { Plus, Receipt, ChevronDown, AlertCircle, StickyNote } from 'lucide-react';
 
 const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
 const fmtBs = (usd, rate) => rate > 0 ? (usd * rate).toFixed(2) : null;
@@ -178,6 +178,11 @@ export default function DebtsPanel() {
                                                     }`}>
                                                     <div className="min-w-0 flex-1 mr-2">
                                                         <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{d.concept}</p>
+                                                        {d.note && (
+                                                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 truncate flex items-center gap-1">
+                                                                <StickyNote size={8} className="shrink-0" /> {d.note}
+                                                            </p>
+                                                        )}
                                                         <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">
                                                             {new Date(d.created_at).toLocaleDateString('es-VE', { day: '2-digit', month: 'short' })}
                                                             {' · '}${Number(d.amount_usd).toFixed(2)}
