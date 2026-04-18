@@ -1,15 +1,13 @@
 # 📓 Bitácora de Desarrollo — Pool Los Diaz POS
 
 > Registro cronológico de avances, bugs resueltos y decisiones técnicas.
-> Última actualización: **05 Abril 2026**
+> Última actualización: **18 Abril 2026**
 
 ---
 
 ## 📍 ¿Dónde estamos?
 
-**Estamos al final de FASE 0 (Infraestructura Base) y en el umbral de FASE 1 (Login con PIN).**
-
-La base de datos, el motor de ventas y el branding están listos. Los componentes de seguridad existen en el código pero **no están integrados en `App.jsx`** todavía — esa es exactamente la tarea pendiente de Fase 1.
+**Todas las fases de desarrollo (0–11) están completadas.** El sistema está en producción con gestión completa de mesas, ventas, caja, inventario, contactos, deudas de empleados, y motor de facturación dual (sesión + seats). Se realizan correcciones y mejoras incrementales según necesidades del negocio.
 
 ---
 
@@ -21,71 +19,155 @@ La base de datos, el motor de ventas y el branding están listos. Los componente
 - [x] `vite.config.js` — nombre PWA actualizado
 - [x] `TermsOverlay.jsx` — términos y condiciones actualizados
 - [x] `PremiumGuard.jsx` — mensajes de licencia actualizados
-- [x] `WalletView.jsx`, `SettingsView.jsx`, `DashboardView.jsx` — UI actualizada
-- [x] `OnboardingOverlay` eliminado de `App.jsx`
 
 ### Motor de Ventas y Base de Datos
 - [x] Función RPC `process_checkout` desplegada en Supabase (`raxcxddreghynthyvllh`)
 - [x] Función RPC `validate_double_entry` desplegada
 - [x] `offlineQueueService.js` — cola de emergencia operativa
 - [x] `useCloudSync.js` — sincronización P2P en tiempo real operativa
-- [x] Restricción FK removida en `sale_items` para compatibilidad con catálogo dinámico
 
 ### Tickets Térmicos 58mm
 - [x] Logo en ticket con **aspect ratio dinámico** (sin distorsión)
-- [x] `ticketGenerator.js` — ancho fijo en 58mm, variables `is80` eliminadas
+- [x] `ticketGenerator.js` — ancho fijo en 58mm
 - [x] `dailyCloseGenerator.js` — ancho fijo en 58mm
-- [x] Opción de selección de papel 80mm **eliminada** de Settings y SettingsModal
 
 ---
 
 ## ✅ FASE 1 — Login con PIN y Roles (COMPLETADA)
 
-### Componentes Integrados
-- [x] `src/hooks/store/authStore.js` — Store de auth con `staff_users` de Supabase
-- [x] `src/components/security/LoginScreen.jsx` — Pantalla y conectada a `App.jsx`
-- [x] `src/components/security/PinPad.jsx` — Teclado numérico táctil
-- [x] `src/components/security/Guards.jsx` — `<AdminRoute>`, `<CashierRoute>`, etc. actuando globalmente.
-- [x] Migración SQL completada: tablas `staff_users` y `cash_sessions` en entorno nube.
-- [x] Bloqueo efectivo del UI a operadores sin caja activa (`CashClosedLockScreen`).
+- [x] `authStore.js` — Store de auth con `staff_users` de Supabase
+- [x] `LoginScreen.jsx` — Pantalla conectada a `App.jsx`
+- [x] `PinPad.jsx` — Teclado numérico táctil
+- [x] `Guards.jsx` — `<AdminRoute>`, `<CashierRoute>`, etc.
+- [x] Migración SQL: tablas `staff_users` y `cash_sessions`
+- [x] Bloqueo del UI a operadores sin caja activa (`CashClosedLockScreen`)
 
 ---
 
-## 🔄 FASE 2 — Plano de Mesas (EN PROGRESO)
+## ✅ FASE 2 — Plano de Mesas (COMPLETADA)
 
-- [ ] Migración SQL: tablas `tables` y `table_sessions`
-- [ ] Implementar motor de timers y facturación de mesas
-- [ ] `TablesView.jsx` — Vista del plano de mesas
-- [ ] `TableCard.jsx` — Tarjeta de mesa con timer regresivo
-- [ ] Motor de timers con `expires_at`
-- [ ] Integración con Supabase Realtime para actualización en vivo
-
----
-
-## ⏳ FASE 3 — Órdenes y Comandas (PENDIENTE)
-
-- [ ] Migración SQL: tablas `orders`, `order_items`, `payments`
-- [ ] `OrderPanel.jsx` — Panel de orden por mesa
-- [ ] Integración con `checkoutProcessor.js`
-- [ ] Vista del cajero con todas las órdenes abiertas
+- [x] Migración SQL: tablas `tables` y `table_sessions`
+- [x] Motor de timers y facturación de mesas (`tableBillingEngine.js`)
+- [x] `TablesView.jsx` — Vista del plano de mesas
+- [x] `TableCard.jsx` — Tarjeta con timer regresivo y desglose de costos
+- [x] Filtros por tipo (Pool/Bar) y estado (Libres/Ocupadas)
+- [x] CRUD de mesas (Admin)
+- [x] Tipos: Mesa de Pool (con timer) vs Mesa Normal (sin costo por tiempo)
 
 ---
 
-## ⏳ FASE 4 — Apertura y Cierre de Caja (PENDIENTE)
+## ✅ FASE 3 — Órdenes y Comandas (COMPLETADA)
 
-- [ ] Migración SQL: tabla `cash_sessions`
-- [ ] Pantalla de apertura de caja
-- [ ] Bloqueo de acceso si no hay caja abierta
-- [ ] Arqueo físico vs sistema
+- [x] Tablas `orders`, `order_items`, `payments`
+- [x] `OrderPanel.jsx` — Panel de consumo por mesa
+- [x] Modal "Detalle de Cuenta" con desglose dual ($/Bs)
+- [x] Diferenciación visual: Pool (Cielo) vs Bar (Violeta)
+- [x] Motor de impresión por mesa (ticket parcial)
+- [x] Flujo de cobro integrado con `checkoutProcessor.js`
 
 ---
 
-## ⏳ FASE 5 — Inventario de Barra (PENDIENTE)
+## ✅ FASE 4 — Apertura y Cierre de Caja (COMPLETADA)
 
-- [ ] Integración catálogo → tabla `products` en Supabase
-- [ ] Descuento automático de stock en checkout
-- [ ] Alertas de stock bajo
-- [ ] Reporte de rotación en cierre del día
+- [x] Tabla `cash_sessions` con fondo inicial, tasas, arqueo
+- [x] Pantalla de apertura de caja
+- [x] Cierre ciego implementado
+- [x] Ticket de cierre (`dailyCloseGenerator.js`)
+- [x] Historial en `ReportsView.jsx`
+
+---
+
+## ✅ FASE 5 — Inventario de Barra (COMPLETADA)
+
+- [x] Catálogo de productos con tabla `products` en Supabase
+- [x] Descuento automático de stock en checkout
+- [x] Alertas de stock bajo configurables
+- [x] Filtros por categoría, búsqueda, paginación
+- [x] Soporte de lotes/bultos con precio unitario calculado
+
+---
+
+## ✅ FASE 6 — Refactorización de Código (COMPLETADA — 05/04/2026)
+
+Modularización de todos los archivos con más de 600 líneas.
+
+### Vistas Refactorizadas
+
+| Archivo | Antes | Después | Extracciones |
+|---------|-------|---------|--------------|
+| `DashboardView.jsx` | 1257 | ~580 | `useDashboardMetrics.js` |
+| `CustomersView.jsx` | 1010 | 438 | `CustomerCard.jsx`, `CustomerModals.jsx` |
+| `ProductsView.jsx` | 1000 | 522 | `useProductForm.js`, `useProductPagination.js` |
+| `SalesView.jsx` | 968 | 445 | `useSalesData.js`, `useSalesCheckout.js` |
+| `ticketGenerator.js` | 751 | 381 | `thermalTicketGenerator.js`, `tableTicketGenerator.js` |
+| `ReportsView.jsx` | 748 | 448 | `TransactionRow.jsx`, `PaymentBreakdownCard.jsx`, `useReportsData.js` |
+| `CheckoutModal.jsx` | 724 | 449 | `useCheckoutPayments.js`, `CustomerPickerSection.jsx` |
+
+---
+
+## ✅ FASE 7 — Onboarding con SpotlightTour (COMPLETADA)
+
+- [x] Tour guiado por rol (Admin/Cajero/Mesero)
+- [x] Mini-tours por pestaña al primera visita
+- [x] Tours contextuales en formularios clave
+
+---
+
+## ✅ FASE 8 — Gestión Avanzada de Usuarios (COMPLETADA)
+
+- [x] Activar/desactivar usuarios sin perder historial
+- [x] Eliminar usuario permanentemente
+- [x] Cuatro roles: ADMIN, CAJERO, MESERO, BARRA
+- [x] Permisos delegables al cajero
+
+---
+
+## ✅ FASE 9 — Gestión de Contactos (COMPLETADA)
+
+- [x] `CustomersView.jsx` con 3 tabs: Clientes, Proveedores, Empleados
+- [x] Sistema de fiado/deuda para clientes con abonos parciales
+- [x] Directorio de proveedores
+- [x] UI responsive optimizada para móviles
+
+---
+
+## ✅ FASE 10 — Sistema de Deudas de Empleados (COMPLETADA — 17/04/2026)
+
+- [x] Tablas `staff_debts` y `staff_debt_payments` en Supabase
+- [x] `useDebtsStore.js` — Zustand store con CRUD completo
+- [x] `DebtsPanel.jsx` — Panel con lista agrupada por empleado
+- [x] `DebtModals.jsx` — AddDebtModal, DebtDetailModal, AddPaymentModal
+- [x] Filtros: Todos / Pendientes / Pagadas
+- [x] Conversión Bs en tiempo real
+- [x] Badge de deuda en `UsersManager.jsx`
+- [x] Tab "Deudas" en SettingsView (adminOnly)
+- [x] UI optimizada para móviles
+
+---
+
+## ✅ FASE 11 — Motor de Facturación Dual y Correcciones (COMPLETADA — 18/04/2026)
+
+Corrección integral del sistema de facturación para soportar la arquitectura dual de tiempo (sesión + seats).
+
+### Problema raíz
+Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.timeCharges` en lugar de `session.hours_paid`. Esto causaba bugs en cascada:
+
+### Correcciones realizadas
+
+| Archivo | Cambio |
+|---------|--------|
+| `tableBillingEngine.js` | Parámetro `seats` en `calculateSessionCost`, `calculateSessionCostBreakdown`, `calculateFullTableBreakdown` para detectar `isLibre` correctamente |
+| `TableCard.jsx` | Timer usa `totalHoursPaid = hours_paid + seatHours`; grandTotal incluye `seatTimeCost` |
+| `TableCardInlineModals.jsx` | `seatTimeCost` pasado a TotalDetailsModal |
+| `TotalDetailsModal.jsx` | Nueva sección "Horas Prepagadas" (sky-blue) para horas de seats |
+| `TableQueuePanel.jsx` | grandTotal incluye seatTimeCost |
+| `CashierCheckoutView.jsx` | grandTotal incluye seatTimeCost |
+| `OperatorDashboardPanel.jsx` | totalUsd incluye seatTimeCost |
+| `tableBillingActions.js` | Restar horas: LIFO desde seat timeCharges, luego hours_paid |
+| `OpenWizardModal.jsx` | Modo libre deshabilitado; solo horas prepagadas |
+| `TableCardTimerDisplay.jsx` | Eliminado texto "acumulado" |
+| `useNotificationCenter.js` | Recibe `tables` para resolver nombres reales; considera seat hours |
+| `DashboardView.jsx` | Pasa `tables` a useNotificationCenter |
 
 ---
 
@@ -93,9 +175,16 @@ La base de datos, el motor de ventas y el branding están listos. Los componente
 
 | Fecha | Bug | Solución |
 |-------|-----|----------|
-| 02/04/2026 | Logo aplastado en ticket PDF | Cálculo dinámico de `logoH` con aspect ratio real (`img.width / img.height`) |
-| 02/04/2026 | Error 409 al sincronizar ventas | Productos "fantasma" en caché local del browser. Solución: limpiar Site Data + quitar FK constraint en `sale_items` |
-| 02/04/2026 | Error 404 en RPC `process_checkout` | Función no existía en nuevo proyecto Supabase. Desplegada manualmente via SQL Editor |
+| 02/04/2026 | Logo aplastado en ticket PDF | Cálculo dinámico de `logoH` con aspect ratio real |
+| 02/04/2026 | Error 409 al sincronizar ventas | Limpiar Site Data + quitar FK constraint en `sale_items` |
+| 02/04/2026 | Error 404 en RPC `process_checkout` | Función desplegada manualmente via SQL Editor |
+| 17/04/2026 | 404 en tabla `staff_debts` | Migración SQL para crear tablas de deudas |
+| 18/04/2026 | Timer no actualiza al agregar horas | Timer no sumaba horas de seat timeCharges |
+| 18/04/2026 | Restar horas no funciona | Solo restaba de `hours_paid`, no de seat timeCharges (LIFO fix) |
+| 18/04/2026 | "$X.XX acumulado" en mesas prepagadas | `isLibre` no consideraba seat hours; texto eliminado |
+| 18/04/2026 | Totales inconsistentes (card vs queue vs checkout) | Faltaba `seatTimeCost` en Queue, Checkout y Dashboard |
+| 18/04/2026 | Detalle de Cuenta sin horas prepagadas | Añadida sección "Horas Prepagadas" en TotalDetailsModal |
+| 18/04/2026 | Notificación "Mesa? Mesa?" | `useNotificationCenter` no tenía acceso a tabla `tables` |
 
 ---
 
@@ -103,53 +192,12 @@ La base de datos, el motor de ventas y el branding están listos. Los componente
 
 | Decisión | Razón |
 |----------|-------|
-| **Sin React Router** — navegación por estado `activeTab` | Compatibilidad PWA offline. No se instalará `react-router-dom` salvo aprobación explícita |
-| **RLS permisivo** en todas las tablas | El sistema es offline-first; la seguridad se implementa en Guards del cliente |
-| **PIN hasheado SHA-256** | Nunca texto plano en BD. Se usa Web Crypto API nativa (sin dependencias externas) |
-| **Papel fijo 58mm** | El cliente tiene únicamente impresora térmica de 58mm |
-| **Moneda base USD** | Bs y COP son conversiones dinámicas; nunca se almacenan como base |
-
----
-
-## ✅ FASE 6 — Refactorización de Código (COMPLETADA — 05/04/2026)
-
-Modularización de todos los archivos con más de 600 líneas. Se extrajeron hooks personalizados y sub-componentes sin romper funcionalidad. Build verificado green.
-
-### Vistas Refactorizadas
-
-| Archivo | Antes | Después | Extracciones |
-|---------|-------|---------|--------------|
-| `DashboardView.jsx` | 1257 | ~580 | `useDashboardMetrics.js` (cálculos useMemo) |
-| `CustomersView.jsx` | 1010 | 438 | `CustomerCard.jsx`, `CustomerModals.jsx` (3 modales) |
-| `ProductsView.jsx` | 1000 | 522 | `useProductForm.js` (22 estados + handlers), `useProductPagination.js` |
-| `SalesView.jsx` | 968 | 445 | `useSalesData.js` (carga + listeners), `useSalesCheckout.js` (checkout handlers) |
-| `ticketGenerator.js` | 751 | 381 | `thermalTicketGenerator.js`, `tableTicketGenerator.js` |
-| `ReportsView.jsx` | 748 | 448 | `TransactionRow.jsx`, `PaymentBreakdownCard.jsx`, `useReportsData.js` |
-| `CheckoutModal.jsx` | 724 | 449 | `useCheckoutPayments.js`, `CustomerPickerSection.jsx` |
-
-### Nuevos Hooks (`src/hooks/`)
-- `useDashboardMetrics.js` — Métricas del dashboard (ventas del día, ganancias, top productos, etc.)
-- `useProductForm.js` — Estado del formulario de productos y handlers (imagen, precios, guardado)
-- `useProductPagination.js` — Paginación, filtrado y ordenamiento de productos
-- `useSalesData.js` — Carga de datos de ventas, listeners de visibilidad/storage
-- `useSalesCheckout.js` — Handlers de checkout con cliente, checkout de mesa, custom amounts
-- `useReportsData.js` — Carga de ventas, cálculo de métricas y agrupación por cierre
-- `useCheckoutPayments.js` — Estado de barras de pago, cálculos bimoneda, confirmación
-
-### Nuevos Componentes
-- `src/components/Customers/CustomerCard.jsx` — Tarjeta compacta de cliente
-- `src/components/Customers/CustomerModals.jsx` — DetailSheet, EditModal, AddModal
-- `src/components/Reports/TransactionRow.jsx` — Fila expandible de transacción
-- `src/components/Reports/PaymentBreakdownCard.jsx` — Desglose por método de pago
-- `src/components/Sales/CustomerPickerSection.jsx` — Selector de cliente + crear inline
-
-### Nuevos Utils
-- `src/utils/thermalTicketGenerator.js` — Impresión térmica via window.print()
-- `src/utils/tableTicketGenerator.js` — Pre-cuenta PDF para mesas de pool
-
-### Patrón de Refactorización
-- **Hooks**: Extraen estado + lógica de negocio. Reciben dependencias como parámetros, retornan estado + handlers.
-- **Componentes**: Extraen JSX auto-contenido con su propio estado local cuando aplica.
-- **Re-exports**: `ticketGenerator.js` re-exporta funciones movidas para compatibilidad hacia atrás.
-
-> **Commit:** `6234389` — `refactor: modularize large files into hooks and components`
+| **Sin React Router** — navegación por estado `activeTab` | Compatibilidad PWA offline |
+| **RLS permisivo** en todas las tablas | Offline-first; seguridad en Guards del cliente |
+| **PIN hasheado SHA-256** | Web Crypto API nativa, sin dependencias |
+| **Papel fijo 58mm** | Impresora térmica 58mm del cliente |
+| **Moneda base USD** | Bs son conversiones dinámicas; nunca almacenadas como base |
+| **Modo libre deshabilitado** | Solo horas prepagadas para evitar confusión y cobros incorrectos |
+| **Arquitectura dual de tiempo** | `session.hours_paid` + `seat.timeCharges[]` permite cobro individual por cliente |
+| **4 roles (ADMIN/CAJERO/MESERO/BARRA)** | BARRA agregado para operadores de barra con permisos limitados |
+| **Web Serial API para impresión** | Impresión directa ESC/POS sin intermediarios |

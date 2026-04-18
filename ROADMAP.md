@@ -1,126 +1,175 @@
-![alt text](image.png)# 🎱 Pool Los Diaz — Hoja de Ruta del Sistema
+# 🎱 Pool Los Diaz — Hoja de Ruta del Sistema
 
-> **Versión:** 1.0  
-> **Proyecto:** Pool Los Diaz POS  
-> **Supabase Ref:** `raxcxddreghynthyvllh`  
-> **Stack:** React + Vite + Supabase + LocalForage (PWA Offline-First)
+> **Versión:** 2.0
+> **Proyecto:** Pool Los Diaz POS
+> **Supabase Ref:** `raxcxddreghynthyvllh`
+> **Stack:** React 19 + Vite + Supabase + LocalForage (PWA Offline-First)
+> **Hosting:** Cloudflare Workers
+> **Última actualización:** 18 Abril 2026
 
 ---
 
 ## 🎯 Visión General
 
-Sistema de punto de venta especializado para un salón de billar, con gestión de mesas, órdenes de consumo, control de caja y reportes financieros. Diseñado para funcionar 100% offline con sincronización en la nube mediante Supabase.
+Sistema de punto de venta especializado para un salón de billar, con gestión de mesas, órdenes de consumo, control de caja, inventario, contactos y reportes financieros. Diseñado para funcionar 100% offline con sincronización en la nube mediante Supabase.
 
 ---
 
-## FASE 1 — Autenticación por PIN y Roles de Personal 🔄 (COMPLETADA)
+## FASE 0 — Infraestructura Base ✅ (COMPLETADA)
 
-**Objetivo:** Controlar el acceso al sistema por rol, sin necesidad de contraseñas complejas. Cada empleado se identifica con su nombre y un PIN de 4 dígitos.
+**Objetivo:** Establecer la base técnica del proyecto — branding, motor de ventas, tickets y sincronización.
 
-### Entregables
-- [x] Tabla `staff_users` en Supabase (id, nombre, rol, pin_hash, activo)
-- [x] Store de autenticación `authStore.js` con caché offline en LocalForage
-- [x] Utilidad `crypto.js` para hashing SHA-256 del PIN (Web Crypto API nativa)
-- [x] Componente `LoginScreen.jsx` — Pantalla completa de acceso por PIN
-- [x] Componente `PinPad.jsx` — Teclado numérico táctil + selector de nombre
-- [x] Guards de ruta: `<AdminRoute>`, `<CashierRoute>`, `<AnyStaffRoute>`
-- [x] Integración en `App.jsx` para interceptar acceso no autenticado
+- [x] Branding "Pool Los Diaz" en toda la app
+- [x] Motor de ventas con RPC `process_checkout`
+- [x] Cola offline (`offlineQueueService.js`)
+- [x] Sincronización P2P (`useCloudSync.js`)
+- [x] Tickets térmicos 58mm con logo dinámico
+
+---
+
+## FASE 1 — Autenticación por PIN y Roles ✅ (COMPLETADA)
+
+**Objetivo:** Control de acceso por rol con PIN de 4 dígitos.
+
+- [x] Tabla `staff_users` en Supabase
+- [x] Store de autenticación con caché offline
+- [x] Hashing SHA-256 vía Web Crypto API
+- [x] `LoginScreen.jsx` + `PinPad.jsx`
+- [x] Guards de ruta por rol
 
 ### Roles del sistema
 | Rol | Descripción | Permisos |
 |-----|------------|----------|
-| `ADMIN` | Dueño / Gerente | Acceso total. Configuración, reportes, caja, mesas |
-| `CAJERO` | Cajero | Ventas, cobros, cierre de caja |
-| `MESERO` | Mesero / Operador | Asignar mesas, registrar órdenes |
+| `ADMIN` | Dueño / Gerente | Acceso total. Configuración, reportes, caja, mesas, deudas |
+| `CAJERO` | Cajero | Ventas, cobros, apertura/cierre de caja (delegable) |
+| `MESERO` | Mesero / Operador | Asignar mesas, registrar órdenes, ver consumo |
+| `BARRA` | Operador de barra | Preparar pedidos, ver órdenes asignadas |
 
 ---
 
-## FASE 2 — Plano Interactivo de Mesas de Pool ✅ (COMPLETADA)
+## FASE 2 — Plano Interactivo de Mesas ✅ (COMPLETADA)
 
-**Objetivo:** Vista principal de operación. El operador ve el estado de cada mesa en tiempo real y puede asignar sesiones, ver timers y cobrar.
+**Objetivo:** Vista principal de operación con estado en tiempo real de cada mesa.
 
-### Entregables
-- [x] Tabla `tables` en Supabase (id, nombre, tipo, estado, precio/hora, posición x/y)
-- [x] Tabla `table_sessions` (mesa, mesero, hora inicio, hora fin, tiempo pagado, estado)
-- [x] Vista `TablesView.jsx` — Plano visual con tarjetas de mesas
-- [x] Componente `TableCard.jsx` — Muestra estado, timer regresivo y precio acumulado
-- [x] Motor de timers con `expires_at` y alertas configurables (ej. 10 min antes de vencer)
-- [x] Acciones por mesa: Abrir sesión / Agregar tiempo / Cerrar y cobrar
-- [x] Sincronización en tiempo real con Supabase Realtime
-
-### Estados de mesa
-| Estado | Color | Significado |
-|--------|-------|-------------|
-| `LIBRE` | 🟢 Verde | Disponible para asignar |
-| `OCUPADA` | 🔴 Rojo | Sesión activa con timer corriendo |
-| `PIÑA` | 🟡 Amarillo | Sesión activa de tipo cobro plano |
-| `MANTENIMIENTO` | ⚫ Gris | Fuera de servicio |
+- [x] Tablas `tables` y `table_sessions`
+- [x] `TablesView.jsx` con plano visual
+- [x] `TableCard.jsx` con timer regresivo y precio
+- [x] Modos: Prepagado por Horas / Piña
+- [x] Mesas tipo NORMAL (bar) sin cobro por tiempo
+- [x] Filtros por tipo y estado
+- [x] CRUD administrativo de mesas
+- [x] Sincronización Supabase Realtime
 
 ---
 
 ## FASE 2.5 — Refinamiento Administrativo y UI Móvil ✅ (COMPLETADA)
 
-**Objetivo:** Permitir al administrador autogestionar el plano estructural del bar (añadir/editar mesas) y optimizar la experiencia para los meseros en teléfonos.
-
-### Entregables
-- [x] Módulo Administrativo: CRUD de Mesas (Añadir mesas nuevas, cambiar nombres).
-- [x] Tipos de Mesas: Soporte para 'Mesa de Pool' (con temporizador) vs 'Mesa Normal' (sólo para cargar consumo, sin costo por tiempo).
-- [x] Filtros Dinámicos: Barra de filtros combinados por **Tipo** (Todas/Pool/Bar) y **Estado** (Libres/Ocupadas).
-- [x] UI/UX Móvil: Optimización de la vista `TablesView.jsx` con diseño adhesivo (sticky) para filtros y contadores.
+- [x] CRUD de mesas (añadir/editar/cambiar nombre)
+- [x] Tipos: Mesa Pool (timer) vs Mesa Normal (solo consumo)
+- [x] Filtros combinados Tipo × Estado
+- [x] UI optimizada para móviles (sticky filters)
 
 ---
 
-## FASE 3 — Sistema de Órdenes, Consumo y Cobro ✅ (COMPLETADA)
+## FASE 3 — Órdenes, Consumo y Cobro ✅ (COMPLETADA)
 
-**Objetivo:** Vincular órdenes de consumo de barra a cada mesa, gestionar la expansión de tiempo y proveer un checkout robusto unificado (consumo + mesas).
+**Objetivo:** Vincular consumo de barra a cada mesa con checkout unificado.
 
-### Entregables
-- [x] Tabla `orders`, `order_items` y `payments`.
-- [x] Componente `OrderPanel.jsx` — Re-diseñado en **Light Mode** y renombrado a "**Consumo**".
-- [x] Modal de "Detalle de Cuenta": Desglose premium de tiempo (solo pool) e ítems consumidos con conversión dual ($/Bs).
-- [x] Diferenciación visual: Esquemas de color únicos para mesas de Pool (Cielo) vs Mesas de Bar (Bulto/Violeta).
-- [x] Motor de Impresión por Mesa: Capacidad de emitir un Ticket Parcial (cuenta temporal o saldo actual para el cliente).
-- [x] Flujo de cobro integrado con el motor existente (`checkoutProcessor.js`).
+- [x] Tablas `orders`, `order_items`, `payments`
+- [x] `OrderPanel.jsx` — Panel de consumo por mesa
+- [x] Modal "Detalle de Cuenta" con desglose dual ($/Bs)
+- [x] Ticket parcial (pre-cuenta)
+- [x] Flujo de cobro integrado con `checkoutProcessor.js`
 
 ---
 
 ## FASE 4 — Apertura y Cierre de Caja ✅ (COMPLETADA)
 
-**Objetivo:** Control formal del dinero físico. El administrador abre la caja con un fondo inicial, el cajero opera, y al final del turno se realiza el arqueo y cierre.
+**Objetivo:** Control formal del dinero físico con arqueo y cierre de turno.
 
-### Entregables
-- [x] Tabla `cash_sessions` (fondo inicial USD/Bs, tasas del momento, estado, arqueo, cajero)
-- [x] Pantalla de **Apertura de Caja** — Ingreso de fondo inicial y verificación de tasas
-- [x] Bloqueo de acceso para cajeros/meseros si no hay caja abierta
-- [x] Vista de **Cierre de Caja** — Arqueo físico vs sistema, diferencias en USD y Bs (Cierre Ciego implementado)
-- [x] Generación de Ticket Térmico/PDF de cierre de caja (`dailyCloseGenerator.js`)
-- [x] Historial de sesiones de caja visualizado en `ReportsView.jsx`
+- [x] Apertura de caja con fondo inicial
+- [x] Bloqueo si no hay caja abierta
+- [x] Cierre ciego (arqueo sin ver totales del sistema)
+- [x] Ticket térmico de cierre
+- [x] Historial en Reportes
 
 ---
 
-## FASE 5 — Inventario de Barra y Cocina ✅ (COMPLETADA)
+## FASE 5 — Inventario de Barra ✅ (COMPLETADA)
 
-**Objetivo:** Control de stock de los productos vendidos en el salón (bebidas, snacks, insumos). Descuento automático de inventario al procesar una orden. *(Esta fase se autocompletó gracias a la migración total de componentes desde Abasto)*.
+**Objetivo:** Control de stock con descuento automático al vender.
 
-### Entregables
-- [x] Integración del catálogo de productos existente con la nueva tabla `products` en Supabase
-- [x] Descuento automático de stock al confirmar una orden (`process_checkout` RPC)
-- [x] Alertas de stock bajo configurables por producto
-- [x] Vista de inventario con filtros por categoría (Bebidas, Snacks, Insumos de mesa)
-- [x] Módulo de ajuste de inventario (entradas, salidas manuales, mermas)
-- [x] Reporte de rotación de productos integrado en el cierre del día
+- [x] Catálogo con precios USD y conversión Bs
+- [x] Lotes/bultos con precio unitario calculado
+- [x] Alertas de stock bajo configurables
+- [x] Escáner de código de barras
+- [x] Filtros, búsqueda y paginación
 
 ---
 
-## 🗓️ Cronograma Estimado
+## FASE 6 — Refactorización de Código ✅ (COMPLETADA — 05/04/2026)
 
-```
-ABR 2026   ████████░░░░░░░░░░░░  FASE 1 — Login y Roles
-MAY 2026   ██████████████████░░  FASE 2 — Plano y Refinamiento (Filtrado)
-JUN 2026   ███████████████░░░░░  FASE 3 — Órdenes y Consumo
-JUL 2026   ████████████████████  FASE 4 — Apertura y Cierre de Caja
-AGO 2026   ████████████████████  FASE 5 — Inventario de Barra
-```
+**Objetivo:** Modularizar archivos >600 líneas sin romper funcionalidad.
+
+- [x] 7 vistas refactorizadas
+- [x] 7+ hooks extraídos
+- [x] 5+ componentes nuevos
+- [x] Build verificado green
+
+---
+
+## FASE 7 — Onboarding ✅ (COMPLETADA)
+
+- [x] SpotlightTour por rol y sección
+- [x] Tours contextuales en formularios
+
+---
+
+## FASE 8 — Gestión Avanzada de Usuarios ✅ (COMPLETADA)
+
+- [x] Activar/desactivar/eliminar usuarios
+- [x] 4 roles: ADMIN, CAJERO, MESERO, BARRA
+- [x] Permisos delegables
+
+---
+
+## FASE 9 — Gestión de Contactos ✅ (COMPLETADA)
+
+**Objetivo:** CRM básico con clientes, proveedores y empleados.
+
+- [x] `CustomersView.jsx` con tabs: Clientes / Proveedores / Empleados
+- [x] Sistema de fiado con abonos parciales
+- [x] Directorio de proveedores
+- [x] UI responsive para móviles
+
+---
+
+## FASE 10 — Sistema de Deudas de Empleados ✅ (COMPLETADA — 17/04/2026)
+
+**Objetivo:** Registro y seguimiento de fiados de empleados con historial de pagos.
+
+- [x] Tablas `staff_debts` y `staff_debt_payments`
+- [x] `useDebtsStore.js` — Store Zustand
+- [x] `DebtsPanel.jsx` + `DebtModals.jsx`
+- [x] Filtros: Todos / Pendientes / Pagadas
+- [x] Conversión Bs en tiempo real
+- [x] Badge de deuda en UsersManager
+- [x] Tab "Deudas" en Settings (adminOnly)
+
+---
+
+## FASE 11 — Motor de Facturación Dual ✅ (COMPLETADA — 18/04/2026)
+
+**Objetivo:** Corregir el sistema de facturación para soportar la arquitectura dual de tiempo (sesión + seats).
+
+- [x] `tableBillingEngine.js` — parámetro `seats` para detección correcta de `isLibre`
+- [x] Timer countdown usa `totalHoursPaid = hours_paid + seatHours`
+- [x] grandTotal incluye `seatTimeCost` en todas las vistas (Card, Queue, Checkout, Dashboard)
+- [x] TotalDetailsModal con sección "Horas Prepagadas"
+- [x] Restar horas: LIFO desde seat timeCharges, luego hours_paid
+- [x] Modo libre deshabilitado; solo horas prepagadas
+- [x] Notificaciones con nombres reales de mesas
+- [x] Texto "acumulado" eliminado
 
 ---
 
@@ -130,18 +179,23 @@ AGO 2026   ████████████████████  FASE 5 
 ┌─────────────────────────────────────────────┐
 │               Pool Los Diaz PWA              │
 ├─────────────────┬───────────────────────────┤
-│   Capa de UI    │  React + Tailwind CSS      │
+│   Capa de UI    │  React 19 + Tailwind CSS  │
 ├─────────────────┼───────────────────────────┤
-│ Estado / Lógica │  Zustand + React Context  │
+│ Estado / Lógica │  Zustand + React Hooks    │
 ├─────────────────┼───────────────────────────┤
-│  Persistencia   │  LocalForage (Offline)    │
-│  Local          │  IndexedDB bajo el capó   │
+│  Persistencia   │  LocalForage (IndexedDB)  │
+│  Local          │  Offline-First            │
 ├─────────────────┼───────────────────────────┤
 │  Sincronización │  useCloudSync.js (P2P)    │
 │  en Tiempo Real │  Supabase Realtime        │
 ├─────────────────┼───────────────────────────┤
 │  Base de Datos  │  Supabase PostgreSQL      │
 │  Remota         │  RPCs transaccionales     │
+├─────────────────┼───────────────────────────┤
+│  Impresión      │  Web Serial API + ESC/POS │
+│                 │  jsPDF (tickets PDF)       │
+├─────────────────┼───────────────────────────┤
+│  Hosting        │  Cloudflare Workers       │
 └─────────────────┴───────────────────────────┘
 ```
 
@@ -149,14 +203,13 @@ AGO 2026   ████████████████████  FASE 5 
 
 ## 📐 Reglas Inamovibles del Sistema
 
-> Estas reglas deben respetarse en cada fase sin excepción.
-
-1. **Offline-First**: Toda acción debe funcionar sin internet. La sincronización es eventual, nunca bloqueante.
-2. **PIN Hasheado**: Ningún PIN se almacena en texto plano — siempre SHA-256.
-3. **Doble Partida**: Cada venta genera un par débito/crédito para garantizar integridad contable.
-4. **Impresora 58mm**: Todos los documentos de impresión están optimizados para papel térmico de 58mm.
-5. **Moneda base USD**: El sistema opera en USD como unidad de cuenta. Bs y COP son conversiones dinámicas.
-6. **RLS Permisivo**: La seguridad de acceso se gestiona en el cliente (Guards), no en políticas de RLS de Supabase, para maximizar la compatibilidad offline.
+1. **Offline-First**: Toda acción funciona sin internet. La sincronización es eventual.
+2. **PIN Hasheado**: SHA-256 vía Web Crypto API. Nunca texto plano.
+3. **Doble Partida**: Cada venta genera débito/crédito para integridad contable.
+4. **Impresora 58mm**: Documentos optimizados para papel térmico 58mm.
+5. **Moneda base USD**: Bs son conversiones dinámicas vía tasa BCV.
+6. **RLS Permisivo**: Seguridad en Guards del cliente, no en políticas RLS.
+7. **Solo horas prepagadas**: Modo libre deshabilitado temporalmente.
 
 ---
 
@@ -165,13 +218,21 @@ AGO 2026   ████████████████████  FASE 5 
 | Tema | Estado |
 |-----------|--------|
 | Branding "Pool Los Diaz" | ✅ Completo |
-| Motor de ventas (`checkoutProcessor`) | ✅ Operativo |
-| Cola offline (`offlineQueueService`) | ✅ Operativa |
-| Sincronización P2P (`useCloudSync`) | ✅ Operativa |
-| Funciones RPC Supabase (`process_checkout`) | ✅ Desplegadas |
+| Motor de ventas | ✅ Operativo |
+| Cola offline | ✅ Operativa |
+| Sincronización P2P | ✅ Operativa |
+| RPCs Supabase | ✅ Desplegadas |
 | Tickets térmicos 58mm | ✅ Calibrado |
-| Sistema de Login por PIN | ✅ Completo (Fase 1) |
-| Plano de Mesas con Timers | ✅ Completo (Fase 2) |
-| Apertura / Cierre de Caja | ✅ Completo (Fase 4) |
-| Órdenes y Comandas | ✅ Completo (Fase 3) |
-| Inventario de Barra | ✅ Completo (Fase 5) |
+| Impresión Web Serial | ✅ Operativa |
+| Login por PIN (4 roles) | ✅ Completo |
+| Plano de Mesas con Timers | ✅ Completo |
+| Órdenes y Comandas | ✅ Completo |
+| Apertura / Cierre de Caja | ✅ Completo |
+| Inventario de Barra | ✅ Completo |
+| Refactorización de Código | ✅ Completo |
+| Onboarding Tours | ✅ Completo |
+| Gestión de Usuarios | ✅ Completo |
+| Gestión de Contactos | ✅ Completo |
+| Deudas de Empleados | ✅ Completo |
+| Motor de Facturación Dual | ✅ Completo |
+| Centro de Notificaciones | ✅ Completo |
