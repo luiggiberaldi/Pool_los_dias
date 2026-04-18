@@ -145,11 +145,6 @@ export default function TableCardTimerDisplay({
                                             {hoursOffset === 0.5 ? '30min' : `${hoursOffset}h`} pagada{hoursOffset !== 1 ? 's' : ''} de {session.hours_paid === 0.5 ? '30min' : `${Number(session.hours_paid)}h`}
                                         </div>
                                     )}
-                                    {costBreakdown?.isLibre && !hasLimit && (
-                                        <div className="text-[10px] font-black tracking-wider uppercase mt-1 text-emerald-300">
-                                            ${timeCost.toFixed(2)} acumulado
-                                        </div>
-                                    )}
                                 </>
                             )}
                         </>
