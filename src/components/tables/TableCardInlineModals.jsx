@@ -12,7 +12,7 @@ import { TotalDetailsModal } from './TotalDetailsModal';
 import { AttributionModal } from './AttributionModal';
 
 export default function TableCardInlineModals({
-    table, session, elapsed, timeCost, totalConsumption, grandTotal,
+    table, session, elapsed, timeCost, seatTimeCost, totalConsumption, grandTotal,
     costBreakdown, config, tasaUSD, currentItems, currentUser,
     hasPinas, isMixedMode, hasHoursActive, hasLimit,
     isProcessingCharge,
@@ -277,6 +277,7 @@ export default function TableCardInlineModals({
             config={config}
             tasaUSD={tasaUSD}
             currentItems={currentItems}
+            seatTimeCost={seatTimeCost}
         />
 
         {/* Confirmación Piña — solo para MESERO */}

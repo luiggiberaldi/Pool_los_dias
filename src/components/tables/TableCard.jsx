@@ -676,6 +676,7 @@ export default function TableCard({ table, session }) {
             session={session}
             elapsed={elapsed}
             timeCost={timeCost}
+            seatTimeCost={seatTimeCost}
             totalConsumption={totalConsumption}
             grandTotal={grandTotal}
             costBreakdown={costBreakdown}

@@ -7,13 +7,19 @@ export function TotalDetailsModal({
     table, session, elapsed,
     timeCost, totalConsumption, grandTotal,
     costBreakdown, config, tasaUSD,
-    currentItems,
+    currentItems, seatTimeCost = 0,
 }) {
+    // Calcular desglose de horas/piñas de seats
+    const seatHours = (session?.seats || []).reduce((sum, s) =>
+        sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((a, tc) => a + (Number(tc.amount) || 0), 0), 0);
+    const seatPinas = (session?.seats || []).reduce((sum, s) =>
+        sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').reduce((a, tc) => a + (Number(tc.amount) || 0), 0), 0);
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Detalle de Cuenta">
              <div className="flex flex-col gap-3 py-4 text-slate-800 dark:text-white max-h-[70vh] overflow-y-auto">
                 {/* Piñas */}
-                {table?.type !== 'NORMAL' && costBreakdown?.hasPinas && (
+                {table?.type !== 'NORMAL' && (costBreakdown?.hasPinas || seatPinas > 0) && (
                 <div className="flex flex-col p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/40">
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-sm font-bold text-amber-700 dark:text-amber-400">Piñas jugadas</span>
@@ -30,7 +36,7 @@ export function TotalDetailsModal({
                 </div>
                 )}
 
-                {/* Tiempo */}
+                {/* Tiempo de sesión (session-level hours) */}
                 {table?.type !== 'NORMAL' && costBreakdown?.hasHours && (
                 <div className="flex flex-col p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-white/10">
                     <div className="flex justify-between items-center mb-1">
@@ -44,6 +50,24 @@ export function TotalDetailsModal({
                     </div>
                     <span className="text-xs text-slate-500">
                         {formatElapsedTime(elapsed)} · {Number(session?.hours_paid) || 0}h pagadas
+                    </span>
+                </div>
+                )}
+
+                {/* Tiempo de seats (horas prepagadas asignadas a clientes) */}
+                {table?.type !== 'NORMAL' && seatHours > 0 && (
+                <div className="flex flex-col p-3 bg-sky-50 dark:bg-sky-950/20 rounded-xl border border-sky-200 dark:border-sky-800/40">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-bold text-sky-700 dark:text-sky-400">Horas Prepagadas</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-lg font-black">${(seatHours * (config.pricePerHour || 0)).toFixed(2)}</span>
+                            <span className="text-xs font-medium text-slate-400">
+                                Bs. {(seatHours * (config.pricePerHour || 0) * tasaUSD).toFixed(2)}
+                            </span>
+                        </div>
+                    </div>
+                    <span className="text-xs text-sky-600 dark:text-sky-400/70">
+                        {seatHours === 0.5 ? '30 min' : `${seatHours}h`} · ${config.pricePerHour || 0}/hora
                     </span>
                 </div>
                 )}
@@ -101,7 +125,7 @@ export function TotalDetailsModal({
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown).toFixed(2)}
+                            Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + (seatTimeCost * tasaUSD)).toFixed(2)}
                         </span>
                     </div>
                 </div>
