@@ -170,7 +170,34 @@ export default function ProductCard({
                     )}
                 </div>
 
-                {/* Stock Control */}
+                {/* Stock Control — oculto para combos (su stock se calcula de los componentes) */}
+                {p.isCombo ? (
+                    <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
+                        {(() => {
+                            const items = p.comboItems?.length > 0
+                                ? p.comboItems.map(ci => ({
+                                    product: allProducts?.find(lp => lp.id === ci.productId),
+                                    qty: ci.qty
+                                }))
+                                : p.linkedProductId
+                                    ? [{ product: allProducts?.find(lp => lp.id === p.linkedProductId), qty: p.linkedQty }]
+                                    : [];
+                            const availQty = items.length > 0 && items.every(i => i.product && i.qty > 0)
+                                ? Math.min(...items.map(i => Math.floor((i.product.stock ?? 0) / i.qty)))
+                                : null;
+                            const isLow = availQty !== null && availQty <= 5;
+                            return (
+                                <div className="flex flex-col items-center justify-center py-2 gap-1">
+                                    <span className={`text-base font-black leading-none ${availQty === 0 ? 'text-red-500' : isLow ? 'text-amber-500' : 'text-violet-600 dark:text-violet-400'}`}>
+                                        {availQty !== null ? availQty : '?'}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">DISPONIBLES</span>
+                                    {availQty === 0 && <span className="text-[9px] font-bold text-red-500">Agotado</span>}
+                                </div>
+                            );
+                        })()}
+                    </div>
+                ) : (
                 <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-xl p-1">
                         {!readOnly && (
@@ -247,6 +274,7 @@ export default function ProductCard({
                         </div>
                     )}
                 </div>
+            )}
             </div>
 
             {/* Actions */}
