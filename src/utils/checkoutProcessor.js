@@ -232,15 +232,14 @@ export async function processSaleTransaction({
     const tipo = fiadoAmountUsd > 0 ? 'VENTA_FIADO' : 'VENTA_COMPLETADA';
     logEvent('VENTA', tipo, `Venta #${saleNumber} [${saleMode.toUpperCase()}] - $${cartTotalUsd.toFixed(2)} - ${cart.length} items - ${selectedCustomer?.name || 'Consumidor Final'}`, currentUser, { saleId: finalPersistedSale.id, total: cartTotalUsd, items: cart.length });
 
-    // ── CLIENT-SIDE STOCK DEDUCTION (optimistic UI only) ──
-    // NOTE: The RPC `process_checkout` handles authoritative stock deduction
-    // server-side within a transaction. This client-side deduction is ONLY for
-    // optimistic UI updates so the user sees stock counts change immediately.
-    // When the RPC succeeds (saleMode === 'online'), we skip client-side
-    // deduction to avoid double-counting — the server is the source of truth.
+    // ── CLIENT-SIDE STOCK DEDUCTION ──
+    // Stock is always deducted client-side regardless of sale mode.
+    // The RPC `process_checkout` does NOT modify the products table,
+    // so this is the authoritative stock update. Changes are saved to
+    // localforage and broadcast to other devices via Supabase Broadcast.
     let updatedProducts = products;
 
-    if (saleMode !== 'online') {
+    {
     // Calculate total deductions per product ID
     const deductions = {};
     cart.forEach(item => {
