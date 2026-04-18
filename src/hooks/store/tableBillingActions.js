@@ -13,6 +13,11 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
             const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
             delete paidCache[sessionId];
             await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+            get().realtimeChannel?.send({
+                type: 'broadcast',
+                event: 'table_paid_clear',
+                payload: { sessionId }
+            });
         }
 
         if (seatId) {
@@ -101,6 +106,15 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
         await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
         set({ paidHoursOffsets: { ...get().paidHoursOffsets, [sessionId]: currentHours } });
 
+        // Guardar minutos transcurridos al momento del cobro para el timer
+        const elapsedAtPayment = session.started_at
+            ? Math.max(0, Math.floor((new Date(paidAt) - new Date(session.started_at)) / 60000))
+            : 0;
+        const elapsedCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+        elapsedCache[sessionId] = elapsedAtPayment;
+        await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedCache);
+        set({ paidElapsedOffsets: { ...get().paidElapsedOffsets, [sessionId]: elapsedAtPayment } });
+
         const hasPinas = session.game_mode === 'PINA' || Number(session.extended_times) > 0;
         if (hasPinas) {
             let currentRounds;
@@ -136,6 +150,7 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
                 sessionId,
                 paidAt,
                 hoursOffset: currentHours,
+                elapsedAtPayment,
                 roundsOffset: hasPinas ? (session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0) : 0,
                 hasPinas
             }
@@ -151,6 +166,11 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
             const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
             delete paidCache[sessionId];
             await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+            get().realtimeChannel?.send({
+                type: 'broadcast',
+                event: 'table_paid_clear',
+                payload: { sessionId }
+            });
         }
 
         if (seatId) {
@@ -207,6 +227,11 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
             const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
             delete paidCache[sessionId];
             await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+            get().realtimeChannel?.send({
+                type: 'broadcast',
+                event: 'table_paid_clear',
+                payload: { sessionId }
+            });
         }
 
         const newSessions = get().activeSessions.map(s =>

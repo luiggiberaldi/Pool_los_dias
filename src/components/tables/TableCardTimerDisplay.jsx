@@ -42,7 +42,7 @@ export default function TableCardTimerDisplay({
                                 Tiempo en mesa: {formatElapsedTime(elapsed)}
                             </div>
                         </div>
-                    ) : isPaidIdle ? (
+                    ) : (isPaidIdle && !hasLimit) ? (
                         <div className="flex flex-col items-center gap-2 mt-2">
                             <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
                                 <Check size={20} className="text-emerald-400" />

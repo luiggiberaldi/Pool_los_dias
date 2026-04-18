@@ -5,12 +5,39 @@ import { scopedKey } from './accountScope';
 import { useTablesStore } from './useTablesStore';
 
 // Helper: obtener user_id del usuario Supabase autenticado
+let _cachedUserId = null;
 const getAuthUserId = async () => {
     try {
         const { data: { session } } = await supabaseCloud.auth.getSession();
-        return session?.user?.id || null;
+        _cachedUserId = session?.user?.id || null;
+        return _cachedUserId;
     } catch { return null; }
 };
+
+// ── Canal Broadcast para orders P2P (0 WAL egress) ──
+let ordersBroadcastChannel = null;
+let ordersBroadcastUserId = null;
+
+function _getOrdersBroadcastChannel(userId) {
+    if (ordersBroadcastChannel && ordersBroadcastUserId === userId) return ordersBroadcastChannel;
+    if (ordersBroadcastChannel) ordersBroadcastChannel.unsubscribe();
+    ordersBroadcastChannel = supabaseCloud.channel(`orders_live:${userId}`);
+    ordersBroadcastUserId = userId;
+    return ordersBroadcastChannel;
+}
+
+/** Notifica a otros dispositivos que las órdenes cambiaron */
+function _broadcastOrdersChanged() {
+    const uid = _cachedUserId;
+    if (!uid) return;
+    try {
+        _getOrdersBroadcastChannel(uid).send({
+            type: 'broadcast',
+            event: 'orders_changed',
+            payload: { ts: Date.now() },
+        });
+    } catch (_) { /* non-fatal */ }
+}
 
 // Espera hasta que la sesión con tempId sea reemplazada por una con UUID real.
 // Devuelve el UUID real, o lanza si se acaba el tiempo.
@@ -71,41 +98,26 @@ export const useOrdersStore = create((set, get) => ({
             syncTimeout = setTimeout(() => get().syncOrders(), 300);
         };
 
-        const channel = supabaseCloud
-            .channel('pool_orders_sync')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-                console.log("[REALTIME] orders change received:", payload);
-                if (payload.eventType === 'UPDATE') {
-                    set(state => ({ orders: state.orders.map(o => o.id === payload.new.id ? payload.new : o) }));
-                } else if (payload.eventType === 'INSERT') {
-                    set(state => ({ orders: [...state.orders.filter(o => o.id !== payload.new.id), payload.new] }));
-                } else if (payload.eventType === 'DELETE') {
-                    set(state => ({ orders: state.orders.filter(o => o.id !== payload.old.id) }));
-                }
-                debouncedSync();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, (payload) => {
-                console.log("[REALTIME] order_items change received:", payload);
-                if (payload.eventType === 'UPDATE') {
-                    set(state => ({ orderItems: state.orderItems.map(i => i.id === payload.new.id ? payload.new : i) }));
-                } else if (payload.eventType === 'INSERT') {
-                    set(state => ({ orderItems: [...state.orderItems.filter(i => i.id !== payload.new.id), payload.new] }));
-                } else if (payload.eventType === 'DELETE') {
-                    set(state => ({ orderItems: state.orderItems.filter(i => i.id !== payload.old.id) }));
-                }
-                debouncedSync();
-            })
-            .subscribe((status) => {
-                console.log("[REALTIME] status pool_orders_sync:", status);
-                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    console.warn('[REALTIME] Error en canal orders — reintentando en 5s');
-                    setTimeout(() => {
-                        get().unsubscribeFromRealtime();
-                        get().subscribeToRealtime();
-                    }, 5000);
-                }
-            });
-        set({ realtimeChannel: channel });
+        // Broadcast P2P: escucha notificaciones de otros dispositivos (0 WAL egress)
+        getAuthUserId().then(userId => {
+            if (!userId) return;
+            const channel = _getOrdersBroadcastChannel(userId)
+                .on('broadcast', { event: 'orders_changed' }, () => {
+                    console.log("[REALTIME] orders broadcast received");
+                    debouncedSync();
+                })
+                .subscribe((status) => {
+                    console.log("[REALTIME] status orders_broadcast:", status);
+                    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        console.warn('[REALTIME] Error en canal orders — reintentando en 5s');
+                        setTimeout(() => {
+                            get().unsubscribeFromRealtime();
+                            get().subscribeToRealtime();
+                        }, 5000);
+                    }
+                });
+            set({ realtimeChannel: channel });
+        });
     },
 
     unsubscribeFromRealtime: () => {
@@ -197,6 +209,7 @@ export const useOrdersStore = create((set, get) => ({
                 const newOrders = [...get().orders, order];
                 set({ orders: newOrders });
                 await ordersCache.setItem(scopedKey('active_orders'), newOrders);
+                _broadcastOrdersChanged();
             }
 
             // Chequear si el producto ya existe en la orden
@@ -214,6 +227,7 @@ export const useOrdersStore = create((set, get) => ({
                 const newItems = get().orderItems.map(i => i.id === updatedItem.id ? updatedItem : i);
                 set({ orderItems: newItems });
                 await ordersCache.setItem(scopedKey('active_order_items'), newItems);
+                _broadcastOrdersChanged();
             } else {
                 const { data: newItem, error: err } = await supabaseCloud
                     .from('order_items')
@@ -233,6 +247,7 @@ export const useOrdersStore = create((set, get) => ({
                 const newItems = [...get().orderItems, newItem];
                 set({ orderItems: newItems });
                 await ordersCache.setItem(scopedKey('active_order_items'), newItems);
+                _broadcastOrdersChanged();
             }
 
         } catch (e) {
@@ -248,6 +263,7 @@ export const useOrdersStore = create((set, get) => ({
             const newItems = get().orderItems.filter(i => i.id !== itemId);
             set({ orderItems: newItems });
             await ordersCache.setItem(scopedKey('active_order_items'), newItems);
+            _broadcastOrdersChanged();
          } catch (e) {
              console.error('Error deleting item:', e);
          }
@@ -269,6 +285,7 @@ export const useOrdersStore = create((set, get) => ({
             const newItems = get().orderItems.map(i => i.id === itemId ? updatedItem : i);
             set({ orderItems: newItems });
             await ordersCache.setItem(scopedKey('active_order_items'), newItems);
+            _broadcastOrdersChanged();
         } catch (e) {
             console.error('Error updating item qty:', e);
             throw e;
@@ -295,6 +312,7 @@ export const useOrdersStore = create((set, get) => ({
             // Background network tasks
             await supabaseCloud.from('order_items').delete().eq('order_id', order.id);
             await supabaseCloud.from('orders').delete().eq('id', order.id);
+            _broadcastOrdersChanged();
         } catch (e) {
             console.error('Error canceling order (network) — rolling back:', e);
             // Rollback: restaurar estado local

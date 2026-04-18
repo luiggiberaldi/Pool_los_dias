@@ -86,11 +86,30 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
         return sumR(amounts);
     }, [barValues, paymentMethods, effectiveRate, tasaCop]);
 
-    const remainingUsd = round2(Math.max(0, subR(cartTotalUsd, totalPaidUsd)));
-    const remainingBs = round2(Math.max(0, subR(cartTotalBs, totalPaidBs)));
-    const changeUsd = round2(Math.max(0, subR(totalPaidUsd, cartTotalUsd)));
-    const changeBs = round2(Math.max(0, subR(totalPaidBs, cartTotalBs)));
-    const isPaid = remainingUsd < EPSILON;
+    // Proportional payment tracking: each currency evaluated against its own total
+    // This handles independent Bs prices (e.g., table hour = $5 / Bs 1500 at 300 Bs/$, not 550)
+    const proportionPaid = useMemo(() => {
+        let usdPaid = 0;
+        let bsPaid = 0;
+        for (const m of paymentMethods) {
+            const val = parseFloat(barValues[m.id]) || 0;
+            if (val === 0) continue;
+            if (m.currency === 'USD') usdPaid += val;
+            else if (m.currency === 'COP') usdPaid += tasaCop ? val / tasaCop : 0;
+            else bsPaid += val;
+        }
+        const propUsd = cartTotalUsd > EPSILON ? usdPaid / cartTotalUsd : 0;
+        const propBs = cartTotalBs > EPSILON ? bsPaid / cartTotalBs : 0;
+        return propUsd + propBs;
+    }, [barValues, paymentMethods, cartTotalUsd, cartTotalBs, tasaCop]);
+
+    const overProportion = Math.max(0, proportionPaid - 1);
+    const remainProportion = Math.max(0, 1 - proportionPaid);
+    const remainingUsd = round2(remainProportion * cartTotalUsd);
+    const remainingBs = round2(remainProportion * cartTotalBs);
+    const changeUsd = round2(overProportion * cartTotalUsd);
+    const changeBs = round2(overProportion * cartTotalBs);
+    const isPaid = cartTotalUsd < EPSILON || proportionPaid >= (1 - EPSILON / Math.max(cartTotalUsd, EPSILON));
 
     // Ref to always have the latest remaining values available for fillBar,
     // avoiding stale closures when user types in one method then clicks Total on another.

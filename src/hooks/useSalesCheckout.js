@@ -75,7 +75,10 @@ export function useSalesCheckout({
         triggerHaptic && triggerHaptic();
 
         const seatId = tableCheckoutData.seatId || null;
-        const session = tableCheckoutData.session;
+        // Use fresh session from store (snapshot session may be stale after adding time/piñas)
+        const snapshotSession = tableCheckoutData.session;
+        const freshSession = useTablesStore.getState().activeSessions.find(s => s.id === snapshotSession?.id);
+        const session = freshSession || snapshotSession;
         const seats = session?.seats || [];
         const config = useTablesStore.getState().config;
         const paidHoursOffsets = useTablesStore.getState().paidHoursOffsets || {};
@@ -179,28 +182,27 @@ export function useSalesCheckout({
             }
         } else {
             // ═══ CLASSIC (FULL TABLE) CHECKOUT ═══
-            if (tableCheckoutData.timeCost > 0) {
-                const breakdown = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOff, roundsOff);
+            // Always recalculate with current offsets (snapshot timeCost may be stale)
+            const breakdown = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOff, roundsOff);
 
-                if (breakdown.pinaCost > 0) {
-                    const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
-                    const billableRounds = Math.max(0, pinaCount - roundsOff);
-                    syntheticCart.push({
-                        id: crypto.randomUUID(),
-                        name: `Piña ${tableCheckoutData.table.name}`,
-                        priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
-                        qty: billableRounds, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
-                    });
-                }
-                if (breakdown.hourCost > 0) {
-                    const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOff);
-                    syntheticCart.push({
-                        id: crypto.randomUUID(),
-                        name: `Tiempo ${tableCheckoutData.table.name} (${formatHoursPaid(billableHours)})`,
-                        priceUsdt: round2(breakdown.hourCost), priceUsd: round2(breakdown.hourCost),
-                        qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
-                    });
-                }
+            if (breakdown.pinaCost > 0) {
+                const pinaCount = session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+                const billableRounds = Math.max(0, pinaCount - roundsOff);
+                syntheticCart.push({
+                    id: crypto.randomUUID(),
+                    name: `Piña ${tableCheckoutData.table.name}`,
+                    priceUsdt: round2(config.pricePina || 0), priceUsd: round2(config.pricePina || 0),
+                    qty: billableRounds, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                });
+            }
+            if (breakdown.hourCost > 0) {
+                const billableHours = Math.max(0, (Number(session.hours_paid) || 0) - hoursOff);
+                syntheticCart.push({
+                    id: crypto.randomUUID(),
+                    name: `Tiempo ${tableCheckoutData.table.name} (${formatHoursPaid(billableHours)})`,
+                    priceUsdt: round2(breakdown.hourCost), priceUsd: round2(breakdown.hourCost),
+                    qty: 1, costUsd: 0, costBs: 0, category: 'servicios', unit: 'servicio', stock: 9999
+                });
             }
             if (tableCheckoutData.currentItems?.length > 0) {
                 tableCheckoutData.currentItems.forEach(item => {
@@ -219,19 +221,26 @@ export function useSalesCheckout({
             }
         }
 
+        // Recalculate totals from actual cart items (defense against stale snapshot)
+        const recalcCartTotal = round2(syntheticCart.reduce((sum, item) => sum + round2((item.priceUsd || 0) * (item.qty || 1)), 0));
+        const discountAmt = tableCheckoutData.discountData?.active ? round2(tableCheckoutData.discountData.amountUsd || 0) : 0;
+        const effectiveCartTotal = round2(Math.max(0, recalcCartTotal - discountAmt));
+
         const opts = {
             cart: syntheticCart,
-            cartTotalUsd: tableCheckoutData.grandTotal,
+            cartTotalUsd: effectiveCartTotal,
             cartTotalBs: (() => {
                 const cfg = useTablesStore.getState().config;
                 if (seats.length > 0) {
                     const itf = tableCheckoutData.table?.type === 'NORMAL';
                     const fb = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, cfg, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, itf);
-                    return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate)) : round2(tableCheckoutData.grandTotal * effectiveRate);
+                    return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate)) : round2(effectiveCartTotal * effectiveRate);
                 }
-                return calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate);
+                // Recalculate fresh time cost with offsets for Bs calculation
+                const freshTimeCost = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff).total;
+                return calculateGrandTotalBs(freshTimeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate);
             })(),
-            cartSubtotalUsd: tableCheckoutData.grandTotal,
+            cartSubtotalUsd: effectiveCartTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,
             effectiveRate, tasaCop, copEnabled,
             discountData: tableCheckoutData.discountData || { active: false, amountUsd: 0, amountBs: 0, type: 'percentage', value: 0 },

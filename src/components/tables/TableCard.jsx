@@ -40,6 +40,7 @@ export default function TableCard({ table, session }) {
     const { config, openSession, closeSession, requestCheckout, cancelCheckoutRequest, updateSessionMetadata, updateSessionSeats, updateSessionTime, addPinaToSession, addHoursToSession, pauseSession, resumeSession } = useTablesStore();
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
+    const paidElapsedOffsets = useTablesStore(state => state.paidElapsedOffsets);
     const pausedData = useTablesStore(state => session ? state.pausedSessions[session.id] : null);
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
@@ -309,18 +310,8 @@ export default function TableCard({ table, session }) {
                     }, 500);
                 }
             } else if (!modePina && modeHora) {
-                if (isMultiSeat && initialChargeTarget !== undefined) {
-                    // Open with 0 hours, then attribute
-                    await openSession(table.id, currentUser.id, 'NORMAL', 0, name, guests, firstSeatClientId, false, seats);
-                    setTimeout(async () => {
-                        try {
-                            const newSession = useTablesStore.getState().activeSessions.find(s => s.table_id === table.id);
-                            if (newSession) await addHoursToSession(newSession.id, selectedHours, initialChargeTarget);
-                        } catch (e) { console.error(e); }
-                    }, 500);
-                } else {
-                    await openSession(table.id, currentUser.id, 'NORMAL', selectedHours, name, guests, firstSeatClientId, false, seats);
-                }
+                // Always open with selected hours as shared
+                await openSession(table.id, currentUser.id, 'NORMAL', selectedHours, name, guests, firstSeatClientId, false, seats);
             } else {
                 // Mixed mode
                 await openSession(table.id, currentUser.id, 'NORMAL', selectedHours, name, guests, firstSeatClientId, true, seats);
@@ -406,14 +397,8 @@ export default function TableCard({ table, session }) {
                 }
             }
         } else if (!modePina && modeHora) {
-            if (isMultiSeat) {
-                // Multi-seat HORA: open with 0 hours, then attribute via modal
-                await handleStartNormal(0, name, guests, firstSeatClientId, false, seats);
-                setPendingCharge({ type: 'hora', hoursValue: selectedHours });
-                setShowAttributeModal(true);
-            } else {
-                await handleStartNormal(selectedHours, name, guests, firstSeatClientId, false, seats);
-            }
+            // Always open with the selected hours (shared), even for multi-seat
+            await handleStartNormal(selectedHours, name, guests, firstSeatClientId, false, seats);
         } else {
             // Mixed mode (piña + hora): keep shared for simplicity
             await handleStartNormal(selectedHours, name, guests, firstSeatClientId, true, seats);
@@ -454,6 +439,7 @@ export default function TableCard({ table, session }) {
     const isTimeFree = table.type === 'NORMAL';
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
+    const elapsedOffset = session ? ((paidElapsedOffsets || {})[session.id] || 0) : 0;
     const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset, session?.seats) : 0;
     const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset, session?.seats) : null;
     const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
@@ -479,7 +465,7 @@ export default function TableCard({ table, session }) {
     const wasOpenedWithHours = isPlaying && !isTimeFree && session?.game_mode === 'NORMAL' && !hasPinas && totalHoursPaid === 0;
     const hasLimit = totalHoursPaid > 0 || wasOpenedWithHours;
     const effectiveHours = hasLimit ? Math.max(0, totalHoursPaid - hoursOffset) : 0;
-    const effectiveElapsed = hoursOffset > 0 ? Math.max(0, elapsed - (hoursOffset * 60)) : elapsed;
+    const effectiveElapsed = elapsedOffset > 0 ? Math.max(0, elapsed - elapsedOffset) : elapsed;
     const remainingMins = hasLimit ? (effectiveHours * 60) - effectiveElapsed : 0;
     const isExceeded = hasLimit && remainingMins < 0;
 

@@ -36,12 +36,14 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
             const cachedSessions = await tablesCache.getItem(scopedKey('active_sessions')) || [];
             const cachedOffsets = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
             const cachedRoundsOffsets = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
+            const cachedElapsedOffsets = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
 
             set({
                 tables: sortTables(cachedTables),
                 activeSessions: cachedSessions,
                 paidHoursOffsets: cachedOffsets,
                 paidRoundsOffsets: cachedRoundsOffsets,
+                paidElapsedOffsets: cachedElapsedOffsets,
                 loading: false
             });
 

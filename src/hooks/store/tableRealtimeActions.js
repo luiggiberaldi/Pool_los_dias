@@ -53,7 +53,7 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
             .on('broadcast', { event: 'table_payment_reset' }, async ({ payload }) => {
                 console.log("[REALTIME] broadcast table_payment_reset:", payload);
                 if (!payload?.sessionId) return;
-                const { sessionId, paidAt, hoursOffset, roundsOffset, hasPinas } = payload;
+                const { sessionId, paidAt, hoursOffset, elapsedAtPayment, roundsOffset, hasPinas } = payload;
 
                 const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
                 paidCache[sessionId] = paidAt;
@@ -63,6 +63,13 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
                 offsetCache[sessionId] = hoursOffset;
                 await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
                 set(state => ({ paidHoursOffsets: { ...state.paidHoursOffsets, [sessionId]: hoursOffset } }));
+
+                if (elapsedAtPayment != null) {
+                    const elapsedCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+                    elapsedCache[sessionId] = elapsedAtPayment;
+                    await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedCache);
+                    set(state => ({ paidElapsedOffsets: { ...state.paidElapsedOffsets, [sessionId]: elapsedAtPayment } }));
+                }
 
                 if (hasPinas) {
                     const roundsOffsetCache = await tablesCache.getItem(scopedKey('paid_rounds_offsets')) || {};
@@ -80,19 +87,20 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
             .on('broadcast', { event: 'table_offsets_state_request' }, async () => {
                 const paidHoursOffsets = get().paidHoursOffsets;
                 const paidRoundsOffsets = get().paidRoundsOffsets;
+                const paidElapsedOffsets = get().paidElapsedOffsets || {};
                 const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
                 if (Object.keys(paidHoursOffsets).length > 0 || Object.keys(paidRoundsOffsets).length > 0) {
                     get().realtimeChannel?.send({
                         type: 'broadcast',
                         event: 'table_offsets_state_sync',
-                        payload: { paidHoursOffsets, paidRoundsOffsets, paidSessions: paidCache }
+                        payload: { paidHoursOffsets, paidRoundsOffsets, paidElapsedOffsets, paidSessions: paidCache }
                     });
                 }
             })
             .on('broadcast', { event: 'table_offsets_state_sync' }, async ({ payload }) => {
                 console.log("[REALTIME] broadcast table_offsets_state_sync:", payload);
                 if (!payload) return;
-                const { paidHoursOffsets: remoteHours, paidRoundsOffsets: remoteRounds, paidSessions: remotePaid } = payload;
+                const { paidHoursOffsets: remoteHours, paidRoundsOffsets: remoteRounds, paidElapsedOffsets: remoteElapsed, paidSessions: remotePaid } = payload;
 
                 if (remoteHours) {
                     const localOffsets = { ...get().paidHoursOffsets };
@@ -106,6 +114,12 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
                     set({ paidRoundsOffsets: merged });
                     await tablesCache.setItem(scopedKey('paid_rounds_offsets'), merged);
                 }
+                if (remoteElapsed) {
+                    const localElapsed = { ...(get().paidElapsedOffsets || {}) };
+                    const merged = { ...remoteElapsed, ...localElapsed };
+                    set({ paidElapsedOffsets: merged });
+                    await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), merged);
+                }
                 if (remotePaid) {
                     const localPaid = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
                     const mergedPaid = { ...remotePaid, ...localPaid };
@@ -116,6 +130,21 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
                         )
                     }));
                 }
+            })
+            .on('broadcast', { event: 'table_paid_clear' }, async ({ payload }) => {
+                console.log("[REALTIME] broadcast table_paid_clear:", payload);
+                if (!payload?.sessionId) return;
+                const { sessionId } = payload;
+                const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
+                if (paidCache[sessionId]) {
+                    delete paidCache[sessionId];
+                    await tablesCache.setItem(scopedKey('paid_sessions'), paidCache);
+                }
+                set(state => ({
+                    activeSessions: state.activeSessions.map(s =>
+                        s.id === sessionId ? { ...s, paid_at: null } : s
+                    )
+                }));
             })
             .on('broadcast', { event: 'table_offsets_clear' }, async ({ payload }) => {
                 console.log("[REALTIME] broadcast table_offsets_clear:", payload);
@@ -141,11 +170,25 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
                     const { [sessionId]: _, ...rest } = state.paidRoundsOffsets;
                     return { paidRoundsOffsets: rest };
                 });
+
+                const elapsedOffsetCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+                delete elapsedOffsetCache[sessionId];
+                await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedOffsetCache);
+                set(state => {
+                    const { [sessionId]: _e, ...rest } = (state.paidElapsedOffsets || {});
+                    return { paidElapsedOffsets: rest };
+                });
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'table_sessions', filter: 'status=in.(ACTIVE,CHECKOUT)' }, (payload) => {
                 console.log("[REALTIME] table_sessions change received:", payload);
                 if (payload.eventType === 'UPDATE') {
-                    set(state => ({ activeSessions: state.activeSessions.map(s => s.id === payload.new.id ? payload.new : s) }));
+                    set(state => ({ activeSessions: state.activeSessions.map(s => {
+                        if (s.id !== payload.new.id) return s;
+                        // Preserve local-only field paid_at (not a DB column)
+                        const merged = { ...payload.new };
+                        if (s.paid_at && !merged.paid_at) merged.paid_at = s.paid_at;
+                        return merged;
+                    }) }));
                 } else if (payload.eventType === 'INSERT') {
                     set(state => ({ activeSessions: [...state.activeSessions.filter(s => s.id !== payload.new.id), payload.new] }));
                 } else if (payload.eventType === 'DELETE') {

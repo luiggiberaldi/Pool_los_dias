@@ -117,6 +117,14 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
             delete newRoundsOffsets[sessionId];
             set({ paidRoundsOffsets: newRoundsOffsets });
         }
+        const elapsedOffsetCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+        if (elapsedOffsetCache[sessionId] !== undefined) {
+            delete elapsedOffsetCache[sessionId];
+            await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedOffsetCache);
+            const newElapsedOffsets = { ...(get().paidElapsedOffsets || {}) };
+            delete newElapsedOffsets[sessionId];
+            set({ paidElapsedOffsets: newElapsedOffsets });
+        }
 
         const cost = Number(totalCost);
         logEvent('MESAS', 'MESA_CERRADA', `Mesa ${tableName} cerrada${cost > 0 ? ` · $${cost.toFixed(2)}` : ''}`, getUser(), { sessionId, totalCost, paymentMethod });

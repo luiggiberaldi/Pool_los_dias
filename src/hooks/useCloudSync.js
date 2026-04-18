@@ -48,6 +48,8 @@ const LOCAL_KEYS = [
 // ─── Estado Global del Motor ───────────────────────────────────────────────
 let globalSubscription = null;
 let globalSubscriptionUserId = null; // Track which user the subscription belongs to
+let syncBroadcastChannel = null;
+let syncBroadcastUserId = null;
 let isSyncingFromCloud = false;
 let syncingFromCloudCount = 0;      // Counter-based guard (safer than boolean)
 let isInitialSyncCompleted = false;  // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
@@ -62,6 +64,15 @@ const getSyncQueueKey = () => scopedKey(SYNC_QUEUE_KEY_BASE);
 export const setImportGuard = () => sessionStorage.setItem(IMPORT_GUARD_KEY, '1');
 export const clearImportGuard = () => sessionStorage.removeItem(IMPORT_GUARD_KEY);
 const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
+
+/** Canal Broadcast para sync_documents P2P (0 WAL egress) */
+function _getSyncBroadcastChannel(userId) {
+    if (syncBroadcastChannel && syncBroadcastUserId === userId) return syncBroadcastChannel;
+    if (syncBroadcastChannel) syncBroadcastChannel.unsubscribe();
+    syncBroadcastChannel = supabaseCloud.channel(`sync_docs:${userId}`);
+    syncBroadcastUserId = userId;
+    return syncBroadcastChannel;
+}
 
 // Gestión de Cola Offline
 export const getSyncQueue = () => {
@@ -311,6 +322,16 @@ export const pushCloudSync = async (key, value, force = false) => {
         if (error) throw error;
         removeFromSyncQueue(key);
 
+        // Broadcast P2P para dispositivos activos (0 DB egress)
+        try {
+            const ch = _getSyncBroadcastChannel(session.user.id);
+            ch.send({
+                type: 'broadcast',
+                event: 'sync_doc_changed',
+                payload: { doc_id: key, collection: collectionType, data: value },
+            });
+        } catch (_) { /* non-fatal: la DB ya tiene el dato */ }
+
     } catch (e) {
         console.warn('[CloudSync] Falló envío. Encolado para reintento:', key);
         addToSyncQueue(key);
@@ -518,8 +539,8 @@ export function useCloudSync() {
                 const { pullNewSales, subscribeSalesRealtime, applyIncomingSale } = await import('../utils/salesSyncService');
                 await pullNewSales(userId);
 
-                // ── Suscripción Realtime ─────────────────────────
-                // Si el userId cambió (logout/login), limpiar la suscripción anterior
+                // ── Suscripción Broadcast P2P (0 WAL egress) ─────────────────
+                // Reemplaza postgres_changes en sync_documents por broadcast
                 if (globalSubscription && globalSubscriptionUserId !== userId) {
                     globalSubscription.unsubscribe();
                     globalSubscription = null;
@@ -527,35 +548,29 @@ export function useCloudSync() {
                 }
                 if (!globalSubscription) {
                     globalSubscriptionUserId = userId;
-                    globalSubscription = supabaseCloud
-                        .channel(`sync:${userId}`)
-                        .on('postgres_changes', {
-                            event: '*',
-                            schema: 'public',
-                            table: 'sync_documents',
-                            filter: `user_id=eq.${userId}`
-                        }, async (payload) => {
-                            const doc = payload.new;
-                            if (!doc) return;
+                    const ch = _getSyncBroadcastChannel(userId);
+                    globalSubscription = ch
+                        .on('broadcast', { event: 'sync_doc_changed' }, async ({ payload }) => {
+                            if (!payload?.doc_id) return;
 
                             // Ventas individuales → merge, no reemplazar
-                            if (doc.collection === 'sale') {
-                                await applyIncomingSale(doc.data?.payload);
+                            if (payload.collection === 'sale') {
+                                await applyIncomingSale(payload.data);
                                 return;
                             }
 
-                            if (!['store', 'local'].includes(doc.collection)) return;
+                            if (!['store', 'local'].includes(payload.collection)) return;
 
                             // Ignorar si nosotros mismos estamos intentando subir cambios de esta misma llave
                             const queue = getSyncQueue();
-                            if (queue.includes(doc.doc_id)) return;
+                            if (queue.includes(payload.doc_id)) return;
 
-                            console.log(`[CloudSync] Recibido P2P: ${doc.doc_id}`);
-                            await _applyFromCloud(doc.doc_id, doc.collection, doc.data.payload);
+                            console.log(`[CloudSync] Recibido P2P (broadcast): ${payload.doc_id}`);
+                            await _applyFromCloud(payload.doc_id, payload.collection, payload.data);
                         })
                         .subscribe((status) => {
                             if (status === 'SUBSCRIBED') {
-                                console.log('[CloudSync] Conectado en Tiempo Real');
+                                console.log('[CloudSync] Conectado en Tiempo Real (Broadcast P2P)');
                             }
                         });
                 }

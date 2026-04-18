@@ -107,7 +107,11 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
     const totalReceivedInUSD = round2(rUsd + divR(rBs, rates));
 
     const changeUSD = totalReceivedInUSD > grandTotal ? round2(subR(totalReceivedInUSD, grandTotal)) : 0;
-    const changeBs = round2(mulR(changeUSD, rates));
+    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates);
+    // Bs remaining/change proportional to USD ratio (Bs prices are independent from $ × tasa)
+    const remainingUSD = totalReceivedInUSD < grandTotal ? round2(subR(grandTotal, totalReceivedInUSD)) : 0;
+    const remainingBs = grandTotal > 0 ? round2((remainingUSD / grandTotal) * grandTotalBs) : 0;
+    const changeBs = grandTotal > 0 && changeUSD > 0 ? round2((changeUSD / grandTotal) * grandTotalBs) : 0;
     const isReady = isFiado ? !!selectedCustomer : totalReceivedInUSD >= grandTotal;
 
     const handleSelectCustomer = (customer) => {
@@ -461,11 +465,9 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                             <span className={`text-lg font-black ${!isReady ? 'text-rose-600' : 'text-sky-600'}`}>
                                 ${!isReady ? subR(grandTotal, totalReceivedInUSD).toFixed(2) : changeUSD.toFixed(2)}
                             </span>
-                            {isReady && changeUSD > 0 && (
-                                <span className="text-[10px] font-bold text-sky-600/70">
-                                    Bs. {changeBs.toFixed(2)}
-                                </span>
-                            )}
+                            <span className={`text-[10px] font-bold ${!isReady ? 'text-rose-600/70' : 'text-sky-600/70'}`}>
+                                Bs. {(!isReady ? remainingBs : changeBs).toFixed(2)}
+                            </span>
                         </div>
                     </div>
                 )}

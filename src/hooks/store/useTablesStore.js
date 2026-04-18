@@ -16,6 +16,7 @@ export const useTablesStore = create((set, get) => ({
     activeSessions: [],
     paidHoursOffsets: {},
     paidRoundsOffsets: {},
+    paidElapsedOffsets: {},
     pausedSessions: {},
     loading: true,
     realtimeChannel: null,
