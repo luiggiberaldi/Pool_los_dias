@@ -7,7 +7,7 @@ import { showToast } from '../Toast';
 export default function TableCardActions({
     table, session, grandTotal,
     isAvailable, isLockedForMe, isPlaying, isCheckoutPending, isTimeFree,
-    hasPinas, isMixedMode, hasHoursActive, costBreakdown, isProcessingCharge,
+    hasPinas, isMixedMode, hasHoursActive, costBreakdown, isProcessingCharge, isPaid,
     showReleaseConfirm, setShowReleaseConfirm,
     staffName, currentUser,
     onRequestOpen, onShowOrderPanel, onRequestCheckout, onNotifyMesaCobrar,
@@ -93,8 +93,8 @@ export default function TableCardActions({
                                     <TargetIcon size={10} /> + Piña
                                 </button>
                             )}
-                            {/* Agregar Hora a sesión que no tiene horas */}
-                            {!hasHoursActive && (
+                            {/* Agregar Hora a sesión que no tiene horas O después de pago */}
+                            {(!hasHoursActive || isPaid) && (
                                 <button
                                     onClick={onAddHoursModal}
                                     className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"

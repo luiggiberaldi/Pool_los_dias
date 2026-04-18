@@ -657,6 +657,7 @@ export default function TableCard({ table, session }) {
                 hasHoursActive={hasHoursActive}
                 costBreakdown={costBreakdown}
                 isProcessingCharge={isProcessingCharge}
+                isPaid={!!session?.paid_at}
                 showReleaseConfirm={showReleaseConfirm}
                 setShowReleaseConfirm={setShowReleaseConfirm}
                 staffName={staffName}
