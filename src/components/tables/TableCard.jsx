@@ -69,7 +69,7 @@ export default function TableCard({ table, session }) {
     // Modo mixto: toggles para modal unificado de apertura
     const [modePina, setModePina] = useState(false);
     const [modeHora, setModeHora] = useState(false);
-    const [selectedHours, setSelectedHours] = useState(0);
+    const [selectedHours, setSelectedHours] = useState(1);
     // Modal para agregar hora a sesión activa (piña → mixto)
     const [showAddHoursModal, setShowAddHoursModal] = useState(false);
 
@@ -211,7 +211,7 @@ export default function TableCard({ table, session }) {
         setSessionSeats([]);
         setModePina(false);
         setModeHora(false);
-        setSelectedHours(0);
+        setSelectedHours(1);
         setInitialChargeTarget(null);
         setWizardStep(1);
         refreshCustomers();

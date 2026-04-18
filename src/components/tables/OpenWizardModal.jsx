@@ -126,6 +126,7 @@ export function OpenWizardModal({
                         {modeHora && (
                             <div className="flex flex-col gap-2 animate-in slide-in-from-top-2 duration-200">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seleccionar tiempo</span>
+                                {/* Botón Libre temporalmente deshabilitado
                                 <button
                                     onClick={() => setSelectedHours(0)}
                                     className={`w-full text-left p-3 rounded-xl border transition-all ${
@@ -137,6 +138,7 @@ export function OpenWizardModal({
                                     <div className="font-black text-sm">Abierta (Libre)</div>
                                     <div className="text-xs opacity-70">Sin límite, cobro al final</div>
                                 </button>
+                                */}
                                 <div className="grid grid-cols-3 gap-2">
                                     {[0.5, 1, 2, 3, 4].map(h => (
                                         <button
