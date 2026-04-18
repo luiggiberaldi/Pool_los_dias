@@ -454,10 +454,10 @@ export default function TableCard({ table, session }) {
     const isTimeFree = table.type === 'NORMAL';
     const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
     const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
-    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
+    const timeCost = isPlaying && !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset, session?.seats) : 0;
     // Mesa pagada sin cerrar y sin cargos nuevos agregados
     const isPaidIdle = isPlaying && !!session?.paid_at && timeCost === 0;
-    const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset) : null;
+    const costBreakdown = isPlaying && !isTimeFree ? calculateSessionCostBreakdown(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset, session?.seats) : null;
     const isMixedMode = costBreakdown ? (costBreakdown.hasPinas && costBreakdown.hasHours) : false;
     const seatHasPinas = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
     const seatHasHours = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));

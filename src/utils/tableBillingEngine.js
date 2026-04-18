@@ -12,7 +12,7 @@ export function calculateElapsedTime(startTimeISO) {
  * Calcula el desglose de costos de una sesión (piñas + horas por separado).
  * Soporta modo mixto: cualquier sesión puede tener piñas Y horas simultáneamente.
  */
-export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = null, hoursOffset = 0, roundsOffset = 0) {
+export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = null, hoursOffset = 0, roundsOffset = 0, seats = null) {
     let pinaCost = 0;
     let hourCost = 0;
 
@@ -40,9 +40,10 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
         hourCost = round2(billableHours * pricePerHour);
     }
 
-    // Libre: game_mode NORMAL sin horas prepagadas → cobro por minuto
+    // Libre: game_mode NORMAL sin horas prepagadas y sin seat-level hours → cobro por minuto
     let libreCost = 0;
-    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0;
+    const seatHasHours = (seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
+    const isLibre = gameMode === 'NORMAL' && hoursPaid === 0 && !seatHasHours;
     if (isLibre && elapsedMinutes > 0) {
         const pricePerHour = config.pricePerHour || 0;
         libreCost = round2((elapsedMinutes / 60) * pricePerHour);
@@ -59,11 +60,11 @@ export function calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, 
     };
 }
 
-export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = null, paidAt = null, hoursOffset = 0, roundsOffset = 0) {
+export function calculateSessionCost(elapsedMinutes, gameMode, config, hoursPaid = 0, extendedTimes = null, paidAt = null, hoursOffset = 0, roundsOffset = 0, seats = null) {
     // Si ya fue cobrada sin liberar, la deuda es $0
     if (paidAt) return 0;
 
-    const breakdown = calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, hoursPaid, extendedTimes, hoursOffset, roundsOffset);
+    const breakdown = calculateSessionCostBreakdown(elapsedMinutes, gameMode, config, hoursPaid, extendedTimes, hoursOffset, roundsOffset, seats);
     return breakdown.total;
 }
 
