@@ -476,7 +476,10 @@ export default function TableCard({ table, session }) {
     const seatHoursTotal = (session?.seats || []).reduce((sum, s) =>
         sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((acc, tc) => acc + (Number(tc.amount) || 0), 0), 0);
     const totalHoursPaid = (Number(session?.hours_paid) || 0) + seatHoursTotal;
-    const hasLimit = totalHoursPaid > 0;
+    // Si la mesa fue abierta en modo hora (NORMAL, no BAR) y las horas llegaron a 0,
+    // tratar como si tuviera límite expirado en vez de timer libre corriendo hacia arriba.
+    const wasOpenedWithHours = isPlaying && !isTimeFree && session?.game_mode === 'NORMAL' && !hasPinas && totalHoursPaid === 0;
+    const hasLimit = totalHoursPaid > 0 || wasOpenedWithHours;
     const effectiveHours = hasLimit ? Math.max(0, totalHoursPaid - hoursOffset) : 0;
     const effectiveElapsed = hoursOffset > 0 ? Math.max(0, elapsed - (hoursOffset * 60)) : elapsed;
     const remainingMins = hasLimit ? (effectiveHours * 60) - effectiveElapsed : 0;
@@ -601,9 +604,9 @@ export default function TableCard({ table, session }) {
                     )}
                 </div>
                 <div className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase shrink-0 ${
-                    isAvailable ? 'bg-emerald-100 text-emerald-700' : isPaidIdle ? 'bg-emerald-400 text-white' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
+                    isAvailable ? 'bg-emerald-100 text-emerald-700' : isPaidIdle ? 'bg-emerald-400 text-white' : (hasLimit && isExceeded) ? 'bg-rose-500 text-white border border-rose-400' : hasLimit ? 'bg-amber-400 text-slate-900 border border-amber-300' : 'bg-white/20 text-white backdrop-blur-md'
                 }`}>
-                    {isAvailable ? 'LIBRE' : isPaidIdle ? 'PAGADO' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : session.game_mode === 'CONSUMO' ? 'BAR' : isTimeFree ? 'BAR' : hasLimit ? (totalHoursPaid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${totalHoursPaid}h`) : hasPinas ? 'LA PIÑA' : 'JUG.'}
+                    {isAvailable ? 'LIBRE' : isPaidIdle ? 'PAGADO' : isMixedMode ? 'PIÑA + HORA' : session.game_mode === 'PINA' ? 'LA PIÑA' : session.game_mode === 'CONSUMO' ? 'BAR' : isTimeFree ? 'BAR' : (wasOpenedWithHours && isExceeded) ? 'SIN TIEMPO' : hasLimit ? (totalHoursPaid === 0.5 ? 'PREPAGO 30MIN' : `PREPAGO ${totalHoursPaid}h`) : hasPinas ? 'LA PIÑA' : 'JUG.'}
                 </div>
             </div>
 
