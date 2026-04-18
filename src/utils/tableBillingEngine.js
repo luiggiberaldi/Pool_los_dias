@@ -257,7 +257,10 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
             session.game_mode,
             config,
             session.hours_paid || 0,
-            session.extended_times || 0
+            session.extended_times || 0,
+            0, // hoursOffset
+            0, // roundsOffset
+            seats // pass seats so isLibre check considers seat-level hours
         );
     const sharedTimeTotal = sessionTimeCost.total;
     const sharedTotal = round2(sharedConsumptionTotal + sharedTimeTotal);
