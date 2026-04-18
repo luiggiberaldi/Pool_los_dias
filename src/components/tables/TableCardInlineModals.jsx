@@ -175,8 +175,8 @@ export default function TableCardInlineModals({
                             <>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
-                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
+                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('30 min restados', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
+                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('1h restada', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
                                 </div>
                             </>
                         )}

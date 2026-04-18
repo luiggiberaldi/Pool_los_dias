@@ -33,17 +33,55 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
                 await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { seats: newSeats } });
             }
         } else {
-            const newHours = Math.max(0, (Number(session.hours_paid) || 0) + additionalHours);
+            // Si estamos restando horas, primero quitar de seat timeCharges, luego de hours_paid
+            let remaining = additionalHours;
+            let newSeats = session.seats ? [...session.seats.map(s => ({ ...s, timeCharges: [...(s.timeCharges || [])] }))] : null;
+            let seatsChanged = false;
+
+            if (remaining < 0 && newSeats) {
+                // Quitar horas de timeCharges de seats (LIFO: último agregado primero)
+                for (const seat of newSeats) {
+                    const hourCharges = (seat.timeCharges || []).filter(tc => tc.type === 'hora');
+                    // Recorrer de último a primero
+                    for (let i = hourCharges.length - 1; i >= 0 && remaining < 0; i--) {
+                        const tc = hourCharges[i];
+                        const tcAmount = Number(tc.amount) || 0;
+                        if (tcAmount <= Math.abs(remaining)) {
+                            // Quitar este timeCharge completo
+                            seat.timeCharges = seat.timeCharges.filter(t => t.id !== tc.id);
+                            remaining += tcAmount;
+                            seatsChanged = true;
+                        } else {
+                            // Reducir parcialmente este timeCharge
+                            seat.timeCharges = seat.timeCharges.map(t =>
+                                t.id === tc.id ? { ...t, amount: tcAmount + remaining } : t
+                            );
+                            remaining = 0;
+                            seatsChanged = true;
+                        }
+                    }
+                }
+            }
+
+            // Lo que quede se aplica a hours_paid
+            const newHours = Math.max(0, (Number(session.hours_paid) || 0) + remaining);
+            const updatePayload = { hours_paid: newHours, paid_at: null };
+            if (seatsChanged) updatePayload.seats = newSeats;
+
             const newSessions = get().activeSessions.map(s =>
-                s.id === sessionId ? { ...s, hours_paid: newHours, paid_at: null } : s
+                s.id === sessionId ? { ...s, ...updatePayload } : s
             );
             set({ activeSessions: newSessions });
             await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
             try {
-                const { error } = await supabaseCloud.from('table_sessions').update({ hours_paid: newHours }).eq('id', sessionId);
+                const dbPayload = { hours_paid: newHours };
+                if (seatsChanged) dbPayload.seats = newSeats;
+                const { error } = await supabaseCloud.from('table_sessions').update(dbPayload).eq('id', sessionId);
                 if (error) throw error;
             } catch (e) {
-                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { hours_paid: newHours } });
+                const pendingPayload = { hours_paid: newHours };
+                if (seatsChanged) pendingPayload.seats = newSeats;
+                await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: pendingPayload });
             }
         }
     },
