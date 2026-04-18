@@ -465,9 +465,11 @@ export default function TableCard({ table, session }) {
     const hasHoursActive = (costBreakdown ? costBreakdown.hasHours : (session?.hours_paid > 0)) || seatHasHours;
     const grandTotal = timeCost + totalConsumption;
     
-    // Countdown logic
+    // Countdown logic — debe restar hoursOffset para no contar horas ya pagadas
     const hasLimit = session?.hours_paid && session.hours_paid > 0;
-    const remainingMins = hasLimit ? (session.hours_paid * 60) - elapsed : 0;
+    const effectiveHours = hasLimit ? Math.max(0, session.hours_paid - hoursOffset) : 0;
+    const effectiveElapsed = hoursOffset > 0 ? Math.max(0, elapsed - (hoursOffset * 60)) : elapsed;
+    const remainingMins = hasLimit ? (effectiveHours * 60) - effectiveElapsed : 0;
     const isExceeded = hasLimit && remainingMins < 0;
 
     // Notification when prepaid time is exceeded (fires once per session)
