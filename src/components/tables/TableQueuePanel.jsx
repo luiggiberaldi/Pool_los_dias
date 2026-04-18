@@ -59,8 +59,14 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     const totalConsumption = items.reduce((a, i) => a + Number(i.unit_price_usd) * Number(i.qty), 0);
                     const elapsed = session.started_at ? calculateElapsedTime(session.started_at) : 0;
                     const isTimeFree = table.type === 'NORMAL';
-                    const timeCost = isTimeFree ? 0 : calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, session.paid_at, (paidHoursOffsets || {})[session.id] || 0, (paidRoundsOffsets || {})[session.id] || 0);
-                    const grandTotal = timeCost + totalConsumption;
+                    const timeCost = isTimeFree ? 0 : calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, session.paid_at, (paidHoursOffsets || {})[session.id] || 0, (paidRoundsOffsets || {})[session.id] || 0, session.seats);
+                    const seatTimeCost = isTimeFree ? 0 : (session.seats || []).filter(s => !s.paid).reduce((sum, s) => {
+                        const tc = (s.timeCharges || []);
+                        const h = tc.filter(t => t.type === 'hora').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                        const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                        return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
+                    }, 0);
+                    const grandTotal = timeCost + seatTimeCost + totalConsumption;
                     const mesero = session.opened_by && cachedUsers?.length
                         ? cachedUsers.find(u => u.id === session.opened_by)
                         : null;

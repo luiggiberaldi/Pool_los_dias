@@ -159,12 +159,18 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         activeSessions.map(s => {
             if (s.status !== 'ACTIVE') return null;
             const elapsedMin = calculateElapsedTime(s.started_at);
-            const gameCost = calculateSessionCost(elapsedMin, s.game_mode, config, s.hours_paid, s.extended_times, s.paid_at, (paidHoursOffsets || {})[s.id] || 0, (paidRoundsOffsets || {})[s.id] || 0);
+            const gameCost = calculateSessionCost(elapsedMin, s.game_mode, config, s.hours_paid, s.extended_times, s.paid_at, (paidHoursOffsets || {})[s.id] || 0, (paidRoundsOffsets || {})[s.id] || 0, s.seats);
             const order = orders.find(o => o.table_session_id === s.id);
             const consumptionCost = order
                 ? orderItems.filter(i => i.order_id === order.id).reduce((sum, i) => sum + (i.unit_price_usd || 0) * i.qty, 0)
                 : 0;
-            const totalUsd = gameCost + consumptionCost;
+            const seatTimeCost = (s.seats || []).filter(st => !st.paid).reduce((sum, st) => {
+                const tc = (st.timeCharges || []);
+                const h = tc.filter(t => t.type === 'hora').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
+            }, 0);
+            const totalUsd = gameCost + seatTimeCost + consumptionCost;
             return totalUsd >= HIGH_BILL_THRESHOLD ? { session: s, totalUsd } : null;
         }).filter(Boolean).sort((a, b) => b.totalUsd - a.totalUsd),
         [activeSessions, orders, orderItems, now, config] // eslint-disable-line react-hooks/exhaustive-deps

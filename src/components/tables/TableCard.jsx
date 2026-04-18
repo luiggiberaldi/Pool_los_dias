@@ -463,7 +463,14 @@ export default function TableCard({ table, session }) {
     const seatHasHours = (session?.seats || []).some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
     const hasPinas = (costBreakdown ? costBreakdown.hasPinas : (session?.game_mode === 'PINA')) || seatHasPinas;
     const hasHoursActive = (costBreakdown ? costBreakdown.hasHours : (session?.hours_paid > 0)) || seatHasHours;
-    const grandTotal = timeCost + totalConsumption;
+    // Sumar costo de seat-level timeCharges (horas + piñas asignadas a clientes)
+    const seatTimeCost = isPlaying && !isTimeFree ? (session?.seats || []).filter(s => !s.paid).reduce((sum, s) => {
+        const tc = (s.timeCharges || []);
+        const h = tc.filter(t => t.type === 'hora').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+        const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+        return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
+    }, 0) : 0;
+    const grandTotal = timeCost + seatTimeCost + totalConsumption;
     
     // Countdown logic — incluye horas de session + horas de seats (timeCharges)
     const seatHoursTotal = (session?.seats || []).reduce((sum, s) =>

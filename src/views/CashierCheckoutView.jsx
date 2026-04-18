@@ -95,8 +95,14 @@ export default function CashierCheckoutView({ triggerHaptic, isActive }) {
                             const isTimeFree = table.type === 'NORMAL';
                             const hoursOffset = (paidHoursOffsets || {})[session.id] || 0;
                             const roundsOffset = (paidRoundsOffsets || {})[session.id] || 0;
-                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset) : 0;
-                            const grandTotal = round2(timeCost + totalConsumption);
+                            const timeCost = !isTimeFree ? calculateSessionCost(elapsed, session.game_mode, config, session?.hours_paid, session?.extended_times, session?.paid_at, hoursOffset, roundsOffset, session?.seats) : 0;
+                            const seatTimeCost = !isTimeFree ? (session?.seats || []).filter(s => !s.paid).reduce((sum, s) => {
+                                const tc = (s.timeCharges || []);
+                                const h = tc.filter(t => t.type === 'hora').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                                const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+                                return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
+                            }, 0) : 0;
+                            const grandTotal = round2(timeCost + seatTimeCost + totalConsumption);
 
                             return (
                                 <div key={session.id} className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border-2 border-orange-500/30 flex flex-col gap-3">
