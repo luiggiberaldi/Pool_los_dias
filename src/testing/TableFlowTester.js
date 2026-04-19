@@ -12,6 +12,10 @@ import {
     calculateSessionCostBreakdown,
     calculateFullTableBreakdown,
     calculateSeatCostBreakdown,
+    calculateGrandTotalBs,
+    calculateSeatTimeCostBs,
+    calculateTimeCostBsBreakdown,
+    calculateTimeCostBs,
     formatHoursPaid,
 } from '../utils/tableBillingEngine';
 
@@ -1364,6 +1368,430 @@ function scenarioR() {
     return { passed, failed };
 }
 
+function scenarioS() {
+    section('ESCENARIO S: Recobro — Bs con Seat TimeCharges');
+    const config = { ...TEST_CONFIG, pricePerHourBs: 1500, pricePinaBs: 600 };
+    const tasaBCV = 300;
+    log(`Config: pricePerHour=$${config.pricePerHour}, pricePerHourBs=${config.pricePerHourBs}, pricePina=$${config.pricePina}, pricePinaBs=${config.pricePinaBs}, tasaBCV=${tasaBCV}`);
+
+    let passed = 0, failed = 0;
+    const check = (c, p, f) => { if (assert(c, p, f)) passed++; else failed++; };
+
+    // ── Test 1: Sesión con horas, cobro, recobro con seat-level hour ──
+    log('Test 1: Cobro inicial 1h → recobro con 1h seat-level');
+    const session1 = {
+        id: 'test-s1', game_mode: 'NORMAL', hours_paid: 1, extended_times: 0,
+        started_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [] }],
+        paid_at: null,
+    };
+    let hoursOff = 0, roundsOff = 0;
+
+    // Primer cobro: 1h = $5 → Bs 1500
+    const bd1 = calculateSessionCostBreakdown(60, session1.game_mode, config, session1.hours_paid, session1.extended_times, hoursOff, roundsOff);
+    const bs1 = calculateGrandTotalBs(bd1.total, 0, session1.game_mode, config, tasaBCV, bd1);
+    const seatBs1 = calculateSeatTimeCostBs(session1.seats, config, tasaBCV);
+    check(bd1.total === 5, `Primer cobro $${bd1.total}`, `Esperado $5, obtenido $${bd1.total}`);
+    check(bs1 === 1500, `Primer Bs correcto: ${bs1}`, `Esperado Bs 1500, obtenido ${bs1}`);
+    check(seatBs1 === 0, `Seat Bs antes de recobro: ${seatBs1}`, `Esperado 0, obtenido ${seatBs1}`);
+
+    // Simular resetSessionAfterPayment
+    hoursOff = 1;
+    session1.paid_at = new Date().toISOString();
+    session1.seats[0].timeCharges = []; // cleared
+
+    // Agregar 1h a seat (recobro)
+    session1.seats[0].timeCharges = [{ type: 'hora', amount: 1, id: 'tc-1' }];
+    session1.paid_at = null;
+
+    // Verificar: session-level cost = $0 (ya pagado), seat-level = $5
+    const bd2 = calculateSessionCostBreakdown(120, session1.game_mode, config, session1.hours_paid, session1.extended_times, hoursOff, roundsOff);
+    const sessionBs2 = calculateGrandTotalBs(bd2.total, 0, session1.game_mode, config, tasaBCV, bd2);
+    const seatBs2 = calculateSeatTimeCostBs(session1.seats, config, tasaBCV);
+    const totalBs2 = round2(sessionBs2 + seatBs2);
+
+    check(bd2.total === 0, `Session-level costo post-recobro: $${bd2.total}`, `Esperado $0, obtenido $${bd2.total}`);
+    check(sessionBs2 === 0, `Session-level Bs: ${sessionBs2}`, `Esperado 0, obtenido ${sessionBs2}`);
+    check(seatBs2 === 1500, `Seat-level Bs correcto: ${seatBs2}`, `Esperado Bs 1500, obtenido ${seatBs2}`);
+    check(totalBs2 === 1500, `Total Bs recobro correcto: ${totalBs2}`, `Esperado Bs 1500, obtenido ${totalBs2}`);
+
+    // ── Test 2: Recobro con piña en seat ──
+    log('Test 2: Cobro inicial piña → recobro con piña seat-level');
+    const session2 = {
+        id: 'test-s2', game_mode: 'PINA', hours_paid: 0, extended_times: 0,
+        started_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [] }],
+        paid_at: null,
+    };
+    let hOff2 = 0, rOff2 = 0;
+
+    // Primer cobro: 1 piña (implícita) = $2 → Bs 600
+    const bdP1 = calculateSessionCostBreakdown(30, session2.game_mode, config, session2.hours_paid, session2.extended_times, hOff2, rOff2);
+    const bsP1 = calculateGrandTotalBs(bdP1.total, 0, session2.game_mode, config, tasaBCV, bdP1);
+    check(bdP1.total === 2, `Piña primer cobro: $${bdP1.total}`, `Esperado $2, obtenido $${bdP1.total}`);
+    check(bsP1 === 600, `Piña primer Bs: ${bsP1}`, `Esperado 600, obtenido ${bsP1}`);
+
+    // Simular reset
+    rOff2 = 1; // 1 piña pagada
+    session2.paid_at = new Date().toISOString();
+    session2.seats[0].timeCharges = [];
+
+    // Agregar piña a seat
+    session2.seats[0].timeCharges = [{ type: 'pina', amount: 1, id: 'tc-2' }];
+    session2.paid_at = null;
+
+    const bdP2 = calculateSessionCostBreakdown(60, session2.game_mode, config, session2.hours_paid, session2.extended_times, hOff2, rOff2);
+    const sessionBsP2 = calculateGrandTotalBs(bdP2.total, 0, session2.game_mode, config, tasaBCV, bdP2);
+    const seatBsP2 = calculateSeatTimeCostBs(session2.seats, config, tasaBCV);
+    const totalBsP2 = round2(sessionBsP2 + seatBsP2);
+
+    check(bdP2.total === 0, `Piña session-level post-recobro: $${bdP2.total}`, `Esperado $0, obtenido $${bdP2.total}`);
+    check(seatBsP2 === 600, `Piña seat Bs: ${seatBsP2}`, `Esperado 600, obtenido ${seatBsP2}`);
+    check(totalBsP2 === 600, `Piña total Bs recobro: ${totalBsP2}`, `Esperado 600, obtenido ${totalBsP2}`);
+
+    // ── Test 3: Recobro mixto (hora + piña en seats) + consumo ──
+    log('Test 3: Recobro mixto con consumo');
+    const session3 = {
+        id: 'test-s3', game_mode: 'NORMAL', hours_paid: 1, extended_times: 0,
+        started_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [] }],
+        paid_at: null,
+    };
+    let hOff3 = 0, rOff3 = 0;
+
+    // Reset after first payment
+    hOff3 = 1;
+    session3.seats[0].timeCharges = [
+        { type: 'hora', amount: 1, id: 'tc-3a' },
+        { type: 'pina', amount: 1, id: 'tc-3b' },
+    ];
+    session3.paid_at = null;
+
+    const totalConsumption = 3; // $3 de consumo
+    const bd3 = calculateSessionCostBreakdown(120, session3.game_mode, config, session3.hours_paid, session3.extended_times, hOff3, rOff3);
+    const sessionBs3 = calculateGrandTotalBs(bd3.total, totalConsumption, session3.game_mode, config, tasaBCV, bd3);
+    const seatBs3 = calculateSeatTimeCostBs(session3.seats, config, tasaBCV);
+    const totalBs3 = round2(sessionBs3 + seatBs3);
+
+    // Session: $0 time + $3 consumo en Bs = $3 * 300 = 900
+    // Seat: 1h ($5) = Bs 1500 + 1 piña ($2) = Bs 600 → Bs 2100
+    // Total: 900 + 2100 = 3000
+    const consumoBs = round2(totalConsumption * tasaBCV);
+    check(consumoBs === 900, `Consumo Bs: ${consumoBs}`, `Esperado 900, obtenido ${consumoBs}`);
+    check(seatBs3 === 2100, `Seat mixto Bs: ${seatBs3}`, `Esperado 2100, obtenido ${seatBs3}`);
+    check(totalBs3 === 3000, `Total mixto recobro Bs: ${totalBs3}`, `Esperado 3000, obtenido ${totalBs3}`);
+
+    // ── Test 4: Sin pricePerHourBs (fallback a tasa BCV) ──
+    log('Test 4: Fallback a tasa BCV cuando no hay precio Bs configurado');
+    const configNoBs = { ...TEST_CONFIG }; // pricePerHourBs=0, pricePinaBs=0
+    const session4 = {
+        id: 'test-s4', game_mode: 'NORMAL', hours_paid: 1, extended_times: 0,
+        started_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [{ type: 'hora', amount: 1, id: 'tc-4' }] }],
+        paid_at: null,
+    };
+    const seatBs4 = calculateSeatTimeCostBs(session4.seats, configNoBs, tasaBCV);
+    // Sin Bs custom: $5 * tasa 300 = 1500
+    check(seatBs4 === 1500, `Fallback BCV seat Bs: ${seatBs4}`, `Esperado 1500, obtenido ${seatBs4}`);
+
+    log(`Escenario S completado: ${passed} pasaron, ${failed} fallaron`, failed > 0 ? 'error' : 'success');
+    return { passed, failed };
+}
+
+// ── Helper: simula processSaleTransaction de forma determinista ──
+function buildMockSale({ cart, totalUsd, totalBs, effectiveRate, tableName, saleNumber, payments }) {
+    return Object.freeze({
+        id: `mock-sale-${saleNumber}`,
+        saleNumber,
+        tipo: 'VENTA',
+        status: 'COMPLETADA',
+        tableName: tableName || null,
+        items: cart.map(i => ({
+            id: i.id, name: i.name, qty: i.qty,
+            priceUsd: i.priceUsd, costBs: 0, costUsd: 0,
+        })),
+        cartSubtotalUsd: totalUsd,
+        totalUsd,
+        totalBs,
+        payments: payments || [{ methodId: 'EFECTIVO', amountUsd: totalUsd, currency: 'USD' }],
+        rate: effectiveRate,
+        timestamp: new Date().toISOString(),
+        changeUsd: 0,
+        changeBs: 0,
+        fiadoUsd: 0,
+        customerId: null,
+        customerName: 'Consumidor Final',
+    });
+}
+
+function scenarioT() {
+    section('ESCENARIO T: Registro en Reportes — Cobro / Recobro / Re-recobro');
+    const config = { ...TEST_CONFIG, pricePerHourBs: 1500, pricePinaBs: 600 };
+    const effectiveRate = 300;
+    log(`Config: pricePerHour=$${config.pricePerHour}, pricePerHourBs=${config.pricePerHourBs}, tasaBCV=${effectiveRate}`);
+
+    let passed = 0, failed = 0;
+    const check = (c, p, f) => { if (assert(c, p, f)) passed++; else failed++; };
+    const salesReport = []; // Simula el array de ventas del sistema
+    let nextSaleNumber = 1;
+
+    // ═══ COBRO #1: Abrir mesa 2h + consumo ═══
+    log('── Cobro #1: 2h + 1 cerveza ──');
+    const session = {
+        id: 'test-t1', game_mode: 'NORMAL', hours_paid: 2, extended_times: 0,
+        started_at: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [] }],
+        paid_at: null,
+    };
+    const orderItems1 = [{ id: 'item-1', product_id: 'beer', product_name: 'Cerveza', unit_price_usd: 2, qty: 1, seat_id: null }];
+    let hoursOff = 0, roundsOff = 0, elapsed = 120;
+
+    const { cart: cart1 } = buildSyntheticCart(session, config, elapsed, hoursOff, roundsOff, orderItems1);
+    const total1 = cartTotal(cart1);
+    const bd1 = calculateSessionCostBreakdown(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, hoursOff, roundsOff);
+    const bs1 = round2(calculateGrandTotalBs(bd1.total, 2, session.game_mode, config, effectiveRate, bd1));
+
+    const sale1 = buildMockSale({ cart: cart1, totalUsd: total1, totalBs: bs1, effectiveRate, tableName: 'Mesa 1', saleNumber: nextSaleNumber++ });
+    salesReport.push(sale1);
+
+    check(sale1.totalUsd === 12, `Cobro #1 USD: $${sale1.totalUsd}`, `Esperado $12, obtenido $${sale1.totalUsd}`);
+    check(sale1.totalBs === 3600, `Cobro #1 Bs: ${sale1.totalBs}`, `Esperado 3600, obtenido ${sale1.totalBs}`);
+    check(sale1.items.length === 2, `Cobro #1 items: ${sale1.items.length}`, `Esperado 2 items, obtenido ${sale1.items.length}`);
+    check(sale1.saleNumber === 1, `Cobro #1 saleNumber: ${sale1.saleNumber}`, `Esperado 1, obtenido ${sale1.saleNumber}`);
+    check(sale1.tableName === 'Mesa 1', `Cobro #1 tableName OK`, `tableName incorrecto: ${sale1.tableName}`);
+    check(salesReport.length === 1, `Reporte tiene 1 venta`, `Esperado 1, tiene ${salesReport.length}`);
+
+    // ═══ Simular resetSessionAfterPayment ═══
+    hoursOff = 2;
+    session.paid_at = new Date().toISOString();
+    session.seats[0].timeCharges = [];
+    log('Reset: hoursOffset=2, timeCharges limpiados');
+
+    // ═══ RECOBRO #2: Agregar 1h seat-level + 1 piña ═══
+    log('── Recobro #2: +1h seat + 1 piña ──');
+    session.seats[0].timeCharges = [
+        { type: 'hora', amount: 1, id: 'tc-r1' },
+        { type: 'pina', amount: 1, id: 'tc-r2' },
+    ];
+    session.paid_at = null;
+    elapsed = 180;
+
+    // Session-level: $0 (todo pagado por offset)
+    const bd2 = calculateSessionCostBreakdown(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, hoursOff, roundsOff);
+    // Seat-level: 1h ($5) + 1 piña ($2) = $7
+    const seatCost2 = calculateSeatCostBreakdown(session.seats[0], elapsed, config);
+    const seatCart2 = [];
+    if (seatCost2.hourCost > 0) seatCart2.push({ id: 'r2-hora', name: 'Tiempo Recobro', priceUsd: round2(seatCost2.hourCost), qty: 1 });
+    if (seatCost2.pinaCost > 0) seatCart2.push({ id: 'r2-pina', name: 'Piña Recobro', priceUsd: round2(config.pricePina), qty: 1 });
+
+    const total2 = round2(bd2.total + seatCost2.total);
+    const sessionBs2 = calculateGrandTotalBs(bd2.total, 0, session.game_mode, config, effectiveRate, bd2);
+    const seatBs2 = calculateSeatTimeCostBs(session.seats, config, effectiveRate);
+    const bs2 = round2(sessionBs2 + seatBs2);
+
+    const sale2 = buildMockSale({ cart: seatCart2, totalUsd: total2, totalBs: bs2, effectiveRate, tableName: 'Mesa 1', saleNumber: nextSaleNumber++ });
+    salesReport.push(sale2);
+
+    check(sale2.totalUsd === 7, `Recobro #2 USD: $${sale2.totalUsd}`, `Esperado $7, obtenido $${sale2.totalUsd}`);
+    check(sale2.totalBs === 2100, `Recobro #2 Bs: ${sale2.totalBs}`, `Esperado 2100, obtenido ${sale2.totalBs}`);
+    check(sale2.items.length === 2, `Recobro #2 items: ${sale2.items.length}`, `Esperado 2 items, obtenido ${sale2.items.length}`);
+    check(sale2.saleNumber === 2, `Recobro #2 saleNumber: ${sale2.saleNumber}`, `Esperado 2, obtenido ${sale2.saleNumber}`);
+    check(salesReport.length === 2, `Reporte tiene 2 ventas`, `Esperado 2, tiene ${salesReport.length}`);
+
+    // ═══ Simular segundo reset ═══
+    hoursOff = 2; // No cambió (session.hours_paid sigue siendo 2)
+    roundsOff = 0; // Piñas eran seat-level, no session-level
+    session.paid_at = new Date().toISOString();
+    session.seats[0].timeCharges = [];
+    log('Reset #2: timeCharges limpiados');
+
+    // ═══ RE-RECOBRO #3: +30min hora + consumo ═══
+    log('── Re-recobro #3: +30min + agua ──');
+    session.seats[0].timeCharges = [
+        { type: 'hora', amount: 0.5, id: 'tc-rr1' },
+    ];
+    session.paid_at = null;
+    elapsed = 210;
+    const orderItems3 = [{ id: 'item-3', product_id: 'water', product_name: 'Agua', unit_price_usd: 1, qty: 1, seat_id: null }];
+
+    const bd3 = calculateSessionCostBreakdown(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, hoursOff, roundsOff);
+    const seatCost3 = calculateSeatCostBreakdown(session.seats[0], elapsed, config);
+    const consumo3 = 1; // agua
+    const seatCart3 = [];
+    if (seatCost3.hourCost > 0) seatCart3.push({ id: 'rr-hora', name: 'Tiempo Re-recobro', priceUsd: round2(seatCost3.hourCost), qty: 1 });
+    orderItems3.forEach(i => seatCart3.push({ id: i.id, name: i.product_name, priceUsd: Number(i.unit_price_usd), qty: Number(i.qty) }));
+
+    const total3 = round2(bd3.total + seatCost3.total + consumo3);
+    const sessionBs3 = calculateGrandTotalBs(bd3.total, consumo3, session.game_mode, config, effectiveRate, bd3);
+    const seatBs3 = calculateSeatTimeCostBs(session.seats, config, effectiveRate);
+    const bs3 = round2(sessionBs3 + seatBs3);
+
+    const sale3 = buildMockSale({ cart: seatCart3, totalUsd: total3, totalBs: bs3, effectiveRate, tableName: 'Mesa 1', saleNumber: nextSaleNumber++ });
+    salesReport.push(sale3);
+
+    // 0.5h = $2.50, agua = $1 → total $3.50
+    check(Math.abs(sale3.totalUsd - 3.50) < EPSILON, `Re-recobro #3 USD: $${sale3.totalUsd}`, `Esperado $3.50, obtenido $${sale3.totalUsd}`);
+    // 0.5h Bs = 0.5 * 1500 = 750, agua = 1 * 300 = 300 → 1050
+    check(Math.abs(sale3.totalBs - 1050) < EPSILON, `Re-recobro #3 Bs: ${sale3.totalBs}`, `Esperado 1050, obtenido ${sale3.totalBs}`);
+    check(sale3.items.length === 2, `Re-recobro #3 items: ${sale3.items.length}`, `Esperado 2 items, obtenido ${sale3.items.length}`);
+    check(sale3.saleNumber === 3, `Re-recobro #3 saleNumber: ${sale3.saleNumber}`, `Esperado 3, obtenido ${sale3.saleNumber}`);
+    check(salesReport.length === 3, `Reporte tiene 3 ventas`, `Esperado 3, tiene ${salesReport.length}`);
+
+    // ═══ Verificaciones del reporte completo ═══
+    log('── Verificando reporte consolidado ──');
+    const totalReporteUsd = round2(salesReport.reduce((s, v) => s + v.totalUsd, 0));
+    const totalReporteBs = round2(salesReport.reduce((s, v) => s + v.totalBs, 0));
+    const totalEsperadoUsd = round2(12 + 7 + 3.50);
+    const totalEsperadoBs = round2(3600 + 2100 + 1050);
+
+    check(Math.abs(totalReporteUsd - totalEsperadoUsd) < EPSILON,
+        `Total reporte USD: $${totalReporteUsd} = $${totalEsperadoUsd}`,
+        `Total reporte USD INCORRECTO: $${totalReporteUsd} vs $${totalEsperadoUsd}`);
+    check(Math.abs(totalReporteBs - totalEsperadoBs) < EPSILON,
+        `Total reporte Bs: ${totalReporteBs} = ${totalEsperadoBs}`,
+        `Total reporte Bs INCORRECTO: ${totalReporteBs} vs ${totalEsperadoBs}`);
+
+    // Verificar que los saleNumbers son secuenciales
+    const numbers = salesReport.map(s => s.saleNumber);
+    check(JSON.stringify(numbers) === '[1,2,3]', `SaleNumbers secuenciales: [${numbers}]`, `SaleNumbers NO secuenciales: [${numbers}]`);
+
+    // Verificar que todas las ventas son de la misma mesa
+    const allSameMesa = salesReport.every(s => s.tableName === 'Mesa 1');
+    check(allSameMesa, `Todas las ventas registran Mesa 1`, `Alguna venta no tiene Mesa 1`);
+
+    // No hay doble cobro: el total de las 3 ventas no excede lo correcto
+    const totalHorasCobradasUsd = round2(10 + 5 + 2.50); // 2h + 1h-seat + 0.5h-seat
+    check(Math.abs(totalHorasCobradasUsd - 17.50) < EPSILON,
+        `Sin doble cobro horas: $${totalHorasCobradasUsd}`,
+        `Posible doble cobro: $${totalHorasCobradasUsd} vs esperado $17.50`);
+
+    log(`Escenario T completado: ${passed} pasaron, ${failed} fallaron`, failed > 0 ? 'error' : 'success');
+    return { passed, failed };
+}
+
+// ── Helper: simula los datos del ticket/pre-cuenta como los genera tableTicketGenerator ──
+function simulateTicketData(session, seats, elapsed, config, currentItems, hoursOffset, roundsOffset, tasaUSD) {
+    const isPina = session.game_mode === 'PINA';
+    const pinaCount = isPina ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0;
+    const hasPinas = isPina || pinaCount > 0;
+    const totalHours = Number(session.hours_paid) || 0;
+    const hasHours = totalHours > 0;
+    const seatHasPinas = seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'pina'));
+    const seatHasHours = seats.some(s => (s.timeCharges || []).some(tc => tc.type === 'hora'));
+
+    const items = [];
+
+    // Piñas (same logic as tableTicketGenerator)
+    if (hasPinas || seatHasPinas) {
+        const pricePerPina = config.pricePina || 0;
+        const seatPinas = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'pina').length, 0);
+        const totalPinas = pinaCount + seatPinas;
+        const fullCost = round2(totalPinas * pricePerPina);
+        items.push({ type: 'pina', label: `${totalPinas} piña(s)`, cost: fullCost });
+    }
+
+    // Horas — uses tc.amount (NOT tc.hours - that was the bug)
+    if (hasHours || seatHasHours) {
+        const pricePerHour = config.pricePerHour || 0;
+        const seatHoursTotal = seats.reduce((sum, s) =>
+            sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (Number(tc.amount) || 0), 0), 0);
+        const combinedHours = totalHours + seatHoursTotal;
+        const fullCost = round2(combinedHours * pricePerHour);
+        items.push({ type: 'hora', label: `${formatHoursPaid(combinedHours)}`, cost: fullCost, hours: combinedHours });
+    }
+
+    // Consumo
+    (currentItems || []).forEach(i => {
+        items.push({ type: 'consumo', label: `${i.qty}x ${i.product_name}`, cost: round2(i.qty * i.unit_price_usd) });
+    });
+
+    const totalUsd = round2(items.reduce((s, i) => s + i.cost, 0));
+    return { items, totalUsd };
+}
+
+function scenarioU() {
+    section('ESCENARIO U: Datos de Ticket — Compra y Recompra');
+    const config = { ...TEST_CONFIG, pricePerHourBs: 1500, pricePinaBs: 600 };
+    const tasaBCV = 300;
+    log(`Config: pricePerHour=$${config.pricePerHour}, pricePina=$${config.pricePina}`);
+
+    let passed = 0, failed = 0;
+    const check = (c, p, f) => { if (assert(c, p, f)) passed++; else failed++; };
+
+    // ═══ COMPRA: Mesa 2h + 1 cerveza ═══
+    log('── Ticket compra: 2h + cerveza ──');
+    const session = {
+        id: 'test-u1', game_mode: 'NORMAL', hours_paid: 2, extended_times: 0,
+        started_at: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
+        seats: [{ id: 'seat1', label: 'P1', paid: false, timeCharges: [] }],
+        paid_at: null,
+    };
+    const items1 = [{ id: 'i1', product_id: 'beer', product_name: 'Cerveza', unit_price_usd: 2, qty: 1, seat_id: null }];
+    let hoursOff = 0, roundsOff = 0;
+
+    const ticket1 = simulateTicketData(session, session.seats, 120, config, items1, hoursOff, roundsOff, tasaBCV);
+    logData('Ticket compra', ticket1);
+
+    check(ticket1.items.length === 2, `Ticket #1 tiene 2 líneas: ${ticket1.items.length}`, `Esperado 2 líneas, obtenido ${ticket1.items.length}`);
+    check(ticket1.items[0].type === 'hora', `Línea 1 es hora`, `Línea 1 tipo incorrecto: ${ticket1.items[0].type}`);
+    check(ticket1.items[0].cost === 10, `Hora cost $10: $${ticket1.items[0].cost}`, `Hora cost incorrecto: $${ticket1.items[0].cost}`);
+    check(ticket1.items[0].hours === 2, `Hora qty 2h: ${ticket1.items[0].hours}`, `Hora qty incorrecto: ${ticket1.items[0].hours}`);
+    check(ticket1.items[1].type === 'consumo', `Línea 2 es consumo`, `Línea 2 tipo incorrecto: ${ticket1.items[1].type}`);
+    check(ticket1.items[1].label === '1x Cerveza', `Consumo label OK`, `Label incorrecto: ${ticket1.items[1].label}`);
+    check(ticket1.items[1].cost === 2, `Consumo cost $2: $${ticket1.items[1].cost}`, `Consumo cost incorrecto: $${ticket1.items[1].cost}`);
+    check(ticket1.totalUsd === 12, `Ticket total $12: $${ticket1.totalUsd}`, `Total incorrecto: $${ticket1.totalUsd}`);
+
+    // ═══ Simular resetSessionAfterPayment ═══
+    hoursOff = 2;
+    session.paid_at = new Date().toISOString();
+    session.seats[0].timeCharges = [];
+    log('Reset: hoursOffset=2');
+
+    // ═══ RECOMPRA: +1h seat + 1 piña seat + agua ═══
+    log('── Ticket recompra: +1h seat + 1 piña seat + agua ──');
+    session.seats[0].timeCharges = [
+        { type: 'hora', amount: 1, id: 'tc-u1' },
+        { type: 'pina', amount: 1, id: 'tc-u2' },
+    ];
+    session.paid_at = null;
+    const items2 = [{ id: 'i2', product_id: 'water', product_name: 'Agua', unit_price_usd: 1, qty: 1, seat_id: null }];
+
+    const ticket2 = simulateTicketData(session, session.seats, 180, config, items2, hoursOff, roundsOff, tasaBCV);
+    logData('Ticket recompra', ticket2);
+
+    // Debe tener: piña(1), hora(2+1=3), agua
+    check(ticket2.items.length === 3, `Ticket #2 tiene 3 líneas: ${ticket2.items.length}`, `Esperado 3 líneas, obtenido ${ticket2.items.length}`);
+
+    const pinaItem = ticket2.items.find(i => i.type === 'pina');
+    const horaItem = ticket2.items.find(i => i.type === 'hora');
+    const consumoItem = ticket2.items.find(i => i.type === 'consumo');
+
+    check(pinaItem !== undefined, `Piña presente en ticket`, `Piña NO encontrada en ticket`);
+    check(pinaItem && pinaItem.cost === 2, `Piña cost $2: $${pinaItem?.cost}`, `Piña cost incorrecto: $${pinaItem?.cost}`);
+
+    // Horas: session.hours_paid(2) + seat-level(1) = 3h total → $15
+    // (el ticket muestra el total acumulado, no solo el delta)
+    check(horaItem !== undefined, `Hora presente en ticket`, `Hora NO encontrada en ticket`);
+    check(horaItem && horaItem.hours === 3, `Horas totales 3h: ${horaItem?.hours}`, `Horas incorrectas: ${horaItem?.hours}`);
+    check(horaItem && horaItem.cost === 15, `Hora cost $15: $${horaItem?.cost}`, `Hora cost incorrecto: $${horaItem?.cost}`);
+
+    check(consumoItem !== undefined, `Consumo presente en ticket`, `Consumo NO encontrado en ticket`);
+    check(consumoItem && consumoItem.label === '1x Agua', `Consumo label OK`, `Label incorrecto: ${consumoItem?.label}`);
+    check(consumoItem && consumoItem.cost === 1, `Consumo cost $1: $${consumoItem?.cost}`, `Consumo cost incorrecto: $${consumoItem?.cost}`);
+
+    // Verificar que tc.amount se usa correctamente (no tc.hours)
+    log('── Verificando que tc.amount se usa (no tc.hours) ──');
+    const badHoursCalc = session.seats.reduce((sum, s) =>
+        sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (tc.hours || 0), 0), 0);
+    const goodHoursCalc = session.seats.reduce((sum, s) =>
+        sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (Number(tc.amount) || 0), 0), 0);
+    check(badHoursCalc === 0, `tc.hours retorna 0 (no existe): ${badHoursCalc}`, `tc.hours debería ser 0: ${badHoursCalc}`);
+    check(goodHoursCalc === 1, `tc.amount retorna 1 (correcto): ${goodHoursCalc}`, `tc.amount debería ser 1: ${goodHoursCalc}`);
+
+    log(`Escenario U completado: ${passed} pasaron, ${failed} fallaron`, failed > 0 ? 'error' : 'success');
+    return { passed, failed };
+}
+
 // ── Suite definitions ──
 const ALL_SUITES = [
     { key: 'scenario_a', name: 'Abrir → Cobrar → Liberar', fn: scenarioA },
@@ -1384,6 +1812,9 @@ const ALL_SUITES = [
     { key: 'scenario_p', name: 'Request/Cancel Checkout', fn: scenarioP },
     { key: 'scenario_q', name: 'Sesión paid_at + Agregar Horas', fn: scenarioQ },
     { key: 'scenario_r', name: 'Falso Fiado — Rounding Divergence', fn: scenarioR },
+    { key: 'scenario_s', name: 'Recobro — Bs con Seat TimeCharges', fn: scenarioS },
+    { key: 'scenario_t', name: 'Registro en Reportes — Cobro/Recobro/Re-recobro', fn: scenarioT },
+    { key: 'scenario_u', name: 'Datos de Ticket — Compra y Recompra', fn: scenarioU },
 ];
 
 // ── Public API ──

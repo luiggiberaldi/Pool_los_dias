@@ -149,6 +149,8 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
                 .filter(m => parseFloat(barValues[m.id]) > 0)
                 .map(m => {
                     const amount = round2(parseFloat(barValues[m.id]));
+                    const amountUsd = m.currency === 'USD' ? amount : m.currency === 'COP' ? (tasaCop ? divR(amount, tasaCop) : 0) : divR(amount, effectiveRate);
+                    console.log(`[PaymentConvert] ${m.label}: ${amount} ${m.currency} → $${amountUsd} USD (effectiveRate=${effectiveRate})`);
                     return {
                         id: crypto.randomUUID(),
                         methodId: m.id,
@@ -156,7 +158,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
                         currency: m.currency,
                         amountInput: amount,
                         amountInputCurrency: m.currency,
-                        amountUsd: m.currency === 'USD' ? amount : m.currency === 'COP' ? (tasaCop ? divR(amount, tasaCop) : 0) : divR(amount, effectiveRate),
+                        amountUsd,
                         amountBs: m.currency === 'BS' ? amount : m.currency === 'COP' ? (tasaCop ? mulR(divR(amount, tasaCop), effectiveRate) : 0) : mulR(amount, effectiveRate),
                     };
                 });

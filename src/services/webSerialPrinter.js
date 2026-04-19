@@ -316,7 +316,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
                     }
                     if (sb.timeCost.hasHours) {
                         const tc = (sb.seat.timeCharges || []).filter(tc => tc.type === 'hora');
-                        const totalH = tc.reduce((sum, c) => sum + (c.hours || 0), 0);
+                        const totalH = tc.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
                         const ph = config?.pricePerHour || 0;
                         p.row(`${formatHoursPaid(totalH)} x $${ph.toFixed(2)}`, `$${sb.timeCost.hourCost.toFixed(2)}`, W);
                     }
@@ -364,7 +364,7 @@ export async function printPreCuentaEscPos({ table, session, elapsed, timeCost, 
 
         if (hasHours || seatHasHours) {
             const pricePerHour = config?.pricePerHour || 0;
-            const seatHoursTotal = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (tc.hours || 0), 0), 0);
+            const seatHoursTotal = seats.reduce((sum, s) => sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((h, tc) => h + (Number(tc.amount) || 0), 0), 0);
             const combinedHours = totalHours + seatHoursTotal;
             const fullCost = round2(combinedHours * pricePerHour);
             const paidCost = round2(hoursOffset * pricePerHour);

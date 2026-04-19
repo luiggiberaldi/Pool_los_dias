@@ -6,7 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
-import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs, calculateSeatTimeCostBs } from '../utils/tableBillingEngine';
 
 const EPSILON = 0.01;
 
@@ -235,9 +235,38 @@ export function useSalesCheckout({
         // covers the shown total we must honor it — never trigger a false fiado.
         const _totalPaidCheck = sumR(payments.map(p => p.amountUsd));
         const _shownTotal = round2(tableCheckoutData.grandTotal || 0);
+        console.log('[TableCheckout] effectiveCartTotal:', effectiveCartTotal, 'recalcCartTotal:', recalcCartTotal, '_totalPaidCheck:', _totalPaidCheck, '_shownTotal:', _shownTotal);
+        console.log('[TableCheckout] payments:', JSON.stringify(payments.map(p => ({ method: p.methodLabel, currency: p.currency, input: p.amountInput, usd: p.amountUsd, bs: p.amountBs }))));
+        console.log('[TableCheckout] effectiveRate (BCV):', effectiveRate, 'discountAmt:', discountAmt);
         if (effectiveCartTotal > _totalPaidCheck && _totalPaidCheck >= _shownTotal - EPSILON) {
             // User paid what was shown — snap to paid amount
             effectiveCartTotal = round2(_totalPaidCheck);
+        }
+        // Also guard small divergences from Bs→USD conversion rounding:
+        // if the user paid within $0.05 of the cart, honor it to avoid false fiado
+        if (effectiveCartTotal > _totalPaidCheck && Math.abs(effectiveCartTotal - _totalPaidCheck) <= 0.05) {
+            effectiveCartTotal = round2(_totalPaidCheck);
+        }
+        // Guard: rate mismatch between display Bs (implicit config rate) and payment
+        // Bs→USD conversion (BCV rate). If user paid enough Bs to cover the displayed
+        // Bs total, honor it — the user paid what was shown on screen.
+        if (effectiveCartTotal > _totalPaidCheck) {
+            const totalBsPaid = sumR(payments.filter(p => p.currency === 'BS').map(p => p.amountInput || 0));
+            if (totalBsPaid > 0) {
+                const cfg = useTablesStore.getState().config;
+                const shownBs = calculateGrandTotalBs(
+                    tableCheckoutData.timeCost || 0,
+                    tableCheckoutData.totalConsumption || 0,
+                    session?.game_mode, cfg, effectiveRate,
+                    calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff)
+                ) + calculateSeatTimeCostBs(seats, cfg, effectiveRate);
+                console.log('[TableCheckout] Bs guard: totalBsPaid:', totalBsPaid, 'shownBs:', shownBs);
+                if (totalBsPaid >= shownBs - 1) {
+                    // User covered the Bs total — snap USD to cover the cart
+                    console.log('[TableCheckout] Bs guard: snapping effectiveCartTotal from', effectiveCartTotal, 'to', _totalPaidCheck);
+                    effectiveCartTotal = round2(_totalPaidCheck);
+                }
+            }
         }
 
         const opts = {
@@ -287,7 +316,7 @@ export function useSalesCheckout({
         if (!result.success) {
             showToast(result.error, result.error.includes('No se pueden') ? 'warning' : 'error');
             playError();
-            return;
+            return { success: false };
         }
 
         setProductsAfterCheckout(result.updatedProducts);

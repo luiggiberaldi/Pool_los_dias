@@ -23,13 +23,15 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
         try {
             const cachedConfig = await tablesCache.getItem(scopedKey('pool_config'));
             if (cachedConfig) {
-                const lsHourBs = parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
-                const lsPinaBs = parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
-                cachedConfig.pricePerHourBs = Math.max(cachedConfig.pricePerHourBs || 0, lsHourBs);
-                cachedConfig.pricePinaBs = Math.max(cachedConfig.pricePinaBs || 0, lsPinaBs);
+                // Use cached values directly — don't Math.max with localStorage
+                // (that prevented saving 0 Bs prices from ever taking effect)
+                const hourBs = cachedConfig.pricePerHourBs ?? (parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0);
+                const pinaBs = cachedConfig.pricePinaBs ?? (parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0);
+                cachedConfig.pricePerHourBs = hourBs;
+                cachedConfig.pricePinaBs = pinaBs;
                 set({ config: cachedConfig });
-                if (cachedConfig.pricePerHourBs > 0) localStorage.setItem('pool_price_per_hour_bs', String(cachedConfig.pricePerHourBs));
-                if (cachedConfig.pricePinaBs > 0) localStorage.setItem('pool_price_pina_bs', String(cachedConfig.pricePinaBs));
+                localStorage.setItem('pool_price_per_hour_bs', String(hourBs));
+                localStorage.setItem('pool_price_pina_bs', String(pinaBs));
             }
 
             const cachedTables = await tablesCache.getItem(scopedKey('tables')) || [];
@@ -58,13 +60,11 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
                 const priceHandler = (e) => {
                     if (e.key === 'pool_price_per_hour_bs' || e.key === 'pool_price_pina_bs') {
                         const val = parseFloat(e.newValue) || 0;
-                        if (val > 0) {
-                            const cfg = { ...get().config };
-                            if (e.key === 'pool_price_per_hour_bs') cfg.pricePerHourBs = val;
-                            if (e.key === 'pool_price_pina_bs') cfg.pricePinaBs = val;
-                            set({ config: cfg });
-                            tablesCache.setItem(scopedKey('pool_config'), cfg);
-                        }
+                        const cfg = { ...get().config };
+                        if (e.key === 'pool_price_per_hour_bs') cfg.pricePerHourBs = val;
+                        if (e.key === 'pool_price_pina_bs') cfg.pricePinaBs = val;
+                        set({ config: cfg });
+                        tablesCache.setItem(scopedKey('pool_config'), cfg);
                     }
                 };
                 window.addEventListener('storage', priceHandler);
@@ -166,13 +166,14 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
             const { data: configData, error: configError } = await configQuery.maybeSingle();
 
             if (!configError && configData) {
-                const lsHourBs = parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
-                const lsPinaBs = parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
+                // Prefer cloud values, even if 0 (use ?? instead of || to respect 0)
+                const cloudHourBs = configData.price_per_hour_bs != null ? Number(configData.price_per_hour_bs) : null;
+                const cloudPinaBs = configData.price_pina_bs != null ? Number(configData.price_pina_bs) : null;
                 const cloudConfig = {
                     pricePerHour: Number(configData.price_per_hour) || get().config.pricePerHour,
-                    pricePerHourBs: Number(configData.price_per_hour_bs) || lsHourBs || get().config.pricePerHourBs || 0,
+                    pricePerHourBs: cloudHourBs ?? get().config.pricePerHourBs ?? 0,
                     pricePina: Number(configData.price_pina) || get().config.pricePina,
-                    pricePinaBs: Number(configData.price_pina_bs) || lsPinaBs || get().config.pricePinaBs || 0,
+                    pricePinaBs: cloudPinaBs ?? get().config.pricePinaBs ?? 0,
                 };
                 set({ config: cloudConfig });
                 await tablesCache.setItem(scopedKey('pool_config'), cloudConfig);

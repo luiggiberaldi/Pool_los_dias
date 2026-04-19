@@ -33,6 +33,7 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
     const productMap = {};
     salesForStats.forEach(s => {
         s.items?.forEach(item => {
+            if (item.category === 'servicios') return;
             if (!productMap[item.name]) productMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
             productMap[item.name].qty += item.qty;
             productMap[item.name].revenue += item.priceUsd * item.qty;

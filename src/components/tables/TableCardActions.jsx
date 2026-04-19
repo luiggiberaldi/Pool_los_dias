@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, ShoppingBag, CreditCard, Clock, Lock, Check, X } from 'lucide-react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
+import { useCashStore } from '../../hooks/store/cashStore';
 import { TargetIcon } from './TargetIcon';
 import { showToast } from '../Toast';
 
@@ -14,6 +15,17 @@ export default function TableCardActions({
     onAddHoursModal, onCancelCheckout, onCloseSession,
     requestAttribution, addPinaToSession,
 }) {
+    const activeCashSession = useCashStore(s => s.activeCashSession);
+
+    const handleRequestCheckout = () => {
+        if (!activeCashSession) {
+            showToast('Abre la caja primero para poder cobrar', 'error');
+            return;
+        }
+        onRequestCheckout(session.id);
+        onNotifyMesaCobrar(table.name, grandTotal);
+    };
+
     return (
         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/10 flex flex-col gap-2">
             {isAvailable ? (
@@ -131,7 +143,7 @@ export default function TableCardActions({
                                 </button>
                                 {grandTotal > 0 && (
                                 <button
-                                    onClick={() => { onRequestCheckout(session.id); onNotifyMesaCobrar(table.name, grandTotal); }}
+                                    onClick={handleRequestCheckout}
                                     className="bg-orange-500 hover:bg-orange-400 text-white font-bold text-[11px] sm:text-xs py-2.5 sm:py-2 px-2 rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-1.5"
                                 >
                                     <CreditCard size={13} />

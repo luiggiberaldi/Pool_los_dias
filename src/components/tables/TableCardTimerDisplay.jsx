@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, DollarSign, Play, Pause, Check, Eye } from 'lucide-react';
-import { formatElapsedTime, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateGrandTotalBs, calculateSeatTimeCostBs } from '../../utils/tableBillingEngine';
 import { TargetIcon } from './TargetIcon';
 
 export default function TableCardTimerDisplay({
@@ -144,7 +144,7 @@ export default function TableCardTimerDisplay({
                             </div>
                             {tasaUSD > 0 && (
                                 <span className="text-[10px] font-semibold text-emerald-200/70 leading-tight">
-                                    Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             )}
                         </div>

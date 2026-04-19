@@ -111,7 +111,36 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
         }
     }, [tablesLength]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Check if implied rate is below BCV (would cause payment issues)
+    const hourBsVal = parseFloat(pricePerHourBs) || 0;
+    const hourUsdVal = parseFloat(pricePerHour) || 0;
+    const pinaBsVal = parseFloat(pricePinaBs) || 0;
+    const pinaUsdVal = parseFloat(pricePina) || 0;
+    const hourRateBelow = hourBsVal > 0 && hourUsdVal > 0 && (hourBsVal / hourUsdVal) < bcvRate;
+    const pinaRateBelow = pinaBsVal > 0 && pinaUsdVal > 0 && (pinaBsVal / pinaUsdVal) < bcvRate;
+    const hourBsMissing = hourUsdVal > 0 && hourBsVal <= 0;
+    const pinaBsMissing = pinaUsdVal > 0 && pinaBsVal <= 0;
+    const anyRateBelow = hourRateBelow || pinaRateBelow;
+    const anyBsMissing = hourBsMissing || pinaBsMissing;
+    const hasError = anyRateBelow || anyBsMissing;
+
     const handleSaveConfig = async () => {
+        if (anyBsMissing) {
+            const items = [];
+            if (hourBsMissing) items.push('Hora Libre');
+            if (pinaBsMissing) items.push('La Piña');
+            showToast(`Falta precio en Bs para: ${items.join(', ')}. Coloca el precio en Bolívares.`, 'error');
+            triggerHaptic?.('error');
+            return;
+        }
+        if (anyRateBelow) {
+            const items = [];
+            if (hourRateBelow) items.push(`Hora Libre: ${(hourBsVal / hourUsdVal).toFixed(0)} Bs/$`);
+            if (pinaRateBelow) items.push(`La Piña: ${(pinaBsVal / pinaUsdVal).toFixed(0)} Bs/$`);
+            showToast(`La tasa implícita (${items.join(', ')}) es menor que la ${rateLabel} (${bcvRate.toFixed(0)} Bs/$). Sube el precio en Bs o baja el de USD.`, 'error');
+            triggerHaptic?.('error');
+            return;
+        }
         await updateConfig({
             pricePerHour: parseFloat(pricePerHour) || 0,
             pricePerHourBs: parseFloat(pricePerHourBs) || 0,
@@ -264,15 +293,29 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                             )}
                             {impliedRateHour && (
                                 <span className={`px-1.5 py-0.5 rounded-full ${
-                                    Math.abs(parseFloat(impliedRateHour) - bcvRate) / bcvRate < 0.1
-                                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                        : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                                    hourRateBelow
+                                        ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+                                        : Math.abs(parseFloat(impliedRateHour) - bcvRate) / bcvRate < 0.1
+                                            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                            : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
                                 }`}>
                                     Tasa: {parseFloat(impliedRateHour).toLocaleString('es-VE')} Bs/$
                                     {bcvRate > 0 && <span className="opacity-60"> ({rateLabel}: {bcvRate.toLocaleString('es-VE')})</span>}
                                 </span>
                             )}
                         </div>
+                        {hourRateBelow && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>Tasa menor que {rateLabel} — al cobrar en Bs no cubrirá el monto en USD</span>
+                            </div>
+                        )}
+                        {hourBsMissing && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>Falta precio en Bs — coloca el precio en Bolívares para la Hora Libre</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* La Piña Block */}
@@ -317,13 +360,27 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                         {impliedRatePina && (
                             <div className="mt-2 text-[10px] font-bold">
                                 <span className={`px-1.5 py-0.5 rounded-full ${
-                                    Math.abs(parseFloat(impliedRatePina) - bcvRate) / bcvRate < 0.1
-                                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                        : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                                    pinaRateBelow
+                                        ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'
+                                        : Math.abs(parseFloat(impliedRatePina) - bcvRate) / bcvRate < 0.1
+                                            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                            : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
                                 }`}>
                                     Tasa: {parseFloat(impliedRatePina).toLocaleString('es-VE')} Bs/$
                                     {bcvRate > 0 && <span className="opacity-60"> (BCV: {bcvRate.toLocaleString('es-VE')})</span>}
                                 </span>
+                            </div>
+                        )}
+                        {pinaRateBelow && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>Tasa menor que {rateLabel} — al cobrar en Bs no cubrirá el monto en USD</span>
+                            </div>
+                        )}
+                        {pinaBsMissing && (
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/20 px-2.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>Falta precio en Bs — coloca el precio en Bolívares para La Piña</span>
                             </div>
                         )}
                     </div>
@@ -331,9 +388,13 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
 
                 <button
                     onClick={handleSaveConfig}
-                    className="w-full flex items-center justify-center gap-2 py-3 mt-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-emerald-100 transition-colors active:scale-[0.98]"
+                    className={`w-full flex items-center justify-center gap-2 py-3 mt-4 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors active:scale-[0.98] ${
+                        hasError
+                            ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 hover:bg-rose-100'
+                            : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
+                    }`}
                 >
-                    <Check size={16} /> Guardar Tarifas
+                    {anyBsMissing ? <><AlertTriangle size={16} /> Falta precio en Bs</> : anyRateBelow ? <><AlertTriangle size={16} /> Tasa menor a {rateLabel}</> : <><Check size={16} /> Guardar Tarifas</>}
                 </button>
             </SectionCard>
             </div>

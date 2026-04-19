@@ -43,7 +43,9 @@ export async function processSaleTransaction({
     const remainingUsd = round2(Math.max(0, subR(cartTotalUsd, totalPaidUsd)));
     const changeUsd = round2(Math.max(0, subR(totalPaidUsd, cartTotalUsd)));
 
+    console.log('[checkoutProcessor] cartTotalUsd:', cartTotalUsd, 'totalPaidUsd:', totalPaidUsd, 'remainingUsd:', remainingUsd, 'EPSILON:', EPSILON);
     if (!selectedCustomer && remainingUsd > EPSILON) {
+        console.warn('[checkoutProcessor] FIADO triggered! remainingUsd:', remainingUsd, '> EPSILON:', EPSILON, '| cartTotal:', cartTotalUsd, '- totalPaid:', totalPaidUsd);
         return { success: false, error: 'Se requiere cliente para ventas fiadas' };
     }
 

@@ -534,7 +534,8 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                         const sessionId = tableCheckoutData.session?.id;
                         const tableName = tableCheckoutData.table?.name || 'Mesa';
                         const isSeatPayment = !!tableCheckoutData.seatId;
-                        handleTableCheckout(payments, change, selectedCustomerId, null, splitMeta).then(() => {
+                        handleTableCheckout(payments, change, selectedCustomerId, null, splitMeta).then((res) => {
+                            if (res && res.success === false) return; // checkout failed — don't show success dialog
                             setShowTablePayment(false);
                             // Solo mostrar diálogo liberar/mantener cuando es cobro completo o todos los asientos pagados
                             // Para pagos per-seat parciales, el bill modal se reabre automáticamente via setTableCheckoutData refresh

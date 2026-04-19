@@ -175,6 +175,26 @@ export function formatHoursPaid(hours) {
 }
 
 /**
+ * Calcula el total en Bs de los timeCharges de seats (piñas + horas asignadas a clientes).
+ * Usa la tasa implícita de config para cada tipo (no tasa BCV genérica).
+ */
+export function calculateSeatTimeCostBs(seats, config, tasaBCV) {
+    if (!seats || seats.length === 0) return 0;
+    const unpaid = seats.filter(s => !s.paid);
+    let seatPinaCost = 0;
+    let seatHourCost = 0;
+    for (const s of unpaid) {
+        const tc = s.timeCharges || [];
+        const pinas = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+        const hours = tc.filter(t => t.type === 'hora').reduce((a, t) => a + (Number(t.amount) || 0), 0);
+        seatPinaCost += pinas * (config.pricePina || 0);
+        seatHourCost += hours * (config.pricePerHour || 0);
+    }
+    if (seatPinaCost === 0 && seatHourCost === 0) return 0;
+    return calculateTimeCostBsBreakdown(round2(seatPinaCost), round2(seatHourCost), config, tasaBCV).totalBs;
+}
+
+/**
  * Calcula el costo de timeCharges individuales de un seat.
  * timeCharges: [{ type: 'hora'|'pina', amount: number }]
  */

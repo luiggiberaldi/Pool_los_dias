@@ -3,8 +3,10 @@ import { CreditCard, Clock, X, ChevronRight, Coffee, Timer, MessageSquare } from
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { useCashStore } from '../../hooks/store/cashStore';
+import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs, calculateSeatTimeCostBs } from '../../utils/tableBillingEngine';
 import { round2 } from '../../utils/dinero';
+import { showToast } from '../Toast';
 
 /**
  * Panel shown in SalesView (cashier) listing all tables that have requested checkout.
@@ -14,6 +16,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const { tables, activeSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
     const { orders, orderItems, subscribeToRealtime: subscribeOrders } = useOrdersStore();
     const config = useTablesStore(s => s.config);
+    const activeCashSession = useCashStore(s => s.activeCashSession);
     const paidHoursOffsets = useTablesStore(s => s.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(s => s.paidRoundsOffsets);
     const cachedUsers = useAuthStore(s => s.cachedUsers);
@@ -76,7 +79,10 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     return (
                         <button
                             key={session.id}
-                            onClick={() => onCheckoutTable({ table, session, elapsed, timeCost, totalConsumption, currentItems: items, grandTotal, frozenDivisor: (session?.seats || []).filter(s => !s.paid).length || null })}
+                            onClick={() => {
+                                if (!activeCashSession) { showToast('Abre la caja primero para poder cobrar', 'error'); return; }
+                                onCheckoutTable({ table, session, elapsed, timeCost, totalConsumption, currentItems: items, grandTotal, frozenDivisor: (session?.seats || []).filter(s => !s.paid).length || null });
+                            }}
                             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-orange-100/70 dark:hover:bg-orange-900/20 active:scale-[0.99] transition-all text-left"
                         >
                             {/* Table name badge */}
@@ -110,7 +116,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                             {/* Total */}
                             <div className="text-right shrink-0">
                                 <p className="font-black text-orange-600 dark:text-orange-400 text-base">${grandTotal.toFixed(2)}</p>
-                                <p className="text-[10px] text-slate-400">Bs {calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, tasaUSD).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-[10px] text-slate-400">Bs {(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, tasaUSD) + calculateSeatTimeCostBs(session.seats, config, tasaUSD)).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
                             </div>
 
                             <ChevronRight size={18} className="text-orange-400 shrink-0" />

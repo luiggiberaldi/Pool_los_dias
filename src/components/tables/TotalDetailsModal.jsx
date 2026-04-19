@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSeatTimeCostBs } from '../../utils/tableBillingEngine';
 import { Modal } from '../Modal';
 
 export function TotalDetailsModal({
@@ -62,7 +62,7 @@ export function TotalDetailsModal({
                         <div className="flex flex-col items-end">
                             <span className="text-lg font-black">${(seatHours * (config.pricePerHour || 0)).toFixed(2)}</span>
                             <span className="text-xs font-medium text-slate-400">
-                                Bs. {(seatHours * (config.pricePerHour || 0) * tasaUSD).toFixed(2)}
+                                Bs. {calculateTimeCostBsBreakdown(0, seatHours * (config.pricePerHour || 0), config, tasaUSD).hourCostBs.toFixed(2)}
                             </span>
                         </div>
                     </div>
@@ -125,7 +125,7 @@ export function TotalDetailsModal({
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + (seatTimeCost * tasaUSD)).toFixed(2)}
+                            Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toFixed(2)}
                         </span>
                     </div>
                 </div>
