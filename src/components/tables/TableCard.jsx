@@ -47,7 +47,7 @@ export default function TableCard({ table, session }) {
     const { currentUser } = useAuthStore();
     const staffName = useStaffName(session?.opened_by);
     const confirm = useConfirm();
-    const { notifyMesaCobrar, notifyTiempoExcedido, notifyMesaPagadaOciosa } = useNotifications();
+    const { notifyMesaCobrar } = useNotifications();
 
     const isAvailable = !session || session.status === 'CLOSED';
     const isPlaying = session && (session.status === 'ACTIVE' || session.status === 'CHECKOUT');
@@ -470,36 +470,9 @@ export default function TableCard({ table, session }) {
     const remainingMins = hasLimit ? (effectiveHours * 60) - effectiveElapsed : 0;
     const isExceeded = hasLimit && remainingMins < 0;
 
-    // Notification when prepaid time is exceeded (fires once per session)
-    const exceededNotifiedRef = useRef(false);
-    useEffect(() => {
-        if (isExceeded && !exceededNotifiedRef.current) {
-            exceededNotifiedRef.current = true;
-            notifyTiempoExcedido(table.name);
-            showToast(`⏰ ${table.name} — Tiempo agotado. Agregar más tiempo o cobrar.`, 'warning', 8000);
-        }
-        if (!isExceeded) {
-            exceededNotifiedRef.current = false;
-        }
-    }, [isExceeded, table.name, notifyTiempoExcedido]);
-
-    // Alerta: mesa pagada sin actividad por 15+ minutos
-    const paidIdleNotifiedRef = useRef(false);
-    useEffect(() => {
-        if (isPaidIdle && session?.paid_at) {
-            const paidTime = new Date(session.paid_at);
-            const msSincePaid = Date.now() - paidTime.getTime();
-            const minsSincePaid = msSincePaid / 60000;
-            if (minsSincePaid >= 15 && !paidIdleNotifiedRef.current) {
-                paidIdleNotifiedRef.current = true;
-                notifyMesaPagadaOciosa(table.name);
-                showToast(`${table.name} lleva 15+ min pagada sin actividad`, 'warning', 8000);
-            }
-        }
-        if (!isPaidIdle) {
-            paidIdleNotifiedRef.current = false;
-        }
-    }, [isPaidIdle, elapsed, session?.paid_at, table.name, notifyMesaPagadaOciosa]);
+    // Notifications for tiempo agotado and mesa pagada ociosa are handled
+    // globally by useGlobalTableAlerts (App.jsx) to avoid duplicates and
+    // ensure ALL devices receive them via Supabase broadcast.
 
     return (
         <>

@@ -38,6 +38,7 @@ import { useCloudSync } from './hooks/useCloudSync';
 import { useConfirm } from './hooks/useConfirm.jsx';
 import { useAppInit } from './hooks/useAppInit';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
+import { useGlobalTableAlerts } from './hooks/useGlobalTableAlerts';
 
 // Nombre del negocio fijo para todos los dispositivos (module-level, runs once on import)
 if (!localStorage.getItem('business_name')) {
@@ -69,6 +70,7 @@ export default function App() {
   const { isOnline, cacheRates } = useOfflineQueue();
   useAutoBackup(false, false, deviceId);
   useAutoLock(); // Auto-lock for ADMINs
+  useGlobalTableAlerts(); // Global timer alerts across all views + broadcast to all devices
 
   // Purge old audit log entries on startup
   useEffect(() => { purgeOldEntries(); }, []);
