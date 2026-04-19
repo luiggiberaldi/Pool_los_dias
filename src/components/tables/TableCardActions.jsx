@@ -93,15 +93,13 @@ export default function TableCardActions({
                                     <TargetIcon size={10} /> + Piña
                                 </button>
                             )}
-                            {/* Agregar Hora a sesión que no tiene horas O después de pago */}
-                            {(!hasHoursActive || isPaid) && (
-                                <button
-                                    onClick={onAddHoursModal}
-                                    className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
-                                >
-                                    <Clock size={10} /> + Hora
-                                </button>
-                            )}
+                            {/* Agregar/Quitar Hora */}
+                            <button
+                                onClick={onAddHoursModal}
+                                className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] py-2 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-1"
+                            >
+                                <Clock size={10} /> Hora
+                            </button>
                         </div>
                     )}
 

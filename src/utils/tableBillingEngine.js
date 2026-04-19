@@ -237,7 +237,7 @@ export function calculateSeatCostBreakdown(seat, elapsedMinutes, config) {
  * sharedDivision: { type: 'equal' } | { type: 'custom', amounts: { [seatId]: number } }
  * isTimeFree: si true, no cobra tiempo de sesión (mesas tipo NORMAL/BAR).
  */
-export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = [], sharedDivision = null, frozenDivisor = null, isTimeFree = false) {
+export function calculateFullTableBreakdown(session, seats, elapsedMinutes, config, orderItems = [], sharedDivision = null, frozenDivisor = null, isTimeFree = false, hoursOffset = 0, roundsOffset = 0) {
     if (!seats || seats.length === 0) return null;
 
     const activeSeats = seats.filter(s => !s.paid);
@@ -254,8 +254,8 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
             config,
             session.hours_paid || 0,
             session.extended_times || 0,
-            0, // hoursOffset
-            0, // roundsOffset
+            hoursOffset,
+            roundsOffset,
             seats // pass seats so isLibre check considers seat-level hours
         );
     const sharedTimeTotal = sessionTimeCost.total;

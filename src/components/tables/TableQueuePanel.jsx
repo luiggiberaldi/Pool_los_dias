@@ -4,6 +4,7 @@ import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs } from '../../utils/tableBillingEngine';
+import { round2 } from '../../utils/dinero';
 
 /**
  * Panel shown in SalesView (cashier) listing all tables that have requested checkout.
@@ -66,7 +67,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                         const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
                         return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
                     }, 0);
-                    const grandTotal = timeCost + seatTimeCost + totalConsumption;
+                    const grandTotal = round2(timeCost + seatTimeCost + totalConsumption);
                     const mesero = session.opened_by && cachedUsers?.length
                         ? cachedUsers.find(u => u.id === session.opened_by)
                         : null;

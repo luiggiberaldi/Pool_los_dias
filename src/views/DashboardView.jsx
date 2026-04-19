@@ -36,7 +36,7 @@ import Skeleton from '../components/Skeleton';
 
 const SALES_KEY = 'bodega_sales_v1';
 
-export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft }) {
+export default function DashboardView({ rates, triggerHaptic, onNavigate, theme, toggleTheme, isActive, isDemo, demoTimeLeft, onLogoClick }) {
     const { notifyCierrePendiente, requestPermission } = useNotifications();
     const { deviceId } = useSecurity();
     const { currentUser: usuarioActivo, role, logout: authLogout } = useAuthStore();
@@ -329,10 +329,10 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                     })()}
                 </div>
                 <div className="hidden sm:flex absolute z-0 pointer-events-none inset-x-0 top-2 justify-center">
-                    <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '139px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
+                    <img src="/logo.png" alt="Pool Los Diaz" onClick={onLogoClick} style={{ height: '139px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
                 </div>
                 <div className="flex sm:hidden absolute z-0 pointer-events-none inset-x-0 top-1 justify-center">
-                    <img src="/logo.png" alt="Pool Los Diaz" style={{ height: '105px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
+                    <img src="/logo.png" alt="Pool Los Diaz" onClick={onLogoClick} style={{ height: '105px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
                 </div>
                 <div className="flex items-center justify-end gap-2 z-20">
                     {/* Bell notification icon */}

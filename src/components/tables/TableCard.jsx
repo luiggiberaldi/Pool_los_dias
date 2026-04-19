@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Printer, X, Users, UserCheck, Lock, MessageSquare } from 'lucide-react';
 import { calculateElapsedTime, calculateSessionCost, calculateSessionCostBreakdown } from '../../utils/tableBillingEngine';
+import { round2 } from '../../utils/dinero';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
@@ -454,7 +455,7 @@ export default function TableCard({ table, session }) {
         const p = tc.filter(t => t.type === 'pina').reduce((a, t) => a + (Number(t.amount) || 0), 0);
         return sum + (h * (config.pricePerHour || 0)) + (p * (config.pricePina || 0));
     }, 0) : 0;
-    const grandTotal = timeCost + seatTimeCost + totalConsumption;
+    const grandTotal = round2(timeCost + seatTimeCost + totalConsumption);
     // Mesa pagada sin cerrar y sin cargos nuevos agregados (ni tiempo ni consumo)
     const isPaidIdle = isPlaying && !!session?.paid_at && grandTotal === 0;
     const seatHoursTotal = (session?.seats || []).reduce((sum, s) =>
@@ -650,7 +651,7 @@ export default function TableCard({ table, session }) {
                 onShowOrderPanel={() => setShowOrderPanel(true)}
                 onRequestCheckout={requestCheckout}
                 onNotifyMesaCobrar={notifyMesaCobrar}
-                onAddHoursModal={() => setShowAddHoursModal(true)}
+                onAddHoursModal={() => setShowAdjustModal(true)}
                 onCancelCheckout={cancelCheckoutRequest}
                 onCloseSession={closeSession}
                 requestAttribution={requestAttribution}
@@ -688,10 +689,6 @@ export default function TableCard({ table, session }) {
             setAdjustMins={setAdjustMins}
             submitAdjustTime={submitAdjustTime}
             requestAttribution={requestAttribution}
-            addHoursToSession={addHoursToSession}
-            // Add hours modal
-            showAddHoursModal={showAddHoursModal}
-            setShowAddHoursModal={setShowAddHoursModal}
             // Piña confirm modal
             showPinaConfirm={showPinaConfirm}
             setShowPinaConfirm={setShowPinaConfirm}

@@ -73,6 +73,7 @@ export const useOrdersStore = create((set, get) => ({
     orderItems: [], // Todos los items pertenecientes a órdenes abiertas
     loading: true,
     realtimeChannel: null,
+    _subscribing: false,
 
     init: async () => {
         set({ loading: true });
@@ -90,9 +91,13 @@ export const useOrdersStore = create((set, get) => ({
     },
 
     subscribeToRealtime: () => {
-        if (get().realtimeChannel) return;
+        // Guard: tanto síncrono (realtimeChannel) como flag de pending para evitar race condition
+        if (get().realtimeChannel || get()._subscribing) return;
+        set({ _subscribing: true });
 
         let syncTimeout;
+        let retryCount = 0;
+        const MAX_RETRIES = 3;
         const debouncedSync = () => {
             clearTimeout(syncTimeout);
             syncTimeout = setTimeout(() => get().syncOrders(), 300);
@@ -100,30 +105,49 @@ export const useOrdersStore = create((set, get) => ({
 
         // Broadcast P2P: escucha notificaciones de otros dispositivos (0 WAL egress)
         getAuthUserId().then(userId => {
-            if (!userId) return;
+            if (!userId) { set({ _subscribing: false }); return; }
+            // Si mientras esperábamos ya se creó un canal, abortar
+            if (get().realtimeChannel) { set({ _subscribing: false }); return; }
+
             const channel = _getOrdersBroadcastChannel(userId)
                 .on('broadcast', { event: 'orders_changed' }, () => {
                     console.log("[REALTIME] orders broadcast received");
+                    retryCount = 0;
                     debouncedSync();
                 })
                 .subscribe((status) => {
                     console.log("[REALTIME] status orders_broadcast:", status);
+                    if (status === 'SUBSCRIBED') {
+                        retryCount = 0;
+                    }
                     if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        console.warn('[REALTIME] Error en canal orders — reintentando en 5s');
+                        retryCount++;
+                        if (retryCount > MAX_RETRIES) {
+                            console.warn(`[REALTIME] Canal orders: ${MAX_RETRIES} reintentos agotados, funcionando sin realtime`);
+                            return;
+                        }
+                        const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 30000);
+                        console.warn(`[REALTIME] Error en canal orders — reintentando en ${delay / 1000}s (intento ${retryCount}/${MAX_RETRIES})`);
                         setTimeout(() => {
                             get().unsubscribeFromRealtime();
                             get().subscribeToRealtime();
-                        }, 5000);
+                        }, delay);
                     }
                 });
-            set({ realtimeChannel: channel });
-        });
+            set({ realtimeChannel: channel, _subscribing: false });
+        }).catch(() => set({ _subscribing: false }));
     },
 
     unsubscribeFromRealtime: () => {
         if (get().realtimeChannel) {
             supabaseCloud.removeChannel(get().realtimeChannel);
             set({ realtimeChannel: null });
+        }
+        // Forzar recreación del canal broadcast en el próximo subscribe
+        if (ordersBroadcastChannel) {
+            try { ordersBroadcastChannel.unsubscribe(); } catch (_) {}
+            ordersBroadcastChannel = null;
+            ordersBroadcastUserId = null;
         }
     },
 

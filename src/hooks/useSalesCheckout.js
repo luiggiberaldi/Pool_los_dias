@@ -1,12 +1,14 @@
 import { useCallback } from 'react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
-import { round2, divR } from '../utils/dinero';
+import { round2, divR, sumR } from '../utils/dinero';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
 import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../utils/tableBillingEngine';
+
+const EPSILON = 0.01;
 
 export function useSalesCheckout({
     cart, cartTotalUsd, cartTotalBs, cartSubtotalUsd,
@@ -133,7 +135,7 @@ export function useSalesCheckout({
             // Shared portion
             const frozenDivisor = tableCheckoutData.frozenDivisor || null;
             const isTimeFree = tableCheckoutData.table?.type === 'NORMAL';
-            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFree);
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFree, hoursOff, roundsOff);
             if (fullBreakdown) {
                 const seatBd = fullBreakdown.seats.find(s => s.seat.id === seatId);
                 if (seatBd && seatBd.sharedPortion > 0) {
@@ -149,7 +151,7 @@ export function useSalesCheckout({
             // ═══ COBRAR TODO CON CUANTAS DIVIDIDAS ═══
             const frozenDivisor = tableCheckoutData.frozenDivisor || null;
             const isTimeFreeAll = tableCheckoutData.table?.type === 'NORMAL';
-            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFreeAll);
+            const fullBreakdown = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, frozenDivisor, isTimeFreeAll, hoursOff, roundsOff);
             if (fullBreakdown) {
                 const unpaidSeatBds = fullBreakdown.seats.filter(sb => !sb.seat.paid);
                 const divisorLabel = unpaidSeatBds.length;
@@ -224,7 +226,19 @@ export function useSalesCheckout({
         // Recalculate totals from actual cart items (defense against stale snapshot)
         const recalcCartTotal = round2(syntheticCart.reduce((sum, item) => sum + round2((item.priceUsd || 0) * (item.qty || 1)), 0));
         const discountAmt = tableCheckoutData.discountData?.active ? round2(tableCheckoutData.discountData.amountUsd || 0) : 0;
-        const effectiveCartTotal = round2(Math.max(0, recalcCartTotal - discountAmt));
+        let effectiveCartTotal = round2(Math.max(0, recalcCartTotal - discountAmt));
+
+        // Guard: the total shown in CheckoutModal (tableCheckoutData.grandTotal) and the
+        // recalculated total from the synthetic cart can diverge due to rounding across
+        // different calculation paths (TableQueuePanel sums raw floats, synthetic cart
+        // rounds each item).  The user paid exactly what was shown, so if their payment
+        // covers the shown total we must honor it — never trigger a false fiado.
+        const _totalPaidCheck = sumR(payments.map(p => p.amountUsd));
+        const _shownTotal = round2(tableCheckoutData.grandTotal || 0);
+        if (effectiveCartTotal > _totalPaidCheck && _totalPaidCheck >= _shownTotal - EPSILON) {
+            // User paid what was shown — snap to paid amount
+            effectiveCartTotal = round2(_totalPaidCheck);
+        }
 
         const opts = {
             cart: syntheticCart,
@@ -233,7 +247,7 @@ export function useSalesCheckout({
                 const cfg = useTablesStore.getState().config;
                 if (seats.length > 0) {
                     const itf = tableCheckoutData.table?.type === 'NORMAL';
-                    const fb = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, cfg, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, itf);
+                    const fb = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, cfg, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, itf, hoursOff, roundsOff);
                     return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate)) : round2(effectiveCartTotal * effectiveRate);
                 }
                 // Recalculate fresh time cost with offsets for Bs calculation

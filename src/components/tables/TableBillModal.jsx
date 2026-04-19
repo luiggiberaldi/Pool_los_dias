@@ -74,12 +74,12 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
         ? { type: 'equal' }
         : { type: 'custom', amounts: customSharedAmounts };
     const isTimeFree = table.type === 'NORMAL';
-    const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, sharedDivision, frozenActiveCount, isTimeFree) : null;
+    const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
+    const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
+    const seatBreakdown = hasSeats ? calculateFullTableBreakdown(session, seats, elapsed, config, currentItems, sharedDivision, frozenActiveCount, isTimeFree, hoursOffset, roundsOffset) : null;
     // H: Bloquear cobro si división manual no suma correctamente
     const customDivisionMismatch = seatBreakdown && sharedDivisionType === 'custom' &&
         Math.abs(Object.values(customSharedAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0) - seatBreakdown.sharedTotal) >= 0.01;
-    const hoursOffset = session ? (paidHoursOffsets[session.id] || 0) : 0;
-    const roundsOffset = session ? (paidRoundsOffsets[session.id] || 0) : 0;
     const zeroBreakdown = { pinaCost: 0, hourCost: 0, libreCost: 0, hasPinas: false, hasHours: false, isLibre: false, total: 0 };
     const breakdown = isTimeFree ? zeroBreakdown : calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, hoursOffset, roundsOffset);
     // Full breakdown (sin offsets) para mostrar totales completos

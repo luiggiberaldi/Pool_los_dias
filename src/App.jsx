@@ -13,6 +13,7 @@ import CashierCheckoutView from './views/CashierCheckoutView';
 const CustomersView = lazy(() => import('./views/CustomersView'));
 const ReportsView = lazy(() => import('./views/ReportsView'));
 const TesterView = lazy(() => import('./views/TesterView').then(m => ({ default: m.TesterView })));
+const TableFlowTesterView = lazy(() => import('./views/TableFlowTesterView').then(m => ({ default: m.TableFlowTesterView })));
 
 import { useRates } from './hooks/useRates';
 import { useSecurity } from './hooks/useSecurity';
@@ -56,9 +57,10 @@ export default function App() {
   const { installPrompt, showIOSInstall, setShowIOSInstall, showIOSButton, handleInstall, dismissIOSInstall } = useInstallPrompt();
 
   // Admin Panel States
-  const [adminClicks, setAdminClicks] = useState(0);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showTester, setShowTester] = useState(false);
+  const [showTableTester, setShowTableTester] = useState(false);
+  const adminClicksRef = useRef({ count: 0, lastTime: 0 });
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
@@ -104,19 +106,20 @@ export default function App() {
     }
   };
 
-  // Admin Panel Logic (Hidden — 10 clicks on top-left corner)
+  // Admin Panel Logic (Hidden — 10 clicks on logo in Dashboard)
   const handleLogoClick = () => {
     const now = Date.now();
-    if (window.lastClickTime && (now - window.lastClickTime > 1000)) {
-      setAdminClicks(1);
+    const ref = adminClicksRef.current;
+    if (now - ref.lastTime > 3000) {
+      ref.count = 1;
     } else {
-      setAdminClicks(prev => prev + 1);
+      ref.count += 1;
     }
-    window.lastClickTime = now;
+    ref.lastTime = now;
 
-    if (adminClicks + 1 >= 10) {
+    if (ref.count >= 10) {
+      ref.count = 0;
       setShowAdminPanel(true);
-      setAdminClicks(0);
       triggerHaptic();
     }
   };
@@ -265,16 +268,20 @@ export default function App() {
         </Suspense>
       )}
 
+      {showTableTester && (
+        <Suspense fallback={<div className="fixed inset-0 z-[150] bg-slate-950 flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-sky-500 border-t-transparent animate-spin" /></div>}>
+          <div className="fixed inset-0 z-[150] bg-slate-950 overflow-y-auto">
+            <TableFlowTesterView onBack={() => setShowTableTester(false)} />
+          </div>
+        </Suspense>
+      )}
+
 
       <CartProvider>
       <ProductProvider rates={rates}>
         <main className={`flex-1 min-h-0 w-full max-w-md sm:max-w-xl md:max-w-3xl lg:max-w-5xl xl:max-w-7xl 2xl:max-w-none px-2 sm:px-4 lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
 
-          {/* Hidden Admin Trigger Area */}
-        <div
-          className="absolute top-0 left-0 w-20 h-20 z-50 cursor-pointer opacity-0"
-          onClick={handleLogoClick}
-        ></div>
+          {/* Admin panel trigger moved to DashboardView logo */}
 
         {/* Eager views — always mounted, visibility toggled via CSS */}
         <div className={`flex-1 min-h-0 flex flex-col ${effectiveTab === 'ventas' ? '' : 'hidden'}`}>
@@ -296,7 +303,7 @@ export default function App() {
         <div className={`flex-1 flex flex-col ${effectiveTab === 'inicio' ? '' : 'hidden'}`}>
           <ErrorBoundary>
             <AnyStaffRoute>
-              <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={effectiveTab === 'inicio'} />
+              <DashboardView rates={rates} triggerHaptic={triggerHaptic} onNavigate={setActiveTab} theme={theme} toggleTheme={toggleTheme} isActive={effectiveTab === 'inicio'} onLogoClick={handleLogoClick} />
             </AnyStaffRoute>
           </ErrorBoundary>
         </div>
@@ -441,6 +448,12 @@ export default function App() {
               className="w-full bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold py-3 rounded-lg text-sm uppercase tracking-wider transition-colors"
             >
               🚀 Abrir Tester
+            </button>
+            <button
+              onClick={() => { triggerHaptic(); setShowTableTester(true); setShowAdminPanel(false); }}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-sm uppercase tracking-wider transition-colors mt-2"
+            >
+              🎱 Tester de Mesas
             </button>
           </div>
         </div>

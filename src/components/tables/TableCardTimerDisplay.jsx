@@ -62,11 +62,6 @@ export default function TableCardTimerDisplay({
                                         <div className={`text-2xl sm:text-3xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
                                             {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                         </div>
-                                        {hasLimit && !isLockedForMe && (
-                                            <button onClick={onAdjustTime} className="p-1 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95">
-                                                <span className="text-base font-black leading-none">+</span>
-                                            </button>
-                                        )}
                                         {!isLockedForMe && (
                                             <button
                                                 onClick={isPaused ? onResumeTimer : onPauseTimer}
@@ -116,15 +111,6 @@ export default function TableCardTimerDisplay({
                                         <div className={`text-3xl sm:text-4xl font-black tabular-nums tracking-tighter drop-shadow-md leading-none ${isExceeded ? 'text-rose-400 animate-pulse' : ''}`}>
                                             {hasLimit ? formatElapsedTime(Math.max(0, remainingMins)) : formatElapsedTime(elapsed)}
                                         </div>
-                                        {(hasLimit || session?.game_mode === 'PINA') && !isLockedForMe && (
-                                        <button
-                                            onClick={onAdjustTime}
-                                            className="p-1.5 text-white/60 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all active:scale-95"
-                                            title="Ampliar tiempo"
-                                        >
-                                            <span className="text-lg font-black leading-none">+</span>
-                                        </button>
-                                        )}
                                         {session?.game_mode !== 'PINA' && !isLockedForMe && (
                                         <button
                                             onClick={isPaused ? onResumeTimer : onPauseTimer}

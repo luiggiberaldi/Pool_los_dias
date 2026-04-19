@@ -129,18 +129,30 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
             set({ paidRoundsOffsets: { ...get().paidRoundsOffsets, [sessionId]: currentRounds } });
         }
 
+        // Limpiar timeCharges de seats para evitar doble cobro al re-cobrar
+        const clearedSeats = (session.seats || []).length > 0
+            ? session.seats.map(s => ({ ...s, timeCharges: [] }))
+            : null;
+
+        const updatePayload = { status: 'ACTIVE', paid_at: paidAt };
+        if (clearedSeats) updatePayload.seats = clearedSeats;
+
         const newSessions = get().activeSessions.map(s =>
-            s.id === sessionId ? { ...s, status: 'ACTIVE', paid_at: paidAt } : s
+            s.id === sessionId ? { ...s, ...updatePayload } : s
         );
         set({ activeSessions: newSessions });
         await tablesCache.setItem(scopedKey('active_sessions'), newSessions);
 
         try {
-            const { error } = await supabaseCloud.from('table_sessions').update({ status: 'ACTIVE' }).eq('id', sessionId);
+            const dbPayload = { status: 'ACTIVE' };
+            if (clearedSeats) dbPayload.seats = clearedSeats;
+            const { error } = await supabaseCloud.from('table_sessions').update(dbPayload).eq('id', sessionId);
             if (error) throw error;
             get().syncTablesAndSessions();
         } catch (e) {
-            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: { status: 'ACTIVE' } });
+            const pendingPayload = { status: 'ACTIVE' };
+            if (clearedSeats) pendingPayload.seats = clearedSeats;
+            await get().addPendingAction({ type: 'UPDATE_SESSION', sessionId, payload: pendingPayload });
         }
 
         get().realtimeChannel?.send({
@@ -152,7 +164,8 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
                 hoursOffset: currentHours,
                 elapsedAtPayment,
                 roundsOffset: hasPinas ? (session.game_mode === 'PINA' ? 1 + (Number(session.extended_times) || 0) : Number(session.extended_times) || 0) : 0,
-                hasPinas
+                hasPinas,
+                clearedSeats: clearedSeats || null
             }
         });
     },

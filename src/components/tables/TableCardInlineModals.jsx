@@ -20,9 +20,7 @@ export default function TableCardInlineModals({
     showCancelModal, setShowCancelModal, handleCancelTable,
     // Adjust modal
     showAdjustModal, setShowAdjustModal, adjustMins, setAdjustMins, submitAdjustTime,
-    requestAttribution, addHoursToSession,
-    // Add hours modal
-    showAddHoursModal, setShowAddHoursModal,
+    requestAttribution,
     // Piña confirm modal
     showPinaConfirm, setShowPinaConfirm, handleStartPina,
     // Open wizard
@@ -122,7 +120,7 @@ export default function TableCardInlineModals({
         />
 
         {/* Modal Modificar Tiempo / Partidas */}
-        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={isMixedMode ? "Agregar Tiempo" : hasPinas && !hasHoursActive ? "Añadir Piñas" : "Modificar Tiempo"}>
+        <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title="Ajustar Tiempo">
             <div className="flex flex-col gap-4 py-2">
                 {/* Sección Piñas — solo visible en modo PINA puro */}
                 {(hasPinas && !isMixedMode) && (
@@ -145,98 +143,37 @@ export default function TableCardInlineModals({
                     </button>
                 )}
 
-                {/* Sección Tiempo — visible si tiene horas (mixto o prepago) */}
-                {hasHoursActive && hasLimit && (
-                    <div className="flex flex-col gap-2">
-                        {!isMixedMode && (
-                            <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                                Esta mesa tiene un prepago. Puede ajustar el tiempo:
-                            </p>
-                        )}
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar</span>
-                        <div className="grid grid-cols-2 gap-2">
-                            {[0.5, 1, 2, 3].map(h => (
-                                <button key={h} disabled={isProcessingCharge} onClick={async () => {
-                                    const seats = session?.seats || [];
-                                    const activeSeats = seats.filter(s => !s.paid);
-                                    if (activeSeats.length > 0) {
-                                        setShowAdjustModal(false);
-                                        requestAttribution({ type: 'hora', hoursValue: h });
-                                    } else {
-                                        await useTablesStore.getState().addHoursToSession(session.id, h);
-                                        setShowAdjustModal(false);
-                                    }
-                                }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl disabled:opacity-50 disabled:pointer-events-none">
-                                    + {h === 0.5 ? '30 Min' : h === 1 ? '1 Hora' : `${h} Horas`}
-                                </button>
-                            ))}
-                        </div>
-                        {(currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO') && (
-                            <>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('30 min restados', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
-                                    <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('1h restada', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Solo piña puro sin horas y no mixto */}
-                {!hasPinas && !hasHoursActive && !hasLimit && (
-                    <>
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                            Ajuste manual para compensar tiempo si faltó la luz.
-                            Use números negativos para restar tiempo transcurrido (ej: -15 reducen el tiempo jugado).
-                        </p>
-                        <input
-                            type="number"
-                            placeholder="Minutos (ej: -15)"
-                            value={adjustMins}
-                            onChange={e => setAdjustMins(e.target.value)}
-                            className="w-full text-center text-xl font-bold bg-slate-100 dark:bg-slate-800 dark:text-white rounded-xl py-3 border-none ring-2 ring-transparent focus:ring-sky-500/50"
-                        />
-                        <button
-                            onClick={submitAdjustTime}
-                            className="w-full bg-slate-900 dark:bg-sky-500 hover:bg-slate-800 dark:hover:bg-sky-400 text-white font-bold py-3.5 rounded-xl shadow-md"
-                        >
-                            Confirmar Ajuste
-                        </button>
-                    </>
-                )}
-            </div>
-        </Modal>
-
-        {/* Modal: Agregar Hora a sesión activa (modo mixto) */}
-        <Modal isOpen={showAddHoursModal} onClose={() => setShowAddHoursModal(false)} title="Agregar Tiempo">
-            <div className="flex flex-col gap-3 py-2">
-                <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    Agregar tiempo prepago a esta mesa. El costo se sumará al total de la cuenta.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                    {[0.5, 1, 2, 3, 4].map(h => (
-                        <button
-                            key={h}
-                            disabled={isProcessingCharge}
-                            onClick={async () => {
-                                setShowAddHoursModal(false);
+                {/* Sección Agregar Tiempo — siempre visible */}
+                <div className="flex flex-col gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Agregar Tiempo</span>
+                    <div className="grid grid-cols-2 gap-2">
+                        {[0.5, 1, 2, 3].map(h => (
+                            <button key={h} disabled={isProcessingCharge} onClick={async () => {
                                 const seats = session?.seats || [];
                                 const activeSeats = seats.filter(s => !s.paid);
                                 if (activeSeats.length > 0) {
+                                    setShowAdjustModal(false);
                                     requestAttribution({ type: 'hora', hoursValue: h });
                                 } else {
-                                    await addHoursToSession(session?.id, h);
+                                    await useTablesStore.getState().addHoursToSession(session.id, h);
+                                    setShowAdjustModal(false);
                                     const { showToast } = await import('../Toast');
                                     showToast(`${h === 0.5 ? '30 min' : h + 'h'} agregadas`, 'success');
                                 }
-                            }}
-                            className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 p-3 rounded-xl font-black transition-colors flex flex-col items-center justify-center"
-                        >
-                            <span className="text-xl">{h === 0.5 ? '30' : h}</span>
-                            <span className="text-[10px] font-semibold opacity-70">{h === 0.5 ? 'MIN' : h === 1 ? 'HORA' : 'HORAS'}</span>
-                        </button>
-                    ))}
+                            }} className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 font-bold py-3 rounded-xl disabled:opacity-50 disabled:pointer-events-none">
+                                + {h === 0.5 ? '30 Min' : h === 1 ? '1 Hora' : `${h} Horas`}
+                            </button>
+                        ))}
+                    </div>
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO') && (
+                        <>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Restar</span>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -0.5); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('30 min restados', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 30 Min</button>
+                                <button onClick={async () => { await useTablesStore.getState().addHoursToSession(session.id, -1); setShowAdjustModal(false); const { showToast } = await import('../Toast'); showToast('1h restada', 'success'); }} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold py-3 rounded-xl">− 1 Hora</button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </Modal>

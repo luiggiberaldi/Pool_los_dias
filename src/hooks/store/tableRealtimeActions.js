@@ -53,7 +53,7 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
             .on('broadcast', { event: 'table_payment_reset' }, async ({ payload }) => {
                 console.log("[REALTIME] broadcast table_payment_reset:", payload);
                 if (!payload?.sessionId) return;
-                const { sessionId, paidAt, hoursOffset, elapsedAtPayment, roundsOffset, hasPinas } = payload;
+                const { sessionId, paidAt, hoursOffset, elapsedAtPayment, roundsOffset, hasPinas, clearedSeats } = payload;
 
                 const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
                 paidCache[sessionId] = paidAt;
@@ -80,7 +80,7 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
 
                 set(state => ({
                     activeSessions: state.activeSessions.map(s =>
-                        s.id === sessionId ? { ...s, paid_at: paidAt, status: 'ACTIVE' } : s
+                        s.id === sessionId ? { ...s, paid_at: paidAt, status: 'ACTIVE', ...(clearedSeats ? { seats: clearedSeats } : {}) } : s
                     )
                 }));
             })
