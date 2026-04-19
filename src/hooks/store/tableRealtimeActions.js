@@ -151,6 +151,23 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
                     )
                 }));
             })
+            .on('broadcast', { event: 'table_elapsed_reset' }, async ({ payload }) => {
+                console.log("[REALTIME] broadcast table_elapsed_reset:", payload);
+                if (!payload?.sessionId) return;
+                const { sessionId, elapsedOffset, hoursOffset } = payload;
+
+                const elapsedCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+                elapsedCache[sessionId] = elapsedOffset;
+                await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedCache);
+                set(state => ({ paidElapsedOffsets: { ...state.paidElapsedOffsets, [sessionId]: elapsedOffset } }));
+
+                if (hoursOffset != null) {
+                    const offsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+                    offsetCache[sessionId] = hoursOffset;
+                    await tablesCache.setItem(scopedKey('paid_hours_offsets'), offsetCache);
+                    set(state => ({ paidHoursOffsets: { ...state.paidHoursOffsets, [sessionId]: hoursOffset } }));
+                }
+            })
             .on('broadcast', { event: 'table_offsets_clear' }, async ({ payload }) => {
                 console.log("[REALTIME] broadcast table_offsets_clear:", payload);
                 if (!payload?.sessionId) return;

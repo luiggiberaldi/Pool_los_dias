@@ -9,6 +9,43 @@ export const createBillingActions = (set, get, tablesCache, scopedKey) => ({
         const session = get().activeSessions.find(s => s.id === sessionId);
         if (!session) return;
 
+        // Fix: si el tiempo prepagado ya expiró, ajustar el elapsedOffset
+        // para que la nueva hora arranque completa desde este momento.
+        if (additionalHours > 0 && session.started_at) {
+            const nowElapsed = Math.max(0, Math.floor((Date.now() - new Date(session.started_at).getTime()) / 60000));
+            const currentElapsedOffset = (get().paidElapsedOffsets || {})[sessionId] || 0;
+            const effectiveElapsed = currentElapsedOffset > 0 ? Math.max(0, nowElapsed - currentElapsedOffset) : nowElapsed;
+
+            const seatHoursTotal = (session.seats || []).reduce((sum, s) =>
+                sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((acc, tc) => acc + (Number(tc.amount) || 0), 0), 0);
+            const currentHoursOffset = (get().paidHoursOffsets || {})[sessionId] || 0;
+            const totalHoursPaid = (Number(session.hours_paid) || 0) + seatHoursTotal;
+            const effectiveHours = Math.max(0, totalHoursPaid - currentHoursOffset);
+            const remainingMins = (effectiveHours * 60) - effectiveElapsed;
+
+            if (remainingMins <= 0) {
+                // Tiempo expirado: avanzar el offset para que el nuevo tiempo arranque desde ahora
+                const newElapsedOffset = nowElapsed;
+                const elapsedCache = await tablesCache.getItem(scopedKey('paid_elapsed_offsets')) || {};
+                elapsedCache[sessionId] = newElapsedOffset;
+                await tablesCache.setItem(scopedKey('paid_elapsed_offsets'), elapsedCache);
+                set({ paidElapsedOffsets: { ...get().paidElapsedOffsets, [sessionId]: newElapsedOffset } });
+
+                // También resetear el hoursOffset para que las horas nuevas cuenten desde 0
+                const hoursOffsetCache = await tablesCache.getItem(scopedKey('paid_hours_offsets')) || {};
+                hoursOffsetCache[sessionId] = totalHoursPaid;
+                await tablesCache.setItem(scopedKey('paid_hours_offsets'), hoursOffsetCache);
+                set({ paidHoursOffsets: { ...get().paidHoursOffsets, [sessionId]: totalHoursPaid } });
+
+                // Broadcast para sincronizar otros dispositivos
+                get().realtimeChannel?.send({
+                    type: 'broadcast',
+                    event: 'table_elapsed_reset',
+                    payload: { sessionId, elapsedOffset: newElapsedOffset, hoursOffset: totalHoursPaid }
+                });
+            }
+        }
+
         if (session.paid_at) {
             const paidCache = await tablesCache.getItem(scopedKey('paid_sessions')) || {};
             delete paidCache[sessionId];
