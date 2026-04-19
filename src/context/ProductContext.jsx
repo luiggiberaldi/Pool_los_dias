@@ -4,6 +4,7 @@ import { logEvent } from '../services/auditService';
 import { BODEGA_CATEGORIES } from '../config/categories';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { fetchCloudProducts } from '../hooks/useCloudSync';
+import { useAuthStore } from '../hooks/store/authStore';
 
 const ProductContext = createContext();
 
@@ -15,6 +16,7 @@ export function ProductProvider({ children, rates }) {
     const [categories, _setCategories] = useState(BODEGA_CATEGORIES);
     const [isLoadingProducts, setIsLoadingProducts] = useState(true);
     const [isSyncReady, setIsSyncReady] = useState(false);
+    const userId = useAuthStore(s => s.cloudSession?.user?.id);
 
     // Guard ref: prevents app_storage_update loop when user edits locally
     const savingRef = useRef(false);
@@ -80,7 +82,8 @@ export function ProductProvider({ children, rates }) {
     const productChannelRef = useRef(null);
 
     useEffect(() => {
-        const ch = supabaseCloud.channel('product_sync_v1');
+        if (!userId) return;
+        const ch = supabaseCloud.channel(`product_sync_v1:${userId}`);
         ch.on('broadcast', { event: 'product_delta' }, ({ payload }) => {
             if (!payload || payload.senderId === DEVICE_ID) return;
 
@@ -118,7 +121,7 @@ export function ProductProvider({ children, rates }) {
         });
         productChannelRef.current = ch;
         return () => { supabaseCloud.removeChannel(ch); };
-    }, []);
+    }, [userId]);
 
     const broadcastProductDelta = useCallback((type, data) => {
         if (!productChannelRef.current) return;
@@ -151,7 +154,8 @@ export function ProductProvider({ children, rates }) {
     }, [useAutoRate, customRate, copEnabled, autoCopEnabled, tasaCopManual]);
 
     useEffect(() => {
-        const channel = supabaseCloud.channel('rate_sync_v1');
+        if (!userId) return;
+        const channel = supabaseCloud.channel(`rate_sync_v1:${userId}`);
 
         channel.on('broadcast', { event: 'rate_settings' }, ({ payload }) => {
             if (!payload || payload.senderId === DEVICE_ID) return;
@@ -190,7 +194,7 @@ export function ProductProvider({ children, rates }) {
 
         channelRef.current = channel;
         return () => { supabaseCloud.removeChannel(channel); };
-    }, []);
+    }, [userId]);
 
     const effectiveRate = useAutoRate ? rates.bcv?.price : (parseFloat(customRate) > 0 ? parseFloat(customRate) : rates.bcv?.price);
     

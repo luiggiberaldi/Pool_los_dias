@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTablesStore } from './store/useTablesStore';
+import { useAuthStore } from './store/authStore';
 import { calculateElapsedTime, calculateSessionCost } from '../utils/tableBillingEngine';
 import { useNotifications } from './useNotifications';
 import { showToast } from '../components/Toast';
@@ -23,10 +24,16 @@ export function useGlobalTableAlerts() {
     const channelRef = useRef(null);
     const prevCheckoutIdsRef = useRef(new Set());
 
-    // Subscribe to broadcast notifications from other devices
+    // Get userId to scope the channel per account
+    const cloudSession = useAuthStore(s => s.cloudSession);
+    const userId = cloudSession?.user?.id;
+
+    // Subscribe to broadcast notifications from other devices (scoped by userId)
     useEffect(() => {
+        if (!userId) return;
+
         const channel = supabaseCloud
-            .channel('pool_table_alerts')
+            .channel(`pool_table_alerts:${userId}`)
             .on('broadcast', { event: 'tiempo_excedido' }, ({ payload }) => {
                 if (!payload?.tableName) return;
                 const key = `excedido-${payload.sessionId}`;
@@ -62,7 +69,7 @@ export function useGlobalTableAlerts() {
             supabaseCloud.removeChannel(channel);
             channelRef.current = null;
         };
-    }, [notifyTiempoExcedido, notifyMesaCobrar, notifyMesaPagadaOciosa, notifyLowStock]);
+    }, [userId, notifyTiempoExcedido, notifyMesaCobrar, notifyMesaPagadaOciosa, notifyLowStock]);
 
     // Periodic check every 15s for expired tables, checkout status, and paid idle
     useEffect(() => {

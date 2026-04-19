@@ -580,7 +580,7 @@ export function useCloudSync() {
 
                 // Suscripción a solicitudes de backup del admin
                 supabaseCloud
-                    .channel('backup-requests')
+                    .channel(`backup-requests:${userId}`)
                     .on('broadcast', { event: 'request' }, async ({ payload }) => {
                         if (payload?.email?.toLowerCase() === session.user.email?.toLowerCase()) {
                             console.log('[CloudSync] Backup solicitado por admin — subiendo...');

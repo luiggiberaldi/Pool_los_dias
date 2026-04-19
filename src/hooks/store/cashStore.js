@@ -3,6 +3,7 @@ import localforage from 'localforage';
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { logEvent } from '../../services/auditService';
 import { scopedKey } from './accountScope';
+import { useAuthStore } from './authStore';
 
 // Helper: obtener user_id del usuario Supabase autenticado
 const getAuthUserId = async () => {
@@ -144,8 +145,10 @@ export const useCashStore = create((set, get) => ({
     // Capa A: Realtime de Supabase — instantáneo si la tabla tiene replication activo
     _subscribeRealtime: () => {
         if (cashRealtimeChannel) return;
+        const userId = useAuthStore.getState().cloudSession?.user?.id;
+        const channelName = userId ? `cash_sessions_realtime:${userId}` : 'cash_sessions_realtime';
         cashRealtimeChannel = supabaseCloud
-            .channel('cash_sessions_realtime')
+            .channel(channelName)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',

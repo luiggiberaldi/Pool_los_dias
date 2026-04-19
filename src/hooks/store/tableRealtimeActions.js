@@ -1,8 +1,13 @@
 import { supabaseCloud } from '../../config/supabaseCloud';
+import { useAuthStore } from './authStore';
 
 export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
     subscribeToRealtime: () => {
         if (get().realtimeChannel) return;
+
+        // Scope channel by userId to prevent cross-account notification leaks
+        const userId = useAuthStore.getState().cloudSession?.user?.id;
+        const channelName = userId ? `pool_tables_sync_v2:${userId}` : 'pool_tables_sync_v2';
 
         const debouncedSync = () => {
             clearTimeout(get()._syncTimeout);
@@ -11,7 +16,7 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
         };
 
         const channel = supabaseCloud
-            .channel('pool_tables_sync_v2')
+            .channel(channelName)
             .on('broadcast', { event: 'table_pause' }, ({ payload }) => {
                 console.log("[REALTIME] broadcast table_pause:", payload);
                 if (payload?.sessionId) {

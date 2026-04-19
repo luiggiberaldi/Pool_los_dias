@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabaseCloud } from '../config/supabaseCloud';
+import { useAuthStore } from './store/authStore';
 
 const DEFAULT_RATES = {
     bcv: { price: 36.35, source: 'BCV Oficial', change: 0.05 },
@@ -15,6 +16,7 @@ const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
 const RATES_DEVICE_ID = crypto.randomUUID();
 
 export function useRates() {
+    const userId = useAuthStore(s => s.cloudSession?.user?.id);
     const [rates, setRates] = useState(() => {
         try {
             const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
@@ -229,8 +231,9 @@ export function useRates() {
         updateData(false);
         const intervalId = setInterval(() => { updateData(true); }, UPDATE_INTERVAL);
 
-        // Escuchar tasas desde otros dispositivos via Supabase Broadcast
-        const channel = supabaseCloud.channel('rate_data_sync');
+        // Escuchar tasas desde otros dispositivos via Supabase Broadcast (scoped por usuario)
+        const channelName = userId ? `rate_data_sync:${userId}` : 'rate_data_sync';
+        const channel = supabaseCloud.channel(channelName);
         channel.on('broadcast', { event: 'rate_data' }, ({ payload }) => {
             if (!payload || payload.senderId === RATES_DEVICE_ID) return;
             if (payload.rates) {
@@ -245,7 +248,7 @@ export function useRates() {
             clearInterval(intervalId);
             supabaseCloud.removeChannel(channel);
         };
-    }, [updateData]);
+    }, [updateData, userId]);
 
     const currentRates = rates || DEFAULT_RATES;
     return { rates: currentRates, loading, isOffline, logs, updateData };
