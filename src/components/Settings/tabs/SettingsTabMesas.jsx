@@ -120,16 +120,19 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const pinaRateBelow = pinaBsVal > 0 && pinaUsdVal > 0 && (pinaBsVal / pinaUsdVal) < bcvRate;
     const hourBsMissing = hourUsdVal > 0 && hourBsVal <= 0;
     const pinaBsMissing = pinaUsdVal > 0 && pinaBsVal <= 0;
+    const anyZero = hourBsVal <= 0 || hourUsdVal <= 0 || pinaBsVal <= 0 || pinaUsdVal <= 0;
     const anyRateBelow = hourRateBelow || pinaRateBelow;
     const anyBsMissing = hourBsMissing || pinaBsMissing;
-    const hasError = anyBsMissing;
+    const hasError = anyZero;
 
     const handleSaveConfig = async () => {
-        if (anyBsMissing) {
+        if (anyZero) {
             const items = [];
-            if (hourBsMissing) items.push('Hora Libre');
-            if (pinaBsMissing) items.push('La Piña');
-            showToast(`Falta precio en Bs para: ${items.join(', ')}. Coloca el precio en Bolívares.`, 'error');
+            if (hourUsdVal <= 0) items.push('Hora Libre (USD)');
+            if (hourBsVal <= 0) items.push('Hora Libre (Bs)');
+            if (pinaUsdVal <= 0) items.push('La Piña (USD)');
+            if (pinaBsVal <= 0) items.push('La Piña (Bs)');
+            showToast(`Tarifa en 0: ${items.join(', ')}. Todas las tarifas deben ser mayores a 0.`, 'error');
             triggerHaptic?.('error');
             return;
         }
@@ -388,14 +391,14 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                 <button
                     onClick={handleSaveConfig}
                     className={`w-full flex items-center justify-center gap-2 py-3 mt-4 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors active:scale-[0.98] ${
-                        anyBsMissing
+                        anyZero
                             ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 hover:bg-rose-100'
                             : anyRateBelow
                             ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100'
                             : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                     }`}
                 >
-                    {anyBsMissing ? <><AlertTriangle size={16} /> Falta precio en Bs</> : anyRateBelow ? <><AlertTriangle size={16} /> Guardar con tasa menor</> : <><Check size={16} /> Guardar Tarifas</>}
+                    {anyZero ? <><AlertTriangle size={16} /> Tarifas en 0</> : anyRateBelow ? <><AlertTriangle size={16} /> Guardar con tasa menor</> : <><Check size={16} /> Guardar Tarifas</>}
                 </button>
             </SectionCard>
             </div>
