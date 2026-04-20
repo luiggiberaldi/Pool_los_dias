@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import { generateTicketPDF } from '../../utils/ticketGenerator';
-import { ChevronDown, ChevronUp, Send, Ban, Shuffle, Clock, Recycle, LockIcon, Printer } from 'lucide-react';
+import { ChevronDown, ChevronUp, Send, Ban, Shuffle, Clock, Recycle, LockIcon, Printer, User, UserCheck } from 'lucide-react';
 
 export default function TransactionRow({
     sale: s, bcvRate, isExpanded, onToggle, onVoidSale, onRecycleSale,
@@ -178,6 +178,26 @@ export default function TransactionRow({
                                     );
                                 })}
                             </div>
+                        </div>
+                    )}
+
+                    {/* ATENDIDO POR / FACTURADO POR */}
+                    {(s.vendedorNombre || s.meseroNombre) && (
+                        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            {s.meseroNombre && (
+                                <span className="flex items-center gap-1">
+                                    <UserCheck size={12} className="text-indigo-400" />
+                                    <span className="text-slate-400">Atendió:</span>
+                                    <span className="font-bold text-slate-600 dark:text-slate-300">{s.meseroNombre}</span>
+                                </span>
+                            )}
+                            {s.vendedorNombre && (
+                                <span className="flex items-center gap-1">
+                                    <User size={12} className="text-emerald-400" />
+                                    <span className="text-slate-400">Facturó:</span>
+                                    <span className="font-bold text-slate-600 dark:text-slate-300">{s.vendedorNombre}</span>
+                                </span>
+                            )}
                         </div>
                     )}
 

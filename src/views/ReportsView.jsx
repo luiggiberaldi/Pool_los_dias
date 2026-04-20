@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Recycle, Search, X, LockIcon } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { generateDailyClosePDF as _generateDailyClosePDF } from '../utils/dailyCloseGenerator';
+import { generateTicketPDF } from '../utils/ticketGenerator';
 import { useProductContext } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import EmptyState from '../components/EmptyState';
@@ -337,6 +338,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                                             onToggle={() => setExpandedSaleId(prev => prev === s.id ? null : s.id)}
                                             onVoidSale={setVoidSaleTarget}
                                             onRecycleSale={setRecycleOffer}
+                                            onDownloadPDF={(sale) => generateTicketPDF(sale, bcvRate)}
                                         />
                                     ))}
 
