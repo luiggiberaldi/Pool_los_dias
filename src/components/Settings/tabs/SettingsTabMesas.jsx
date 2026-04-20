@@ -122,7 +122,7 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
     const pinaBsMissing = pinaUsdVal > 0 && pinaBsVal <= 0;
     const anyRateBelow = hourRateBelow || pinaRateBelow;
     const anyBsMissing = hourBsMissing || pinaBsMissing;
-    const hasError = anyRateBelow || anyBsMissing;
+    const hasError = anyBsMissing;
 
     const handleSaveConfig = async () => {
         if (anyBsMissing) {
@@ -137,9 +137,8 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
             const items = [];
             if (hourRateBelow) items.push(`Hora Libre: ${(hourBsVal / hourUsdVal).toFixed(0)} Bs/$`);
             if (pinaRateBelow) items.push(`La Piña: ${(pinaBsVal / pinaUsdVal).toFixed(0)} Bs/$`);
-            showToast(`La tasa implícita (${items.join(', ')}) es menor que la ${rateLabel} (${bcvRate.toFixed(0)} Bs/$). Sube el precio en Bs o baja el de USD.`, 'error');
-            triggerHaptic?.('error');
-            return;
+            showToast(`Tasa implícita (${items.join(', ')}) menor que ${rateLabel} (${bcvRate.toFixed(0)} Bs/$). Al cobrar en Bs no cubrirá el monto en USD.`, 'warning');
+            triggerHaptic?.('warning');
         }
         await updateConfig({
             pricePerHour: parseFloat(pricePerHour) || 0,
@@ -389,12 +388,14 @@ export default function SettingsTabMesas({ showToast, triggerHaptic }) {
                 <button
                     onClick={handleSaveConfig}
                     className={`w-full flex items-center justify-center gap-2 py-3 mt-4 font-bold text-xs uppercase tracking-wider rounded-xl transition-colors active:scale-[0.98] ${
-                        hasError
+                        anyBsMissing
                             ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-500 dark:text-rose-400 hover:bg-rose-100'
+                            : anyRateBelow
+                            ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100'
                             : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                     }`}
                 >
-                    {anyBsMissing ? <><AlertTriangle size={16} /> Falta precio en Bs</> : anyRateBelow ? <><AlertTriangle size={16} /> Tasa menor a {rateLabel}</> : <><Check size={16} /> Guardar Tarifas</>}
+                    {anyBsMissing ? <><AlertTriangle size={16} /> Falta precio en Bs</> : anyRateBelow ? <><AlertTriangle size={16} /> Guardar con tasa menor</> : <><Check size={16} /> Guardar Tarifas</>}
                 </button>
             </SectionCard>
             </div>
