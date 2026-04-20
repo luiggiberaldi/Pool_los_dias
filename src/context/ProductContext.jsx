@@ -370,13 +370,21 @@ export function ProductProvider({ children, rates }) {
     };
 
     const adjustStock = (productId, delta) => {
-        const p = products.find(p => p.id === productId);
         const allowNeg = localStorage.getItem('allow_negative_stock') === 'true';
-        const newStock = allowNeg ? (p?.stock ?? 0) + delta : Math.max(0, (p?.stock ?? 0) + delta);
-        setProducts(prevProducts => prevProducts.map(pr =>
-            pr.id === productId ? { ...pr, stock: newStock } : pr
-        ));
-        broadcastProductDelta('stock_update', { changes: [{ id: productId, stock: newStock }] });
+        let computedStock;
+        setProducts(prevProducts => prevProducts.map(pr => {
+            if (pr.id === productId) {
+                computedStock = allowNeg ? (pr.stock ?? 0) + delta : Math.max(0, (pr.stock ?? 0) + delta);
+                return { ...pr, stock: computedStock };
+            }
+            return pr;
+        }));
+        // Broadcast after setProducts schedules the update
+        setTimeout(() => {
+            if (computedStock !== undefined) {
+                broadcastProductDelta('stock_update', { changes: [{ id: productId, stock: computedStock }] });
+            }
+        }, 0);
     };
 
     // Actualiza productos después de checkout: guarda local + broadcast instantáneo de stock
