@@ -1,7 +1,74 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Modal } from '../Modal';
-import { Search, TrendingUp, TrendingDown, Check, Package, X, AlertTriangle, ChevronDown, Minus, Plus } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Check, Package, X, AlertTriangle, Minus, Plus } from 'lucide-react';
 import { showToast } from '../Toast';
+
+function ProductRow({ p, qty, direction, isSelected, maxStock, onTapAdd, onSetQty }) {
+    const stock = p.stock ?? 0;
+    const lowAlert = p.lowStockAlert ?? 5;
+    const isLow = stock <= lowAlert;
+    const stockPct = Math.min(100, Math.max(0, (stock / maxStock) * 100));
+    const newStock = direction === 'ingreso' ? stock + qty : Math.max(0, stock - qty);
+
+    return (
+        <div
+            className={`flex items-center gap-3 px-3 py-3 transition-all ${
+                isSelected
+                    ? direction === 'ingreso'
+                        ? 'bg-emerald-50/70 dark:bg-emerald-950/30'
+                        : 'bg-red-50/70 dark:bg-red-950/30'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer active:bg-slate-100 dark:active:bg-slate-800'
+            }`}
+            onClick={!isSelected ? () => onTapAdd(p.id) : undefined}
+        >
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
+                <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden max-w-[80px]">
+                        <div
+                            className={`h-full rounded-full transition-all ${isLow ? 'bg-amber-400' : 'bg-sky-400'}`}
+                            style={{ width: `${stockPct}%` }}
+                        />
+                    </div>
+                    <span className={`text-[11px] font-bold ${isLow ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                        {stock}
+                    </span>
+                    {isSelected && (
+                        <span className={`text-[11px] font-black ${direction === 'ingreso' ? 'text-emerald-500' : 'text-red-500'}`}>
+                            → {newStock}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {isSelected ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); onSetQty(p.id, qty - 1); }}
+                        disabled={qty <= 0}
+                        className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-red-500 disabled:opacity-30 transition-all active:scale-90">
+                        <Minus size={18} strokeWidth={2.5} />
+                    </button>
+                    <input type="number" value={qty || ''} placeholder="0"
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => onSetQty(p.id, e.target.value)}
+                        className="w-14 h-10 text-center text-base font-black bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-brand/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                    <button onClick={(e) => { e.stopPropagation(); onSetQty(p.id, qty + 1); }}
+                        className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-emerald-500 transition-all active:scale-90">
+                        <Plus size={18} strokeWidth={2.5} />
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); onSetQty(p.id, 0); }}
+                        className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-400 hover:text-red-600 transition-all active:scale-90">
+                        <X size={16} strokeWidth={2.5} />
+                    </button>
+                </div>
+            ) : (
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600">
+                    <Plus size={16} />
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function StockAdjustmentModal({
     isOpen, onClose, products, adjustStock, triggerHaptic,
@@ -42,10 +109,10 @@ export default function StockAdjustmentModal({
         setAdjustments(prev => ({ ...prev, [productId]: num }));
     };
 
-    const tapAdd = (productId) => {
+    const tapAdd = useCallback((productId) => {
         triggerHaptic?.('light');
         setAdjustments(prev => ({ ...prev, [productId]: (prev[productId] || 0) + 1 }));
-    };
+    }, [triggerHaptic]);
 
     const needsNote = direction === 'egreso' && !note.trim();
 
@@ -99,77 +166,6 @@ export default function StockAdjustmentModal({
     [allProducts]);
 
     if (!isOpen) return null;
-
-    const ProductRow = ({ p, isSelected }) => {
-        const qty = adjustments[p.id] || 0;
-        const stock = p.stock ?? 0;
-        const lowAlert = p.lowStockAlert ?? 5;
-        const isLow = stock <= lowAlert;
-        const stockPct = Math.min(100, Math.max(0, (stock / maxStock) * 100));
-        const newStock = direction === 'ingreso' ? stock + qty : Math.max(0, stock - qty);
-
-        return (
-            <div
-                className={`flex items-center gap-3 px-3 py-3 transition-all ${
-                    isSelected
-                        ? direction === 'ingreso'
-                            ? 'bg-emerald-50/70 dark:bg-emerald-950/30'
-                            : 'bg-red-50/70 dark:bg-red-950/30'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer active:bg-slate-100 dark:active:bg-slate-800'
-                }`}
-                onClick={!isSelected ? () => tapAdd(p.id) : undefined}
-            >
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                        {/* Stock bar */}
-                        <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden max-w-[80px]">
-                            <div
-                                className={`h-full rounded-full transition-all ${
-                                    isLow ? 'bg-amber-400' : 'bg-sky-400'
-                                }`}
-                                style={{ width: `${stockPct}%` }}
-                            />
-                        </div>
-                        <span className={`text-[11px] font-bold ${isLow ? 'text-amber-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                            {stock}
-                        </span>
-                        {isSelected && (
-                            <span className={`text-[11px] font-black ${direction === 'ingreso' ? 'text-emerald-500' : 'text-red-500'}`}>
-                                → {newStock}
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {isSelected ? (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); setQty(p.id, qty - 1); }}
-                            disabled={qty <= 0}
-                            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-red-500 disabled:opacity-30 transition-all active:scale-90">
-                            <Minus size={18} strokeWidth={2.5} />
-                        </button>
-                        <input type="number" value={qty || ''} placeholder="0"
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setQty(p.id, e.target.value)}
-                            className="w-14 h-10 text-center text-base font-black bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:ring-2 focus:ring-brand/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                        <button onClick={(e) => { e.stopPropagation(); setQty(p.id, qty + 1); }}
-                            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-emerald-500 transition-all active:scale-90">
-                            <Plus size={18} strokeWidth={2.5} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setQty(p.id, 0); }}
-                            className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-400 hover:text-red-600 transition-all active:scale-90">
-                            <X size={16} strokeWidth={2.5} />
-                        </button>
-                    </div>
-                ) : (
-                    <div className="shrink-0 w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600">
-                        <Plus size={16} />
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     // Confirm view
     if (showConfirm) {
@@ -271,7 +267,7 @@ export default function StockAdjustmentModal({
                 <div ref={listRef} className="max-h-[45vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                     {/* Selected products (sticky top) */}
                     {selectedProducts.length > 0 && (
-                        <div className="sticky top-0 z-10 border-b-2 border-slate-200 dark:border-slate-700">
+                        <div className="sticky top-0 z-10 border-b-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                             <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${
                                 direction === 'ingreso'
                                     ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
@@ -281,7 +277,7 @@ export default function StockAdjustmentModal({
                             </div>
                             <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                 {selectedProducts.map(p => (
-                                    <ProductRow key={p.id} p={p} isSelected />
+                                    <ProductRow key={p.id} p={p} qty={adjustments[p.id] || 0} direction={direction} isSelected maxStock={maxStock} onTapAdd={tapAdd} onSetQty={setQty} />
                                 ))}
                             </div>
                         </div>
@@ -300,7 +296,7 @@ export default function StockAdjustmentModal({
                                 Sin resultados
                             </div>
                         ) : unselectedProducts.map(p => (
-                            <ProductRow key={p.id} p={p} isSelected={false} />
+                            <ProductRow key={p.id} p={p} qty={0} direction={direction} isSelected={false} maxStock={maxStock} onTapAdd={tapAdd} onSetQty={setQty} />
                         ))}
                     </div>
                 </div>
