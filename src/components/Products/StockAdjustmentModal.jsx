@@ -265,7 +265,7 @@ export default function StockAdjustmentModal({
 
                 {/* Product List */}
                 <div ref={listRef} className="max-h-[45vh] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-                    {/* Selected products (sticky top) */}
+                    {/* Selected products (sticky top, max 3 visible then scroll) */}
                     {selectedProducts.length > 0 && (
                         <div className="sticky top-0 z-10 border-b-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
                             <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${
@@ -275,7 +275,7 @@ export default function StockAdjustmentModal({
                             }`}>
                                 Seleccionados ({selectedProducts.length})
                             </div>
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[25vh] overflow-y-auto">
                                 {selectedProducts.map(p => (
                                     <ProductRow key={p.id} p={p} qty={adjustments[p.id] || 0} direction={direction} isSelected maxStock={maxStock} onTapAdd={tapAdd} onSetQty={setQty} />
                                 ))}
