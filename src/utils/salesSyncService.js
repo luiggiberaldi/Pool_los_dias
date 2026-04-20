@@ -127,26 +127,85 @@ export async function pullNewSales(userId) {
         if (error || !docs?.length) return 0;
 
         const existingSales = await storageService.getItem(SALES_KEY, []);
-        const existingIds = new Set(existingSales.map(s => s.id));
+        const existingMap = new Map(existingSales.map(s => [s.id, s]));
 
-        const newSales = docs
-            .map(doc => doc.data?.payload)
-            .filter(sale => sale && !existingIds.has(sale.id));
+        const newSales = [];
+        let cierreUpdates = 0;
 
-        if (newSales.length > 0) {
-            let merged = [...newSales, ...existingSales]
-                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        for (const doc of docs) {
+            const sale = doc.data?.payload;
+            if (!sale) continue;
+
+            const existing = existingMap.get(sale.id);
+            if (!existing) {
+                newSales.push(sale);
+            } else if (sale.cajaCerrada && !existing.cajaCerrada) {
+                // Actualizar marcas de cierre en venta existente
+                existingMap.set(sale.id, { ...existing, cajaCerrada: sale.cajaCerrada, cierreId: sale.cierreId });
+                cierreUpdates++;
+            }
+        }
+
+        if (newSales.length > 0 || cierreUpdates > 0) {
+            let merged = newSales.length > 0
+                ? [...newSales, ...Array.from(existingMap.values())]
+                : Array.from(existingMap.values());
+            merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             merged = fixDuplicateNumbers(merged);
             await storageService.setItem(SALES_KEY, merged);
             window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: SALES_KEY } }));
-            console.log(`[SalesSync] Merged ${newSales.length} venta(s) nueva(s) desde la nube`);
+            if (newSales.length > 0) console.log(`[SalesSync] Merged ${newSales.length} venta(s) nueva(s) desde la nube`);
+            if (cierreUpdates > 0) console.log(`[SalesSync] Actualizadas ${cierreUpdates} venta(s) con marcas de cierre desde la nube`);
         }
 
         localStorage.setItem(getLastSalesPullKey(), new Date().toISOString());
-        return newSales.length;
+        return newSales.length + cierreUpdates;
     } catch (e) {
         console.warn('[SalesSync] pullNewSales falló:', e?.message);
         return 0;
+    }
+}
+
+/**
+ * Sincroniza marcas de cierre (cajaCerrada, cierreId) a la nube para las ventas afectadas.
+ * Esto asegura que otros dispositivos vean el historial de cierres correctamente.
+ */
+export async function syncCierreMarks(affectedSales, userId) {
+    if (!userId || !affectedSales?.length) return;
+
+    // 1. Broadcast P2P — otros dispositivos activos reciben al instante
+    try {
+        const ch = getSalesBroadcastChannel(userId);
+        await ch.send({
+            type: 'broadcast',
+            event: 'cierre_marks',
+            payload: affectedSales.map(s => ({ id: s.id, cajaCerrada: s.cajaCerrada, cierreId: s.cierreId })),
+        });
+    } catch (e) {
+        console.warn('[SalesSync] Broadcast cierre marks falló:', e?.message);
+    }
+
+    // 2. Re-upsert cada venta afectada en sync_documents con las marcas de cierre
+    try {
+        const rows = affectedSales.map(sale => ({
+            user_id: userId,
+            collection: 'sale',
+            doc_id: sale.id,
+            data: { payload: sale },
+            updated_at: new Date().toISOString(),
+        }));
+
+        // Upsert en lotes de 50 para no saturar
+        for (let i = 0; i < rows.length; i += 50) {
+            const batch = rows.slice(i, i + 50);
+            const { error } = await supabaseCloud.from('sync_documents').upsert(batch, {
+                onConflict: 'user_id,collection,doc_id',
+            });
+            if (error) console.warn(`[SalesSync] Error sincronizando cierre batch ${i}:`, error.message);
+        }
+        console.log(`[SalesSync] ${affectedSales.length} ventas actualizadas con marcas de cierre en la nube ✓`);
+    } catch (e) {
+        console.warn('[SalesSync] Persist cierre marks falló:', e?.message);
     }
 }
 
@@ -157,7 +216,19 @@ export async function applyIncomingSale(sale) {
     if (!sale?.id) return;
     try {
         const existingSales = await storageService.getItem(SALES_KEY, []);
-        if (existingSales.some(s => s.id === sale.id)) return; // ya la tenemos
+        const existingIdx = existingSales.findIndex(s => s.id === sale.id);
+
+        if (existingIdx >= 0) {
+            // Ya existe — solo actualizar si trae marcas de cierre nuevas
+            const existing = existingSales[existingIdx];
+            if (sale.cajaCerrada && !existing.cajaCerrada) {
+                existingSales[existingIdx] = { ...existing, cajaCerrada: sale.cajaCerrada, cierreId: sale.cierreId };
+                await storageService.setItem(SALES_KEY, existingSales);
+                window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: SALES_KEY } }));
+                console.log(`[SalesSync] Venta ${sale.id} actualizada con marcas de cierre`);
+            }
+            return;
+        }
 
         let merged = [sale, ...existingSales]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -167,6 +238,35 @@ export async function applyIncomingSale(sale) {
         console.log(`[SalesSync] Venta recibida en tiempo real: ${sale.id}`);
     } catch (e) {
         console.warn('[SalesSync] Error aplicando venta entrante:', e?.message);
+    }
+}
+
+/**
+ * Aplica marcas de cierre recibidas por Broadcast a ventas locales.
+ */
+export async function applyCierreMarks(marks) {
+    if (!marks?.length) return;
+    try {
+        const existingSales = await storageService.getItem(SALES_KEY, []);
+        const marksMap = new Map(marks.map(m => [m.id, m]));
+        let changed = false;
+
+        const updated = existingSales.map(s => {
+            const mark = marksMap.get(s.id);
+            if (mark && !s.cajaCerrada) {
+                changed = true;
+                return { ...s, cajaCerrada: mark.cajaCerrada, cierreId: mark.cierreId };
+            }
+            return s;
+        });
+
+        if (changed) {
+            await storageService.setItem(SALES_KEY, updated);
+            window.dispatchEvent(new CustomEvent('app_storage_update', { detail: { key: SALES_KEY } }));
+            console.log(`[SalesSync] Marcas de cierre aplicadas: ${marks.length} ventas`);
+        }
+    } catch (e) {
+        console.warn('[SalesSync] Error aplicando marcas de cierre:', e?.message);
     }
 }
 
@@ -182,6 +282,8 @@ export function subscribeSalesRealtime(userId, onSaleReceived) {
 
     ch.on('broadcast', { event: 'new_sale' }, ({ payload }) => {
         if (payload) onSaleReceived(payload);
+    }).on('broadcast', { event: 'cierre_marks' }, ({ payload }) => {
+        if (payload) applyCierreMarks(payload);
     }).subscribe((status) => {
         if (status === 'SUBSCRIBED') {
             console.log('[SalesSync] Canal Broadcast de ventas activo');

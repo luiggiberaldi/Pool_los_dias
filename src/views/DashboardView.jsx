@@ -25,6 +25,7 @@ import { useSecurity } from '../hooks/useSecurity';
 import { useAuthStore as useLegacyAuthStore } from '../hooks/store/useAuthStore';
 import { useAuthStore } from '../hooks/store/authStore';
 import { useCashStore } from '../hooks/store/cashStore';
+import { syncCierreMarks } from '../utils/salesSyncService';
 import { useAudit } from '../hooks/useAudit';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -251,6 +252,12 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         setIsCashReconOpen(false);
         showToast('Cierre de caja completado (Historial conservado)', 'success');
         auditLog('VENTA', 'CIERRE_CAJA', 'Cierre de caja completado');
+
+        // Sincronizar marcas de cierre a la nube (no bloquea UI)
+        const affectedSales = updatedSales.filter(s => s.cierreId === currentCierreId);
+        supabaseCloud.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user?.id) syncCierreMarks(affectedSales, session.user.id);
+        }).catch(() => {});
     };
 
     // ── Pull-to-refresh ──
