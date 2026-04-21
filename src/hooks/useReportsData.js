@@ -20,7 +20,16 @@ export function useReportsData({ isActive, products, bcvRate, selectedRange, cus
             }
         };
         load();
-        return () => { mounted = false; };
+
+        // Escuchar actualizaciones de ventas (broadcast P2P, pull incremental, cierres)
+        const onStorageUpdate = (e) => {
+            if (e.detail?.key === SALES_KEY) load();
+        };
+        window.addEventListener('app_storage_update', onStorageUpdate);
+        return () => {
+            mounted = false;
+            window.removeEventListener('app_storage_update', onStorageUpdate);
+        };
     }, [isActive]);
 
     const { from, to } = useMemo(() => {
