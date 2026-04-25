@@ -128,6 +128,12 @@ export function OrderPanel({ session, table, onClose }) {
                 showToast(`${product.name}: stock máximo alcanzado (${available})`, 'warning');
                 return;
             }
+        } else {
+            const available = getAvailableStock(product.id);
+            const inOrder = getQtyInOrder(product.id);
+            if (inOrder + 1 > available) {
+                showToast(`${product.name}: sin stock disponible (vendiendo en negativo)`, 'warning');
+            }
         }
         setAddingItem(product.id);
         const productForOrder = {
@@ -369,6 +375,7 @@ export function OrderPanel({ session, table, onClose }) {
                                 const availableStock = getAvailableStock(p.id);
                                 const qtyInOrder = getQtyInOrder(p.id);
                                 const isOutOfStock = !allowNegativeStock && availableStock <= 0 && !p.isCombo;
+                                const isNegativeStock = allowNegativeStock && availableStock <= 0 && !p.isCombo;
                                 const isMaxReached = !allowNegativeStock && qtyInOrder >= availableStock;
                                 const isLowStock = availableStock > 0 && availableStock <= (p.lowStockAlert ?? 5);
                                 return (
@@ -388,8 +395,8 @@ export function OrderPanel({ session, table, onClose }) {
                                         )}
                                         {/* Stock indicator */}
                                         {!p.isCombo && (
-                                            <div className={`text-[9px] font-bold mb-1.5 ${isOutOfStock ? 'text-red-500' : isLowStock ? 'text-amber-500' : 'text-slate-400'}`}>
-                                                {isOutOfStock ? 'Agotado' : `Stock: ${availableStock}`}
+                                            <div className={`text-[9px] font-bold mb-1.5 ${isOutOfStock ? 'text-red-500' : isNegativeStock ? 'text-amber-500' : isLowStock ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                {isOutOfStock ? 'Agotado' : isNegativeStock ? 'Sin stock' : `Stock: ${availableStock}`}
                                             </div>
                                         )}
                                         <div className="flex items-center justify-between mt-auto">

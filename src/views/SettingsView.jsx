@@ -183,7 +183,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
     const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || 'Pool los diaz');
     const [businessRif, setBusinessRif] = useState(localStorage.getItem('business_rif') || '');
     const [paperWidth, setPaperWidth] = useState(localStorage.getItem('printer_paper_width') || '58');
-    const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') !== 'false');
+    const [allowNegativeStock, setAllowNegativeStock] = useState(localStorage.getItem('allow_negative_stock') === 'true');
     const [maxDiscountCajero, setMaxDiscountCajero] = useState(parseInt(localStorage.getItem('max_discount_cajero') ?? '100') || 100);
     const [cajeroAbreCaja, setCajeroAbreCaja] = useState(localStorage.getItem('cajero_puede_abrir_caja') === 'true');
     const [cajeroCierraCaja, setCajeroCierraCaja] = useState(localStorage.getItem('cajero_puede_cerrar_caja') === 'true');

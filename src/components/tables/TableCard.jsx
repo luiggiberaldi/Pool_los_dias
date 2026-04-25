@@ -12,6 +12,7 @@ import { generatePartialSessionTicketPDF } from '../../utils/ticketGenerator';
 import { showToast } from '../Toast';
 import { logEvent } from '../../services/auditService';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useProductContext } from '../../context/ProductContext';
 
 import TableCardTimerDisplay from './TableCardTimerDisplay';
 import TableCardActions from './TableCardActions';
@@ -115,6 +116,7 @@ export default function TableCard({ table, session }) {
     const allOrders = useOrdersStore(state => state.orders);
     const allItems = useOrdersStore(state => state.orderItems);
     const cancelOrderBySessionId = useOrdersStore(state => state.cancelOrderBySessionId);
+    const { products, adjustStock } = useProductContext();
     
     const order = session ? allOrders.find(o => o.table_session_id === session.id) : null;
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
@@ -123,11 +125,29 @@ export default function TableCard({ table, session }) {
     const handleCancelTable = async () => {
         setShowCancelModal(false);
         try {
+            // Devolver stock de cada producto al inventario antes de cancelar
+            currentItems.forEach(item => {
+                const qty = Number(item.qty) || 0;
+                if (qty <= 0) return;
+                const product = products.find(p => p.id === item.product_id);
+                if (product?.isCombo) {
+                    if (product.comboItems && product.comboItems.length > 0) {
+                        product.comboItems.forEach(ci => {
+                            adjustStock(ci.productId, qty * (ci.qty || 1));
+                        });
+                    } else if (product.linkedProductId) {
+                        adjustStock(product.linkedProductId, qty * (product.linkedQty || 1));
+                    }
+                } else {
+                    adjustStock(item.product_id, qty);
+                }
+            });
+
             await Promise.all([
                 cancelOrderBySessionId(session.id).catch(e => console.warn("cancelOrder offline", e)),
                 closeSession(session.id, currentUser?.id || "SYSTEM", 0).catch(e => console.warn("closeSession offline", e))
             ]);
-            logEvent('MESAS', 'ANULACION', `Mesa ${table.name} anulada manualmente. ${currentItems.length} items descartados.`, currentUser);
+            logEvent('MESAS', 'ANULACION', `Mesa ${table.name} anulada manualmente. ${currentItems.length} items devueltos al inventario.`, currentUser);
         } catch (error) {
             console.error("Error anulando mesa", error);
             alert("Ocurrió un error local al preparar la anulación.");
