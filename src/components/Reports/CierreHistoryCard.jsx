@@ -57,7 +57,7 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
                     <div>
                         <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
                             Cierre de Caja
-                            <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded uppercase font-black">{cierre.salesCount} ops</span>
+                            <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded uppercase font-black">{cierre.sales.length} ops</span>
                         </p>
                         <p className="text-[11px] text-slate-400 capitalize">{dateLabel}</p>
                     </div>

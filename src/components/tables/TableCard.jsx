@@ -523,7 +523,7 @@ export default function TableCard({ table, session }) {
                                 >
                                     <Printer size={12} />
                                 </button>
-                                {(currentUser?.role === 'ADMIN') && (
+                                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO') && (
                                     <button
                                         onClick={() => setShowCancelModal(true)}
                                         className="w-6 h-6 rounded-full flex items-center justify-center bg-rose-500/80 hover:bg-rose-500 text-white transition-all active:scale-95 shrink-0 shadow-sm"

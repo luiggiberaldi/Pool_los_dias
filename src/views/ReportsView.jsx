@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Recycle, Search, X, LockIcon } from 'lucide-react';
+import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Recycle, Search, X, LockIcon, ListOrdered } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { generateDailyClosePDF as _generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
@@ -35,6 +35,8 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
     const [historyFilter, setHistoryFilter] = useState('all');
     const [voidSaleTarget, setVoidSaleTarget] = useState(null);
     const [recycleOffer, setRecycleOffer] = useState(null);
+    const [articleSearch, setArticleSearch] = useState('');
+    const [articleSort, setArticleSort] = useState('qty'); // 'qty' | 'revenue' | 'name'
 
     const {
         allSales, setAllSales, isLoading,
@@ -43,6 +45,30 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
         paymentBreakdown, topProducts, salesByDay,
         groupedClosings, maxDayTotal,
     } = useReportsData({ isActive, products, bcvRate, selectedRange, customFrom, customTo, activeTab });
+
+    // ── Aggregated product sales for "Por Artículo" tab ──
+    const allProductsSold = useMemo(() => {
+        const map = {};
+        salesForStats.forEach(s => {
+            s.items?.forEach(item => {
+                const key = item.name;
+                if (!map[key]) map[key] = { name: item.name, qty: 0, revenue: 0, isWeight: !!item.isWeight };
+                map[key].qty += item.qty;
+                map[key].revenue += item.priceUsd * item.qty;
+            });
+        });
+        let list = Object.values(map);
+        // Filter by search
+        if (articleSearch.trim()) {
+            const q = articleSearch.toLowerCase();
+            list = list.filter(p => p.name.toLowerCase().includes(q));
+        }
+        // Sort
+        if (articleSort === 'qty') list.sort((a, b) => b.qty - a.qty);
+        else if (articleSort === 'revenue') list.sort((a, b) => b.revenue - a.revenue);
+        else list.sort((a, b) => a.name.localeCompare(b.name));
+        return list;
+    }, [salesForStats, articleSearch, articleSort]);
 
     const confirmVoidSale = async () => {
         const sale = voidSaleTarget;
@@ -146,13 +172,19 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                     onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('metrics'); }}
                     className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'metrics' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
                 >
-                    <BarChart3 size={16} className="inline mr-1.5 align-text-bottom"/> Métricas de Ventas
+                    <BarChart3 size={16} className="inline mr-1.5 align-text-bottom"/> Métricas
+                </button>
+                <button
+                    onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('articles'); setArticleSearch(''); }}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'articles' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                >
+                    <ListOrdered size={16} className="inline mr-1.5 align-text-bottom"/> Por Artículo
                 </button>
                 <button
                     onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('history'); }}
                     className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
                 >
-                    <LockIcon size={16} className="inline mr-1.5 align-text-bottom"/> Cierres de Caja
+                    <LockIcon size={16} className="inline mr-1.5 align-text-bottom"/> Cierres
                 </button>
             </div>
 
@@ -374,6 +406,95 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                         </div>
                     )}
                 </>
+            ) : activeTab === 'articles' ? (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-3">
+                    {/* Summary strip */}
+                    <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                            <ListOrdered size={16} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-slate-700 dark:text-white">Venta por Artículos</p>
+                            <p className="text-[10px] text-slate-400">{allProductsSold.length} producto{allProductsSold.length !== 1 ? 's' : ''} vendidos en este periodo</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-black text-slate-800 dark:text-white">{allProductsSold.reduce((a, p) => a + p.qty, 0).toFixed(0)} uds</p>
+                            <p className="text-[10px] font-bold text-indigo-500">${allProductsSold.reduce((a, p) => a + p.revenue, 0).toFixed(2)}</p>
+                        </div>
+                    </div>
+
+                    {/* Search + Sort */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 p-3 space-y-2">
+                        <div className="relative">
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={articleSearch}
+                                onChange={e => setArticleSearch(e.target.value)}
+                                placeholder="Buscar producto..."
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-2 pl-9 pr-8 text-xs font-medium text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
+                            />
+                            {articleSearch && (
+                                <button onClick={() => setArticleSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            {[{ id: 'qty', label: 'Más vendidos' }, { id: 'revenue', label: 'Mayor ingreso' }, { id: 'name', label: 'A-Z' }].map(s => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => setArticleSort(s.id)}
+                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${articleSort === s.id
+                                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                        : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-600'}`}
+                                >{s.label}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Product List */}
+                    {allProductsSold.length > 0 ? (
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+                            {/* Header */}
+                            <div className="grid grid-cols-[1fr_80px_80px] gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Producto</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase text-right">Cant.</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase text-right">Ingreso</span>
+                            </div>
+                            {/* Rows */}
+                            {allProductsSold.map((p, i) => (
+                                <div
+                                    key={p.name}
+                                    className={`grid grid-cols-[1fr_80px_80px] gap-2 px-4 py-2.5 items-center ${i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/20'} ${i < allProductsSold.length - 1 ? 'border-b border-slate-50 dark:border-slate-800/50' : ''}`}
+                                >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black shrink-0 ${i < 3 ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>{i + 1}</span>
+                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</p>
+                                    </div>
+                                    <p className="text-xs font-black text-slate-700 dark:text-white text-right">
+                                        {p.isWeight ? p.qty.toFixed(2) + ' kg' : p.qty}
+                                    </p>
+                                    <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 text-right">${p.revenue.toFixed(2)}</p>
+                                </div>
+                            ))}
+                            {/* Footer totals */}
+                            <div className="grid grid-cols-[1fr_80px_80px] gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 border-t border-indigo-100 dark:border-indigo-800/30">
+                                <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase">Total</span>
+                                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 text-right">{allProductsSold.reduce((a, p) => a + p.qty, 0).toFixed(0)}</span>
+                                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 text-right">${allProductsSold.reduce((a, p) => a + p.revenue, 0).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mt-8">
+                            <EmptyState
+                                icon={ListOrdered}
+                                title={articleSearch ? 'Sin resultados' : 'Sin ventas en este periodo'}
+                                description={articleSearch ? 'No se encontraron productos con ese nombre.' : 'Selecciona otro rango de fechas para ver artículos vendidos.'}
+                            />
+                        </div>
+                    )}
+                </div>
             ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                     {groupedClosings.length > 0 ? (

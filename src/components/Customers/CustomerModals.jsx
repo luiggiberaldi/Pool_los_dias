@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { X, Pencil, Trash2, RefreshCw, CreditCard, Clock, Phone, Save, User, CheckCircle2, ArrowUpRight, ShoppingBag } from 'lucide-react';
+import { X, Pencil, Trash2, RefreshCw, CreditCard, Clock, Phone, Save, User, CheckCircle2, ArrowUpRight, ShoppingBag, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import { formatBs, formatUsd } from '../../utils/calculatorUtils';
 
 // ─── CustomerDetailSheet ─────────────────────────────────────
 export function CustomerDetailSheet({ customer, isOpen, isAdmin, onClose, onAjustar, onReset, onEdit, onDelete, bcvRate, tasaCop, copEnabled, sales }) {
+    const [expandedSaleId, setExpandedSaleId] = useState(null);
     if (!isOpen || !customer) return null;
 
     const createdDate = customer.createdAt
@@ -101,53 +102,101 @@ export function CustomerDetailSheet({ customer, isOpen, isAdmin, onClose, onAjus
                     {/* Historial */}
                     <div>
                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-3">
-                            <Clock size={12} /> Historial
+                            <Clock size={12} /> Historial de Compras
                         </h4>
                         {(!sales || sales.length === 0) ? (
                             <p className="text-xs text-slate-400 text-center py-6">Sin registros aún</p>
                         ) : (
                             <div className="space-y-2">
-                                {sales.slice(0, 10).map(sale => {
+                                {sales.slice(0, 20).map(sale => {
                                     const date = new Date(sale.timestamp);
                                     const dateStr = date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                     const timeStr = date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: false });
                                     const isCobro = sale.tipo === 'COBRO_DEUDA';
                                     const isFiada = sale.tipo === 'VENTA_FIADA';
                                     const isAnulada = sale.status === 'ANULADA';
+                                    const isExpanded = expandedSaleId === sale.id;
+                                    const hasItems = sale.items && sale.items.length > 0;
                                     return (
-                                        <div key={sale.id} className={`flex items-start gap-2.5 py-2 px-2 bg-slate-50 dark:bg-slate-950 rounded-xl ${isAnulada ? 'opacity-50 grayscale' : ''}`}>
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${isAnulada ? 'bg-slate-200 dark:bg-slate-800' : isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30' : isFiada ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
-                                                {isCobro ? <ArrowUpRight size={14} className={isAnulada ? "text-slate-500" : "text-emerald-500"} /> : isFiada ? <CreditCard size={14} className={isAnulada ? "text-slate-500" : "text-amber-500"} /> : <ShoppingBag size={14} className={isAnulada ? "text-slate-500" : "text-blue-500"} />}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start">
-                                                    <div className="flex flex-col">
-                                                        <p className={`text-xs font-bold ${isAnulada ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
-                                                            {isCobro ? 'Abono de deuda' : isFiada ? 'Venta fiada' : 'Venta'}
-                                                        </p>
-                                                        {isAnulada && <span className="text-[10px] font-black text-red-500 tracking-wider">ANULADA</span>}
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className={`text-xs font-black ${isAnulada ? 'text-slate-400 line-through' : isCobro ? 'text-emerald-500' : isFiada ? 'text-amber-500' : 'text-slate-700 dark:text-white'}`}>
-                                                            {isCobro ? '+' : ''}${formatUsd(sale.totalUsd || 0)}
-                                                        </p>
-                                                        {bcvRate > 0 && !isAnulada && (
-                                                            <p className={`text-[9px] font-bold ${isCobro ? 'text-emerald-400/70' : isFiada ? 'text-amber-400/70' : 'text-slate-400'}`}>
-                                                                {isCobro ? '+' : ''}{formatBs((sale.totalUsd || 0) * bcvRate)} Bs
-                                                            </p>
-                                                        )}
-                                                    </div>
+                                        <div key={sale.id} className={`bg-slate-50 dark:bg-slate-950 rounded-xl overflow-hidden ${isAnulada ? 'opacity-50 grayscale' : ''}`}>
+                                            <div
+                                                className="flex items-start gap-2.5 py-2 px-2 cursor-pointer active:bg-slate-100 dark:active:bg-slate-800/50 transition-colors"
+                                                onClick={() => hasItems && setExpandedSaleId(isExpanded ? null : sale.id)}
+                                            >
+                                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${isAnulada ? 'bg-slate-200 dark:bg-slate-800' : isCobro ? 'bg-emerald-100 dark:bg-emerald-900/30' : isFiada ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                                                    {isCobro ? <ArrowUpRight size={14} className={isAnulada ? "text-slate-500" : "text-emerald-500"} /> : isFiada ? <CreditCard size={14} className={isAnulada ? "text-slate-500" : "text-amber-500"} /> : <ShoppingBag size={14} className={isAnulada ? "text-slate-500" : "text-blue-500"} />}
                                                 </div>
-                                                {sale.items && sale.items.length > 0 && (
-                                                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                                        {sale.items.map(i => i.name).join(', ')}
-                                                    </p>
-                                                )}
-                                                {sale.fiadoUsd > 0 && (
-                                                    <p className="text-[10px] text-amber-500 font-bold mt-0.5">Deuda: ${formatUsd(sale.fiadoUsd)}</p>
-                                                )}
-                                                <p className="text-[9px] text-slate-400 mt-0.5">{dateStr} • {timeStr}</p>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="flex flex-col">
+                                                            <p className={`text-xs font-bold ${isAnulada ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                                {isCobro ? 'Abono de deuda' : isFiada ? 'Venta fiada' : 'Venta'}
+                                                            </p>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                {isAnulada && <span className="text-[9px] font-black text-red-500 tracking-wider">ANULADA</span>}
+                                                                {sale.tableName && (
+                                                                    <span className="text-[9px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                                        <Layers size={8} /> {sale.tableName}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right flex items-center gap-1.5">
+                                                            <div>
+                                                                <p className={`text-xs font-black ${isAnulada ? 'text-slate-400 line-through' : isCobro ? 'text-emerald-500' : isFiada ? 'text-amber-500' : 'text-slate-700 dark:text-white'}`}>
+                                                                    {isCobro ? '+' : ''}${formatUsd(sale.totalUsd || 0)}
+                                                                </p>
+                                                                {bcvRate > 0 && !isAnulada && (
+                                                                    <p className={`text-[9px] font-bold ${isCobro ? 'text-emerald-400/70' : isFiada ? 'text-amber-400/70' : 'text-slate-400'}`}>
+                                                                        {isCobro ? '+' : ''}{formatBs((sale.totalUsd || 0) * bcvRate)} Bs
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            {hasItems && (
+                                                                isExpanded
+                                                                    ? <ChevronUp size={14} className="text-slate-400 shrink-0" />
+                                                                    : <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {!isExpanded && hasItems && (
+                                                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                                            {sale.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                                                        </p>
+                                                    )}
+                                                    {sale.fiadoUsd > 0 && (
+                                                        <p className="text-[10px] text-amber-500 font-bold mt-0.5">Deuda: ${formatUsd(sale.fiadoUsd)}</p>
+                                                    )}
+                                                    <p className="text-[9px] text-slate-400 mt-0.5">{dateStr} • {timeStr}{sale.saleNumber ? ` • #${String(sale.saleNumber).padStart(4, '0')}` : ''}</p>
+                                                </div>
                                             </div>
+                                            {/* Expanded items detail */}
+                                            {isExpanded && hasItems && (
+                                                <div className="px-3 pb-2.5 pt-0.5 border-t border-slate-100 dark:border-slate-800/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5 mt-1.5">Artículos</p>
+                                                    <div className="space-y-1">
+                                                        {sale.items.map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-center">
+                                                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                                                    <span className="text-[10px] font-black text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 w-5 h-5 rounded flex items-center justify-center shrink-0">
+                                                                        {item.isWeight ? item.qty.toFixed(1) : item.qty}
+                                                                    </span>
+                                                                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate">{item.name}</span>
+                                                                </div>
+                                                                <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 shrink-0 ml-2">
+                                                                    ${formatUsd(item.priceUsd * item.qty)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {sale.discountAmountUsd > 0 && (
+                                                        <div className="flex justify-between items-center mt-1.5 pt-1 border-t border-dashed border-slate-200 dark:border-slate-800">
+                                                            <span className="text-[10px] font-bold text-orange-500">Descuento</span>
+                                                            <span className="text-[10px] font-black text-orange-500">-${formatUsd(sale.discountAmountUsd)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}

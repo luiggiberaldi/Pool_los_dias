@@ -18,18 +18,39 @@ export async function processVoidSale(sale, currentSales, currentProducts) {
         return s;
     });
 
-    // 2. Revertir Stock
+    // 2. Revertir Stock (misma lógica que checkoutProcessor pero invertida)
     let updatedProducts = [...currentProducts];
     if (sale.items && sale.items.length > 0) {
+        // Calcular restauraciones por product ID (igual que deductions en checkout)
+        const restorations = {};
+        sale.items.forEach(item => {
+            let restoration = 0;
+            if (item.isWeight) restoration = item.qty;
+            else if (item._mode === 'unit') restoration = (item.qty / (item._unitsPerPackage || 1));
+            else restoration = item.qty;
+
+            if (item.isCombo) {
+                if (item.comboItems && item.comboItems.length > 0) {
+                    // Multi-product combo: restaurar sub-productos
+                    item.comboItems.forEach(ci => {
+                        const ciRestoration = restoration * (ci.qty || 1);
+                        restorations[ci.productId] = (restorations[ci.productId] || 0) + ciRestoration;
+                    });
+                } else if (item.linkedProductId) {
+                    // Legacy single-product combo
+                    const linkedRestoration = restoration * (item.linkedQty || 1);
+                    restorations[item.linkedProductId] = (restorations[item.linkedProductId] || 0) + linkedRestoration;
+                }
+                // Combos no restauran su propio stock
+            } else {
+                const id = item._originalId || item.id;
+                restorations[id] = (restorations[id] || 0) + restoration;
+            }
+        });
+
         updatedProducts = currentProducts.map(p => {
-            const itemsInSale = sale.items.filter(i => (i._originalId || i.id) === p.id);
-            if (itemsInSale.length > 0) {
-                const totalToRestore = itemsInSale.reduce((sum, item) => {
-                    if (item.isWeight) return sum + item.qty;
-                    if (item._mode === 'unit') return sum + (item.qty / (item._unitsPerPackage || 1));
-                    return sum + item.qty;
-                }, 0);
-                return { ...p, stock: round2((p.stock || 0) + totalToRestore) };
+            if (restorations[p.id]) {
+                return { ...p, stock: round2((p.stock || 0) + restorations[p.id]) };
             }
             return p;
         });
