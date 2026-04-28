@@ -129,10 +129,43 @@ export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
 }
 
 /**
+ * Calcula el total de consumo en Bs usando unit_price_bs por item cuando está disponible.
+ * Para combos sin unit_price_bs en DB, busca el priceBs del producto local.
+ * Si no tiene priceBs, usa unit_price_usd * tasa.
+ */
+/**
+ * Calcula el total de consumo en Bs usando unit_price_bs por item cuando está disponible.
+ * Para combos sin unit_price_bs en DB, busca el priceBs del producto en la lista de productos.
+ * Si no tiene priceBs, usa unit_price_usd * tasa.
+ * @param {Array} items - order items con product_id, unit_price_usd, unit_price_bs, qty
+ * @param {number} tasaBCV - tasa de cambio
+ * @param {Array} [productsList] - lista de productos locales para buscar priceBs de combos
+ */
+export function calculateConsumptionBs(items, tasaBCV, productsList = null) {
+    if (!items || items.length === 0) return 0;
+    const products = productsList || [];
+    return round2(items.reduce((acc, item) => {
+        const qty = Number(item.qty) || 0;
+        // 1. DB has unit_price_bs
+        if (item.unit_price_bs != null && Number(item.unit_price_bs) > 0) {
+            return acc + Number(item.unit_price_bs) * qty;
+        }
+        // 2. Fallback: lookup product's priceBs (for combos with independent Bs pricing)
+        const product = products.find(p => p.id === item.product_id);
+        if (product && product.isCombo && product.priceBs > 0) {
+            return acc + product.priceBs * qty;
+        }
+        // 3. Default: USD * rate
+        return acc + (Number(item.unit_price_usd) || 0) * qty * (tasaBCV || 1);
+    }, 0));
+}
+
+/**
  * Calcula el gran total en Bs: tiempo con tasa implícita + consumo con tasa BCV.
  * Acepta un breakdown opcional para modo mixto (convierte piñas y horas por separado).
+ * consumoBsOverride: si se pasa, usa ese valor para el consumo en Bs en vez de totalConsumption * tasa.
  */
-export function calculateGrandTotalBs(timeCost, totalConsumption, gameMode, config, tasaBCV, breakdown = null) {
+export function calculateGrandTotalBs(timeCost, totalConsumption, gameMode, config, tasaBCV, breakdown = null, consumoBsOverride = null) {
     let timeBs;
     if (breakdown && (breakdown.pinaCost > 0 || breakdown.hourCost > 0 || breakdown.libreCost > 0)) {
         const mixed = calculateTimeCostBsBreakdown(breakdown.pinaCost, breakdown.hourCost, config, tasaBCV, breakdown.libreCost);
@@ -140,7 +173,7 @@ export function calculateGrandTotalBs(timeCost, totalConsumption, gameMode, conf
     } else {
         timeBs = calculateTimeCostBs(timeCost, gameMode, config, tasaBCV);
     }
-    const consumoBs = round2(totalConsumption * (tasaBCV || 1));
+    const consumoBs = consumoBsOverride != null ? round2(consumoBsOverride) : round2(totalConsumption * (tasaBCV || 1));
     return round2(timeBs + consumoBs);
 }
 

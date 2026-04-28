@@ -6,7 +6,7 @@ import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useTablesStore } from './store/useTablesStore';
 import { useOrdersStore } from './store/useOrdersStore';
 import { useAuthStore } from './store/authStore';
-import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs, calculateSeatTimeCostBs } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateSeatCostBreakdown, calculateFullTableBreakdown, calculateBreakdownTotalBs, calculateSeatTimeCostBs, calculateConsumptionBs } from '../utils/tableBillingEngine';
 
 const EPSILON = 0.01;
 
@@ -126,8 +126,9 @@ export function useSalesCheckout({
             const seatItems = (tableCheckoutData.currentItems || []).filter(i => i.seat_id === seatId);
             seatItems.forEach(item => {
                 const p = products.find(p => p.id === item.product_id);
+                const _exactBs = p?.isCombo && p?.priceBs > 0 ? p.priceBs : null;
                 syntheticCart.push(p
-                    ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 }
+                    ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0, exactBs: _exactBs }
                     : { id: item.product_id, name: item.product_name || 'Producto', priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: 0, costUsd: 0, unit: 'unidad', category: 'otros', stock: 9999 }
                 );
             });
@@ -172,8 +173,9 @@ export function useSalesCheckout({
                     }
                     seatBd.items.forEach(item => {
                         const p = products.find(p => p.id === item.product_id);
+                        const _exactBs = p?.isCombo && p?.priceBs > 0 ? p.priceBs : null;
                         syntheticCart.push(p
-                            ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 }
+                            ? { ...p, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0, exactBs: _exactBs }
                             : { id: item.product_id, name: item.product_name || 'Producto', priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: 0, costUsd: 0, unit: 'unidad', category: 'otros', stock: 9999 }
                         );
                     });
@@ -209,8 +211,9 @@ export function useSalesCheckout({
             if (tableCheckoutData.currentItems?.length > 0) {
                 tableCheckoutData.currentItems.forEach(item => {
                     const p = products.find(p => p.id === item.product_id);
+                    const _exactBs = p?.isCombo && p?.priceBs > 0 ? p.priceBs : null;
                     if (p) {
-                        syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0 });
+                        syntheticCart.push({ ...p, id: p.id, priceUsdt: Number(item.unit_price_usd), priceUsd: Number(item.unit_price_usd), qty: Number(item.qty), costBs: p.costBs || 0, costUsd: p.costUsd || 0, exactBs: _exactBs });
                     } else {
                         syntheticCart.push({
                             id: item.product_id, _originalId: item.product_id,
@@ -258,8 +261,8 @@ export function useSalesCheckout({
                     tableCheckoutData.timeCost || 0,
                     tableCheckoutData.totalConsumption || 0,
                     session?.game_mode, cfg, effectiveRate,
-                    calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff)
-                ) + calculateSeatTimeCostBs(seats, cfg, effectiveRate);
+                    calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff),
+                    calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate, products)                ) + calculateSeatTimeCostBs(seats, cfg, effectiveRate);
                 console.log('[TableCheckout] Bs guard: totalBsPaid:', totalBsPaid, 'shownBs:', shownBs);
                 if (totalBsPaid >= shownBs - 1) {
                     // User covered the Bs total — snap USD to cover the cart
@@ -281,7 +284,7 @@ export function useSalesCheckout({
                 }
                 // Recalculate fresh time cost with offsets for Bs calculation
                 const freshTimeCost = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff).total;
-                return calculateGrandTotalBs(freshTimeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate);
+                return calculateGrandTotalBs(freshTimeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate, null, calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate));
             })(),
             cartSubtotalUsd: effectiveCartTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,

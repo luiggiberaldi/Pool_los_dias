@@ -4,7 +4,7 @@ import { storageService } from '../utils/storageService';
 import { useSounds } from '../hooks/useSounds';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { useTablesStore } from '../hooks/store/useTablesStore';
-import { calculateGrandTotalBs, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../utils/tableBillingEngine';
+import { calculateGrandTotalBs, calculateFullTableBreakdown, calculateBreakdownTotalBs, calculateConsumptionBs } from '../utils/tableBillingEngine';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useNotifications } from '../hooks/useNotifications';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -186,7 +186,16 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         triggerHaptic && triggerHaptic();
         if (!product.priceUsdt || isNaN(product.priceUsdt) || product.priceUsdt <= 0) { playError(); showToast('Este producto no tiene precio válido. Edítalo primero.', 'warning'); return; }
         const allowNegativeStock = localStorage.getItem('allow_negative_stock') === 'true';
-        const currentStock = parseFloat(product.stock) || 0;
+        let currentStock = parseFloat(product.stock) || 0;
+        if (product.isCombo) {
+            const comboIngredients = product.comboItems?.length > 0
+                ? product.comboItems.map(ci => ({ product: products.find(lp => lp.id === ci.productId), qty: ci.qty }))
+                : product.linkedProductId
+                    ? [{ product: products.find(lp => lp.id === product.linkedProductId), qty: product.linkedQty || 1 }]
+                    : [];
+            if (comboIngredients.length > 0 && comboIngredients.every(i => i.product && i.qty > 0))
+                currentStock = Math.min(...comboIngredients.map(i => Math.floor((i.product.stock ?? 0) / i.qty)));
+        }
         if (!allowNegativeStock && currentStock <= 0) { playError(); showToast(`${product.name}: sin stock`, 'warning'); return; }
         playAdd();
         if (product.sellByUnit && product.unitPriceUsd && !forceMode && !qtyOverride) { setHierarchyPending(product); return; }
@@ -228,7 +237,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
             if (existing && qtyOverride) return prev.map(i => i.id === cartId ? { ...i, qty: i.qty + qtyOverride } : i);
             const itemCostBs = product.costBs || (product.costUsd ? product.costUsd * effectiveRate : 0);
             return [{
-                ...product, id: cartId, name: cartName, priceUsd: priceToUse, exactBs: product.exactBs || null,
+                ...product, id: cartId, name: cartName, priceUsd: priceToUse, exactBs: product.exactBs || (product.isCombo && product.priceBs ? product.priceBs : null),
                 costBs: forceMode === 'unit' ? itemCostBs / (product.unitsPerPackage || 1) : itemCostBs,
                 costUsd: forceMode === 'unit' ? (product.costUsd || 0) / (product.unitsPerPackage || 1) : (product.costUsd || 0),
                 qty: qtyToAdd, isWeight: !!qtyOverride,
@@ -320,7 +329,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                                 <SearchBar ref={searchInputRef} searchTerm={searchTerm} onSearchChange={handleSetSearchTerm}
                                     onKeyDown={handleSearchKeyDown} onPasteBarcode={handlePasteBarcode}
                                     searchResults={searchResults} selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
-                                    effectiveRate={effectiveRate} addToCart={addToCart}
+                                    effectiveRate={effectiveRate} addToCart={addToCart} allProducts={products}
                                     isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
                                     hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
                                     weightPending={weightPending} setWeightPending={setWeightPending} />
@@ -518,7 +527,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                         finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
                     }
                 } else {
-                    finalTotalBs = calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, config, effectiveRate);
+                    finalTotalBs = calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, config, effectiveRate, null, calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate, products));
                     if (discData.active && discData.amountUsd > 0) {
                         finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
                     }

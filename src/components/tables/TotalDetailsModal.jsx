@@ -1,14 +1,23 @@
 import React from 'react';
 import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSeatTimeCostBs } from '../../utils/tableBillingEngine';
 import { Modal } from '../Modal';
+import { useProductContext } from '../../context/ProductContext';
+
+function getItemBs(item, tasaUSD, products) {
+    if (item.unit_price_bs != null && Number(item.unit_price_bs) > 0) return Number(item.unit_price_bs);
+    const p = (products || []).find(pr => pr.id === item.product_id);
+    if (p && p.isCombo && p.priceBs > 0) return p.priceBs;
+    return item.unit_price_usd * tasaUSD;
+}
 
 export function TotalDetailsModal({
     isOpen, onClose,
     table, session, elapsed,
-    timeCost, totalConsumption, grandTotal,
+    timeCost, totalConsumption, consumptionBs, grandTotal,
     costBreakdown, config, tasaUSD,
     currentItems, seatTimeCost = 0,
 }) {
+    const { products: allProducts } = useProductContext();
     // Calcular desglose de horas/piñas de seats
     const seatHours = (session?.seats || []).reduce((sum, s) =>
         sum + (s.timeCharges || []).filter(tc => tc.type === 'hora').reduce((a, tc) => a + (Number(tc.amount) || 0), 0), 0);
@@ -91,7 +100,7 @@ export function TotalDetailsModal({
                         <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Consumo en Mesa</span>
                         <div className="flex flex-col items-end">
                             <span className="text-lg font-black">${totalConsumption.toFixed(2)}</span>
-                            <span className="text-xs font-medium text-slate-400">Bs. {(totalConsumption * tasaUSD).toFixed(2)}</span>
+                            <span className="text-xs font-medium text-slate-400">Bs. {(consumptionBs != null ? consumptionBs : totalConsumption * tasaUSD).toFixed(2)}</span>
                         </div>
                     </div>
                     {currentItems.length > 0 ? (
@@ -104,7 +113,7 @@ export function TotalDetailsModal({
                                     </span>
                                     <div className="flex flex-col items-end shrink-0 ml-2">
                                         <span className="font-bold text-slate-800 dark:text-white">${(item.qty * item.unit_price_usd).toFixed(2)}</span>
-                                        <span className="text-[10px] text-slate-400">Bs. {(item.qty * item.unit_price_usd * tasaUSD).toFixed(2)}</span>
+                                        <span className="text-[10px] text-slate-400">Bs. {(item.qty * getItemBs(item, tasaUSD, allProducts)).toFixed(2)}</span>
                                     </div>
                                 </div>
                             ))}
@@ -125,7 +134,7 @@ export function TotalDetailsModal({
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toFixed(2)}
+                            Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown, consumptionBs) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toFixed(2)}
                         </span>
                     </div>
                 </div>

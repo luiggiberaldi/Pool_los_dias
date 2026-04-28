@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Gift, Search, X, Plus, Minus, Camera, Tag, Percent, Package, CheckCircle, Sparkles } from 'lucide-react';
+import { Gift, Search, X, Plus, Minus, Camera, Tag, Percent, Package, CheckCircle, Sparkles, AlertTriangle } from 'lucide-react';
 import { Modal } from '../Modal';
 import { mulR, divR, round2 } from '../../utils/dinero';
 
@@ -90,17 +90,13 @@ export default function ComboFormModal({
     }, [isOpen, editingCombo, products]);
 
     // ── Handlers ──
-    const handlePriceUsdChange = (val) => {
-        setPriceUsd(val);
-        if (!val || parseFloat(val) <= 0) { setPriceBs(''); return; }
-        setPriceBs(String(mulR(parseFloat(val), effectiveRate)));
-    };
+    const handlePriceUsdChange = (val) => setPriceUsd(val);
+    const handlePriceBsChange = (val) => setPriceBs(val);
 
-    const handlePriceBsChange = (val) => {
-        setPriceBs(val);
-        if (!val || parseFloat(val) <= 0) { setPriceUsd(''); return; }
-        setPriceUsd(String(divR(parseFloat(val), effectiveRate)));
-    };
+    const impliedRate = (parseFloat(priceBs) > 0 && parseFloat(priceUsd) > 0)
+        ? (parseFloat(priceBs) / parseFloat(priceUsd)).toFixed(2)
+        : null;
+    const rateBelowBcv = impliedRate && effectiveRate && parseFloat(impliedRate) < effectiveRate;
 
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
@@ -387,20 +383,6 @@ export default function ComboFormModal({
                             <Sparkles size={11} /> Precio del combo
                         </label>
 
-                        {/* Discount presets */}
-                        <div className="flex gap-1.5">
-                            {[10, 15, 20, 25].map(pct => {
-                                const suggested = round2(individualTotal * (1 - pct / 100));
-                                return (
-                                    <button key={pct} type="button" onClick={() => applyDiscount(pct)}
-                                        className="flex-1 py-2 px-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/40 text-center hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all active:scale-95">
-                                        <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">-{pct}%</div>
-                                        <div className="text-[11px] font-black text-emerald-700 dark:text-emerald-300">${suggested.toFixed(2)}</div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
                         {/* Price inputs */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -429,6 +411,26 @@ export default function ComboFormModal({
                                 />
                             </div>
                         </div>
+
+                        {/* Implied rate indicator */}
+                        {impliedRate && (
+                            <div className={`flex items-center justify-between rounded-xl px-3 py-2 border ${rateBelowBcv
+                                ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40'
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800'}`}>
+                                <span className={`text-[11px] font-bold flex items-center gap-1 ${rateBelowBcv
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-slate-400'}`}>
+                                    {rateBelowBcv && <AlertTriangle size={11} />}
+                                    Tasa implícita
+                                </span>
+                                <span className={`text-sm font-black ${rateBelowBcv
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-slate-500 dark:text-slate-400'}`}>
+                                    {impliedRate} Bs/$
+                                    {rateBelowBcv && <span className="text-[10px] font-bold ml-1">(BCV: {effectiveRate})</span>}
+                                </span>
+                            </div>
+                        )}
 
                         {/* Savings display */}
                         {savingsUsd > 0 && (

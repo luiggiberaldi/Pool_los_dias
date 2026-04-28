@@ -1,5 +1,5 @@
 import { printPreCuentaEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
-import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown } from './tableBillingEngine';
+import { calculateGrandTotalBs, calculateTimeCostBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown, calculateConsumptionBs } from './tableBillingEngine';
 import { round2 } from './dinero';
 
 /**
@@ -168,7 +168,7 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     const totalLabel = hasPaidBefore ? "TOTAL PENDIENTE:" : "TOTAL ESTIMADO:";
     push(`<div class="row total"><span>${totalLabel}</span><span>$${grandTotal.toFixed(2)}</span></div>`);
     const bkdn = calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
-    const refBs = config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, bkdn).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2);
+    const refBs = config ? calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, bkdn, calculateConsumptionBs(currentItems || [], tasaUSD)).toFixed(2) : (grandTotal * (tasaUSD || 1)).toFixed(2);
     push(`<div class="right small">Ref: BS. ${refBs}</div>`);
     push(`<div class="center disclaimer">*** NO ES RECIBO DE PAGO ***</div>`);
 

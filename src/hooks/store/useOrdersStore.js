@@ -170,7 +170,7 @@ export const useOrdersStore = create((set, get) => ({
             if (orderIds.length > 0) {
                 const { data: openItems, error: itemsError } = await supabaseCloud
                     .from('order_items')
-                    .select('id, order_id, product_id, product_name, unit_price_usd, qty, seat_id')
+                    .select('id, order_id, product_id, product_name, unit_price_usd, unit_price_bs, qty, seat_id')
                     .in('order_id', orderIds);
                 if (itemsError) throw itemsError;
                 items = openItems;
@@ -260,6 +260,7 @@ export const useOrdersStore = create((set, get) => ({
                         product_id: productInfo.id,
                         product_name: productInfo.name,
                         unit_price_usd: productInfo.priceUsd || productInfo.priceUsdt || productInfo.price || 0,
+                        unit_price_bs: productInfo.priceBs || null,
                         qty: 1,
                         added_by: creatorId,
                         ...(seatId ? { seat_id: seatId } : {})

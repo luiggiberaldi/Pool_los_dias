@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, Coffee, Layers, ChevronRight, Timer, MessageSquare, Percent, Tag, Trash2, Users, Target } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown, calculateBreakdownTotalBs } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateFullTableBreakdown, calculateBreakdownTotalBs, calculateConsumptionBs } from '../../utils/tableBillingEngine';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useProductContext } from '../../context/ProductContext';
@@ -44,7 +44,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
     const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
-    const { effectiveRate } = useProductContext();
+    const { effectiveRate, products: allProducts } = useProductContext();
     const canDiscount = currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO';
 
     const [discount, setDiscount] = useState({ type: 'percentage', value: 0 });
@@ -86,7 +86,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const fullBreakdown = isTimeFree ? zeroBreakdown : calculateSessionCostBreakdown(elapsed, session?.game_mode, config, session?.hours_paid, session?.extended_times, 0, 0);
     const isMixed = fullBreakdown.hasPinas && fullBreakdown.hasHours;
 
-    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown);
+    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, breakdown, calculateConsumptionBs(currentItems, tasaUSD, allProducts));
 
     // Item discounts: recalculate consumption total
     const itemDiscountTotal = (currentItems || []).reduce((acc, item) => {

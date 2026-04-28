@@ -4,7 +4,8 @@ import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useCashStore } from '../../hooks/store/cashStore';
-import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs, calculateSeatTimeCostBs } from '../../utils/tableBillingEngine';
+import { useProductContext } from '../../context/ProductContext';
+import { formatElapsedTime, calculateElapsedTime, calculateSessionCost, calculateGrandTotalBs, calculateSeatTimeCostBs, calculateConsumptionBs } from '../../utils/tableBillingEngine';
 import { round2 } from '../../utils/dinero';
 import { showToast } from '../Toast';
 
@@ -21,7 +22,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const paidRoundsOffsets = useTablesStore(s => s.paidRoundsOffsets);
     const cachedUsers = useAuthStore(s => s.cachedUsers);
     const tasaUSD = effectiveRate;
-
+    const { products: allProducts } = useProductContext();
     // Ensure realtime is active while this panel is mounted
     useEffect(() => {
         subscribeToRealtime();
@@ -61,6 +62,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                     const order = orders.find(o => o.table_session_id === session.id);
                     const items = order ? orderItems.filter(i => i.order_id === order.id) : [];
                     const totalConsumption = items.reduce((a, i) => a + Number(i.unit_price_usd) * Number(i.qty), 0);
+                    const cBs = calculateConsumptionBs(items, tasaUSD, allProducts);
                     const elapsed = session.started_at ? calculateElapsedTime(session.started_at) : 0;
                     const isTimeFree = table.type === 'NORMAL';
                     const timeCost = isTimeFree ? 0 : calculateSessionCost(elapsed, session.game_mode, config, session.hours_paid, session.extended_times, session.paid_at, (paidHoursOffsets || {})[session.id] || 0, (paidRoundsOffsets || {})[session.id] || 0, session.seats);
@@ -116,7 +118,7 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
                             {/* Total */}
                             <div className="text-right shrink-0">
                                 <p className="font-black text-orange-600 dark:text-orange-400 text-base">${grandTotal.toFixed(2)}</p>
-                                <p className="text-[10px] text-slate-400">Bs {(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, tasaUSD) + calculateSeatTimeCostBs(session.seats, config, tasaUSD)).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-[10px] text-slate-400">Bs {(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, tasaUSD, null, cBs) + calculateSeatTimeCostBs(session.seats, config, tasaUSD)).toLocaleString('es-VE', { maximumFractionDigits: 0 })}</p>
                             </div>
 
                             <ChevronRight size={18} className="text-orange-400 shrink-0" />

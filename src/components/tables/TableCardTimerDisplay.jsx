@@ -8,7 +8,7 @@ export default function TableCardTimerDisplay({
     isAvailable, isTimeFree, isPaidIdle, isMixedMode,
     hasPinas, hasHoursActive, hasLimit, remainingMins, isExceeded,
     isPaused, isLockedForMe,
-    timeCost, grandTotal, totalConsumption,
+    timeCost, grandTotal, totalConsumption, consumptionBs,
     costBreakdown, config, tasaUSD,
     roundsOffset, hoursOffset,
     onAdjustTime, onPauseTimer, onResumeTimer, onShowTotalDetails,
@@ -144,7 +144,7 @@ export default function TableCardTimerDisplay({
                             </div>
                             {tasaUSD > 0 && (
                                 <span className="text-[10px] font-semibold text-emerald-200/70 leading-tight">
-                                    Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    Bs. {(calculateGrandTotalBs(timeCost, totalConsumption, session?.game_mode, config, tasaUSD, costBreakdown, consumptionBs) + calculateSeatTimeCostBs(session?.seats, config, tasaUSD)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                             )}
                         </div>

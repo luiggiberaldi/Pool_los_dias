@@ -4,6 +4,17 @@ import { BODEGA_CATEGORIES, CATEGORY_ICONS, CATEGORY_COLORS } from '../../config
 
 const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
+function getEffectiveStock(p, allProducts) {
+    if (!p.isCombo) return p.stock ?? 0;
+    const items = p.comboItems?.length > 0
+        ? p.comboItems.map(ci => ({ product: (allProducts || []).find(lp => lp.id === ci.productId), qty: ci.qty }))
+        : p.linkedProductId
+            ? [{ product: (allProducts || []).find(lp => lp.id === p.linkedProductId), qty: p.linkedQty || 1 }]
+            : [];
+    if (items.length === 0 || !items.every(i => i.product && i.qty > 0)) return 0;
+    return Math.min(...items.map(i => Math.floor((i.product.stock ?? 0) / i.qty)));
+}
+
 const SearchBar = forwardRef(function SearchBar({
     searchTerm,
     onSearchChange,
@@ -14,6 +25,7 @@ const SearchBar = forwardRef(function SearchBar({
     setSelectedIndex,
     effectiveRate,
     addToCart,
+    allProducts,
     isRecording,
     isProcessingAudio,
     startRecording,
@@ -74,8 +86,9 @@ const SearchBar = forwardRef(function SearchBar({
             {searchResults.length > 0 && (
                 <div className="absolute top-full mt-2 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden">
                     {searchResults.map((p, index) => {
-                        const isLowStock = (p.stock ?? 0) <= (p.lowStockAlert ?? 5) && (p.stock ?? 0) >= 0;
-                        const isOutOfStock = (p.stock ?? 0) === 0;
+                        const stock = getEffectiveStock(p, allProducts);
+                        const isLowStock = stock <= (p.lowStockAlert ?? 5) && stock >= 0;
+                        const isOutOfStock = stock === 0;
                         const catInfo = BODEGA_CATEGORIES.find(c => c.id === p.category);
                         const catColor = catInfo ? CATEGORY_COLORS[catInfo.color] : null;
                         const CatIcon = catInfo ? CATEGORY_ICONS[catInfo.id] : null;
@@ -113,7 +126,7 @@ const SearchBar = forwardRef(function SearchBar({
                                         <span className={`text-[10px] font-medium flex items-center gap-1
                                             ${isOutOfStock ? 'text-red-500' : isLowStock ? 'text-amber-500' : 'text-slate-400'}`}>
                                             {isLowStock && !isOutOfStock && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
-                                            {isOutOfStock ? 'Sin stock' : `Stock: ${p.stock ?? 0}`}
+                                            {isOutOfStock ? 'Sin stock' : `Stock: ${stock}`}
                                         </span>
                                     </div>
                                 </div>

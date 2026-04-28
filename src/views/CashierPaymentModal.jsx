@@ -4,7 +4,7 @@ import { useTablesStore } from '../hooks/store/useTablesStore';
 import { useOrdersStore } from '../hooks/store/useOrdersStore';
 import { useAuthStore } from '../hooks/store/authStore';
 import { useCustomersStore } from '../hooks/store/useCustomersStore';
-import { calculateSessionCost, calculateElapsedTime, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid } from '../utils/tableBillingEngine';
+import { calculateSessionCost, calculateElapsedTime, calculateGrandTotalBs, calculateSessionCostBreakdown, formatHoursPaid, calculateConsumptionBs } from '../utils/tableBillingEngine';
 import { Modal } from '../components/Modal';
 import { processSaleTransaction } from '../utils/checkoutProcessor';
 import { useProductContext } from '../context/ProductContext';
@@ -107,7 +107,8 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
     const totalReceivedInUSD = round2(rUsd + divR(rBs, rates));
 
     const changeUSD = totalReceivedInUSD > grandTotal ? round2(subR(totalReceivedInUSD, grandTotal)) : 0;
-    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates);
+    const _cBs = calculateConsumptionBs(currentItems, rates, products);
+    const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates, null, _cBs);
     // Bs remaining/change proportional to USD ratio (Bs prices are independent from $ × tasa)
     const remainingUSD = totalReceivedInUSD < grandTotal ? round2(subR(grandTotal, totalReceivedInUSD)) : 0;
     const remainingBs = grandTotal > 0 ? round2((remainingUSD / grandTotal) * grandTotalBs) : 0;
@@ -131,6 +132,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                 name: item.product_name,
                 qty: item.qty,
                 priceUsd: Number(item.unit_price_usd),
+                exactBs: item.unit_price_bs != null && Number(item.unit_price_bs) > 0 ? Number(item.unit_price_bs) : null,
                 isWeight: false
             }));
 
@@ -204,7 +206,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
             const saleResult = await processSaleTransaction({
                 cart,
                 cartTotalUsd: grandTotal,
-                cartTotalBs: calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates),
+                cartTotalBs: calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates, null, _cBs),
                 cartSubtotalUsd: grandTotal,
                 payments: paymentPayload,
                 changeBreakdown: { changeUsdGiven: changeUSD, changeBsGiven: changeBs },
@@ -369,7 +371,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                             ${grandTotal.toFixed(2)}
                         </span>
                         <span className="text-sm font-bold text-emerald-600/80 dark:text-emerald-400/80">
-                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates).toFixed(2)}
+                            Bs. {calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates, null, _cBs).toFixed(2)}
                         </span>
                     </div>
                 </div>
@@ -406,7 +408,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                                     ${divR(grandTotal, splitPeople).toFixed(2)}
                                 </span>
                                 <span className="text-xs font-bold text-violet-600/70 dark:text-violet-400/70 mt-0.5">
-                                    Bs. {divR(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates), splitPeople).toFixed(2)}
+                                    Bs. {divR(calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates, null, _cBs), splitPeople).toFixed(2)}
                                 </span>
                             </div>
                         </div>

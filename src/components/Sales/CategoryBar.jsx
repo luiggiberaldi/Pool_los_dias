@@ -69,7 +69,18 @@ export default function CategoryBar({
                 <div className="flex-1 overflow-y-auto min-h-0 pb-2">
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2">
                         {visibleProducts.map(p => {
-                            const isOut = (p.stock ?? 0) <= 0;
+                            let effectiveStock = p.stock ?? 0;
+                            if (p.isCombo) {
+                                const items = p.comboItems?.length > 0
+                                    ? p.comboItems.map(ci => ({ product: products.find(lp => lp.id === ci.productId), qty: ci.qty }))
+                                    : p.linkedProductId
+                                        ? [{ product: products.find(lp => lp.id === p.linkedProductId), qty: p.linkedQty }]
+                                        : [];
+                                effectiveStock = items.length > 0 && items.every(i => i.product && i.qty > 0)
+                                    ? Math.min(...items.map(i => Math.floor((i.product.stock ?? 0) / i.qty)))
+                                    : 0;
+                            }
+                            const isOut = effectiveStock <= 0;
                             const isDisabled = isOut && !allowNegativeStock;
                             const CatIcon = CATEGORY_ICONS[p.category] || Package;
                             return (
@@ -88,7 +99,7 @@ export default function CategoryBar({
                                     </div>
                                     <p className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 leading-tight line-clamp-2 mb-1">{p.name}</p>
                                     <p className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-400">${p.priceUsdt?.toFixed(2)}</p>
-                                    <p className="text-[9px] text-slate-400 font-medium">{isOut ? 'Agotado' : `${p.stock ?? 0} disp.`}</p>
+                                    <p className="text-[9px] text-slate-400 font-medium">{isOut ? 'Agotado' : `${effectiveStock} disp.`}</p>
                                 </button>
                             );
                         })}

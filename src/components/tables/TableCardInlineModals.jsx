@@ -12,7 +12,7 @@ import { TotalDetailsModal } from './TotalDetailsModal';
 import { AttributionModal } from './AttributionModal';
 
 export default function TableCardInlineModals({
-    table, session, elapsed, timeCost, seatTimeCost, totalConsumption, grandTotal,
+    table, session, elapsed, timeCost, seatTimeCost, totalConsumption, consumptionBs, grandTotal,
     costBreakdown, config, tasaUSD, currentItems, currentUser,
     hasPinas, isMixedMode, hasHoursActive, hasLimit,
     isProcessingCharge,
@@ -209,6 +209,7 @@ export default function TableCardInlineModals({
             elapsed={elapsed}
             timeCost={timeCost}
             totalConsumption={totalConsumption}
+            consumptionBs={consumptionBs}
             grandTotal={grandTotal}
             costBreakdown={costBreakdown}
             config={config}

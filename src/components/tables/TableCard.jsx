@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Printer, X, Users, UserCheck, Lock, MessageSquare } from 'lucide-react';
-import { calculateElapsedTime, calculateSessionCost, calculateSessionCostBreakdown } from '../../utils/tableBillingEngine';
+import { calculateElapsedTime, calculateSessionCost, calculateSessionCostBreakdown, calculateConsumptionBs } from '../../utils/tableBillingEngine';
 import { round2 } from '../../utils/dinero';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -121,6 +121,7 @@ export default function TableCard({ table, session }) {
     const order = session ? allOrders.find(o => o.table_session_id === session.id) : null;
     const currentItems = order ? allItems.filter(i => i.order_id === order.id) : [];
     const totalConsumption = currentItems.reduce((acc, item) => acc + (Number(item.unit_price_usd) * Number(item.qty)), 0);
+    const consumptionBs = calculateConsumptionBs(currentItems, tasaUSD, products);
     
     const handleCancelTable = async () => {
         setShowCancelModal(false);
@@ -607,6 +608,7 @@ export default function TableCard({ table, session }) {
                 timeCost={timeCost}
                 grandTotal={grandTotal}
                 totalConsumption={totalConsumption}
+                consumptionBs={consumptionBs}
                 costBreakdown={costBreakdown}
                 config={config}
                 tasaUSD={tasaUSD}
@@ -660,6 +662,7 @@ export default function TableCard({ table, session }) {
             timeCost={timeCost}
             seatTimeCost={seatTimeCost}
             totalConsumption={totalConsumption}
+            consumptionBs={consumptionBs}
             grandTotal={grandTotal}
             costBreakdown={costBreakdown}
             config={config}
