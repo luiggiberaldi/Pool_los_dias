@@ -27,15 +27,20 @@ function _getOrdersBroadcastChannel(userId) {
 }
 
 /** Notifica a otros dispositivos que las órdenes cambiaron */
-function _broadcastOrdersChanged() {
-    const uid = _cachedUserId;
+async function _broadcastOrdersChanged() {
+    // Resolver userId en el momento — evita race condition si _cachedUserId aún es null
+    const uid = _cachedUserId || await getAuthUserId();
     if (!uid) return;
     try {
-        _getOrdersBroadcastChannel(uid).send({
-            type: 'broadcast',
-            event: 'orders_changed',
-            payload: { ts: Date.now() },
-        });
+        const ch = _getOrdersBroadcastChannel(uid);
+        // Solo enviar si el canal ya está suscrito; si no, el fallback WAL cubre el caso
+        if (ch.state === 'joined') {
+            ch.send({
+                type: 'broadcast',
+                event: 'orders_changed',
+                payload: { ts: Date.now() },
+            });
+        }
     } catch (_) { /* non-fatal */ }
 }
 
@@ -84,6 +89,9 @@ export const useOrdersStore = create((set, get) => ({
             
             // Sync initial state
             get().syncOrders();
+            // Suscribir canal realtime temprano para que esté listo antes del primer addItem
+            // El guard interno evita doble suscripción si useAppInit lo llama después
+            get().subscribeToRealtime();
         } catch (e) {
             console.error('Error loading orders cache:', e);
             set({ loading: false });
@@ -112,6 +120,13 @@ export const useOrdersStore = create((set, get) => ({
             const channel = _getOrdersBroadcastChannel(userId)
                 .on('broadcast', { event: 'orders_changed' }, () => {
                     console.log("[REALTIME] orders broadcast received");
+                    retryCount = 0;
+                    debouncedSync();
+                })
+                // Fallback WAL: garantiza sync aunque el broadcast falle
+                // (mismo patrón que table_sessions en tableRealtimeActions.js)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+                    console.log('[REALTIME] order_items DB change — syncing');
                     retryCount = 0;
                     debouncedSync();
                 })
