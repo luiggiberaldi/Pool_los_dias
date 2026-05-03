@@ -169,11 +169,16 @@ export const useOrdersStore = create((set, get) => ({
     syncOrders: async () => {
         try {
             const userId = await getAuthUserId();
-            // Fetch OPEN orders, filtrado por user_id si la columna existe
+
+            // Filtro de seguridad: solo órdenes OPEN de las últimas 48h para evitar
+            // acumular cientos de IDs que superan el límite de URL de PostgREST
+            const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
             let query = supabaseCloud
                 .from('orders')
                 .select('id, table_id, table_session_id, status, exchange_rate_used, user_id, created_at')
-                .eq('status', 'OPEN');
+                .eq('status', 'OPEN')
+                .gte('created_at', since);
             if (userId) query = query.eq('user_id', userId);
 
             const { data: openOrders, error: orderError } = await query;
@@ -181,14 +186,28 @@ export const useOrdersStore = create((set, get) => ({
 
             const orderIds = openOrders.map(o => o.id);
             let items = [];
-            
+
             if (orderIds.length > 0) {
-                const { data: openItems, error: itemsError } = await supabaseCloud
-                    .from('order_items')
-                    .select('id, order_id, product_id, product_name, unit_price_usd, unit_price_bs, qty, seat_id')
-                    .in('order_id', orderIds);
-                if (itemsError) throw itemsError;
-                items = openItems;
+                // Usar JOIN vía select embebido para evitar URL larga con .in() masivo
+                // Fallback: si hay demasiados IDs (>50), hacer query con JOIN directo
+                if (orderIds.length <= 50) {
+                    const { data: openItems, error: itemsError } = await supabaseCloud
+                        .from('order_items')
+                        .select('id, order_id, product_id, product_name, unit_price_usd, unit_price_bs, qty, seat_id')
+                        .in('order_id', orderIds);
+                    if (itemsError) throw itemsError;
+                    items = openItems || [];
+                } else {
+                    // Demasiadas órdenes OPEN — traer items via created_at para evitar URL enorme
+                    const { data: openItems, error: itemsError } = await supabaseCloud
+                        .from('order_items')
+                        .select('id, order_id, product_id, product_name, unit_price_usd, unit_price_bs, qty, seat_id')
+                        .gte('created_at', since);
+                    if (itemsError) throw itemsError;
+                    // Filtrar en cliente para que solo queden los que pertenecen a órdenes abiertas
+                    const openSet = new Set(orderIds);
+                    items = (openItems || []).filter(i => openSet.has(i.order_id));
+                }
             }
 
             set({ orders: openOrders, orderItems: items });
