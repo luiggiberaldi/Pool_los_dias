@@ -1,6 +1,7 @@
 import { supabaseCloud } from '../../config/supabaseCloud';
 import { logEvent } from '../../services/auditService';
 import { useAuthStore } from './authStore';
+import { useOrdersStore } from './useOrdersStore';
 
 const getUser = () => useAuthStore.getState().currentUser;
 const getAuthUserId = async () => {
@@ -148,6 +149,14 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
         } catch (error) {
             console.warn('Cierre en nube fallido, encolado.');
             await get().addPendingAction({ type: 'CLOSE_SESSION', sessionId, payload: updatePayload });
+        }
+
+        // Capa 1: Cerrar/eliminar la orden asociada para evitar órdenes huérfanas
+        try {
+            await useOrdersStore.getState().cancelOrderBySessionId(sessionId);
+        } catch (_) {
+            // Non-fatal: si falla, la Capa 3 (trigger DB) lo resuelve
+            console.warn('[closeSession] No se pudo cerrar la orden asociada — el trigger DB lo resolverá');
         }
     },
 
