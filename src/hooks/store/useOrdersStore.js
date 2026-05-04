@@ -182,9 +182,8 @@ export const useOrdersStore = create((set, get) => ({
             // NO filtrar por user_id — todos los dispositivos deben ver todas las órdenes
             // El aislamiento por cuenta ya lo garantiza RLS + el vínculo con table_sessions
 
-            const { data: fetchedOrders, error: orderError } = await query;
+            const { data: openOrders, error: orderError } = await query;
             if (orderError) throw orderError;
-            let openOrders = fetchedOrders;
 
             const orderIds = openOrders.map(o => o.id);
             let items = [];
@@ -208,38 +207,6 @@ export const useOrdersStore = create((set, get) => ({
                 for (const { data, error } of results) {
                     if (error) throw error;
                     items = items.concat(data || []);
-                }
-            }
-
-            // Capa 2: Detectar y cerrar órdenes huérfanas en background
-            // (órdenes OPEN cuya sesión ya no está ACTIVE/CHECKOUT)
-            if (openOrders.length > 0) {
-                const sessionIds = [...new Set(openOrders.map(o => o.table_session_id).filter(Boolean))];
-                if (sessionIds.length > 0) {
-                    const { data: activeSessions } = await supabaseCloud
-                        .from('table_sessions')
-                        .select('id')
-                        .in('id', sessionIds.slice(0, 50))
-                        .in('status', ['ACTIVE', 'CHECKOUT']);
-
-                    const activeSet = new Set((activeSessions || []).map(s => s.id));
-                    const orphanOrders = openOrders.filter(o => o.table_session_id && !activeSet.has(o.table_session_id));
-
-                    if (orphanOrders.length > 0) {
-                        console.warn(`[syncOrders] Detectadas ${orphanOrders.length} órdenes huérfanas — cerrando en background`);
-                        const orphanIds = orphanOrders.map(o => o.id);
-                        // Cerrar en DB sin bloquear la UI
-                        supabaseCloud
-                            .from('orders')
-                            .update({ status: 'CANCELLED' })
-                            .in('id', orphanIds)
-                            .then(() => console.log(`[syncOrders] ${orphanIds.length} órdenes huérfanas cerradas`))
-                            .catch(e => console.warn('[syncOrders] Error cerrando huérfanas:', e));
-                        // Excluir huérfanas del estado local inmediatamente
-                        const orphanSet = new Set(orphanIds);
-                        openOrders = openOrders.filter(o => !orphanSet.has(o.id));
-                        items = items.filter(i => !orphanSet.has(i.order_id));
-                    }
                 }
             }
 
