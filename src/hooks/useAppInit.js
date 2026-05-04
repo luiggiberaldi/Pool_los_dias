@@ -9,6 +9,11 @@ export function useAppInit() {
     const [cloudSession, setCloudSession] = useState(null);
     const [checkingSession, setCheckingSession] = useState(true);
     const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+    
+    // Control de Versiones
+    const CURRENT_APP_VERSION = 2; // Incrementar este número para forzar actualización
+    const [isVersionObsolete, setIsVersionObsolete] = useState(false);
+    const [requiredVersion, setRequiredVersion] = useState(null);
 
     const clearUsersCache = useAuthStore(s => s.clearUsersCache);
     const setCloudEmail = useAuthStore(s => s.setCloudEmail);
@@ -37,6 +42,28 @@ export function useAppInit() {
 
         const applySession = async (session) => {
             if (!mounted) return;
+
+            // 1. Check de versión global antes de inicializar nada
+            try {
+                const { data: versionData } = await supabaseCloud
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'min_app_version')
+                    .single();
+                
+                if (versionData && versionData.value) {
+                    const reqVersion = parseInt(versionData.value, 10);
+                    if (CURRENT_APP_VERSION < reqVersion) {
+                        setRequiredVersion(reqVersion);
+                        setIsVersionObsolete(true);
+                        setCheckingSession(false);
+                        return; // Abortar inicio si la versión es obsoleta
+                    }
+                }
+            } catch (e) {
+                console.warn('[AppInit] Error al chequear versión de la app:', e);
+                // Si falla (ej. sin internet), continuamos con la ejecución normal
+            }
 
             if (!session?.user?.email) {
                 setCloudEmail(null);
@@ -136,11 +163,8 @@ export function useAppInit() {
             }
         });
 
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
-    }, []);
+        return () => { mounted = false; subscription.unsubscribe(); };
+    }, [setCloudEmail]);
 
     return {
         cloudSession,
@@ -148,5 +172,8 @@ export function useAppInit() {
         showPasswordRecovery,
         setShowPasswordRecovery,
         setCloudSession,
+        isVersionObsolete,
+        currentVersion: CURRENT_APP_VERSION,
+        requiredVersion
     };
 }

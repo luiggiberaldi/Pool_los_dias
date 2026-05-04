@@ -39,6 +39,7 @@ import { useConfirm } from './hooks/useConfirm.jsx';
 import { useAppInit } from './hooks/useAppInit';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { useGlobalTableAlerts } from './hooks/useGlobalTableAlerts';
+import AppVersionLock from './components/AppVersionLock';
 
 // Nombre del negocio fijo para todos los dispositivos (module-level, runs once on import)
 if (!localStorage.getItem('business_name')) {
@@ -52,7 +53,7 @@ export default function App() {
   useCloudSync();
 
   // Cloud Auth Session + Realtime Subscriptions
-  const { cloudSession, checkingSession, showPasswordRecovery, setShowPasswordRecovery, setCloudSession } = useAppInit();
+  const { cloudSession, checkingSession, showPasswordRecovery, setShowPasswordRecovery, setCloudSession, isVersionObsolete, currentVersion, requiredVersion } = useAppInit();
 
   // PWA Install Prompt
   const { installPrompt, showIOSInstall, setShowIOSInstall, showIOSButton, handleInstall, dismissIOSInstall } = useInstallPrompt();
@@ -203,6 +204,10 @@ export default function App() {
   }, [role, activeTab, cajeroVeMesas]);
 
   // Global Hard Gate: Loading State
+  if (isVersionObsolete) {
+    return <AppVersionLock currentVersion={currentVersion} requiredVersion={requiredVersion} />;
+  }
+
   if (checkingSession) {
     return (
       <div className="h-[100dvh] w-full bg-[#F8FAFC] flex items-center justify-center">
