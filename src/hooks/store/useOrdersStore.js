@@ -179,7 +179,8 @@ export const useOrdersStore = create((set, get) => ({
                 .select('id, table_id, table_session_id, status, exchange_rate_used, user_id, created_at')
                 .eq('status', 'OPEN')
                 .gte('created_at', since);
-            if (userId) query = query.eq('user_id', userId);
+            // NO filtrar por user_id — todos los dispositivos deben ver todas las órdenes
+            // El aislamiento por cuenta ya lo garantiza RLS + el vínculo con table_sessions
 
             const { data: openOrders, error: orderError } = await query;
             if (orderError) throw orderError;
