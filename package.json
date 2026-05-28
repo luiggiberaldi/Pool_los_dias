@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "prettier": "prettier --write .",
     "linc": "eslint .",
+    "save-seed": "node scripts/save-seed.js",
     "preview": "vite preview"
   },
   "dependencies": {

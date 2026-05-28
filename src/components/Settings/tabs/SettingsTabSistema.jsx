@@ -8,6 +8,10 @@ import AuditLogViewer from '../AuditLogViewer';
 import WebSerialPanel from '../WebSerialPanel';
 
 import { useAudit } from '../../../hooks/useAudit';
+import { useConfirm } from '../../../hooks/useConfirm.jsx';
+import { useProductContext } from '../../../context/ProductContext';
+import { initialProducts } from '../../../config/initialProducts';
+import { showToast } from '../../../components/Toast';
 
 export default function SettingsTabSistema({
     theme, toggleTheme,
@@ -23,6 +27,28 @@ export default function SettingsTabSistema({
     triggerHaptic,
 }) {
     const { log } = useAudit();
+    const confirm = useConfirm();
+    const { setProducts } = useProductContext();
+
+    const handleRestoreSeedWithAudit = async () => {
+        if (!isAdmin) return;
+        triggerHaptic && triggerHaptic();
+        const ok = await confirm({
+            title: '¿Restaurar Catálogo Base?',
+            message: '¿Estás seguro que deseas restablecer el catálogo de productos al estado base del código? Esto reemplazará tu inventario actual en este dispositivo y se subirá de nuevo a la nube.',
+            confirmText: 'Sí, restaurar',
+            variant: 'warning'
+        });
+        if (ok) {
+            try {
+                await setProducts(initialProducts);
+                log('CONFIG', 'CONFIG_SISTEMA_CAMBIADA', 'Catálogo semilla restaurado desde código', { count: initialProducts.length });
+                showToast('Catálogo base restaurado con éxito', 'success');
+            } catch (err) {
+                showToast('Error al restaurar catálogo base', 'error');
+            }
+        }
+    };
 
     const handleThemeToggleWithAudit = () => {
         const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -80,6 +106,17 @@ export default function SettingsTabSistema({
                         </div>
                         <ChevronRight size={16} className="text-slate-300" />
                     </button>
+
+                    {isAdmin && (
+                        <button onClick={handleRestoreSeedWithAudit} className="w-full flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]">
+                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg"><RotateCcw size={18} className="text-indigo-500" /></div>
+                            <div className="text-left flex-1">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Restaurar Catálogo Base</p>
+                                <p className="text-[10px] text-slate-400">Recargar 23 productos semilla del código</p>
+                            </div>
+                            <ChevronRight size={16} className="text-slate-300" />
+                        </button>
+                    )}
                 </div>
 
                 {importStatus && (

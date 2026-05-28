@@ -5,6 +5,7 @@ import { BODEGA_CATEGORIES } from '../config/categories';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { fetchCloudProducts } from '../hooks/useCloudSync';
 import { useAuthStore } from '../hooks/store/authStore';
+import { initialProducts } from '../config/initialProducts';
 
 const ProductContext = createContext();
 
@@ -226,6 +227,34 @@ export function ProductProvider({ children, rates }) {
                             // 3. Nube respondió: usar datos de la nube como fuente de verdad
                             const cloudProducts = cloudData.products || [];
                             const cloudCategories = cloudData.categories || BODEGA_CATEGORIES;
+
+                            // [GUARDIA ANTI-WIPE] Si la nube retorna 0 productos pero localmente sí tenemos productos en caché,
+                            // no sobreescribir la memoria local. Conservar local y marcar sincronización de vuelta (autoreparación).
+                            const localProducts = await storageService.getItem('bodega_products_v1', []);
+                            if (cloudProducts.length === 0 && localProducts.length > 0) {
+                                console.warn(`[ProductContext] La nube retornó 0 productos, pero local tiene ${localProducts.length} productos. Conservando caché local para evitar wipes.`);
+                                _setProducts(localProducts);
+                                _setCategories(cloudCategories);
+                                // Sincronizar de vuelta a la nube tras 1.5s para reparar el servidor
+                                setTimeout(() => {
+                                    setProducts(localProducts);
+                                    console.log('[ProductContext] Catálogo local restaurado de vuelta a Supabase con éxito.');
+                                }, 1500);
+                                if (isMounted) setIsLoadingProducts(false);
+                                return;
+                            }
+
+                            // [GUARDIA DUAL-EMPTY] Si tanto la nube como el almacenamiento local están en 0 (tablet nueva + nube vacía),
+                            // cargar el catálogo semilla de emergencia para mantener el POS operativo.
+                            if (cloudProducts.length === 0 && localProducts.length === 0) {
+                                console.warn('[ProductContext] Vacío total (nube y local en 0). Cargando catálogo semilla de código.');
+                                _setProducts(initialProducts);
+                                _setCategories(BODEGA_CATEGORIES);
+                                await storageService.setItem('bodega_products_v1', initialProducts);
+                                if (isMounted) setIsLoadingProducts(false);
+                                return;
+                            }
+
                             _setProducts(cloudProducts);
                             _setCategories(cloudCategories);
                             // Cachear en local para offline (sin triggear push de vuelta)
@@ -244,7 +273,13 @@ export function ProductProvider({ children, rates }) {
                 const savedProducts = await storageService.getItem('bodega_products_v1', []);
                 const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
                 if (isMounted) {
-                    _setProducts(savedProducts);
+                    if (savedProducts.length === 0) {
+                        console.warn('[ProductContext] Caché local vacío en modo offline. Cargando catálogo semilla de código.');
+                        _setProducts(initialProducts);
+                        await storageService.setItemSilent('bodega_products_v1', initialProducts);
+                    } else {
+                        _setProducts(savedProducts);
+                    }
                     _setCategories(savedCategories);
                     setIsLoadingProducts(false);
                 }
@@ -254,7 +289,11 @@ export function ProductProvider({ children, rates }) {
                 const savedProducts = await storageService.getItem('bodega_products_v1', []);
                 const savedCategories = await storageService.getItem('poolbar_categories_v1', BODEGA_CATEGORIES);
                 if (isMounted) {
-                    _setProducts(savedProducts);
+                    if (savedProducts.length === 0) {
+                        _setProducts(initialProducts);
+                    } else {
+                        _setProducts(savedProducts);
+                    }
                     _setCategories(savedCategories);
                     setIsLoadingProducts(false);
                 }
