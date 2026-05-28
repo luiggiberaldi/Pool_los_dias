@@ -126,15 +126,21 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
         setIsProcessing(true);
         try {
             // 1. Armar el carrito de compras a partir de currentItems
-            const cart = currentItems.map(item => ({
-                id: item.product_id,
-                _originalId: item.product_id,
-                name: item.product_name,
-                qty: item.qty,
-                priceUsd: Number(item.unit_price_usd),
-                exactBs: item.unit_price_bs != null && Number(item.unit_price_bs) > 0 ? Number(item.unit_price_bs) : null,
-                isWeight: false
-            }));
+            const cart = currentItems.map(item => {
+                const p = products?.find(prod => prod.id === item.product_id);
+                const _exactBs = item.unit_price_bs != null && Number(item.unit_price_bs) > 0 
+                    ? Number(item.unit_price_bs) 
+                    : (p && p.isCombo && p.priceBs > 0 ? p.priceBs : null);
+                return {
+                    id: item.product_id,
+                    _originalId: item.product_id,
+                    name: item.product_name,
+                    qty: item.qty,
+                    priceUsd: Number(item.unit_price_usd),
+                    exactBs: _exactBs,
+                    isWeight: false
+                };
+            });
 
             // 2. Si la mesa cobró tiempo, ingresarlo como ítems separados (piñas + horas)
             if (timeCost > 0) {

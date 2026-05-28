@@ -280,11 +280,11 @@ export function useSalesCheckout({
                 if (seats.length > 0) {
                     const itf = tableCheckoutData.table?.type === 'NORMAL';
                     const fb = calculateFullTableBreakdown(session, seats, tableCheckoutData.elapsed, cfg, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, itf, hoursOff, roundsOff);
-                    return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate)) : round2(effectiveCartTotal * effectiveRate);
+                    return fb ? round2(calculateBreakdownTotalBs(fb, cfg, effectiveRate, products)) : round2(effectiveCartTotal * effectiveRate);
                 }
                 // Recalculate fresh time cost with offsets for Bs calculation
                 const freshTimeCost = calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff).total;
-                return calculateGrandTotalBs(freshTimeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate, null, calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate));
+                return calculateGrandTotalBs(freshTimeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, cfg, effectiveRate, null, calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate, products));
             })(),
             cartSubtotalUsd: effectiveCartTotal,
             payments, changeBreakdown, selectedCustomerId, customers, products,

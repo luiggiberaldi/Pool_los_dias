@@ -12,6 +12,15 @@ const DEFAULT_EUR_USD_RATIO = 1.18;
 const UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutos (era 30s)
 
 const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
+const NEXT_PUBLIC_BCV_API = import.meta.env.NEXT_PUBLIC_BCV_API || import.meta.env.VITE_NEXT_PUBLIC_BCV_API || '';
+const BCV_TOKEN = import.meta.env.BCV_TOKEN || import.meta.env.VITE_BCV_TOKEN || '';
+
+const getSecondaryBcvUrl = () => {
+    if (!NEXT_PUBLIC_BCV_API || NEXT_PUBLIC_BCV_API.includes('TU_URL')) return '';
+    const separator = NEXT_PUBLIC_BCV_API.includes('?') ? '&' : '?';
+    return BCV_TOKEN ? `${NEXT_PUBLIC_BCV_API}${separator}token=${BCV_TOKEN}` : NEXT_PUBLIC_BCV_API;
+};
+const SECONDARY_BCV_URL = getSecondaryBcvUrl();
 
 const RATES_DEVICE_ID = crypto.randomUUID();
 
@@ -113,13 +122,15 @@ export function useRates() {
         };
 
         try {
-            // Fetch en paralelo: datos privados (Google Script), dolarapi fallback, y external rates (Euro, COP)
-            const taskPrivate = fetchGeneric(GOOGLE_SCRIPT_URL);
+            // Fetch en paralelo: datos privados (Google Script), datos secundarios (si están configurados), dolarapi fallback, y external rates (Euro, COP)
+            const taskPrivate = GOOGLE_SCRIPT_URL ? fetchGeneric(GOOGLE_SCRIPT_URL) : Promise.resolve(null);
+            const taskSecondary = SECONDARY_BCV_URL ? fetchGeneric(SECONDARY_BCV_URL) : Promise.resolve(null);
             const taskDolarApi = fetchGeneric('https://ve.dolarapi.com/v1/dolares');
             const taskExternal = getExternalRatesFallback();
 
-            const [privateData, bcvFallbackData, externalRates] = await Promise.all([
+            const [privateData, secondaryData, bcvFallbackData, externalRates] = await Promise.all([
                 taskPrivate.catch(() => null),
+                taskSecondary.catch(() => null),
                 taskDolarApi.catch(() => null),
                 taskExternal.catch(() => ({ eur: DEFAULT_EUR_USD_RATIO, cop: null }))
             ]);
@@ -127,6 +138,7 @@ export function useRates() {
             const euroFactor = externalRates.eur;
 
             if (privateData) log("✅ Datos Privados Recibidos", "success");
+            if (secondaryData) log("✅ Datos de Respaldo Recibidos", "success");
 
             let newRates = { ...(ratesRef.current || DEFAULT_RATES) };
 
@@ -134,9 +146,12 @@ export function useRates() {
             let newEuroPrice = 0;
             let newUsdtPrice = 0;
 
-            // Extraer USDT de privateData o DolarApi
+            // Extraer USDT de privateData, secondaryData o DolarApi
             if (privateData && privateData.usdt) {
                 newUsdtPrice = parseSafeFloat(typeof privateData.usdt === 'object' ? privateData.usdt.price : privateData.usdt);
+            }
+            if (!newUsdtPrice && secondaryData && secondaryData.usdt) {
+                newUsdtPrice = parseSafeFloat(typeof secondaryData.usdt === 'object' ? secondaryData.usdt.price : secondaryData.usdt);
             }
             if (!newUsdtPrice && bcvFallbackData) {
                 const usdtData = Array.isArray(bcvFallbackData) ? bcvFallbackData.find(d => d.nombre?.toLowerCase() === 'binance' || d.fuente === 'binance' || d.casa === 'binance') || bcvFallbackData.find(d => d.nombre?.toLowerCase() === 'paralelo' || d.fuente === 'paralelo' || d.casa === 'paralelo') : null;
@@ -144,9 +159,49 @@ export function useRates() {
             }
 
             // Procesar BCV/Euro desde datos privados (Google Script)
-            if (privateData) {
+            // ⚠️ Validar frescura: si los datos tienen más de 24 horas, ignorarlos
+            const isPrivateDataFresh = (() => {
+                if (!privateData) return false;
                 const rawBcv = privateData.bcv || privateData.usd;
-                const rawEuro = privateData.euro || privateData.eur;
+                const lastUpdate = rawBcv?.last_update || rawBcv?.lastUpdate || privateData.lastUpdate || privateData.last_update;
+                if (!lastUpdate) return true; // sin fecha, asumir fresco
+                const ageMs = Date.now() - new Date(lastUpdate).getTime();
+                const ageHours = ageMs / (1000 * 60 * 60);
+                if (ageHours > 24) {
+                    addLog(`⚠️ Google Script principal desactualizado (${Math.round(ageHours)}h atrás).`, 'warning');
+                    return false;
+                }
+                return true;
+            })();
+
+            const isSecondaryDataFresh = (() => {
+                if (!secondaryData) return false;
+                const rawBcv = secondaryData.bcv || secondaryData.usd;
+                const lastUpdate = rawBcv?.last_update || rawBcv?.lastUpdate || secondaryData.lastUpdate || secondaryData.last_update;
+                if (!lastUpdate) return true; // sin fecha, asumir fresco
+                const ageMs = Date.now() - new Date(lastUpdate).getTime();
+                const ageHours = ageMs / (1000 * 60 * 60);
+                if (ageHours > 24) {
+                    addLog(`⚠️ Google Script respaldo desactualizado (${Math.round(ageHours)}h atrás).`, 'warning');
+                    return false;
+                }
+                return true;
+            })();
+
+            let selectedSourceData = null;
+            let sourceName = '';
+
+            if (privateData && isPrivateDataFresh) {
+                selectedSourceData = privateData;
+                sourceName = 'BCV Oficial';
+            } else if (secondaryData && isSecondaryDataFresh) {
+                selectedSourceData = secondaryData;
+                sourceName = 'BCV Oficial (Respaldo API)';
+            }
+
+            if (selectedSourceData) {
+                const rawBcv = selectedSourceData.bcv || selectedSourceData.usd;
+                const rawEuro = selectedSourceData.euro || selectedSourceData.eur;
 
                 let bcvP = parseSafeFloat(typeof rawBcv === 'object' ? rawBcv.price : rawBcv);
                 let euroP = parseSafeFloat(typeof rawEuro === 'object' ? rawEuro.price : rawEuro);
@@ -157,11 +212,12 @@ export function useRates() {
                 // Validación de magnitud: si el precio es irrazonablemente bajo o alto, corregir
                 const validateMagnitude = (val) => {
                     if (!val || val <= 0) return val;
-                    // Las tasas BCV venezolanas están típicamente entre 10 y 200
+                    // Las tasas BCV venezolanas están típicamente en un rango razonable.
+                    // Si el valor es extremadamente alto (por ejemplo, remanente de reconversión anterior, > 20000), normalizar.
                     if (val < 1) {
                         while (val < 10) val *= 10;
-                    } else if (val > 1000) {
-                        while (val > 200) val /= 10;
+                    } else if (val > 20000) {
+                        while (val > 2000) val /= 10;
                     }
                     return val;
                 };
@@ -171,11 +227,11 @@ export function useRates() {
 
                 if (newBcvPrice > 0) {
                     const meta = getMeta(newBcvPrice, newRates.bcv.price, newRates.bcv.change, apiBcvChange);
-                    newRates.bcv = { ...newRates.bcv, ...meta, source: 'BCV Oficial' };
+                    newRates.bcv = { ...newRates.bcv, ...meta, source: sourceName };
                 }
                 if (newEuroPrice > 0) {
                     const meta = getMeta(newEuroPrice, newRates.euro.price, newRates.euro.change, apiEuroChange);
-                    newRates.euro = { ...newRates.euro, ...meta, source: 'Euro BCV' };
+                    newRates.euro = { ...newRates.euro, ...meta, source: sourceName === 'BCV Oficial' ? 'Euro BCV' : 'Euro BCV (Respaldo API)' };
                 }
 
             } else if (bcvFallbackData) {

@@ -7,23 +7,14 @@ import { calculateSessionCost, calculateElapsedTime } from '../utils/tableBillin
 import { useConfirm } from '../hooks/useConfirm.jsx';
 import { round2 } from '../utils/dinero';
 import CashierPaymentModal from './CashierPaymentModal';
-function useBcvRate() {
-    try {
-        const useAuto = JSON.parse(localStorage.getItem('bodega_use_auto_rate') ?? 'true');
-        if (!useAuto) {
-            const manual = parseFloat(localStorage.getItem('bodega_custom_rate'));
-            if (manual > 0) return manual;
-        }
-        const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-        return saved?.bcv?.price || 1;
-    } catch { return 1; }
-}
+import { useProductContext } from '../context/ProductContext';
 
 export default function CashierCheckoutView({ triggerHaptic, isActive }) {
     const { tables, activeSessions, config, closeSession, cancelCheckoutRequest, syncTablesAndSessions, paidHoursOffsets, paidRoundsOffsets } = useTablesStore();
     const { orders: allOrders, orderItems: allItems } = useOrdersStore();
     const { currentUser } = useAuthStore();
-    const tasaUSD = useBcvRate();
+    const { effectiveRate } = useProductContext();
+    const tasaUSD = effectiveRate;
     const confirm = useConfirm();
 
     const [selectedSession, setSelectedSession] = useState(null);

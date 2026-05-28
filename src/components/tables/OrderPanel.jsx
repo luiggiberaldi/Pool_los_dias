@@ -139,7 +139,8 @@ export function OrderPanel({ session, table, onClose }) {
         const productForOrder = {
             id: product.id,
             name: product.name,
-            price: product.priceUsdt || product.priceUsd || product.price || 0
+            price: product.priceUsdt || product.priceUsd || product.price || 0,
+            priceBs: product.priceBs || null
         };
         const seatId = seatIdOverride !== undefined ? seatIdOverride : selectedSeatId;
         try {
@@ -289,7 +290,10 @@ export function OrderPanel({ session, table, onClose }) {
                                 </div>
                                 {/* Controls */}
                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => handleAddProduct({ id: item.product_id, name: item.product_name, price: item.unit_price_usd }, item.seat_id || null)}
+                                    <button onClick={() => {
+                                        const p = products.find(prod => prod.id === item.product_id);
+                                        if (p) handleAddProduct(p, item.seat_id || null);
+                                    }}
                                         disabled={!!addingItem}
                                         className="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition-all active:scale-90 disabled:opacity-40">
                                         <Plus size={14} />

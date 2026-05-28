@@ -12,17 +12,7 @@ function formatBs(val) {
     return (val || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function useBcvRate() {
-    try {
-        const useAuto = JSON.parse(localStorage.getItem('bodega_use_auto_rate') ?? 'true');
-        if (!useAuto) {
-            const manual = parseFloat(localStorage.getItem('bodega_custom_rate'));
-            if (manual > 0) return manual;
-        }
-        const saved = JSON.parse(localStorage.getItem('monitor_rates_v12'));
-        return saved?.bcv?.price || 1;
-    } catch { return 1; }
-}
+
 
 function TargetIcon({size}) {
     return (
@@ -42,9 +32,9 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
     const config = useTablesStore(state => state.config);
     const paidHoursOffsets = useTablesStore(state => state.paidHoursOffsets);
     const paidRoundsOffsets = useTablesStore(state => state.paidRoundsOffsets);
-    const tasaUSD = useBcvRate();
     const { currentUser } = useAuthStore();
     const { effectiveRate, products: allProducts } = useProductContext();
+    const tasaUSD = effectiveRate;
     const canDiscount = currentUser?.role === 'ADMIN' || currentUser?.role === 'CAJERO';
 
     const [discount, setDiscount] = useState({ type: 'percentage', value: 0 });
@@ -236,7 +226,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                             </p>
                             <p className="text-xs font-bold text-white/70">
                                 Bs {formatBs(hasSeats && seatBreakdown
-                                    ? calculateBreakdownTotalBs(seatBreakdown, config, tasaUSD) - (discountAmountUsd * tasaUSD)
+                                    ? calculateBreakdownTotalBs(seatBreakdown, config, tasaUSD, allProducts) - (discountAmountUsd * tasaUSD)
                                     : grandTotalBs - (discountAmountUsd * tasaUSD))}
                             </p>
                         </div>

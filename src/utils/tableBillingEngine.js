@@ -360,7 +360,7 @@ export function calculateFullTableBreakdown(session, seats, elapsedMinutes, conf
  * de la configuración para el tiempo y la tasa BCV para el consumo.
  * Esto evita usar solo tasa BCV para todo (que da montos incorrectos en mesas).
  */
-export function calculateBreakdownTotalBs(seatBreakdown, config, tasaBCV) {
+export function calculateBreakdownTotalBs(seatBreakdown, config, tasaBCV, productsList = null) {
     if (!seatBreakdown) return 0;
 
     // Shared time cost en Bs (usa tasa implícita de config)
@@ -384,10 +384,13 @@ export function calculateBreakdownTotalBs(seatBreakdown, config, tasaBCV) {
             return acc + bs.totalBs;
         }, 0);
 
-    // Consumption en Bs (usa tasa BCV)
-    const consumptionUsd = seatBreakdown.sharedConsumptionTotal +
-        seatBreakdown.seats.filter(sb => !sb.seat.paid).reduce((acc, sb) => acc + sb.consumption, 0);
-    const consumptionBs = round2(consumptionUsd * (tasaBCV || 1));
+    // Consumption en Bs (usa tasa BCV, y calculateConsumptionBs para soportar combos)
+    const sharedItems = seatBreakdown.sharedItems || [];
+    const seatItems = seatBreakdown.seats
+        .filter(sb => !sb.seat.paid)
+        .flatMap(sb => sb.items || []);
+    const unpaidItems = [...sharedItems, ...seatItems];
+    const consumptionBs = calculateConsumptionBs(unpaidItems, tasaBCV, productsList);
 
     return round2(sharedTimeBs + seatTimeBs + consumptionBs);
 }

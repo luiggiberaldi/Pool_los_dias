@@ -521,7 +521,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     const _ho2 = (_pho || {})[tableCheckoutData.session?.id] || 0;
                     const _ro2 = (_pro || {})[tableCheckoutData.session?.id] || 0;
                     const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, isTimeFree, _ho2, _ro2);
-                    finalTotalBs = fb ? calculateBreakdownTotalBs(fb, config, effectiveRate) : finalTotal * effectiveRate;
+                    finalTotalBs = fb ? calculateBreakdownTotalBs(fb, config, effectiveRate, products) : finalTotal * effectiveRate;
                     // Ajustar por descuento si aplica
                     if (discData.active && discData.amountUsd > 0) {
                         finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
