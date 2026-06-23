@@ -66,15 +66,10 @@ export function calculateReportsData(allSales, from, to, bcvRate, products) {
 }
 
 export function groupSalesByCierreId(allSales, from, to) {
-    // 1. Encontrar ventas/aperturas que caen en el rango y tienen cierreId
-    const entitiesInDateRange = allSales.filter(s => {
-        const dateStr = getLocalISODate(new Date(s.timestamp));
-        return dateStr >= from && dateStr <= to && s.cierreId;
-    });
-
-    // 2. Agrupar por cierreId
+    // 1. Agrupar todas las ventas/aperturas por cierreId
     const cMap = {};
-    entitiesInDateRange.forEach(entity => {
+    allSales.forEach(entity => {
+        if (!entity.cierreId) return;
         const cId = entity.cierreId;
         if (!cMap[cId]) {
             cMap[cId] = {
@@ -91,9 +86,12 @@ export function groupSalesByCierreId(allSales, from, to) {
         }
     });
 
-    // 3. Calcular resumen y ordenar desc
+    // 2. Filtrar cierres por su fecha de ejecución y calcular resumen
     const result = Object.values(cMap)
-        .filter(c => c.sales.length > 0)
+        .filter(c => {
+            const closureDateStr = getLocalISODate(new Date(c.cierreId));
+            return closureDateStr >= from && closureDateStr <= to && c.sales.length > 0;
+        })
         .map(c => {
             const dateObj = new Date(c.cierreId);
 
