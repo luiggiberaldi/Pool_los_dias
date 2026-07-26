@@ -97,15 +97,32 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
         for (const action of queue) {
             try {
                 let success = false;
+                const isTempId = (id) => typeof id === 'string' && id.startsWith('temp-');
+
                 if (action.type === 'OPEN_SESSION') {
-                    const { error } = await supabaseCloud.from('table_sessions').insert(action.payload);
-                    if (!error) success = true;
+                    if (isTempId(action.payload?.id)) {
+                        console.warn(`[TablesSync] Descartando apertura obsoleta con ID temp: ${action.payload.id}`);
+                        success = true;
+                    } else {
+                        const { error } = await supabaseCloud.from('table_sessions').insert(action.payload);
+                        if (!error || error?.code === '22P02') success = true;
+                    }
                 } else if (action.type === 'UPDATE_SESSION') {
-                    const { error } = await supabaseCloud.from('table_sessions').update(action.payload).eq('id', action.sessionId);
-                    if (!error) success = true;
+                    if (isTempId(action.sessionId)) {
+                        console.warn(`[TablesSync] Descartando actualización obsoleta con ID temp: ${action.sessionId}`);
+                        success = true;
+                    } else {
+                        const { error } = await supabaseCloud.from('table_sessions').update(action.payload).eq('id', action.sessionId);
+                        if (!error || error?.code === '22P02') success = true;
+                    }
                 } else if (action.type === 'CLOSE_SESSION') {
-                    const { error } = await supabaseCloud.from('table_sessions').update(action.payload).eq('id', action.sessionId);
-                    if (!error) success = true;
+                    if (isTempId(action.sessionId)) {
+                        console.warn(`[TablesSync] Descartando cierre obsoleto con ID temp: ${action.sessionId}`);
+                        success = true;
+                    } else {
+                        const { error } = await supabaseCloud.from('table_sessions').update(action.payload).eq('id', action.sessionId);
+                        if (!error || error?.code === '22P02') success = true;
+                    }
                 }
                 if (!success) remainingQueue.push(action);
             } catch (e) {
