@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { formatBs } from './calculatorUtils';
 import { getPaymentLabel, toTitleCase } from '../config/paymentMethods';
+export { generateDailyCloseLetterPDF } from './letterCloseGenerator';
 
 /**
  * Genera un PDF de Cierre del Día con reporte detallado.
@@ -129,6 +130,54 @@ export async function generateDailyClosePDF({
 
     y += 2;
     dash(y); y += 6;
+
+    // ════════════════════════════════════
+    //  SERVICIOS DE POOL (HORAS Y PIÑAS)
+    // ════════════════════════════════════
+    let totalPinasCount = 0;
+    let totalPinasUsd = 0;
+    let totalHoursCount = 0;
+    let totalHoursUsd = 0;
+
+    allSales.forEach(s => {
+        if (s.status === 'ANULADA') return;
+        (s.items || []).forEach(item => {
+            if (item.category === 'servicios') {
+                const nameLower = (item.name || '').toLowerCase();
+                if (nameLower.includes('piña') || nameLower.includes('pina')) {
+                    totalPinasCount += (item.qty || 1);
+                    totalPinasUsd += (item.priceUsd || 0) * (item.qty || 1);
+                } else if (nameLower.includes('tiempo') || nameLower.includes('hora')) {
+                    totalHoursCount += (item.qty || 1);
+                    totalHoursUsd += (item.priceUsd || 0) * (item.qty || 1);
+                }
+            }
+        });
+    });
+
+    if (totalPinasCount > 0 || totalHoursCount > 0) {
+        y = sectionTitle('SERVICIOS DE POOL', y);
+
+        const poolRows = [
+            ['Partidas / Piñas', `${totalPinasCount} ($${totalPinasUsd.toFixed(2)})`],
+            ['Tiempo (Horas)', `${totalHoursCount} ($${totalHoursUsd.toFixed(2)})`],
+            ['Total Mesas Pool', `$${(totalPinasUsd + totalHoursUsd).toFixed(2)}`],
+        ];
+
+        poolRows.forEach(([label, value]) => {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7);
+            doc.setTextColor(...BODY);
+            doc.text(label, M, y);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...INK);
+            doc.text(value, RIGHT, y, { align: 'right' });
+            y += 5;
+        });
+
+        y += 2;
+        dash(y); y += 6;
+    }
 
     // ════════════════════════════════════
     //  DESGLOSE POR MÉTODO DE PAGO

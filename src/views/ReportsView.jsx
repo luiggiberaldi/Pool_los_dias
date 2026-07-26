@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Recycle, Search, X, LockIcon, ListOrdered } from 'lucide-react';
+import { BarChart3, Calendar, Download, TrendingUp, ShoppingBag, DollarSign, Package, ChevronDown, ChevronUp, Clock, Recycle, Search, X, LockIcon, ListOrdered, FileText, Printer } from 'lucide-react';
 import { formatBs } from '../utils/calculatorUtils';
 import { generateDailyClosePDF as _generateDailyClosePDF } from '../utils/dailyCloseGenerator';
 import { generateTicketPDF, printThermalTicket } from '../utils/ticketGenerator';
@@ -85,11 +85,14 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
         }
     };
 
-    const handleExportPDF = async () => {
+    const handleExportPDF = async (format = 'letter') => {
         triggerHaptic && triggerHaptic();
         try {
-            const { generateDailyClosePDF } = await import('../utils/dailyCloseGenerator');
-            await generateDailyClosePDF({
+            const { generateDailyClosePDF, generateDailyCloseLetterPDF } = await import('../utils/dailyCloseGenerator');
+            const apertura = allSales.find(s => s.tipo === 'APERTURA_CAJA' && !s.cajaCerrada) || null;
+            const periodLabel = RANGE_OPTIONS.find(r => r.id === selectedRange)?.label || 'Turno Actual';
+
+            const payload = {
                 sales: salesForCashFlow,
                 allSales: salesForStats,
                 bcvRate,
@@ -99,7 +102,15 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                 todayTotalBs: totalBs,
                 todayProfit: profit,
                 todayItemsSold: totalItems,
-            });
+                apertura,
+                periodLabel,
+            };
+
+            if (format === 'letter') {
+                await generateDailyCloseLetterPDF(payload);
+            } else {
+                await generateDailyClosePDF(payload);
+            }
         } catch (e) {
             console.error('Error generando PDF:', e);
         }
@@ -158,13 +169,22 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                     </div>
                     Reportes
                 </h2>
-                <button
-                    onClick={handleExportPDF}
-                    disabled={salesForStats.length === 0 && salesForCashFlow.length === 0}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl text-sm shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
-                >
-                    <Download size={16} /> Descargar PDF
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => handleExportPDF('letter')}
+                        disabled={salesForStats.length === 0 && salesForCashFlow.length === 0}
+                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-md shadow-indigo-500/20 active:scale-95 transition-all"
+                    >
+                        <FileText size={16} /> PDF Carta
+                    </button>
+                    <button
+                        onClick={() => handleExportPDF('ticket')}
+                        disabled={salesForStats.length === 0 && salesForCashFlow.length === 0}
+                        className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs sm:text-sm active:scale-95 transition-all"
+                    >
+                        <Printer size={16} /> Ticket 58mm
+                    </button>
+                </div>
             </div>
 
             {/* Tab Selector */}

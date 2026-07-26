@@ -190,6 +190,7 @@ Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.
 | 25/07/2026 | Error Supabase 22P02 (`temp-...` en `table_sessions`) | Se asigna `crypto.randomUUID()` nativo al payload y estado optimista en `tableSessionActions.js` |
 | 25/07/2026 | Bucle de reintento `22P02` en cola offline de mesas | Se purgan automáticamente las acciones pendientes con IDs `temp-` u homologados con error `22P02` en `tableSyncActions.js` para evitar reintentos infinitos |
 | 25/07/2026 | Filtro de "Turno Actual" en Módulo de Reportes | Agregado filtro "Turno Actual" como predeterminado (`selectedRange = 'shift'`), alineando métricas en tiempo real con `activeCashSession` |
+| 26/07/2026 | Reporte Cierre PDF Carta + Cálculo Horas y Piñas | Añadido generador `letterCloseGenerator.js` (PDF Letter Size con resumen de Pool: Piñas + Tiempo), botones duales (Carta / Ticket 58mm) en `ReportsView.jsx` y `CierreHistoryCard.jsx` |
 
 ---
 

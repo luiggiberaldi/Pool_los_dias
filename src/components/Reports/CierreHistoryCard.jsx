@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, LockIcon, Printer, DollarSign, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, LockIcon, Printer, DollarSign, Clock, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase, PAYMENT_ICONS } from '../../config/paymentMethods';
-import { generateDailyClosePDF } from '../../utils/dailyCloseGenerator';
+import { generateDailyClosePDF, generateDailyCloseLetterPDF } from '../../utils/dailyCloseGenerator';
 
 export default function CierreHistoryCard({ cierre, bcvRate, products: _products }) {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -12,7 +12,7 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
         hour: '2-digit', minute: '2-digit' 
     });
 
-    const handlePrintPDF = (e) => {
+    const handlePrintPDF = (e, format = 'letter') => {
         e.stopPropagation();
         
         const todayProductMap = {};
@@ -27,7 +27,7 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
         });
         const todayTopProducts = Object.values(todayProductMap).sort((a, b) => b.qty - a.qty).slice(0, 10);
 
-        generateDailyClosePDF({
+        const payload = {
             sales: cierre.salesForCashFlow.filter(s => s.tipo !== 'APERTURA_CAJA'),
             allSales: cierre.salesForStats,
             bcvRate,
@@ -39,8 +39,15 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
             todayItemsSold: cierre.totalItems,
             reconData: null,
             apertura: cierre.apertura,
+            periodLabel: dateLabel,
             isReprint: true
-        });
+        };
+
+        if (format === 'letter') {
+            generateDailyCloseLetterPDF(payload);
+        } else {
+            generateDailyClosePDF(payload);
+        }
     };
 
     const hasApertura = !!cierre.apertura;
@@ -108,10 +115,16 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
 
                     <div className="pt-3 mt-1 flex gap-2">
                         <button 
-                            onClick={handlePrintPDF}
-                            className="flex-1 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                            onClick={(e) => handlePrintPDF(e, 'letter')}
+                            className="flex-1 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors active:scale-95 shadow-sm"
                         >
-                            <Printer size={16} /> Re-imprimir PDF
+                            <FileText size={16} /> PDF Carta
+                        </button>
+                        <button 
+                            onClick={(e) => handlePrintPDF(e, 'ticket')}
+                            className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors active:scale-95"
+                        >
+                            <Printer size={16} /> Ticket 58mm
                         </button>
                     </div>
                 </div>
