@@ -130,7 +130,7 @@ export default function TransactionRow({
                                 <span className="font-bold">{formatBs(s.totalBs || 0)} Bs</span>
                             </div>
                             <div className="flex justify-between text-slate-400">
-                                <span>Tasa BCV aplicada</span>
+                                <span>Tasa aplicada</span>
                                 <span className="font-medium">{formatBs(saleRate)} Bs/$</span>
                             </div>
                             {s.tasaCop > 0 && (

@@ -107,7 +107,7 @@ export default function ReceiptModal({ receipt, onClose, onShareWhatsApp, curren
 
                         <div className="mt-6 flex flex-col items-center gap-1">
                             <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-                                Tasa BCV Aplicada: {formatBs(receipt.rate)} Bs/$
+                                Tasa Aplicada: {formatBs(receipt.rate)} Bs/$
                             </p>
                             {receipt.tasaCop > 0 && (
                                 <p className="text-center text-[10px] text-slate-400 uppercase tracking-wider font-bold">
