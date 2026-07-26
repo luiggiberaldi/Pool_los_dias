@@ -191,6 +191,12 @@ Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.
 | 25/07/2026 | Bucle de reintento `22P02` en cola offline de mesas | Se purgan automáticamente las acciones pendientes con IDs `temp-` u homologados con error `22P02` en `tableSyncActions.js` para evitar reintentos infinitos |
 | 25/07/2026 | Filtro de "Turno Actual" en Módulo de Reportes | Agregado filtro "Turno Actual" como predeterminado (`selectedRange = 'shift'`), alineando métricas en tiempo real con `activeCashSession` |
 | 26/07/2026 | Reporte Cierre PDF Carta + Cálculo Horas y Piñas | Añadido generador `letterCloseGenerator.js` (PDF Letter Size con resumen de Pool: Piñas + Tiempo), botones duales (Carta / Ticket 58mm) en `ReportsView.jsx` y `CierreHistoryCard.jsx` |
+| 26/07/2026 | Corrección ortográfica y layout de encabezado PDF | Actualizado "POOL LOS DIAS" -> "POOL LOS DIAZ" (con Z) y ajustado margen superior para evitar solapamiento del logo con la línea separadora |
+| 26/07/2026 | Detalle completo expandido por venta en PDF Carta | Rediseñada la sección 6 del PDF Carta para mostrar bloques detallados por operación: lista de productos completa sin recortar, vendedor/mesero, mesa, desgloses de pagos, vueltos y descuentos |
+| 26/07/2026 | Listado completo de artículos en Sección 5 | Actualizada la sección 5 a "RESUMEN COMPLETO DE PRODUCTOS Y ARTÍCULOS VENDIDOS", listando la totalidad de productos/servicios vendidos en el turno sin recorte ni límite de 8 ítems |
+| 26/07/2026 | Separación estricta de Productos vs Servicios Pool | Implementado helper `isPoolServiceItem` con detección dual (`category === 'servicios'` + prefijos `tiempo`, `piña`, `pina`, `partida`, `compartido`, `mesa`). Corrige el conteo de la Sección 2 (Servicios Pool) y excluye los cobros de mesas de la Sección 5 (Productos Vendidos) |
+| 26/07/2026 | Conteo acumulado de horas de juego en Sección 2 | Implementado helper `parseHoursFromItem` para calcular y desplegar el total exacto de tiempo jugado en horas (`hrs`) acumuladas (ej: `5.5 hrs`) en lugar del número estático de registros |
+| 26/07/2026 | Persistencia de Cuadre de Caja (reconData) en Cierres | Preservado `reconData` (Declarado USD/Bs y Diferencia) al guardar el cierre en `DashboardView.jsx` y `reportsProcessor.js`, permitiendo que las reimpresiones del historial (`CierreHistoryCard.jsx`) contengan la reconciliación real declarada |
 
 ---
 

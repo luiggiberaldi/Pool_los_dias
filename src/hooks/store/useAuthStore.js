@@ -215,6 +215,8 @@ export const useAuthStore = create(
                 usuarios: state.usuarios,
                 requireLogin: state.requireLogin,
             }),
+            version: 1,
+            migrate: (persistedState) => persistedState,
             storage: {
                 getItem: (name) => {
                     const str = localStorage.getItem(name);

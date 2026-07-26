@@ -115,6 +115,9 @@ export function groupSalesByCierreId(allSales, from, to) {
         } else {
             cMap[cId].sales.push(entity);
         }
+        if (entity.reconData && !cMap[cId].reconData) {
+            cMap[cId].reconData = entity.reconData;
+        }
     });
 
     // 2. Filtrar cierres por su fecha de ejecución y calcular resumen
@@ -136,6 +139,7 @@ export function groupSalesByCierreId(allSales, from, to) {
             
             // Reconstruir desglose de pago de esta caja
             const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
+            const reconData = c.reconData || c.apertura?.reconData || c.sales.find(s => s.reconData)?.reconData || null;
 
             return {
                 ...c,
@@ -146,6 +150,7 @@ export function groupSalesByCierreId(allSales, from, to) {
                 totalBs,
                 totalItems,
                 paymentBreakdown,
+                reconData,
             };
         })
         .sort((a, b) => b.cierreId - a.cierreId);

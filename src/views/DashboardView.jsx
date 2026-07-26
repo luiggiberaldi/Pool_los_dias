@@ -243,7 +243,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         const validTipos = ['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'];
         const updatedSales = sales.map(s =>
             !s.cajaCerrada && validTipos.includes(s.tipo || 'VENTA') && isInSession(s)
-                ? { ...s, cajaCerrada: true, cierreId: currentCierreId }
+                ? { ...s, cajaCerrada: true, cierreId: currentCierreId, reconData }
                 : s
         );
         await storageService.setItem(SALES_KEY, updatedSales);

@@ -37,7 +37,7 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
             todayTotalBs: cierre.totalBs,
             todayProfit: 0,
             todayItemsSold: cierre.totalItems,
-            reconData: null,
+            reconData: cierre.reconData || null,
             apertura: cierre.apertura,
             periodLabel: dateLabel,
             isReprint: true

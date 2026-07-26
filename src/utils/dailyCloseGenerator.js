@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { formatBs } from './calculatorUtils';
 import { getPaymentLabel, toTitleCase } from '../config/paymentMethods';
-export { generateDailyCloseLetterPDF } from './letterCloseGenerator';
+import { isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
+export { generateDailyCloseLetterPDF, isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
 
 /**
  * Genera un PDF de Cierre del Día con reporte detallado.
@@ -136,31 +137,33 @@ export async function generateDailyClosePDF({
     // ════════════════════════════════════
     let totalPinasCount = 0;
     let totalPinasUsd = 0;
-    let totalHoursCount = 0;
+    let totalHoursPlayed = 0;
     let totalHoursUsd = 0;
 
     allSales.forEach(s => {
         if (s.status === 'ANULADA') return;
         (s.items || []).forEach(item => {
-            if (item.category === 'servicios') {
+            if (isPoolServiceItem(item)) {
                 const nameLower = (item.name || '').toLowerCase();
-                if (nameLower.includes('piña') || nameLower.includes('pina')) {
+                if (nameLower.includes('piña') || nameLower.includes('pina') || nameLower.includes('partida')) {
                     totalPinasCount += (item.qty || 1);
                     totalPinasUsd += (item.priceUsd || 0) * (item.qty || 1);
-                } else if (nameLower.includes('tiempo') || nameLower.includes('hora')) {
-                    totalHoursCount += (item.qty || 1);
+                } else {
+                    totalHoursPlayed += parseHoursFromItem(item);
                     totalHoursUsd += (item.priceUsd || 0) * (item.qty || 1);
                 }
             }
         });
     });
 
-    if (totalPinasCount > 0 || totalHoursCount > 0) {
+    const hoursDisplayStr = totalHoursPlayed % 1 === 0 ? `${totalHoursPlayed} hrs` : `${totalHoursPlayed.toFixed(1)} hrs`;
+
+    if (totalPinasCount > 0 || totalHoursPlayed > 0) {
         y = sectionTitle('SERVICIOS DE POOL', y);
 
         const poolRows = [
             ['Partidas / Piñas', `${totalPinasCount} ($${totalPinasUsd.toFixed(2)})`],
-            ['Tiempo (Horas)', `${totalHoursCount} ($${totalHoursUsd.toFixed(2)})`],
+            ['Tiempo (Horas)', `${hoursDisplayStr} ($${totalHoursUsd.toFixed(2)})`],
             ['Total Mesas Pool', `$${(totalPinasUsd + totalHoursUsd).toFixed(2)}`],
         ];
 
