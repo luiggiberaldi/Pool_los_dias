@@ -31,7 +31,9 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
             }
         }
 
+        const realId = crypto.randomUUID();
         const sessionPayload = {
+            id: realId,
             table_id: tableId,
             opened_by: staffId,
             game_mode: gameMode,
@@ -47,8 +49,7 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
         };
         if (userId) sessionPayload.user_id = userId;
 
-        const fakeId = 'temp-' + Date.now();
-        const optimisticSession = { ...sessionPayload, id: fakeId };
+        const optimisticSession = sessionPayload;
 
         const newSessions = [...get().activeSessions, optimisticSession];
         set({ activeSessions: newSessions });
@@ -66,14 +67,14 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
             const { data, error } = await supabaseCloud.from('table_sessions').insert(sessionPayload).select().single();
             if (error) throw error;
             set(state => ({
-                activeSessions: state.activeSessions.map(s => s.id === fakeId ? data : s)
+                activeSessions: state.activeSessions.map(s => s.id === realId ? (data || s) : s)
             }));
             await tablesCache.setItem(scopedKey('active_sessions'), get().activeSessions);
         } catch (error) {
-            console.warn('Guardado en nube fallido, encolado para más tarde.');
+            console.warn('Guardado en nube fallido, encolado para más tarde.', error);
             set(state => ({
                 activeSessions: state.activeSessions.map(s =>
-                    s.id === fakeId ? { ...s, _pendingSync: true } : s
+                    s.id === realId ? { ...s, _pendingSync: true } : s
                 )
             }));
             await tablesCache.setItem(scopedKey('active_sessions'), get().activeSessions);
