@@ -1,27 +1,58 @@
 import { FinancialEngine } from '../core/FinancialEngine';
 import { getLocalISODate } from './dateHelpers';
 
-export function calculateReportsData(allSales, from, to, bcvRate, products) {
-    // Ventas de Mercancía (para Totales, Profit, Top Productos)
-    const salesForStats = allSales.filter(s => {
-        if (s.status === 'ANULADA' || (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA')) return false;
-        const dateStr = getLocalISODate(new Date(s.timestamp));
-        return dateStr >= from && dateStr <= to;
-    });
+export function calculateReportsData(allSales, from, to, bcvRate, products, selectedRange, activeCashSession) {
+    let salesForStats = [];
+    let salesForCashFlow = [];
+    let historySales = [];
 
-    // Flujo de Dinero (para Desglose de Pagos, incluye pagos de deudas)
-    const salesForCashFlow = allSales.filter(s => {
-        if (s.status === 'ANULADA') return false;
-        if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA' && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'PAGO_PROVEEDOR') return false;
-        const dateStr = getLocalISODate(new Date(s.timestamp));
-        return dateStr >= from && dateStr <= to;
-    });
+    if (selectedRange === 'shift') {
+        if (activeCashSession?.opened_at) {
+            const openedAtMs = new Date(activeCashSession.opened_at).getTime();
+            salesForStats = allSales.filter(s => {
+                if (s.status === 'ANULADA' || (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA')) return false;
+                if (s.cajaCerrada) return false;
+                const saleMs = new Date(s.timestamp).getTime();
+                return !isNaN(saleMs) && saleMs >= openedAtMs;
+            });
 
-    const historySales = allSales.filter(s => {
-        if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
-        const dateStr = getLocalISODate(new Date(s.timestamp));
-        return dateStr >= from && dateStr <= to;
-    });
+            salesForCashFlow = allSales.filter(s => {
+                if (s.status === 'ANULADA') return false;
+                if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA' && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'PAGO_PROVEEDOR') return false;
+                if (s.cajaCerrada) return false;
+                const saleMs = new Date(s.timestamp).getTime();
+                return !isNaN(saleMs) && saleMs >= openedAtMs;
+            });
+
+            historySales = allSales.filter(s => {
+                if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
+                if (s.cajaCerrada) return false;
+                const saleMs = new Date(s.timestamp).getTime();
+                return !isNaN(saleMs) && saleMs >= openedAtMs;
+            });
+        }
+    } else {
+        // Ventas de Mercancía (para Totales, Profit, Top Productos)
+        salesForStats = allSales.filter(s => {
+            if (s.status === 'ANULADA' || (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA')) return false;
+            const dateStr = getLocalISODate(new Date(s.timestamp));
+            return dateStr >= from && dateStr <= to;
+        });
+
+        // Flujo de Dinero (para Desglose de Pagos, incluye pagos de deudas)
+        salesForCashFlow = allSales.filter(s => {
+            if (s.status === 'ANULADA') return false;
+            if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA' && s.tipo !== 'COBRO_DEUDA' && s.tipo !== 'PAGO_PROVEEDOR') return false;
+            const dateStr = getLocalISODate(new Date(s.timestamp));
+            return dateStr >= from && dateStr <= to;
+        });
+
+        historySales = allSales.filter(s => {
+            if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
+            const dateStr = getLocalISODate(new Date(s.timestamp));
+            return dateStr >= from && dateStr <= to;
+        });
+    }
 
     const totalUsd = salesForStats.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
     const totalBs = salesForStats.reduce((s, sale) => s + (sale.totalBs || 0), 0);

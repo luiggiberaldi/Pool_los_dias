@@ -14,6 +14,7 @@ import PaymentBreakdownCard from '../components/Reports/PaymentBreakdownCard';
 import { useReportsData } from '../hooks/useReportsData';
 
 const RANGE_OPTIONS = [
+    { id: 'shift', label: 'Turno Actual' },
     { id: 'today', label: 'Hoy' },
     { id: 'week', label: 'Esta Semana' },
     { id: 'month', label: 'Este Mes' },
@@ -25,7 +26,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
     const [activeTab, setActiveTab] = useState('metrics');
-    const [selectedRange, setSelectedRange] = useState('week');
+    const [selectedRange, setSelectedRange] = useState('shift');
     const [customFrom, setCustomFrom] = useState('');
     const [customTo, setCustomTo] = useState('');
     const [showHistory, setShowHistory] = useState(false);

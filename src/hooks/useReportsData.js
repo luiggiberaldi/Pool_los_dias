@@ -2,12 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
 import { getLocalISODate, getDateRange } from '../utils/dateHelpers';
 import { calculateReportsData, groupSalesByCierreId } from '../utils/reportsProcessor';
+import { useCashStore } from './store/cashStore';
 
 const SALES_KEY = 'bodega_sales_v1';
 
 export function useReportsData({ isActive, products, bcvRate, selectedRange, customFrom, customTo, activeTab }) {
     const [allSales, setAllSales] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const activeCashSession = useCashStore(s => s.activeCashSession);
 
     useEffect(() => {
         if (isActive === false) return;
@@ -70,7 +72,10 @@ export function useReportsData({ isActive, products, bcvRate, selectedRange, cus
         paymentBreakdown,
         topProducts,
         salesByDay,
-    } = useMemo(() => calculateReportsData(allSales, from, to, bcvRate, products), [allSales, from, to, bcvRate, products]);
+    } = useMemo(
+        () => calculateReportsData(allSales, from, to, bcvRate, products, selectedRange, activeCashSession),
+        [allSales, from, to, bcvRate, products, selectedRange, activeCashSession]
+    );
 
     const groupedClosings = useMemo(() => {
         if (activeTab === 'history') {

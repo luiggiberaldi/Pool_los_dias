@@ -10,6 +10,7 @@ export function getDateRange(rangeId) {
     const todayStr = getLocalISODate(now);
 
     switch (rangeId) {
+        case 'shift':
         case 'today': {
             return { from: todayStr, to: todayStr };
         }
