@@ -222,9 +222,9 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleConfirmCashRecon = async (reconData) => {
         const sessionOpenedAt = activeCashSession?.opened_at || null;
         const isInSession = (s) => {
-            if (sessionOpenedAt) return s.timestamp >= sessionOpenedAt;
-            const saleLocalDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : getLocalISODate(new Date());
-            return saleLocalDay === today;
+            if (s.cajaCerrada === true) return false;
+            if (!sessionOpenedAt) return false;
+            return s.timestamp >= sessionOpenedAt;
         };
 
         if (todayCashFlow.length > 0 || todaySales.length > 0) {

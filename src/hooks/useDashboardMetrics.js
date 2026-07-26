@@ -33,7 +33,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
             return isInSessionPeriod(s);
         }),
-        [sales, today, sessionOpenedAt]
+        [sales, sessionOpenedAt]
     );
 
     const todayCashFlow = useMemo(() =>
@@ -42,7 +42,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (!['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'].includes(s.tipo)) return false;
             return isInSessionPeriod(s);
         }),
-        [sales, today, sessionOpenedAt]
+        [sales, sessionOpenedAt]
     );
 
     const todayApertura = useMemo(() =>
@@ -64,10 +64,11 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
 
     const todayExpenses = useMemo(() =>
         sales.filter(s => {
+            if (s.status === 'ANULADA') return false;
             if (s.tipo !== 'PAGO_PROVEEDOR') return false;
             return isInSessionPeriod(s);
         }),
-        [sales, today, sessionOpenedAt]
+        [sales, sessionOpenedAt]
     );
     const todayExpensesUsd = useMemo(() =>
         todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0),

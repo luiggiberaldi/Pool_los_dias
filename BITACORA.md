@@ -185,6 +185,8 @@ Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.
 | 18/04/2026 | Totales inconsistentes (card vs queue vs checkout) | Faltaba `seatTimeCost` en Queue, Checkout y Dashboard |
 | 18/04/2026 | Detalle de Cuenta sin horas prepagadas | Añadida sección "Horas Prepagadas" en TotalDetailsModal |
 | 18/04/2026 | Notificación "Mesa? Mesa?" | `useNotificationCenter` no tenía acceso a tabla `tables` |
+| 25/07/2026 | Inconsistencia en `isInSession` al cerrar caja | Se agregó guard `cajaCerrada === true` y se eliminó fallback desalineado con `useDashboardMetrics` en `DashboardView.jsx` |
+| 25/07/2026 | Egresos anulados contaban en el turno | Se agregó guard `status !== 'ANULADA'` al filtro de `todayExpenses` en `useDashboardMetrics.js` |
 
 ---
 
