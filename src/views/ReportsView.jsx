@@ -202,7 +202,11 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                     <ListOrdered size={16} className="inline mr-1.5 align-text-bottom"/> Por Artículo
                 </button>
                 <button
-                    onClick={() => { triggerHaptic && triggerHaptic(); setActiveTab('history'); }}
+                    onClick={() => {
+                        triggerHaptic && triggerHaptic();
+                        setActiveTab('history');
+                        if (selectedRange === 'shift') setSelectedRange('month');
+                    }}
                     className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
                 >
                     <LockIcon size={16} className="inline mr-1.5 align-text-bottom"/> Cierres
@@ -211,7 +215,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
 
             {/* Range Selector */}
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-                {RANGE_OPTIONS.map(opt => (
+                {(activeTab === 'history' ? RANGE_OPTIONS.filter(o => o.id !== 'shift') : RANGE_OPTIONS).map(opt => (
                     <button
                         key={opt.id}
                         onClick={() => { triggerHaptic && triggerHaptic(); setSelectedRange(opt.id); }}

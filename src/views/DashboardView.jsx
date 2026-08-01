@@ -241,11 +241,24 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
         }
         const currentCierreId = Date.now();
         const validTipos = ['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'];
-        const updatedSales = sales.map(s =>
-            !s.cajaCerrada && validTipos.includes(s.tipo || 'VENTA') && isInSession(s)
-                ? { ...s, cajaCerrada: true, cierreId: currentCierreId, reconData }
-                : s
-        );
+        const cierreRecord = {
+            id: `cierre_${currentCierreId}`,
+            tipo: 'CIERRE_CAJA',
+            cierreId: currentCierreId,
+            timestamp: new Date().toISOString(),
+            cajaCerrada: true,
+            reconData,
+            apertura: todayApertura,
+            closedBy: usuarioActivo?.nombre || usuarioActivo?.email || 'Admin',
+        };
+        const updatedSales = [
+            ...sales.map(s =>
+                !s.cajaCerrada && validTipos.includes(s.tipo || 'VENTA') && isInSession(s)
+                    ? { ...s, cajaCerrada: true, cierreId: currentCierreId, reconData }
+                    : s
+            ),
+            cierreRecord
+        ];
         await storageService.setItem(SALES_KEY, updatedSales);
         setSales(updatedSales);
         await closeCashSession(reconData, usuarioActivo?.email || 'admin');

@@ -112,6 +112,8 @@ export function groupSalesByCierreId(allSales, from, to) {
         }
         if (entity.tipo === 'APERTURA_CAJA') {
             cMap[cId].apertura = entity;
+        } else if (entity.tipo === 'CIERRE_CAJA') {
+            cMap[cId].cierreRecord = entity;
         } else {
             cMap[cId].sales.push(entity);
         }
@@ -124,7 +126,7 @@ export function groupSalesByCierreId(allSales, from, to) {
     const result = Object.values(cMap)
         .filter(c => {
             const closureDateStr = getLocalISODate(new Date(c.cierreId));
-            return closureDateStr >= from && closureDateStr <= to && c.sales.length > 0;
+            return closureDateStr >= from && closureDateStr <= to && (c.sales.length > 0 || !!c.cierreRecord);
         })
         .map(c => {
             const dateObj = new Date(c.cierreId);
@@ -139,7 +141,7 @@ export function groupSalesByCierreId(allSales, from, to) {
             
             // Reconstruir desglose de pago de esta caja
             const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
-            const reconData = c.reconData || c.apertura?.reconData || c.sales.find(s => s.reconData)?.reconData || null;
+            const reconData = c.cierreRecord?.reconData || c.reconData || c.apertura?.reconData || c.sales.find(s => s.reconData)?.reconData || null;
 
             return {
                 ...c,

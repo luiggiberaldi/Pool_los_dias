@@ -197,6 +197,7 @@ Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.
 | 26/07/2026 | Separación estricta de Productos vs Servicios Pool | Implementado helper `isPoolServiceItem` con detección dual (`category === 'servicios'` + prefijos `tiempo`, `piña`, `pina`, `partida`, `compartido`, `mesa`). Corrige el conteo de la Sección 2 (Servicios Pool) y excluye los cobros de mesas de la Sección 5 (Productos Vendidos) |
 | 26/07/2026 | Conteo acumulado de horas de juego en Sección 2 | Implementado helper `parseHoursFromItem` para calcular y desplegar el total exacto de tiempo jugado en horas (`hrs`) acumuladas (ej: `5.5 hrs`) en lugar del número estático de registros |
 | 26/07/2026 | Persistencia de Cuadre de Caja (reconData) en Cierres | Preservado `reconData` (Declarado USD/Bs y Diferencia) al guardar el cierre en `DashboardView.jsx` y `reportsProcessor.js`, permitiendo que las reimpresiones del historial (`CierreHistoryCard.jsx`) contengan la reconciliación real declarada |
+| 01/08/2026 | Fix Pestaña Cierres + Entidad CIERRE_CAJA | Auto-switch de filtro de fecha a "Este Mes" al entrar a pestaña Cierres en `ReportsView.jsx`, eliminación de la opción invalida "Turno Actual" en Cierres, y creación de entidad autónoma `tipo: 'CIERRE_CAJA'` en `DashboardView.jsx` y `reportsProcessor.js` |
 
 ---
 
