@@ -546,8 +546,15 @@ export async function printReceiptEscPos(sale, bcvRate) {
     // Totales
     p.align(1).bigText(true).bold(true);
     p.text('$' + (sale.totalUsd || 0).toFixed(2)).newline();
-    p.bigText(false).bold(true);
-    p.text(formatBsSimple(sale.totalBs) + ' Bs').newline();
+    const bsPaymentsEsc = sale.payments?.filter(pm => pm.currency === 'BS' || pm.methodId?.includes('_bs') || pm.methodId === 'pago_movil' || pm.methodId === 'punto_de_venta');
+    let displayTotalBsEsc = sale.totalBs || 0;
+    if (bsPaymentsEsc?.length > 0) {
+        const sumPaidBs = bsPaymentsEsc.reduce((acc, pm) => acc + (pm.amountInput || pm.amountBs || (pm.amountUsd && rate ? pm.amountUsd * rate : 0) || 0), 0);
+        if (sumPaidBs > 0) displayTotalBsEsc = sumPaidBs;
+    } else if (sale.totalUsd > 0 && rate > 0) {
+        displayTotalBsEsc = sale.totalUsd * rate;
+    }
+    p.text(formatBsSimple(displayTotalBsEsc) + ' Bs').newline();
     if (sale.copEnabled && sale.tasaCop > 0) {
         const cop = sale.totalCop || (sale.totalUsd * sale.tasaCop);
         p.text(cop.toLocaleString('es-CO', { minimumFractionDigits: 2 }) + ' COP').newline();

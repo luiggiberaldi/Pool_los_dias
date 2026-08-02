@@ -196,7 +196,17 @@ export async function processSaleTransaction({
         discountValue: discountData?.value || 0,
         discountAmountUsd: discountData?.amountUsd || 0,
         totalUsd: cartTotalUsd,
-        totalBs: cartTotalBs,
+        totalBs: (() => {
+            const bsPayments = payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
+            if (bsPayments?.length > 0) {
+                const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && effectiveRate ? p.amountUsd * effectiveRate : 0) || 0), 0);
+                if (sumPaidBs > 0) return round2(sumPaidBs);
+            }
+            if (cartTotalUsd > 0 && effectiveRate > 0) {
+                return round2(cartTotalUsd * effectiveRate);
+            }
+            return cartTotalBs;
+        })(),
         totalCop: copEnabled && tasaCop > 0 ? cartTotalUsd * tasaCop : 0,
         payments,
         rate: effectiveRate,

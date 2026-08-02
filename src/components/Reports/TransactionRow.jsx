@@ -39,6 +39,19 @@ export default function TransactionRow({
     const dateLabel = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
     const saleRate = s.rate || bcvRate;
 
+    // Normalización de Total en Bs: Prioriza la suma real cobrada en Bs o la conversión a la tasa aplicada
+    const effectiveTotalBs = useMemo(() => {
+        const bsPayments = s.payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
+        if (bsPayments?.length > 0) {
+            const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && s.rate ? p.amountUsd * s.rate : 0) || 0), 0);
+            if (sumPaidBs > 0) return sumPaidBs;
+        }
+        if (s.totalUsd > 0 && saleRate > 0) {
+            return s.totalUsd * saleRate;
+        }
+        return s.totalBs || 0;
+    }, [s, saleRate]);
+
     const handleShare = (e) => {
         e.stopPropagation();
         if (onShareWhatsApp) {
@@ -59,7 +72,7 @@ export default function TransactionRow({
             });
         }
         text += `\n*TOTAL: $${(s.totalUsd || 0).toFixed(2)}*\n`;
-        text += `Ref: ${formatBs(s.totalBs || 0)} Bs\n`;
+        text += `Ref: ${formatBs(effectiveTotalBs)} Bs\n`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     };
 
@@ -93,7 +106,7 @@ export default function TransactionRow({
                 </div>
                 <div className="text-right shrink-0">
                     <p className={`text-sm font-black ${isCanceled ? 'text-slate-400' : 'text-slate-800 dark:text-white'}`}>${(s.totalUsd || 0).toFixed(2)}</p>
-                    <p className="text-[11px] text-slate-400 font-medium">{formatBs(s.totalBs || 0)} Bs</p>
+                    <p className="text-[11px] text-slate-400 font-medium">{formatBs(effectiveTotalBs)} Bs</p>
                     <div className="flex justify-end mt-0.5">
                         {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                     </div>
@@ -127,7 +140,7 @@ export default function TransactionRow({
                         <div className="space-y-1 text-xs">
                             <div className="flex justify-between text-slate-600 dark:text-slate-300">
                                 <span>Total en Bs</span>
-                                <span className="font-bold">{formatBs(s.totalBs || 0)} Bs</span>
+                                <span className="font-bold">{formatBs(effectiveTotalBs)} Bs</span>
                             </div>
                             <div className="flex justify-between text-slate-400">
                                 <span>Tasa aplicada</span>

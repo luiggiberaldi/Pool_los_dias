@@ -231,7 +231,17 @@ function _printThermalHTML(sale, bcvRate) {
         ` : ''}
         <div class="center bold" style="font-size:${fSmall};color:#000;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
-        <div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(sale.totalBs || 0)}</div>
+        ${(() => {
+            const bsPayments = sale.payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
+            let displayTotalBs = sale.totalBs || 0;
+            if (bsPayments?.length > 0) {
+                const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && rate ? p.amountUsd * rate : 0) || 0), 0);
+                if (sumPaidBs > 0) displayTotalBs = sumPaidBs;
+            } else if (sale.totalUsd > 0 && rate > 0) {
+                displayTotalBs = sale.totalUsd * rate;
+            }
+            return `<div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(displayTotalBs)}</div>`;
+        })()}
         ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:13px;">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
     </div>
 
