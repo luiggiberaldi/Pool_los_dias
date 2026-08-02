@@ -39,32 +39,122 @@ function getSalesBroadcastChannel(userId) {
  * - Upsert en sync_documents como fila individual (recuperación offline).
  */
 export async function broadcastNewSale(sale, userId) {
-    if (!userId) return;
+    if (!sale?.id) return;
 
     // 1. Broadcast P2P — instantáneo, sin pasar por la DB
-    try {
-        const ch = getSalesBroadcastChannel(userId);
-        await ch.send({
-            type: 'broadcast',
-            event: 'new_sale',
-            payload: sale,
-        });
-    } catch (e) {
-        // Non-fatal: el persist en DB actúa como fallback
-        console.warn('[SalesSync] Broadcast P2P falló:', e?.message);
+    if (userId) {
+        try {
+            const ch = getSalesBroadcastChannel(userId);
+            await ch.send({
+                type: 'broadcast',
+                event: 'new_sale',
+                payload: sale,
+            });
+        } catch (e) {
+            console.warn('[SalesSync] Broadcast P2P falló:', e?.message);
+        }
     }
 
     // 2. Persistir fila individual — fallback para dispositivos offline
+    if (userId) {
+        try {
+            const { error } = await supabaseCloud.from('sync_documents').upsert({
+                user_id: userId,
+                collection: 'sale',
+                doc_id: sale.id,
+                data: { payload: sale },
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,collection,doc_id' });
+
+            if (!error) {
+                // Limpiar de la cola de pendientes si se subió con éxito
+                const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+                let pendingQueue = [];
+                try { pendingQueue = JSON.parse(pendingQueueStr); } catch (_) { pendingQueue = []; }
+                const updatedQueue = pendingQueue.filter(id => id !== sale.id);
+                localStorage.setItem('_pending_sale_uploads', JSON.stringify(updatedQueue));
+            }
+        } catch (e) {
+            console.warn('[SalesSync] Persist en DB falló:', e?.message);
+        }
+    }
+}
+
+/**
+ * Sincroniza ventas pendientes guardadas localmente hacia la nube.
+ * Incluye Safety Snapshot automático antes de subir.
+ */
+export async function syncPendingSalesToCloud(userId) {
+    if (!userId) return 0;
     try {
-        await supabaseCloud.from('sync_documents').upsert({
-            user_id: userId,
-            collection: 'sale',
-            doc_id: sale.id,
-            data: { payload: sale },
-            updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,collection,doc_id' });
+        const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+        let pendingIds = [];
+        try { pendingIds = JSON.parse(pendingQueueStr); } catch (_) { pendingIds = []; }
+
+        const localSales = await storageService.getItem(SALES_KEY, []);
+
+        // Guardarraíl: incluir ventas de la sesión activa que no estén cerradas en la cola de subida
+        if (localSales.length > 0) {
+            const openLocalSales = localSales.filter(s => !s.cajaCerrada && s.id);
+            openLocalSales.forEach(s => {
+                if (!pendingIds.includes(s.id)) pendingIds.push(s.id);
+            });
+        }
+
+        if (!pendingIds.length) return 0;
+
+        // Guardarraíl: Triple Snapshot de resguardo antes de cualquier operación
+        if (localSales.length > 0) {
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+            await storageService.setItem('bodega_sales_backup_MASTER_REAL', localSales);
+            await storageService.setItem('bodega_sales_backup_safety', localSales);
+            try {
+                localStorage.setItem('bodega_sales_backup_ls_' + ts.substring(0, 16), JSON.stringify(localSales.slice(0, 20)));
+            } catch (_) {}
+        }
+
+        const pendingSet = new Set(pendingIds);
+        const pendingSales = localSales.filter(s => pendingSet.has(s.id));
+
+        if (!pendingSales.length) {
+            localStorage.setItem('_pending_sale_uploads', '[]');
+            return 0;
+        }
+
+        console.log(`[SalesSync] Subiendo ${pendingSales.length} venta(s) pendiente(s) a la nube...`);
+        const uploadedIds = [];
+        for (const sale of pendingSales) {
+            try {
+                const { error } = await supabaseCloud.from('sync_documents').upsert({
+                    user_id: userId,
+                    collection: 'sale',
+                    doc_id: sale.id,
+                    data: { payload: sale },
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'user_id,collection,doc_id' });
+
+                if (!error) {
+                    uploadedIds.push(sale.id);
+                }
+            } catch (e) {
+                console.warn(`[SalesSync] Fallo en upsert de venta ${sale.id}:`, e?.message);
+            }
+        }
+
+        if (uploadedIds.length > 0) {
+            const remaining = pendingIds.filter(id => !uploadedIds.includes(id));
+            localStorage.setItem('_pending_sale_uploads', JSON.stringify(remaining));
+            console.log(`[SalesSync] ✓ ${uploadedIds.length} venta(s) sincronizada(s) exitosamente con la nube.`);
+            try {
+                const { showToast } = await import('../components/Toast');
+                showToast(`🟢 ${uploadedIds.length} venta(s) sincronizadas con la nube`, 'success', 4000);
+            } catch (_) {}
+        }
+
+        return uploadedIds.length;
     } catch (e) {
-        console.warn('[SalesSync] Persist en DB falló:', e?.message);
+        console.warn('[SalesSync] syncPendingSalesToCloud falló:', e?.message);
+        return 0;
     }
 }
 

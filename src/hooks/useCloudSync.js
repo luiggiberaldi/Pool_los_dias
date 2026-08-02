@@ -444,9 +444,12 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
                 console.log('[CloudSync] App volvió al primer plano – re-sincronizando...');
                 pullLatestFromCloud();
                 // También pull incremental de ventas
-                const { pullNewSales } = await import('../utils/salesSyncService');
+                const { pullNewSales, syncPendingSalesToCloud } = await import('../utils/salesSyncService');
                 const { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
-                if (session?.user?.id) pullNewSales(session.user.id);
+                if (session?.user?.id) {
+                    await pullNewSales(session.user.id);
+                    await syncPendingSalesToCloud(session.user.id);
+                }
             }, 500);
         }
     });
@@ -536,8 +539,9 @@ export function useCloudSync() {
                 processSyncQueue();
 
                 // Pull incremental de ventas (solo nuevas desde último sync)
-                const { pullNewSales, subscribeSalesRealtime, applyIncomingSale } = await import('../utils/salesSyncService');
+                const { pullNewSales, syncPendingSalesToCloud, subscribeSalesRealtime, applyIncomingSale } = await import('../utils/salesSyncService');
                 await pullNewSales(userId);
+                await syncPendingSalesToCloud(userId);
 
                 // ── Suscripción Broadcast P2P (0 WAL egress) ─────────────────
                 // Reemplaza postgres_changes en sync_documents por broadcast
@@ -588,6 +592,18 @@ export function useCloudSync() {
                         }
                     })
                     .subscribe();
+
+                // Heartbeat Sync Daemon: reintento silencioso cada 30 segundos
+                const heartbeatInterval = setInterval(async () => {
+                    if (isInitialSyncCompleted) {
+                        try {
+                            const { syncPendingSalesToCloud } = await import('../utils/salesSyncService');
+                            await syncPendingSalesToCloud(userId);
+                        } catch (_) {}
+                    }
+                }, 30_000);
+
+                return () => clearInterval(heartbeatInterval);
 
             } catch (err) {
                 console.error('[CloudSync] Error inicialización P2P:', err);

@@ -199,6 +199,7 @@ Cuando una mesa tiene clientes/seats, `requestAttribution` enruta horas a `seat.
 | 26/07/2026 | Persistencia de Cuadre de Caja (reconData) en Cierres | Preservado `reconData` (Declarado USD/Bs y Diferencia) al guardar el cierre en `DashboardView.jsx` y `reportsProcessor.js`, permitiendo que las reimpresiones del historial (`CierreHistoryCard.jsx`) contengan la reconciliación real declarada |
 | 01/08/2026 | Fix Pestaña Cierres + Entidad CIERRE_CAJA | Auto-switch de filtro de fecha a "Este Mes" al entrar a pestaña Cierres en `ReportsView.jsx`, eliminación de la opción invalida "Turno Actual" en Cierres, y creación de entidad autónoma `tipo: 'CIERRE_CAJA'` en `DashboardView.jsx` y `reportsProcessor.js` |
 | 01/08/2026 | Fix Muestreo de Restante en Pagos Mixtos (Checkout) | Corregido el cálculo de `remainingBs` y `proportionPaid` en `useCheckoutPayments.js` para usar la conversión de `effectiveRate` en lugar de `cartTotalBs` con tasa desalineada. Evita falsos disparos de "Ventas Fiadas" en pagos mixtos USD + Bs |
+| 01/08/2026 | Sincronización Multi-Dispositivo con Guardarraíles | Implementada cola persistente `_pending_sale_uploads`, función `syncPendingSalesToCloud` con Safety Snapshot automático (`bodega_sales_backup_safety`) y sync bidireccional al arrancar/reconectar para garantizar paridad entre PWA, Vercel y equipos secundarios sin borrado de datos |
 
 ---
 

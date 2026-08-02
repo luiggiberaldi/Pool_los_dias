@@ -224,6 +224,17 @@ export async function processSaleTransaction({
 
     await storageService.setItem(SALES_KEY, [finalPersistedSale, ...existingSales]);
 
+    // Guardarraíl: Encolar ID de venta para asegurar subida a la nube
+    try {
+        const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+        let pendingQueue = [];
+        try { pendingQueue = JSON.parse(pendingQueueStr); } catch (_) { pendingQueue = []; }
+        if (!pendingQueue.includes(finalPersistedSale.id)) {
+            pendingQueue.push(finalPersistedSale.id);
+            localStorage.setItem('_pending_sale_uploads', JSON.stringify(pendingQueue));
+        }
+    } catch (_) {}
+
     // Sincronizar venta a otros dispositivos (Broadcast P2P + persist individual en DB)
     supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user?.id) {
