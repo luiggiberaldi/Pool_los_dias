@@ -93,11 +93,10 @@ export async function syncPendingSalesToCloud(userId) {
 
         const localSales = await storageService.getItem(SALES_KEY, []);
 
-        // Guardarraíl: incluir ventas de la sesión activa que no estén cerradas en la cola de subida
+        // Sincronización Universal: incluir TODAS las ventas y registros de caja (abiertos o cerrados)
         if (localSales.length > 0) {
-            const openLocalSales = localSales.filter(s => !s.cajaCerrada && s.id);
-            openLocalSales.forEach(s => {
-                if (!pendingIds.includes(s.id)) pendingIds.push(s.id);
+            localSales.forEach(s => {
+                if (s.id && !pendingIds.includes(s.id)) pendingIds.push(s.id);
             });
         }
 

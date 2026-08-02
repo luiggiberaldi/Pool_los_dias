@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { X, Download, FileSpreadsheet, TrendingUp, ShoppingBag, CreditCard, Clock, Package } from 'lucide-react';
 import { getPaymentLabel } from '../../config/paymentMethods';
+import { getSaleBs } from '../../utils/calculatorUtils';
 
 function formatHora(ts) {
     if (!ts) return '—';
@@ -95,7 +96,7 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                 productos,
                 s.items ? s.items.reduce((sum, i) => sum + i.qty, 0) : 0,
                 `$${(s.totalUsd || 0).toFixed(2)}`,
-                `Bs ${(s.totalBs || 0).toFixed(2)}`,
+                `Bs ${getSaleBs(s).toFixed(2)}`,
                 getSalePaymentLabel(s),
             ]);
         });

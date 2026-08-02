@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { FinancialEngine } from '../core/FinancialEngine';
-import { capitalizeName } from '../utils/calculatorUtils';
+import { capitalizeName, getSaleBs } from '../utils/calculatorUtils';
 
 export function getLocalISODate(d = new Date()) {
     const year = d.getFullYear();
@@ -55,7 +55,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         [sales, today, sessionOpenedAt]
     );
 
-    const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [todaySales]);
+    const todayTotalBs = useMemo(() => todaySales.reduce((sum, s) => sum + getSaleBs(s), 0), [todaySales]);
     const todayTotalUsd = useMemo(() => todaySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [todaySales]);
     const todayItemsSold = useMemo(() =>
         todaySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0),
@@ -90,7 +90,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
         [sales, today]
     );
     const dayTotalUsd = useMemo(() => daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [daySales]);
-    const dayTotalBs = useMemo(() => daySales.reduce((sum, s) => sum + (s.totalBs || 0), 0), [daySales]);
+    const dayTotalBs = useMemo(() => daySales.reduce((sum, s) => sum + getSaleBs(s), 0), [daySales]);
     const dayItemsSold = useMemo(() =>
         daySales.reduce((sum, s) => sum + (s.items ? s.items.reduce((is, i) => is + i.qty, 0) : 0), 0),
         [daySales]

@@ -95,9 +95,10 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
     const overProportion = Math.max(0, proportionPaid - 1);
     const remainProportion = Math.max(0, 1 - proportionPaid);
     const remainingUsd = round2(remainProportion * cartTotalUsd);
-    const remainingBs = round2(remainingUsd * effectiveRate);
+    const effectiveTotalBs = cartTotalBs && cartTotalBs > 0 ? cartTotalBs : round2(cartTotalUsd * effectiveRate);
+    const remainingBs = round2(remainProportion * effectiveTotalBs);
     const changeUsd = round2(overProportion * cartTotalUsd);
-    const changeBs = round2(changeUsd * effectiveRate);
+    const changeBs = round2(overProportion * effectiveTotalBs);
     const isPaid = cartTotalUsd < EPSILON || proportionPaid >= (1 - EPSILON / Math.max(cartTotalUsd, EPSILON));
 
     // Ref to always have the latest remaining values available for fillBar,

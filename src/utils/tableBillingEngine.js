@@ -112,13 +112,13 @@ export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV
 export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
     if (costUSD <= 0) return 0;
 
-    let priceBs, priceUsd;
+    let priceBs = 0, priceUsd = 0;
     if (gameMode === 'PINA') {
-        priceBs = config.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
-        priceUsd = config.pricePina || 0;
+        priceBs = config?.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
+        priceUsd = config?.pricePina || 0;
     } else {
-        priceBs = config.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
-        priceUsd = config.pricePerHour || 0;
+        priceBs = config?.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+        priceUsd = config?.pricePerHour || 0;
     }
 
     if (priceBs > 0 && priceUsd > 0) {

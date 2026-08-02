@@ -49,7 +49,7 @@ export function useReportsData({ isActive, products, bcvRate, selectedRange, cus
             mounted = false;
             window.removeEventListener('app_storage_update', onStorageUpdate);
         };
-    }, [isActive]);
+    }, [isActive, activeTab, selectedRange]);
 
     const { from, to } = useMemo(() => {
         if (selectedRange === 'custom') {
