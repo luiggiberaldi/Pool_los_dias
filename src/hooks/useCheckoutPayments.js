@@ -95,7 +95,7 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
     const overProportion = Math.max(0, proportionPaid - 1);
     const remainProportion = Math.max(0, 1 - proportionPaid);
     const remainingUsd = round2(remainProportion * cartTotalUsd);
-    const effectiveTotalBs = cartTotalBs && cartTotalBs > 0 ? cartTotalBs : round2(cartTotalUsd * effectiveRate);
+    const effectiveTotalBs = round2(cartTotalUsd * effectiveRate);
     const remainingBs = round2(remainProportion * effectiveTotalBs);
     const changeUsd = round2(overProportion * cartTotalUsd);
     const changeBs = round2(overProportion * effectiveTotalBs);
@@ -116,19 +116,34 @@ export function useCheckoutPayments({ paymentMethods, effectiveRate, tasaCop, ca
 
     const fillBar = useCallback((methodId, currency, splitRemainingUsd = null) => {
         triggerHaptic && triggerHaptic();
-        const curRemaining = remainingRef.current;
-        const targetUsd = splitRemainingUsd != null ? splitRemainingUsd : curRemaining.usd;
-        const targetBs = splitRemainingUsd != null ? mulR(splitRemainingUsd, effectiveRate) : curRemaining.bs;
+
+        // Target isolation: calculate USD paid by OTHER methods (excluding target methodId)
+        const otherPaidUsd = sumR(
+            paymentMethods
+                .filter(m => m.id !== methodId)
+                .map(m => {
+                    const val = parseFloat(barValues[m.id]) || 0;
+                    if (val === 0) return 0;
+                    if (m.currency === 'USD') return round2(val);
+                    if (m.currency === 'COP') return tasaCop ? divR(val, tasaCop) : 0;
+                    return divR(val, effectiveRate);
+                })
+        );
+
+        const targetUsd = splitRemainingUsd != null
+            ? splitRemainingUsd
+            : Math.max(0, round2(cartTotalUsd - otherPaidUsd));
+
         let val;
         if (currency === 'USD') {
             val = targetUsd > 0 ? round2(targetUsd).toString() : null;
         } else if (currency === 'COP') {
             val = targetUsd > 0 && tasaCop ? mulR(targetUsd, tasaCop).toString() : null;
         } else {
-            val = targetBs > 0 ? round2(targetBs).toString() : null;
+            val = targetUsd > 0 ? round2(mulR(targetUsd, effectiveRate)).toString() : null;
         }
         if (val) setBarValues(prev => ({ ...prev, [methodId]: val }));
-    }, [effectiveRate, triggerHaptic, tasaCop]);
+    }, [effectiveRate, triggerHaptic, tasaCop, paymentMethods, barValues, cartTotalUsd]);
 
     const _doConfirm = useCallback(async () => {
         if (submittingRef.current) return;

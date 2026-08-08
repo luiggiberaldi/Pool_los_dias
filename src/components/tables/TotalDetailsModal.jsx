@@ -4,7 +4,6 @@ import { Modal } from '../Modal';
 import { useProductContext } from '../../context/ProductContext';
 
 function getItemBs(item, tasaUSD, products) {
-    if (item.unit_price_bs != null && Number(item.unit_price_bs) > 0) return Number(item.unit_price_bs);
     const p = (products || []).find(pr => pr.id === item.product_id);
     if (p && p.isCombo && p.priceBs > 0) return p.priceBs;
     return item.unit_price_usd * tasaUSD;
@@ -127,7 +126,7 @@ export function TotalDetailsModal({
                 <div className="flex justify-between items-center mt-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
                     <div className="flex flex-col">
                         <span className="text-sm font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Total Cuenta</span>
-                        <span className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa BCV: Bs. {Number(tasaUSD).toFixed(2)}</span>
+                        <span className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 pt-1">Tasa Activa: Bs. {Number(tasaUSD).toFixed(2)}</span>
                     </div>
                     <div className="flex flex-col items-end">
                         <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none mb-1">

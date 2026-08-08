@@ -169,7 +169,7 @@ export default function TableBillModal({ data, onClose, onProceedToPayment }) {
                     {!hasSeats && (
                         <BillClassicBreakdown
                             session={session} elapsed={elapsed} timeCost={timeCost}
-                            currentItems={currentItems} config={config} tasaUSD={tasaUSD}
+                            currentItems={currentItems} config={config} tasaUSD={tasaUSD} products={allProducts}
                             fullBreakdown={fullBreakdown} breakdown={breakdown}
                             hoursOffset={hoursOffset} roundsOffset={roundsOffset}
                             pinaCount={pinaCount} canDiscount={canDiscount}

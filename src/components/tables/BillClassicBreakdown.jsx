@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock, Coffee, Percent, Tag, Trash2 } from 'lucide-react';
-import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, formatHoursPaid } from '../../utils/tableBillingEngine';
+import { formatElapsedTime, calculateTimeCostBs, calculateTimeCostBsBreakdown, calculateConsumptionBs, formatHoursPaid } from '../../utils/tableBillingEngine';
 
 function formatBs(val) {
     return (val || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -15,7 +15,7 @@ function TargetIcon({size}) {
 }
 
 export function BillClassicBreakdown({
-    session, elapsed, timeCost, currentItems, config, tasaUSD,
+    session, elapsed, timeCost, currentItems, config, tasaUSD, products,
     fullBreakdown, breakdown,
     hoursOffset, roundsOffset,
     pinaCount, canDiscount,
@@ -162,7 +162,7 @@ export function BillClassicBreakdown({
                                             ) : (
                                                 <p className="text-sm font-black text-slate-800 dark:text-white">${lineTotal.toFixed(2)}</p>
                                             )}
-                                            <p className="text-[10px] text-slate-400">Bs {formatBs(finalLine * tasaUSD)}</p>
+                                            <p className="text-[10px] text-slate-400">Bs {formatBs(calculateConsumptionBs([item], tasaUSD, products) * (lineTotal > 0 ? finalLine / lineTotal : 1))}</p>
                                         </div>
                                     </div>
                                 </div>

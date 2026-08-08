@@ -18,6 +18,7 @@ import {
     calculateTimeCostBs,
     formatHoursPaid,
 } from '../utils/tableBillingEngine';
+import { runRateSyncTests } from './RateSyncTester';
 
 // ── Test State ──
 const state = {
@@ -1792,6 +1793,26 @@ function scenarioU() {
     return { passed, failed };
 }
 
+function scenarioRateSync() {
+    section("Escenario RateSync: Sincronización de Tasa (Mesa → Cobro)");
+    const syncResults = runRateSyncTests();
+    let passed = 0;
+    let failed = 0;
+
+    syncResults.forEach(res => {
+        if (res.pass) {
+            log(res.name, 'success');
+            passed++;
+        } else {
+            log(`${res.name}: ${res.error}`, 'error');
+            failed++;
+        }
+    });
+
+    log(`Escenario RateSync completado: ${passed} pasaron, ${failed} fallaron`, failed > 0 ? 'error' : 'success');
+    return { passed, failed };
+}
+
 // ── Suite definitions ──
 const ALL_SUITES = [
     { key: 'scenario_a', name: 'Abrir → Cobrar → Liberar', fn: scenarioA },
@@ -1815,6 +1836,7 @@ const ALL_SUITES = [
     { key: 'scenario_s', name: 'Recobro — Bs con Seat TimeCharges', fn: scenarioS },
     { key: 'scenario_t', name: 'Registro en Reportes — Cobro/Recobro/Re-recobro', fn: scenarioT },
     { key: 'scenario_u', name: 'Datos de Ticket — Compra y Recompra', fn: scenarioU },
+    { key: 'scenario_ratesync', name: 'Consistencia Tasa Cambio (Mesa → Cobro)', fn: scenarioRateSync },
 ];
 
 // ── Public API ──

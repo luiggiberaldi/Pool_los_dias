@@ -72,34 +72,32 @@ export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV
     let hourCostBs = 0;
     let libreCostBs = 0;
 
+    const rate = tasaBCV || 1;
+
     if (pinaCost > 0) {
-        const priceBs = config.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
-        const priceUsd = config.pricePina || 0;
+        const priceBs = config?.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
+        const priceUsd = config?.pricePina || 0;
+        // Si el usuario configuró un precio explícito en Bs, siempre lo honramos
         if (priceBs > 0 && priceUsd > 0) {
             pinaCostBs = round2(pinaCost * (priceBs / priceUsd));
         } else {
-            pinaCostBs = round2(pinaCost * (tasaBCV || 1));
+            pinaCostBs = round2(pinaCost * rate);
         }
     }
 
     if (hourCost > 0) {
-        const priceBs = config.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
-        const priceUsd = config.pricePerHour || 0;
+        const priceBs = config?.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
+        const priceUsd = config?.pricePerHour || 0;
+        // Si el usuario configuró un precio explícito en Bs, siempre lo honramos
         if (priceBs > 0 && priceUsd > 0) {
             hourCostBs = round2(hourCost * (priceBs / priceUsd));
         } else {
-            hourCostBs = round2(hourCost * (tasaBCV || 1));
+            hourCostBs = round2(hourCost * rate);
         }
     }
 
     if (libreCost > 0) {
-        const priceBs = config.pricePerHourBs || parseFloat(localStorage.getItem('pool_price_per_hour_bs')) || 0;
-        const priceUsd = config.pricePerHour || 0;
-        if (priceBs > 0 && priceUsd > 0) {
-            libreCostBs = round2(libreCost * (priceBs / priceUsd));
-        } else {
-            libreCostBs = round2(libreCost * (tasaBCV || 1));
-        }
+        libreCostBs = round2(libreCost * rate);
     }
 
     return { pinaCostBs, hourCostBs, libreCostBs, totalBs: round2(pinaCostBs + hourCostBs + libreCostBs) };
@@ -112,6 +110,7 @@ export function calculateTimeCostBsBreakdown(pinaCost, hourCost, config, tasaBCV
 export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
     if (costUSD <= 0) return 0;
 
+    const rate = tasaBCV || 1;
     let priceBs = 0, priceUsd = 0;
     if (gameMode === 'PINA') {
         priceBs = config?.pricePinaBs || parseFloat(localStorage.getItem('pool_price_pina_bs')) || 0;
@@ -121,42 +120,35 @@ export function calculateTimeCostBs(costUSD, gameMode, config, tasaBCV) {
         priceUsd = config?.pricePerHour || 0;
     }
 
+    // Si el usuario configuró un precio explícito en Bs, siempre lo honramos
     if (priceBs > 0 && priceUsd > 0) {
         return round2(costUSD * (priceBs / priceUsd));
     }
 
-    return round2(costUSD * (tasaBCV || 1));
+    return round2(costUSD * rate);
 }
 
 /**
- * Calcula el total de consumo en Bs usando unit_price_bs por item cuando está disponible.
- * Para combos sin unit_price_bs en DB, busca el priceBs del producto local.
- * Si no tiene priceBs, usa unit_price_usd * tasa.
- */
-/**
- * Calcula el total de consumo en Bs usando unit_price_bs por item cuando está disponible.
- * Para combos sin unit_price_bs en DB, busca el priceBs del producto en la lista de productos.
- * Si no tiene priceBs, usa unit_price_usd * tasa.
+ * Calcula el total de consumo en Bs usando conversión dinámica con tasaBCV (effectiveRate).
+ * Para combos con precio independiente en Bs (priceBs), usa su precio de lista explícito.
  * @param {Array} items - order items con product_id, unit_price_usd, unit_price_bs, qty
- * @param {number} tasaBCV - tasa de cambio
+ * @param {number} tasaBCV - tasa de cambio activa
  * @param {Array} [productsList] - lista de productos locales para buscar priceBs de combos
  */
 export function calculateConsumptionBs(items, tasaBCV, productsList = null) {
     if (!items || items.length === 0) return 0;
     const products = productsList || [];
+    const rate = tasaBCV || 1;
+
     return round2(items.reduce((acc, item) => {
         const qty = Number(item.qty) || 0;
-        // 1. DB has unit_price_bs
-        if (item.unit_price_bs != null && Number(item.unit_price_bs) > 0) {
-            return acc + Number(item.unit_price_bs) * qty;
-        }
-        // 2. Fallback: lookup product's priceBs (for combos with independent Bs pricing)
+        // 1. Fallback: lookup product's explicit priceBs (for combos with independent Bs pricing)
         const product = products.find(p => p.id === item.product_id);
         if (product && product.isCombo && product.priceBs > 0) {
             return acc + product.priceBs * qty;
         }
-        // 3. Default: USD * rate
-        return acc + (Number(item.unit_price_usd) || 0) * qty * (tasaBCV || 1);
+        // 2. Default: USD * rate (conversión dinámica con la tasa activa del sistema)
+        return acc + (Number(item.unit_price_usd) || 0) * qty * rate;
     }, 0));
 }
 

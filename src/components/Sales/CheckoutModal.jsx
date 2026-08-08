@@ -392,7 +392,7 @@ export default function CheckoutModal({
                     {/* Resultado visual simple */}
                     {splitPeople && cartTotalUsd > 0 && (() => {
                         const perPersonUsd = divR(cartTotalUsd, splitPeople);
-                        const perPersonBs = divR(cartTotalBs, splitPeople);
+                        const perPersonBs = divR(cartTotalUsd * effectiveRate, splitPeople);
                         return (
                             <div className="mt-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
                                 <div>
