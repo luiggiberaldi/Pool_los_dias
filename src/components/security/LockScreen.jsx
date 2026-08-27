@@ -5,6 +5,8 @@ import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 import SuperAdminModal from './SuperAdminModal';
 
+import { LogOut } from 'lucide-react';
+
 export default function LockScreen() {
   const { usuarios, loginWithBiometric, verifyPin, loginAsSuperAdmin } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState(null);
@@ -107,9 +109,9 @@ export default function LockScreen() {
         </p>
         <button
           onClick={handleCloudLogout}
-          className="flex items-center gap-1.5 text-[10px] font-bold text-rose-500/60 hover:text-rose-400 transition-colors"
+          className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-rose-500/80 hover:text-rose-600 transition-colors cursor-pointer"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <LogOut className="w-3.5 h-3.5" strokeWidth={2.5} />
           Cerrar sesión
         </button>
       </div>

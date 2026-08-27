@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../hooks/store/authStore';
+import { useConfirm } from '../../hooks/useConfirm.jsx';
+import { supabaseCloud } from '../../config/supabaseCloud';
 import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
 import SuperAdminModal from './SuperAdminModal';
-import { DownloadCloud } from 'lucide-react';
+import { DownloadCloud, LogOut } from 'lucide-react';
 
 export default function LoginScreen() {
-    const { cachedUsers, loginWithBiometric, verifyPin, syncUsers, loginAsSuperAdmin } = useAuthStore();
+    const { cachedUsers, loginWithBiometric, verifyPin, syncUsers, loginAsSuperAdmin, logout } = useAuthStore();
+    const confirm = useConfirm();
     const visibleUsers = cachedUsers.filter(user => user.active !== false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -37,6 +40,25 @@ export default function LoginScreen() {
         await syncUsers();
         setIsSyncing(false);
     }, [syncUsers]);
+
+    const handleCloudLogout = async () => {
+        const ok = await confirm({
+            title: '¿Cerrar sesión cloud?',
+            message: 'Se cerrará la sesión de la cuenta en este dispositivo. Deberás iniciar sesión nuevamente para continuar.',
+            confirmText: 'Cerrar sesión',
+            cancelText: 'Cancelar',
+            variant: 'logout'
+        });
+        if (!ok) return;
+        try {
+            await logout();
+            localStorage.removeItem('pool_had_cloud_session');
+            await supabaseCloud.auth.signOut();
+        } catch (e) {
+            console.error('[LoginScreen] Error al cerrar sesión cloud:', e);
+        }
+        window.location.reload();
+    };
 
     useEffect(() => {
         // Diferir la sincronización evita actualizar estado durante el commit inicial.
@@ -127,14 +149,22 @@ export default function LoginScreen() {
                     <p className="text-[10px] sm:text-xs text-slate-600 font-medium tracking-wider">
                         Ingresa tu PIN asignado
                     </p>
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4 sm:gap-6">
                         <button
                             onClick={handleForceSync}
                             disabled={isSyncing}
-                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-400 hover:text-sky-500 transition-colors disabled:opacity-50 cursor-pointer"
                         >
-                            <DownloadCloud className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
+                            <DownloadCloud className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} strokeWidth={2.5} />
                             Refrescar
+                        </button>
+                        <span className="text-slate-300 select-none">·</span>
+                        <button
+                            onClick={handleCloudLogout}
+                            className="flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-rose-500/80 hover:text-rose-600 transition-colors cursor-pointer"
+                        >
+                            <LogOut className="w-3.5 h-3.5" strokeWidth={2.5} />
+                            Cerrar sesión
                         </button>
                     </div>
                 </div>
