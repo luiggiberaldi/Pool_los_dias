@@ -363,11 +363,13 @@ export const pushCloudSync = async (key, value, force = false) => {
         // Broadcast P2P para dispositivos activos (0 DB egress)
         try {
             const ch = _getSyncBroadcastChannel(session.user.id);
-            ch.send({
-                type: 'broadcast',
-                event: 'sync_doc_changed',
-                payload: { doc_id: key, collection: collectionType, data: value },
-            });
+            if (ch?.state === 'joined') {
+                ch.send({
+                    type: 'broadcast',
+                    event: 'sync_doc_changed',
+                    payload: { doc_id: key, collection: collectionType, data: value },
+                });
+            }
         } catch (_) { /* non-fatal: la DB ya tiene el dato */ }
 
     } catch (e) {

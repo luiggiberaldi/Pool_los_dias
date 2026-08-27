@@ -42,7 +42,9 @@ if ('serviceWorker' in navigator) {
       if (!response.ok || !contentType.includes('javascript')) {
         // En desarrollo Vite puede devolver index.html para /sw.js. No
         // registrar esa respuesta como service worker: evita el MIME error.
-        console.warn('[PWA] Service worker omitido: /sw.js no devolvió JavaScript.');
+        if (!import.meta.env.DEV) {
+          console.warn('[PWA] Service worker omitido: /sw.js no devolvió JavaScript.');
+        }
         return;
       }
       const reg = await navigator.serviceWorker.register(swUrl.pathname, { scope: '/' });
