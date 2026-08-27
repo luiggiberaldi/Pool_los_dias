@@ -494,10 +494,7 @@ export default function ProductFormModal({
                                     {parsedCost > 0 && <div className="flex justify-between"><span className="text-slate-400">Costo:</span><span className="font-bold text-slate-600">${parsedCost.toFixed(2)}</span></div>}
                                     {mainMarginPct !== null && <div className="flex justify-between"><span className="text-slate-400">Margen:</span><span className={`font-black ${mainMarginPct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{mainMarginPct.toFixed(1)}%</span></div>}
                                     {isCombo ? (
-                                        <>
-                                            <div className="flex justify-between"><span className="text-violet-500">Tipo:</span><span className="font-bold text-violet-600">Combo / Promo</span></div>
-                                            {linkedProductId && <div className="flex justify-between"><span className="text-violet-500">Contiene:</span><span className="font-bold text-violet-600">{linkedQty}x {products?.find(p => p.id === linkedProductId)?.name || '—'}</span></div>}
-                                        </>
+                                        <div className="flex justify-between"><span className="text-violet-500">Tipo:</span><span className="font-bold text-violet-600">Combo / Promo</span></div>
                                     ) : (
                                         <div className="flex justify-between"><span className="text-slate-400">Stock:</span><span className="font-bold text-slate-700 dark:text-white">{stock || 0}</span></div>
                                     )}

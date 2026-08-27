@@ -1,9 +1,15 @@
-import { RefreshCw, ShoppingCart, Keyboard, Lock } from 'lucide-react';
+import { RefreshCw, Keyboard, Lock } from 'lucide-react';
 import Tooltip from '../Tooltip';
 import { useAuthStore } from '../../hooks/store/authStore';
 
 const formatBs = (n) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 
+/**
+ * SalesHeader — versión compacta (port PLAN-CAJA-ESPACIO).
+ * Ya no ocupa una franja propia con título: es un chip de tasa + botón de atajos
+ * que vive en la MISMA fila que el buscador (ver SalesView). El panel de
+ * configuración de tasa se abre como popover bajo el chip.
+ */
 export default function SalesHeader({
     effectiveRate,
     useAutoRate,
@@ -25,64 +31,53 @@ export default function SalesHeader({
     };
 
     return (
-        <div className="shrink-0 mb-3 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
-                        <div className="bg-emerald-500 text-white p-1.5 sm:p-2 rounded-xl shadow-lg shadow-emerald-500/30">
-                            <ShoppingCart size={20} className="sm:w-[22px] sm:h-[22px]" />
-                        </div>
-                        Punto de Venta
-                    </h2>
-                    {/* Tasa Móvil (visible solo en sm) */}
-                    <div className="sm:hidden">
-                        <button 
-                            onClick={handleRateToggle} 
-                            disabled={isLocked}
-                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${isLocked ? 'bg-slate-100 border-slate-200 opacity-80 cursor-not-allowed dark:bg-slate-800/50' : 'bg-slate-50 border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 active:scale-95 dark:bg-slate-800 dark:border-slate-700'}`}
-                        >
-                            {isLocked ? <Lock size={12} className="text-slate-400" /> : <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "text-slate-400"} />}
-                            <strong className="text-xs text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)}</strong>
-                        </button>
-                    </div>
-                </div>
+        <div className="relative shrink-0 flex flex-col gap-1.5 w-[86px] sm:w-[100px]">
+            {/* Chip de tasa (estilo Listo POS) */}
+            <Tooltip text={isLocked ? "Solo los administradores pueden fijar la tasa" : (useAutoRate ? "Tasa oficial sincronizada (BCV)" : "Usando tasa manual fijada por ti")} position="bottom">
+                <button
+                    data-tour="bcv-rate-btn"
+                    onClick={handleRateToggle}
+                    disabled={isLocked}
+                    className={`w-full h-full min-h-[52px] flex flex-col items-center justify-center gap-0.5 px-2 rounded-2xl sm:rounded-3xl border shadow-sm transition-all ${isLocked
+                        ? 'bg-slate-100 border-slate-200 dark:bg-slate-800/60 dark:border-slate-800 cursor-not-allowed opacity-80'
+                        : showRateConfig
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 dark:border-emerald-700'
+                            : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-700'
+                        }`}
+                >
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        {isLocked ? <Lock size={9} /> : <RefreshCw size={9} className={showRateConfig ? 'text-emerald-500' : ''} />}
+                        BCV
+                    </span>
+                    <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
+                        {formatBs(effectiveRate)}
+                    </span>
+                    {!useAutoRate && (
+                        <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-1 rounded font-bold leading-none">MAN</span>
+                    )}
+                </button>
+            </Tooltip>
 
-                {/* Tasa Desktop y Botones (oculto en sm) */}
-                <div className="hidden sm:flex items-center gap-2">
-                    <button 
-                        onClick={() => setShowKeyboardHelp(true)}
-                        className="hidden md:flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-900/40"
-                    >
-                        <Keyboard size={14} />
-                        <span className="text-xs font-bold">Atajos (PC)</span>
-                    </button>
+            {/* Atajos de teclado (solo desktop) */}
+            <button
+                onClick={() => setShowKeyboardHelp(true)}
+                className="hidden md:flex items-center justify-center gap-1 min-h-[30px] px-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                title="Atajos de teclado"
+            >
+                <Keyboard size={12} /> Atajos
+            </button>
 
-                    <Tooltip text={isLocked ? "Solo los administradores pueden fijar la tasa" : (useAutoRate ? "Tasa oficial sincronizada (BCV)" : "Usando tasa manual fijada por ti")} position="bottom">
-                        <button
-                            data-tour="bcv-rate-btn"
-                            onClick={handleRateToggle}
-                            disabled={isLocked}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all group ${isLocked ? 'bg-slate-100 border-slate-200 dark:bg-slate-800/80 dark:border-slate-800 cursor-not-allowed opacity-80' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:shadow-sm'}`}
-                        >
-                            <span className="text-xs text-slate-500 dark:text-slate-400 font-bold flex items-center gap-1.5">
-                                {isLocked ? <Lock size={12} className="text-slate-400" /> : <RefreshCw size={12} className={showRateConfig ? "text-emerald-500" : "group-hover:text-emerald-500"} />}
-                                BCV:
-                            </span>
-                            <strong className="text-sm text-emerald-600 dark:text-emerald-400">{formatBs(effectiveRate)} Bs</strong>
-                            {!useAutoRate && <span className="text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1 rounded-md font-bold">MAN</span>}
-                        </button>
-                    </Tooltip>
-                </div>
-            </div>
-
-            {/* Rate Config Panel */}
+            {/* Popover de configuración de tasa */}
             {showRateConfig && !isLocked && (
-                <div data-tour="bcv-rate-config" className="bg-slate-50 dark:bg-slate-950 rounded-xl sm:rounded-2xl border border-slate-200 dark:border-slate-800 p-3 mb-3 animate-in fade-in slide-in-from-top-2">
+                <div
+                    data-tour="bcv-rate-config"
+                    className="absolute right-0 top-full mt-1.5 w-72 z-40 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl p-3 animate-in fade-in slide-in-from-top-2 duration-150"
+                >
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-slate-500">Tasa de Cambio</span>
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-bold text-slate-400">
-                                {useAutoRate ? <span className="text-emerald-500">Auto Dólar BCV</span> : <span>Manual</span>}
+                                {useAutoRate ? <span className="text-emerald-500">Auto BCV</span> : <span>Manual</span>}
                             </span>
                             <button onClick={() => { triggerHaptic && triggerHaptic(); setUseAutoRate(!useAutoRate); }}
                                 className={`relative w-10 h-6 rounded-full transition-colors ${useAutoRate ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
@@ -92,7 +87,7 @@ export default function SalesHeader({
                     </div>
                     {!useAutoRate && (
                         <input type="number" value={customRate} onChange={e => setCustomRate(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                            className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                             placeholder="Ingresa Tasa Manual (Bs por $)" autoFocus />
                     )}
                     <button

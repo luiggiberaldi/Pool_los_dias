@@ -191,7 +191,7 @@ export const ProductsView = ({ rates, triggerHaptic }) => {
 
     // ── RENDER ──
     return (
-        <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 overflow-y-auto">
+        <div className="flex flex-col h-full min-h-0 bg-slate-50 dark:bg-slate-950 p-3 sm:p-6 pb-app-nav">
 
             {/* Header */}
             <div className="shrink-0 mb-3 space-y-2">

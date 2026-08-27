@@ -91,7 +91,7 @@ export default function CierreCajaWizard({
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-200" onClick={handleClose}>
             <div
-                className="bg-white dark:bg-slate-900 w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col shadow-2xl border-t border-slate-200 dark:border-slate-700 animate-in slide-in-from-bottom duration-300"
+                className="bg-white dark:bg-slate-900 w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex min-h-0 flex-col shadow-2xl border-t border-slate-200 dark:border-slate-700 animate-in slide-in-from-bottom duration-300"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Progress Bar */}
@@ -115,7 +115,7 @@ export default function CierreCajaWizard({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-hide">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 scrollbar-track-transparent">
 
                     {/* ═══ STEP 1: Resumen del Dia ═══ */}
                     {step === 1 && (

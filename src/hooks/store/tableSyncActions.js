@@ -145,20 +145,29 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
         if (merged.pricePinaBs != null) localStorage.setItem('pool_price_pina_bs', String(merged.pricePinaBs));
 
         try {
-            const { error } = await supabaseCloud.from('pool_config').update({
+            const userId = await getAuthUserId();
+            if (!userId) throw new Error('No hay cuenta cloud autenticada');
+
+            const payload = {
+                user_id: userId,
                 price_per_hour: merged.pricePerHour,
-                price_per_hour_bs: merged.pricePerHourBs || 0,
+                price_per_hour_bs: merged.pricePerHourBs ?? 0,
                 price_pina: merged.pricePina,
-                price_pina_bs: merged.pricePinaBs || 0,
+                price_pina_bs: merged.pricePinaBs ?? 0,
                 updated_at: new Date().toISOString()
-            }).eq('id', 1);
-            if (error && error.message?.includes('column')) {
-                await supabaseCloud.from('pool_config').update({
-                    price_per_hour: merged.pricePerHour,
-                    price_pina: merged.pricePina,
-                    updated_at: new Date().toISOString()
-                }).eq('id', 1);
-            }
+            };
+
+            const { data: existing, error: lookupError } = await supabaseCloud
+                .from('pool_config')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+            if (lookupError) throw lookupError;
+
+            const { error } = existing
+                ? await supabaseCloud.from('pool_config').update(payload).eq('id', existing.id)
+                : await supabaseCloud.from('pool_config').insert(payload);
+            if (error) throw error;
         } catch (e) {
             console.error('Error updating config in cloud', e);
         }
@@ -167,6 +176,7 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
     syncTablesAndSessions: async () => {
         try {
             const userId = await getAuthUserId();
+            if (!userId) return;
 
             let tablesQuery = supabaseCloud.from('tables').select('*').eq('active', true).order('name', { ascending: true });
             if (userId) tablesQuery = tablesQuery.eq('user_id', userId);
@@ -178,9 +188,17 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
             const { data: sessionsData, error: sessionsError } = await sessionsQuery;
             if (sessionsError) throw sessionsError;
 
-            let configQuery = supabaseCloud.from('pool_config').select('*').eq('id', 1);
-            if (userId) configQuery = configQuery.eq('user_id', userId);
-            const { data: configData, error: configError } = await configQuery.maybeSingle();
+            let configData = null;
+            let configError = null;
+            if (userId) {
+                const configResult = await supabaseCloud
+                    .from('pool_config')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                configData = configResult.data;
+                configError = configResult.error;
+            }
 
             if (!configError && configData) {
                 // Prefer cloud values, even if 0 (use ?? instead of || to respect 0)
@@ -217,8 +235,8 @@ export const createSyncActions = (set, get, tablesCache, scopedKey) => ({
     // --- ADMINISTRACIÓN DE MESAS ---
     addTable: async (name, type = 'POOL') => {
         const userId = await getAuthUserId();
-        const insertPayload = { name, type, status: 'libre', active: true };
-        if (userId) insertPayload.user_id = userId;
+        if (!userId) throw new Error('No hay cuenta cloud autenticada para crear la mesa');
+        const insertPayload = { name, type, status: 'libre', active: true, user_id: userId };
         const { data, error } = await supabaseCloud.from('tables').insert([insertPayload]).select().single();
         if (error) throw error;
         set(state => ({ tables: sortTables([...state.tables, data]) }));

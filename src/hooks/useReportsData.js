@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../utils/storageService';
-import { getLocalISODate, getDateRange } from '../utils/dateHelpers';
+import { getDateRange, normalizeDateRange } from '../utils/dateHelpers';
 import { calculateReportsData, groupSalesByCierreId } from '../utils/reportsProcessor';
 import { useCashStore } from './store/cashStore';
 
@@ -53,10 +53,8 @@ export function useReportsData({ isActive, products, bcvRate, selectedRange, cus
 
     const { from, to } = useMemo(() => {
         if (selectedRange === 'custom') {
-            return {
-                from: customFrom || getLocalISODate(new Date()),
-                to: customTo || getLocalISODate(new Date()),
-            };
+            // Rango invertido (Desde > Hasta) se normaliza en vez de devolver vacío
+            return normalizeDateRange(customFrom, customTo);
         }
         return getDateRange(selectedRange);
     }, [selectedRange, customFrom, customTo]);

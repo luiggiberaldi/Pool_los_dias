@@ -287,9 +287,9 @@ export function useRates() {
         updateData(false);
         const intervalId = setInterval(() => { updateData(true); }, UPDATE_INTERVAL);
 
-        // Escuchar tasas desde otros dispositivos via Supabase Broadcast (scoped por usuario)
-        const channelName = userId ? `rate_data_sync:${userId}` : 'rate_data_sync';
-        const channel = supabaseCloud.channel(channelName);
+        // Nunca abrir canales sin tenant: un canal sin UUID permite escuchar broadcasts ajenos.
+        if (!userId) return () => clearInterval(intervalId);
+        const channel = supabaseCloud.channel(`rate_data_sync:${userId}`);
         channel.on('broadcast', { event: 'rate_data' }, ({ payload }) => {
             if (!payload || payload.senderId === RATES_DEVICE_ID) return;
             if (payload.rates) {

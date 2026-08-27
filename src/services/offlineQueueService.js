@@ -10,6 +10,8 @@ const getQueueKey = () => scopedKey(QUEUE_KEY_BASE);
 const getLockKey = () => scopedKey(SYNC_LOCK_KEY_BASE);
 const LOCK_TTL = 30_000; // 30s — si un tab crashea, el lock expira
 const RPC_TIMEOUT = 12_000; // 12s timeout para cada RPC
+const AUTH_RETRY_DELAY = 30_000;
+let authRetryAt = 0;
 
 // Errores de PostgreSQL que NUNCA van a resolverse reintentando
 const UNRECOVERABLE_CODES = new Set([
@@ -37,7 +39,7 @@ function acquireSyncLock() {
 }
 
 function releaseSyncLock() {
-    try { localStorage.removeItem(getLockKey()); } catch {}
+    try { localStorage.removeItem(getLockKey()); } catch { /* storage cleanup is best effort */ }
 }
 
 // ─── Timeout wrapper ───────────────────────────────────────────────────────
@@ -87,8 +89,13 @@ export const offlineQueueService = {
     let synced = 0, failed = 0;
 
     try {
-        // Verify active session before attempting RPC calls
-        const { data: { session } } = await supabase.auth.getSession();
+        // Verify/refresh active session before attempting RPC calls. A 401 must
+        // pause the queue, not trigger a retry storm or mark sales as failed.
+        let { data: { session } } = await supabase.auth.getSession();
+        if (session?.expires_at && session.expires_at * 1000 <= Date.now() + 30_000) {
+            const refreshed = await supabase.auth.refreshSession();
+            if (!refreshed.error) session = refreshed.data.session || session;
+        }
         if (!session) {
             console.warn('[Offline Sync] No hay sesión activa — no se puede sincronizar.');
             const queue = await localforage.getItem(getQueueKey()) || [];
@@ -193,6 +200,7 @@ export const offlineQueueService = {
             const errMsg = err?.message || 'Unknown error';
             const errCode = err?.code;
             const errDetails = err?.details || err?.hint || '';
+            const isAuthError = errCode === '401' || errCode === 'PGRST301' || /401|JWT|token.*(expired|invalid)|unauthori[sz]ed/i.test(`${errMsg} ${errDetails}`);
             console.error(`[Offline Sync] Fallo al sincronizar venta offline:`, {
                 message: errMsg,
                 code: errCode,
@@ -211,6 +219,13 @@ export const offlineQueueService = {
 
             // Errores irrecuperables — no reintentar jamás
             // Incluye: códigos PG conocidos, o errores HTTP 400 sin código PG (payload inválido)
+            if (isAuthError) {
+                authRetryAt = Date.now() + AUTH_RETRY_DELAY;
+                // Mantener pendiente sin incrementar intentos: el token debe
+                // renovarse antes de reanudar la sincronización.
+                updatedQueue = updatedQueue.map(q => q.id === item.id ? { ...q, next_retry_at: authRetryAt, last_error: 'AUTH_SESSION_REQUIRED' } : q);
+                continue;
+            }
             const isUnrecoverable = UNRECOVERABLE_CODES.has(errCode) ||
                 (!isTimeout && !errCode && err?.message?.includes('400'));
             if (isUnrecoverable) {
@@ -245,6 +260,11 @@ export const offlineQueueService = {
     } finally {
         releaseSyncLock();
     }
+  },
+
+  async resumeAfterAuth() {
+    authRetryAt = 0;
+    return this.syncPendingSales(true);
   }
 };
 
@@ -255,6 +275,6 @@ window.addEventListener('online', () => {
     setTimeout(() => {
         syncScheduled = false;
         console.log("[Offline Sync] Internet restaurado. Sincronizando ventas pendientes...");
-        offlineQueueService.syncPendingSales(true);
+        if (Date.now() >= authRetryAt) offlineQueueService.syncPendingSales(true);
     }, 2000);
 });

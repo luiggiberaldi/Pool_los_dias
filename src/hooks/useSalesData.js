@@ -73,10 +73,13 @@ export function useSalesData({ isActive, setProductsSilent, cart, cartRef, setCa
         };
     }, [handleReloadContent]);
 
-    const buildCurrentFloat = (todaySalesData) => {
+    // Gaveta en vivo alineada con la SESIÓN DE CAJA activa (misma ventana que el arqueo).
+    // Incluye el fondo de apertura y excluye ventas de turnos anteriores no cerrados.
+    const buildCurrentFloat = (todaySalesData, sessionOpenedAt = null) => {
         const todayStr = getLocalISODate(new Date());
         const todayOpen = todaySalesData.filter(s => {
             if (s.cajaCerrada) return false;
+            if (sessionOpenedAt && s.timestamp < sessionOpenedAt) return false;
             const saleDay = s.timestamp ? getLocalISODate(new Date(s.timestamp)) : todayStr;
             return saleDay === todayStr;
         });

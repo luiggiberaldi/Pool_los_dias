@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Search, Truck, Receipt } from 'lucide-react';
+import { Users, Plus, Search, Receipt } from 'lucide-react';
 import { storageService } from '../utils/storageService';
 import { showToast } from '../components/Toast';
 import { round2, mulR, divR } from '../utils/dinero';
@@ -16,13 +16,33 @@ import { useAuthStore } from '../hooks/store/authStore';
 import CustomerCard from '../components/Customers/CustomerCard';
 import { CustomerDetailSheet, EditCustomerModal, AddCustomerModal } from '../components/Customers/CustomerModals';
 
-// Componentes de Proveedores
-import SuppliersList from '../components/Suppliers/SuppliersList';
-import { AddSupplierModal, AddInvoiceModal, PayInvoiceModal, SupplierDetailsSheet } from '../components/Suppliers/SupplierModals';
 import { getActivePaymentMethods } from '../config/paymentMethods';
 
 // Componentes de Empleados (Deudas)
 import DebtsPanel from '../components/Settings/DebtsPanel';
+
+function TabControl({ activeTab, setActiveTab, isAdmin, triggerHaptic }) {
+    return (
+        <div className="px-3 sm:px-6 pt-3 sm:pt-6 shrink-0 z-10 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
+            <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl shadow-inner">
+                <button
+                    onClick={() => { setActiveTab('clientes'); triggerHaptic && triggerHaptic(); }}
+                    className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                >
+                    <Users size={16} /> Clientes
+                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => { setActiveTab('empleados'); triggerHaptic && triggerHaptic(); }}
+                        className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'empleados' ? 'bg-white dark:bg-slate-900 shadow-sm text-rose-600 dark:text-rose-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
+                    >
+                        <Receipt size={16} /> Empleados
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [customers, setCustomers] = useState([]);
@@ -46,28 +66,14 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [deleteCustomerTarget, setDeleteCustomerTarget] = useState(null);
 
-    // ── ESTADOS DE PROVEEDORES ──
     const [activeTab, setActiveTab] = useState('clientes');
-    const [suppliers, setSuppliers] = useState([]);
-    const [invoices, setInvoices] = useState([]);
-    const [selectedSupplier, setSelectedSupplier] = useState(null);
-    const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
-    const [editingSupplier, setEditingSupplier] = useState(null);
-    const [isAddInvoiceModalOpen, setIsAddInvoiceModalOpen] = useState(false);
-    const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState(false);
-    const [deleteSupplierTarget, setDeleteSupplierTarget] = useState(null);
-    const [supplierHistoryData, setSupplierHistoryData] = useState([]);
 
     const loadData = async () => {
-        const [savedCustomers, savedSuppliers, savedInvoices, savedMethods] = await Promise.all([
+        const [savedCustomers, savedMethods] = await Promise.all([
             storageService.getItem('bodega_customers_v1', []),
-            storageService.getItem('bodega_suppliers_v1', []),
-            storageService.getItem('bodega_supplier_invoices_v1', []),
             getActivePaymentMethods()
         ]);
         setCustomers(savedCustomers);
-        setSuppliers(savedSuppliers);
-        setInvoices(savedInvoices);
         setActivePaymentMethods(savedMethods);
     };
 
@@ -88,16 +94,6 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
     const saveCustomers = async (updatedCustomers) => {
         setCustomers(updatedCustomers);
         await storageService.setItem('bodega_customers_v1', updatedCustomers);
-    };
-
-    const saveSuppliers = async (updatedSuppliers) => {
-        setSuppliers(updatedSuppliers);
-        await storageService.setItem('bodega_suppliers_v1', updatedSuppliers);
-    };
-
-    const saveInvoices = async (updatedInvoices) => {
-        setInvoices(updatedInvoices);
-        await storageService.setItem('bodega_supplier_invoices_v1', updatedInvoices);
     };
 
     // ── LÓGICA DE CLIENTES ──
@@ -147,7 +143,9 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         setPaymentMethod('efectivo_bs');
     };
 
-    // ── LÓGICA DE PROVEEDORES ──
+    /* Proveedores retirados del flujo de Cuentas. */
+    /* legacy supplier handlers intentionally removed */
+    /*
     const handleSaveSupplier = async (supplierData) => {
         triggerHaptic && triggerHaptic();
         let updated;
@@ -229,6 +227,8 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         refreshSupplierHistory(supplier.id);
     };
 
+    */
+
     const filteredCustomers = customers.filter(c => {
         const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || (c.phone && c.phone.includes(searchTerm));
         if (!matchesSearch) return false;
@@ -237,108 +237,24 @@ export default function CustomersView({ triggerHaptic, rates, isActive }) {
         return true;
     });
 
-    // ── SEGMENTED CONTROL (compartido) ──
-    const TabControl = () => (
-        <div className="px-3 sm:px-6 pt-3 sm:pt-6 shrink-0 z-10 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-xl">
-            <div className="flex bg-slate-200/50 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl shadow-inner">
-                <button
-                    onClick={() => { setActiveTab('clientes'); triggerHaptic && triggerHaptic(); }}
-                    className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'clientes' ? 'bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
-                >
-                    <Users size={16} /> Clientes
-                </button>
-                {isAdmin && (
-                    <button
-                        onClick={() => { setActiveTab('proveedores'); triggerHaptic && triggerHaptic(); }}
-                        className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'proveedores' ? 'bg-white dark:bg-slate-900 shadow-sm text-purple-600 dark:text-purple-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
-                    >
-                        <Truck size={16} /> <span className="hidden xs:inline">Proveedor</span><span className="xs:hidden">Proveed.</span>
-                    </button>
-                )}
-                {isAdmin && (
-                    <button
-                        onClick={() => { setActiveTab('empleados'); triggerHaptic && triggerHaptic(); }}
-                        className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === 'empleados' ? 'bg-white dark:bg-slate-900 shadow-sm text-rose-600 dark:text-rose-400 scale-100 ring-1 ring-slate-900/5 dark:ring-white/10' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 scale-95 hover:scale-100'}`}
-                    >
-                        <Receipt size={16} /> Empleados
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-
     // ── TAB EMPLEADOS (Deudas) ──
     if (activeTab === 'empleados') {
-        return (
-            <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
-                <TabControl />
-                <div className="flex-1 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-20">
+        return (                <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
+                <TabControl activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} triggerHaptic={triggerHaptic} />
+                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-app-nav">
                     <DebtsPanel />
                 </div>
             </div>
         );
     }
 
-    // ── TAB PROVEEDORES ──
-    if (activeTab === 'proveedores') {
-        return (
-            <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
-                <TabControl />
-                <div className="flex-1 overflow-y-auto scrollbar-hide">
-                    <SuppliersList
-                        suppliers={suppliers} bcvRate={bcvRate} tasaCop={tasaCop} copEnabled={copEnabled}
-                        triggerHaptic={triggerHaptic} isAdmin={isAdmin}
-                        onAddSupplier={() => setIsAddSupplierModalOpen(true)}
-                        onSelectSupplier={handleSelectSupplier}
-                        onDeleteSupplier={(s) => setDeleteSupplierTarget(s)}
-                    />
-                </div>
-                {isAddSupplierModalOpen && (
-                    <AddSupplierModal editingSupplier={editingSupplier}
-                        onClose={() => { setIsAddSupplierModalOpen(false); setEditingSupplier(null); }}
-                        onSave={handleSaveSupplier} />
-                )}
-                {isAddInvoiceModalOpen && selectedSupplier && (
-                    <AddInvoiceModal supplier={selectedSupplier} bcvRate={bcvRate}
-                        onClose={() => setIsAddInvoiceModalOpen(false)} onSave={handleAddInvoice} />
-                )}
-                {isPayInvoiceModalOpen && selectedSupplier && (
-                    <PayInvoiceModal supplier={selectedSupplier} bcvRate={bcvRate} tasaCop={tasaCop}
-                        copEnabled={copEnabled} activePaymentMethods={activePaymentMethods}
-                        onClose={() => setIsPayInvoiceModalOpen(false)} onSave={handlePayInvoice} />
-                )}
-                <SupplierDetailsSheet
-                    supplier={selectedSupplier} isOpen={!!selectedSupplier} isAdmin={isAdmin}
-                    bcvRate={bcvRate} tasaCop={tasaCop} copEnabled={copEnabled}
-                    historyData={supplierHistoryData} onClose={() => setSelectedSupplier(null)}
-                    onAddInvoice={() => setIsAddInvoiceModalOpen(true)}
-                    onPayInvoice={() => setIsPayInvoiceModalOpen(true)}
-                    onEdit={() => { setEditingSupplier(selectedSupplier); setIsAddSupplierModalOpen(true); }}
-                    onDelete={() => setDeleteSupplierTarget(selectedSupplier)}
-                />
-                <ConfirmModal
-                    isOpen={!!deleteSupplierTarget} onClose={() => setDeleteSupplierTarget(null)}
-                    onConfirm={async () => {
-                        await saveSuppliers(suppliers.filter(s => s.id !== deleteSupplierTarget.id));
-                        showToast(`Proveedor ${deleteSupplierTarget.name} eliminado`, 'success');
-                        auditLog('PROVEEDOR', 'PROVEEDOR_ELIMINADO', `Proveedor ${deleteSupplierTarget.name} eliminado`, { proveedorId: deleteSupplierTarget.id });
-                        setSelectedSupplier(null);
-                        setDeleteSupplierTarget(null);
-                    }}
-                    title="Eliminar Proveedor"
-                    message={deleteSupplierTarget ? `¿Eliminar a ${deleteSupplierTarget.name}? Esta acción no se puede deshacer.` : ''}
-                    confirmText="Sí, eliminar" variant="danger"
-                />
-            </div>
-        );
-    }
 
     // ── TAB CLIENTES ──
     return (
         <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 overflow-hidden relative">
-            <TabControl />
+            <TabControl activeTab={activeTab} setActiveTab={setActiveTab} isAdmin={isAdmin} triggerHaptic={triggerHaptic} />
 
-            <div className="flex-1 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-20">
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-3 sm:p-6 pb-app-nav">
                 {/* Header */}
                 <div className="shrink-0 mb-5 flex justify-between items-start">
                     <div>

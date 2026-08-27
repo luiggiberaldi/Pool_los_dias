@@ -292,7 +292,11 @@ export class FinancialEngine {
         
         const totalUsd = round2(Math.max(0, subR(subtotalUsd, discountAmountUsd)));
         
-        const discountAmountBs = mulR(discountAmountUsd, bcvRate);
+        // Descuento en Bs proporcional al subtotal Bs (respeta precios duales exactBs).
+        // Con carritos sin precio dual es idéntico a mulR(discountAmountUsd, bcvRate).
+        const discountAmountBs = subtotalUsd > 0
+            ? round2(subtotalBs * (discountAmountUsd / subtotalUsd))
+            : mulR(discountAmountUsd, bcvRate);
         const totalBs = round2(Math.max(0, subR(subtotalBs, discountAmountBs)));
         
         const totalCop = copRate > 0 ? mulR(totalUsd, copRate) : 0;

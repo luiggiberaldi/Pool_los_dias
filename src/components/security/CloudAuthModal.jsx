@@ -42,6 +42,7 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
         localDeviceAlias, setLocalDeviceAlias,
         handleDataConflictChoice,
         handleUnlinkSpecificDevice,
+        handleUnlinkAllOtherDevices,
         handleSaveCloudAccount,
         handleResetPasswordRequest
     } = useCloudAuthLogic();
@@ -224,7 +225,27 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                         <p className="text-sm text-white/90 mt-2">Esta cuenta permite <strong>{deviceLimitError.limit || 1} dispositivo(s)</strong> simultáneo(s).</p>
                     </div>
                     <div className="p-6">
-                        <p className="text-sm font-bold text-slate-800 mb-3">Sesiones activas ({blockedDevices.length} / {deviceLimitError.limit || 1}):</p>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                            <p className="text-sm font-bold text-slate-800">Sesiones activas ({blockedDevices.length} / {deviceLimitError.limit || 1}):</p>
+                            {blockedDevices.length > 1 && (
+                                <button
+                                    onClick={async () => {
+                                        const ok = await confirm({
+                                            title: 'Expulsar todos los equipos anteriores',
+                                            message: '¿Desconectar todas las demás sesiones registradas para habilitar este equipo?',
+                                            confirmText: 'Sí, expulsar todos',
+                                            cancelText: 'Cancelar',
+                                            variant: 'danger'
+                                        });
+                                        if (ok) handleUnlinkAllOtherDevices();
+                                    }}
+                                    disabled={importStatus === 'loading'}
+                                    className="px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-all disabled:opacity-50"
+                                >
+                                    Expulsar todas las demás
+                                </button>
+                            )}
+                        </div>
                         <div className="space-y-2 mb-6 max-h-[40vh] overflow-y-auto pr-1">
                             {blockedDevices.map((d, i) => {
                                 const isCurrent = d.device_id === deviceLimitError.currentId;
@@ -257,7 +278,13 @@ export default function CloudAuthModal({ isOpen, onClose, forceLogin = false }) 
                             })}
                         </div>
                         <button
-                            onClick={() => { setDeviceLimitError(null); setBlockedDevices([]); if (onClose) onClose(); }}
+                            onClick={() => {
+                                localStorage.removeItem('pda_explicit_login');
+                                supabaseCloud.auth.signOut().catch(() => {});
+                                setDeviceLimitError(null);
+                                setBlockedDevices([]);
+                                if (onClose) onClose();
+                            }}
                             className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white text-sm font-black rounded-xl transition-all shadow-md"
                         >
                             Cancelar y volver

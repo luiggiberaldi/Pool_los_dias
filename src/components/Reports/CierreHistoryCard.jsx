@@ -3,8 +3,9 @@ import { ChevronDown, ChevronUp, LockIcon, Printer, DollarSign, Clock, CheckCirc
 import { formatBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentIcon, toTitleCase, PAYMENT_ICONS } from '../../config/paymentMethods';
 import { generateDailyClosePDF, generateDailyCloseLetterPDF } from '../../utils/dailyCloseGenerator';
+import { FinancialEngine } from '../../core/FinancialEngine';
 
-export default function CierreHistoryCard({ cierre, bcvRate, products: _products }) {
+export default function CierreHistoryCard({ cierre, bcvRate, products }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     const dateLabel = new Date(cierre.cierreId).toLocaleString('es-VE', { 
@@ -35,11 +36,15 @@ export default function CierreHistoryCard({ cierre, bcvRate, products: _products
             topProducts: todayTopProducts,
             todayTotalUsd: cierre.totalUsd,
             todayTotalBs: cierre.totalBs,
-            todayProfit: 0,
+            // Ganancia real del turno (antes iba 0 fijo en la reimpresión)
+            todayProfit: FinancialEngine.calculateAggregateProfit(cierre.salesForStats, bcvRate, products || []),
             todayItemsSold: cierre.totalItems,
             reconData: cierre.reconData || null,
             apertura: cierre.apertura,
             periodLabel: dateLabel,
+            // Los cierres antiguos pueden tener el resumen de mesa guardado
+            // fuera de los ítems sintéticos de la venta.
+            poolSummary: cierre.poolSummary || cierre.reconData?.poolSummary || null,
             isReprint: true
         };
 

@@ -33,7 +33,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
             return isInSessionPeriod(s);
         }),
-        [sales, sessionOpenedAt]
+        [sales, sessionOpenedAt, isInSessionPeriod]
     );
 
     const todayCashFlow = useMemo(() =>
@@ -42,7 +42,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (!['VENTA','VENTA_FIADA','COBRO_DEUDA','PAGO_PROVEEDOR','APERTURA_CAJA'].includes(s.tipo)) return false;
             return isInSessionPeriod(s);
         }),
-        [sales, sessionOpenedAt]
+        [sales, sessionOpenedAt, isInSessionPeriod]
     );
 
     const todayApertura = useMemo(() =>
@@ -68,7 +68,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (s.tipo !== 'PAGO_PROVEEDOR') return false;
             return isInSessionPeriod(s);
         }),
-        [sales, sessionOpenedAt]
+        [sales, sessionOpenedAt, isInSessionPeriod]
     );
     const todayExpensesUsd = useMemo(() =>
         todayExpenses.reduce((sum, s) => sum + Math.abs(s.totalUsd || 0), 0),
@@ -87,7 +87,7 @@ export function useDashboardMetrics({ sales, customers, products, bcvRate, selec
             if (s.tipo !== 'VENTA' && s.tipo !== 'VENTA_FIADA') return false;
             return isToday(s);
         }),
-        [sales, today]
+        [sales, today, isToday]
     );
     const dayTotalUsd = useMemo(() => daySales.reduce((sum, s) => sum + (s.totalUsd || 0), 0), [daySales]);
     const dayTotalBs = useMemo(() => daySales.reduce((sum, s) => sum + getSaleBs(s), 0), [daySales]);

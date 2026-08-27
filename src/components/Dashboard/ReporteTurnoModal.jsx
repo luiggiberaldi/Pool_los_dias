@@ -21,8 +21,6 @@ function getSalePaymentLabel(s) {
 }
 
 export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTotalUsd, todayTotalBs, todayItemsSold, paymentBreakdown, activeCashSession, cajeroName, products = [], role = 'ADMIN' }) {
-    if (!isOpen) return null;
-
     const isAdmin = role === 'ADMIN';
 
     const fecha = formatFecha(activeCashSession?.opened_at || new Date().toISOString());
@@ -59,6 +57,8 @@ export default function ReporteTurnoModal({ isOpen, onClose, todaySales, todayTo
                 return bUsd - aUsd;
             });
     }, [paymentBreakdown, todaySales]);
+
+    if (!isOpen) return null;
 
     const handleDownloadCSV = () => {
         const rows = [];

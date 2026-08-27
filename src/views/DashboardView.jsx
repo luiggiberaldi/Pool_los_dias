@@ -26,6 +26,7 @@ import { useAuthStore as useLegacyAuthStore } from '../hooks/store/useAuthStore'
 import { useAuthStore } from '../hooks/store/authStore';
 import { useCashStore } from '../hooks/store/cashStore';
 import { syncCierreMarks } from '../utils/salesSyncService';
+import { calculatePoolServices } from '../utils/letterCloseGenerator';
 import { useAudit } from '../hooks/useAudit';
 import { supabaseCloud } from '../config/supabaseCloud';
 import { useConfirm } from '../hooks/useConfirm.jsx';
@@ -221,22 +222,33 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
     const handleDailyClose = () => { triggerHaptic && triggerHaptic(); setIsCashReconOpen(true); };
     const handleConfirmCashRecon = async (reconData) => {
         const sessionOpenedAt = activeCashSession?.opened_at || null;
+        // Guardarraíl: sin sesión de caja activa no hay nada que cerrar.
+        // Antes se creaba un CIERRE_CAJA fantasma y el toast decía "completado".
+        if (!sessionOpenedAt) {
+            setIsCashReconOpen(false);
+            showToast('No hay una caja abierta para cerrar', 'warning');
+            return;
+        }
         const isInSession = (s) => {
             if (s.cajaCerrada === true) return false;
             if (!sessionOpenedAt) return false;
             return s.timestamp >= sessionOpenedAt;
         };
 
+        const allTodayForReport = sales.filter(s =>
+            !s.cajaCerrada && s.tipo !== 'APERTURA_CAJA' && isInSession(s)
+        );
+        // Snapshot explícito de servicios de mesa: se guarda en el cierre para
+        // que futuras reimpresiones no dependan de que siga activa la sesión.
+        const poolSummary = calculatePoolServices(allTodayForReport, bcvRate);
         if (todayCashFlow.length > 0 || todaySales.length > 0) {
-            const allTodayForReport = sales.filter(s =>
-                !s.cajaCerrada && s.tipo !== 'APERTURA_CAJA' && isInSession(s)
-            );
             await generateDailyClosePDF({
                 sales: todayCashFlow.filter(s => s.tipo !== 'APERTURA_CAJA'),
                 allSales: allTodayForReport,
                 bcvRate, paymentBreakdown, topProducts: todayTopProducts,
                 todayTotalUsd, todayTotalBs, todayProfit, todayItemsSold,
                 reconData, apertura: todayApertura,
+                poolSummary,
             });
         }
         const currentCierreId = Date.now();
@@ -247,7 +259,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             cierreId: currentCierreId,
             timestamp: new Date().toISOString(),
             cajaCerrada: true,
-            reconData,
+            reconData: { ...reconData, poolSummary },
+            poolSummary,
             apertura: todayApertura,
             closedBy: usuarioActivo?.nombre || usuarioActivo?.email || 'Admin',
         };
@@ -324,7 +337,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             )}
 
             {/* ── HEADER ── */}
-            <div className="flex items-center justify-between px-3 sm:px-5 pt-3 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[120px] sm:min-h-[160px]">
+            <div className="flex items-center justify-between px-3 sm:px-5 pt-2 sm:pt-4 pb-2 sm:pb-4 transition-all z-10 relative min-h-[104px] sm:min-h-[160px]">
                 <div className="flex items-center justify-start gap-2 sm:gap-3 z-20">
                     <SyncStatus />
                     {usuarioActivo && (() => {
@@ -351,8 +364,8 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
                 <div className="hidden sm:flex absolute z-0 pointer-events-none inset-x-0 top-2 justify-center">
                     <img src="/logo.png" alt="Pool Los Diaz" onClick={onLogoClick} style={{ height: '139px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-300 cursor-pointer" draggable={false} />
                 </div>
-                <div className="flex sm:hidden absolute z-0 pointer-events-none inset-x-0 top-1 justify-center">
-                    <img src="/logo.png" alt="Pool Los Diaz" onClick={onLogoClick} style={{ height: '105px' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
+                <div className="flex sm:hidden absolute z-0 pointer-events-none inset-x-0 top-0 justify-center">
+                    <img src="/logo.png" alt="Pool Los Diaz" onClick={onLogoClick}                        style={{ height: 'clamp(82px, 24vw, 105px)' }} className="w-auto object-contain select-none drop-shadow-sm pointer-events-auto transition-transform hover:scale-105 duration-75" draggable={false} />
                 </div>
                 <div className="flex items-center justify-end gap-2 z-20">
                     {/* Bell notification icon */}
@@ -420,7 +433,7 @@ export default function DashboardView({ rates, triggerHaptic, onNavigate, theme,
             {showNotifPanel && <div className="fixed inset-0 z-40" onClick={() => setShowNotifPanel(false)} />}
 
             {/* ── SCROLL CONTENT ── */}
-            <div className="flex flex-col gap-3 px-3 sm:px-4 md:px-6 lg:px-8 pt-2 pb-28">
+            <div className="flex flex-col gap-3 px-3 sm:px-4 md:px-6 lg:px-8 pt-2 pb-app-nav">
 
             {/* Demo Banner */}
             {isDemo && demoTimeLeft && (

@@ -61,3 +61,44 @@ export function procesarImpactoCliente(clienteInicial, transaccion) {
 
     return cliente;
 }
+
+/**
+ * Inversa exacta de `procesarImpactoCliente` para anular una venta/transacción.
+ * Sirve para el flujo de ANULACIÓN desde Reportes → Historial.
+ * Debe aceptar tanto `customerId` (checkout) como `clienteId` (módulo Clientes)
+ * en la venta, pero la resolución del id vive en el caller.
+ * @param {Object} clienteInicial - Cliente actual (deuda/favor en USD)
+ * @param {Object} sale - Venta/transacción a revertir
+ * @returns {Object} Nuevo cliente con deuda/favor revertidos
+ */
+export function revertCustomerImpact(clienteInicial, sale) {
+    if (!sale) return { ...clienteInicial };
+    const c = { ...clienteInicial };
+
+    // Fiado (genera deuda) → quitar la deuda generada
+    const fiadoAmountUsd = sale.fiadoUsd || (sale.tipo === 'VENTA_FIADA' ? sale.totalUsd : 0) || 0;
+
+    // Pago con saldo a favor → restaurar el favor consumido
+    const favorUsed = sale.payments
+        ?.filter(p => p.methodId === 'saldo_favor')
+        .reduce((sum, p) => sum + (p.amountUsd || 0), 0) || 0;
+
+    // Abono de deuda anulado → restaurar la deuda que ese pago redujo.
+    // El abono SIEMPRE sube el neto (favor - deuda) en totalUsd (deuda primero,
+    // luego favor), así que su inversa exacta es restar totalUsd al neto actual.
+    const abonoUsd = sale.tipo === 'COBRO_DEUDA' ? round2(sale.totalUsd || 0) : 0;
+
+    if (fiadoAmountUsd > 0) {
+        c.deuda = round2(Math.max(0, (c.deuda || 0) - fiadoAmountUsd));
+    }
+    if (favorUsed > 0) {
+        c.favor = round2((c.favor || 0) + favorUsed);
+    }
+    if (abonoUsd > 0) {
+        const net = round2((c.favor || 0) - (c.deuda || 0) - abonoUsd);
+        c.favor = net >= 0 ? net : 0;
+        c.deuda = net < 0 ? round2(Math.abs(net)) : 0;
+    }
+
+    return c;
+}

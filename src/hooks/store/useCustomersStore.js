@@ -40,6 +40,6 @@ export const useCustomersStore = create((set, get) => ({
         try {
             const customers = await storageService.getItem(STORAGE_KEY, []);
             set({ customers: customers || [], fetched: true });
-        } catch {}
+        } catch { /* storage read failed; keep the current state */ }
     },
 }));

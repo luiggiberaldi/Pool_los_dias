@@ -1,8 +1,8 @@
 import { jsPDF } from 'jspdf';
-import { formatBs } from './calculatorUtils';
+import { formatBs, getSaleBs } from './calculatorUtils';
 import { getPaymentLabel, toTitleCase } from '../config/paymentMethods';
-import { isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
-export { generateDailyCloseLetterPDF, isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
+import { calculatePoolServices, isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
+export { generateDailyCloseLetterPDF, calculatePoolServices, isPoolServiceItem, parseHoursFromItem } from './letterCloseGenerator';
 
 /**
  * Genera un PDF de Cierre del Día con reporte detallado.
@@ -20,6 +20,7 @@ export async function generateDailyClosePDF({
     todayItemsSold,
     reconData, // Datos del cuadre físico
     apertura,  // Registro de apertura de caja: { openingUsd, openingBs, sellerName }
+    poolSummary, // Resumen histórico de mesa opcional (cierre antiguo)
 }) {
     const WIDTH = 58;
     const M = 4;
@@ -109,13 +110,13 @@ export async function generateDailyClosePDF({
     y = sectionTitle('RESUMEN GENERAL', y);
 
     const statsRows = [
-        ['Ventas realizadas', `${sales.length}`],
+        // Conteo de VENTAS reales (antes contaba COBRO_DEUDA/PAGO_PROVEEDOR del flujo de caja)
+        ['Ventas realizadas', `${allSales.length}`],
         ['Artículos vendidos', `${todayItemsSold}`],
         ['Ingresos brutos ($)', `$${todayTotalUsd.toFixed(2)}`],
         ['Ingresos brutos (Bs)', `Bs ${formatBs(todayTotalBs)}`],
-        ['Ganancia estimada ($)', `$${(todayProfit / bcvRate).toFixed(2)}`],
+        ['Ganancia estimada ($)', `$${bcvRate > 0 ? (todayProfit / bcvRate).toFixed(2) : '0.00'}`],
         ['Ganancia estimada (Bs)', `Bs ${formatBs(todayProfit)}`],
-        ['Tasa BCV', `Bs ${formatBs(bcvRate)} / $1`],
     ];
 
     statsRows.forEach(([label, value]) => {
@@ -135,36 +136,24 @@ export async function generateDailyClosePDF({
     // ════════════════════════════════════
     //  SERVICIOS DE POOL (HORAS Y PIÑAS)
     // ════════════════════════════════════
-    let totalPinasCount = 0;
-    let totalPinasUsd = 0;
-    let totalHoursPlayed = 0;
-    let totalHoursUsd = 0;
-
-    allSales.forEach(s => {
-        if (s.status === 'ANULADA') return;
-        (s.items || []).forEach(item => {
-            if (isPoolServiceItem(item)) {
-                const nameLower = (item.name || '').toLowerCase();
-                if (nameLower.includes('piña') || nameLower.includes('pina') || nameLower.includes('partida')) {
-                    totalPinasCount += (item.qty || 1);
-                    totalPinasUsd += (item.priceUsd || 0) * (item.qty || 1);
-                } else {
-                    totalHoursPlayed += parseHoursFromItem(item);
-                    totalHoursUsd += (item.priceUsd || 0) * (item.qty || 1);
-                }
-            }
-        });
-    });
-
+    const pool = calculatePoolServices(allSales, bcvRate, poolSummary);
+    const totalPinasCount = pool.pinaCount;
+    const totalPinasUsd = pool.pinaUsd;
+    const totalPinasBs = pool.pinaBs;
+    const totalHoursPlayed = pool.hours;
+    const totalHoursUsd = pool.hoursUsd;
+    const totalHoursBs = pool.hoursBs;
+    const totalPoolServicesUsd = pool.totalUsd;
+    const totalPoolServicesBs = pool.totalBs;
     const hoursDisplayStr = totalHoursPlayed % 1 === 0 ? `${totalHoursPlayed} hrs` : `${totalHoursPlayed.toFixed(1)} hrs`;
 
-    if (totalPinasCount > 0 || totalHoursPlayed > 0) {
+    if (totalPinasCount > 0 || totalHoursPlayed > 0 || pool.sharedUsd > 0) {
         y = sectionTitle('SERVICIOS DE POOL', y);
 
         const poolRows = [
-            ['Partidas / Piñas', `${totalPinasCount} ($${totalPinasUsd.toFixed(2)})`],
-            ['Tiempo (Horas)', `${hoursDisplayStr} ($${totalHoursUsd.toFixed(2)})`],
-            ['Total Mesas Pool', `$${(totalPinasUsd + totalHoursUsd).toFixed(2)}`],
+            ['Partidas / Piñas', `${totalPinasCount} ($${totalPinasUsd.toFixed(2)} · Bs ${formatBs(totalPinasBs)})`],
+            ['Tiempo (Horas)', `${hoursDisplayStr} ($${totalHoursUsd.toFixed(2)} · Bs ${formatBs(totalHoursBs)})`],
+            ['Total Mesas Pool', `$${totalPoolServicesUsd.toFixed(2)} · Bs ${formatBs(totalPoolServicesBs)}`],
         ];
 
         poolRows.forEach(([label, value]) => {
@@ -190,7 +179,12 @@ export async function generateDailyClosePDF({
 
         Object.entries(paymentBreakdown).forEach(([methodId, data]) => {
             const label = toTitleCase(getPaymentLabel(methodId, data.label));
-            const val = (data.currency === 'USD' || data.currency === 'FIADO')
+            // Vuelto (bucket negativo) con signo legible antes de la moneda
+            const neg = data.total < 0;
+            const abs = Math.abs(data.total);
+            const val = neg
+                ? (data.currency === 'VUELTO_USD' ? `- $${abs.toFixed(2)}` : `- Bs ${formatBs(abs)}`)
+                : (data.currency === 'USD' || data.currency === 'FIADO')
                 ? `$${data.total.toFixed(2)}`
                 : data.currency === 'COP'
                 ? `COP ${data.total.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -388,11 +382,11 @@ export async function generateDailyClosePDF({
             y += 3.5;
         }
 
-        // Referencia final Bs
+        // Referencia final Bs (neto de vuelto, dual-aware)
         if (!isCanceled) {
             doc.setFontSize(6);
             doc.setTextColor(...MUTED);
-            doc.text(`Ref Venta: Bs ${formatBs(s.totalBs || 0)}`, RIGHT, y, { align: 'right' });
+            doc.text(`Ref Venta: Bs ${formatBs(getSaleBs(s))}`, RIGHT, y, { align: 'right' });
             y += 3.5;
         }
 

@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+const source = fs.readFileSync('src/views/DashboardView.jsx', 'utf8');
+const letter = fs.readFileSync('src/utils/letterCloseGenerator.js', 'utf8');
+const daily = fs.readFileSync('src/utils/dailyCloseGenerator.js', 'utf8');
+let passed = 0, failed = 0;
+const ok = (v, l) => v ? (passed++, console.log(`✅ ${l}`)) : (failed++, console.error(`❌ ${l}`));
+ok(source.includes('const poolSummary = calculatePoolServices(allTodayForReport, bcvRate)'), 'El cierre calcula snapshot de servicios de pool');
+ok(source.includes('poolSummary,') && source.includes('reconData: { ...reconData, poolSummary }'), 'El cierre persiste poolSummary');
+ok(letter.includes('calculatePoolServices(allSales, bcvRate, poolSummary)'), 'PDF Carta consume snapshot histórico');
+ok(daily.includes('calculatePoolServices(allSales, bcvRate, poolSummary)'), 'PDF 58mm consume snapshot histórico');
+ok(letter.includes("s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA'"), 'Solo ventas válidas alimentan servicios');
+ok(letter.includes('item.exactBs'), 'Precio dual exactBs soportado');
+ok(letter.includes('result.usedSummary'), 'Distingue snapshot histórico de reconstrucción');
+if (failed) process.exit(1);
+console.log(`PASS: ${passed}/${passed} invariantes del cierre histórico de pool`);

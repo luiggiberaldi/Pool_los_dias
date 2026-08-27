@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { formatBs } from '../../utils/calculatorUtils';
+import { formatBs, getSaleBs } from '../../utils/calculatorUtils';
 import { getPaymentLabel, getPaymentMethod, PAYMENT_ICONS, toTitleCase, getPaymentIcon } from '../../config/paymentMethods';
 import { generateTicketPDF } from '../../utils/ticketGenerator';
 import { ChevronDown, ChevronUp, Send, Ban, Shuffle, Clock, Recycle, LockIcon, Printer, User, UserCheck } from 'lucide-react';
@@ -39,18 +39,10 @@ export default function TransactionRow({
     const dateLabel = d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
     const saleRate = s.rate || bcvRate;
 
-    // Normalización de Total en Bs: Prioriza la suma real cobrada en Bs o la conversión a la tasa aplicada
-    const effectiveTotalBs = useMemo(() => {
-        const bsPayments = s.payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
-        if (bsPayments?.length > 0) {
-            const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && s.rate ? p.amountUsd * s.rate : 0) || 0), 0);
-            if (sumPaidBs > 0) return sumPaidBs;
-        }
-        if (s.totalUsd > 0 && saleRate > 0) {
-            return s.totalUsd * saleRate;
-        }
-        return s.totalBs || 0;
-    }, [s, saleRate]);
+    // Total en Bs: un solo criterio con Reportes/Dashboard (getSaleBs: neto de vuelto,
+    // respeta precios duales de mesas y convierte por tasa aplicada). Antes sumaba los
+    // amountInput brutos y mostraba Bs 600 como "total" cuando la venta fue de Bs 500.
+    const effectiveTotalBs = getSaleBs(s);
 
     const handleShare = (e) => {
         e.stopPropagation();

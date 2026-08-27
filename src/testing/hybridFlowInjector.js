@@ -7,7 +7,7 @@
 
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
-import { round2, sumR, subR } from '../utils/dinero';
+import { round2, sumR } from '../utils/dinero';
 
 // ── 10 productos con UUIDs fijos registrados en Supabase ──
 const HYBRID_PRODUCTS = [
@@ -25,6 +25,7 @@ const HYBRID_PRODUCTS = [
 
 // Número de ventas de prueba a inyectar
 const INJECT_COUNT = 5;
+const HYBRID_RUN_ID = globalThis.crypto?.randomUUID?.() || `run-${Date.now().toString(36)}`;
 
 // ── Mulberry32 PRNG determinista ──
 function createSeededRandom(seed) {
@@ -82,6 +83,8 @@ export async function injectHybridFlowSales(onLog = () => {}) {
                 payments,
                 fiadoUsd: 0,
             };
+
+            rpcPayload.idempotency_key = `hybrid-${HYBRID_RUN_ID}-${i + 1}`;
 
             if (isOnline) {
                 // ── Modo Online: llamar RPC directamente ──

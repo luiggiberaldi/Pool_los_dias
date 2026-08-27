@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { formatBs, formatUsd, capitalizeName } from './calculatorUtils';
+import { formatBs, capitalizeName, getSaleBs } from './calculatorUtils';
 
 // Re-exports for backward compatibility
 export { printThermalTicket } from './thermalTicketGenerator';
@@ -23,7 +23,7 @@ export async function generateTicketPDF(sale, bcvRate) {
     const hasChange = (sale.changeUsd > 0 || sale.changeBs > 0);
 
     // Altura MUY generosa para que nunca se corte
-    const H = 80 + (itemCount * 12) + (paymentCount * 6) + (hasFiado ? 14 : 0) + (hasChange ? 18 : 0);
+    const H = 80 + (itemCount * 18) + (paymentCount * 6) + (hasFiado ? 14 : 0) + (hasChange ? 18 : 0);
 
     const doc = new jsPDF({ unit: 'mm', format: [WIDTH, H] });
 
@@ -53,7 +53,7 @@ export async function generateTicketPDF(sale, bcvRate) {
         const img = new Image();
         img.src = '/logo-ticket.png';
         await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-        const targetW = 50;
+        const targetW = 56;
         const ratio = img.width / img.height;
         const logoH = targetW / ratio;
         doc.addImage(img, 'PNG', CX - targetW / 2, y, targetW, logoH);
@@ -61,6 +61,12 @@ export async function generateTicketPDF(sale, bcvRate) {
     } catch (_) { y += 2; }
 
     dash(y); y += 5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...INK);
+    doc.text('POOL BAR LOS DIAZ', CX, y, { align: 'center' });
+    y += 6;
 
     // ════════════════════════════════════
     //  INFO DEL TICKET (cada dato en su línea)
@@ -145,17 +151,18 @@ export async function generateTicketPDF(sale, bcvRate) {
             const qty = item.isWeight ? item.qty.toFixed(2) : String(item.qty);
             const unit = item.isWeight ? 'Kg' : 'u';
             const sub = item.priceUsd * item.qty;
-            const subBs = sub * rate;
-            const name = item.name.length > 20 ? item.name.substring(0, 20) + '…' : item.name;
+            // Referencia Bs dual-aware: respeta el precio Bs fijo de mesas (exactBs)
+            const subBs = item.exactBs != null ? item.exactBs * item.qty : sub * rate;
+            const nameLines = doc.splitTextToSize(item.name || '', RIGHT - (M + 10) - 18);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(7.5);
             doc.setTextColor(...INK);
             doc.text(`${qty}${unit}`, M, y);
-            doc.text(name, M + 10, y);
+            doc.text(nameLines, M + 10, y);
             doc.setFont('helvetica', 'bold');
             doc.text('$' + sub.toFixed(2), RIGHT, y, { align: 'right' });
-            y += 4;
+            y += Math.max(4, nameLines.length * 3.2);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(6);
@@ -168,18 +175,6 @@ export async function generateTicketPDF(sale, bcvRate) {
     y += 2;
     dash(y); y += 7;
 
-    // ════════════════════════════════════
-    //  TASA DE CAMBIO (centrada, sola)
-    // ════════════════════════════════════
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(...MUTED);
-    doc.text('Tasa BCV: Bs ' + formatBs(rate) + ' por $1', CX, y, { align: 'center' });
-    y += 5;
-    if (sale.tasaCop > 0) {
-        doc.text('Tasa COP: ' + sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' por $1', CX, y, { align: 'center' });
-        y += 5;
-    }
     y += 3;
 
     // ════════════════════════════════════
@@ -211,7 +206,8 @@ export async function generateTicketPDF(sale, bcvRate) {
 
     doc.setFontSize(10);
     doc.setTextColor(...BODY);
-    doc.text('Bs ' + formatBs(sale.totalBs || 0), CX, y, { align: 'center' });
+    // Total Bs neto de vuelto y dual-aware (un solo criterio con Reportes/Dashboard)
+    doc.text('Bs ' + formatBs(getSaleBs(sale)), CX, y, { align: 'center' });
     y += 6;
 
     if (sale.copEnabled && sale.tasaCop > 0) {
@@ -268,7 +264,7 @@ export async function generateTicketPDF(sale, bcvRate) {
             y += 4;
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(6.5);
-            doc.text('Bs ' + formatBs(sale.fiadoUsd * fiadoRate) + ' (tasa actual)', RIGHT, y, { align: 'right' });
+            doc.text('Bs ' + formatBs(sale.fiadoUsd * fiadoRate), RIGHT, y, { align: 'right' });
             y += 6;
         }
 

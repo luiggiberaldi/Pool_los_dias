@@ -7,7 +7,6 @@ import { ProductsView } from './views/ProductsView';
 import SettingsView from './views/SettingsView';
 import ResetPasswordView from './views/ResetPasswordView';
 import TablesView from './views/TablesView';
-import CashierCheckoutView from './views/CashierCheckoutView';
 
 // Lazy-loaded views (no se usan al inicio)
 const CustomersView = lazy(() => import('./views/CustomersView'));
@@ -63,6 +62,9 @@ export default function App() {
   const [showTester, setShowTester] = useState(false);
   const [showTableTester, setShowTableTester] = useState(false);
   const adminClicksRef = useRef({ count: 0, lastTime: 0 });
+  const [showMasterPassword, setShowMasterPassword] = useState(false);
+  const [masterPassword, setMasterPassword] = useState('');
+  const [masterPasswordError, setMasterPasswordError] = useState('');
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
@@ -122,7 +124,9 @@ export default function App() {
 
     if (ref.count >= 10) {
       ref.count = 0;
-      setShowAdminPanel(true);
+      setMasterPassword('');
+      setMasterPasswordError('');
+      setShowMasterPassword(true);
       triggerHaptic();
     }
   };
@@ -235,7 +239,7 @@ export default function App() {
   if (!isAuthenticated) return <LoginScreen />;
 
   return (
-    <div className="font-sans antialiased bg-[#F8FAFC] h-[100dvh] flex flex-col overflow-clip">
+    <div className="font-sans antialiased bg-[#F8FAFC] h-[100dvh] flex flex-col overflow-hidden">
 
       {/* Terms and Conditions Overlay (First Use) */}
       <TermsOverlay onAccept={() => setTermsAccepted(true)} />
@@ -286,7 +290,8 @@ export default function App() {
 
       <CartProvider>
       <ProductProvider rates={rates}>
-        <main className={`flex-1 min-h-0 w-full max-w-md sm:max-w-xl md:max-w-3xl lg:max-w-5xl xl:max-w-7xl 2xl:max-w-none px-2 sm:px-4 lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-24'} flex flex-col overflow-y-auto`}>
+        {/* Sin franja reservada bajo el nav flotante (estilo PreciosAlDia): el contenido pasa por debajo del pill */}
+        <main className={`flex-1 min-h-0 w-full max-w-md sm:max-w-xl md:max-w-3xl lg:max-w-5xl xl:max-w-7xl 2xl:max-w-none px-2 sm:px-4 lg:px-6 mx-auto relative ${isKeyboardOpen ? 'pb-4' : 'pb-2'} flex flex-col min-h-0 overflow-y-auto overscroll-contain`}>
 
           {/* Admin panel trigger moved to DashboardView logo */}
 
@@ -374,7 +379,7 @@ export default function App() {
 
       {/* Bottom Nav — hidden in POS mode for full-screen selling */}
       {!isKeyboardOpen && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 sm:px-6 pb-[env(safe-area-inset-bottom)] pt-0 mb-4 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-30 pointer-events-none animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-0 left-0 right-0 px-3 sm:px-6 pb-[env(safe-area-inset-bottom)] pt-0 mb-3 sm:mb-4 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-30 pointer-events-none animate-in slide-in-from-bottom-4 duration-300">
           <div className="bg-[#1E293B]/95 backdrop-blur-xl rounded-2xl p-1 flex justify-between items-center shadow-2xl shadow-slate-900/30 border border-white/10 ring-1 ring-black/5 pointer-events-auto">
             {TABS.map(tab => (
               <TabButton
@@ -436,6 +441,36 @@ export default function App() {
               Entendido
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Master password modal */}
+      {showMasterPassword && (
+        <div className="fixed inset-0 z-[250] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            const expected = import.meta.env.VITE_MASTER_PASSWORD;
+            if (!expected) {
+              setMasterPasswordError('La contraseña maestra no está configurada.');
+              return;
+            }
+            if (masterPassword !== expected) {
+              setMasterPasswordError('Contraseña maestra incorrecta.');
+              setMasterPassword('');
+              return;
+            }
+            setShowMasterPassword(false);
+            setShowAdminPanel(true);
+          }} className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-xl font-black text-slate-800">Acceso maestro</h2>
+            <p className="text-sm text-slate-500 mt-1 mb-5">Ingresa la contraseña maestra para continuar.</p>
+            <input autoFocus type="password" value={masterPassword} onChange={e => setMasterPassword(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-sky-500" placeholder="Contraseña maestra" />
+            {masterPasswordError && <p className="text-xs text-red-600 font-bold mt-2">{masterPasswordError}</p>}
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setShowMasterPassword(false)} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 font-bold">Cancelar</button>
+              <button type="submit" className="flex-1 py-3 rounded-xl bg-sky-500 text-white font-bold">Entrar</button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -7,8 +7,10 @@ import { supabaseCloud as supabase } from '../config/supabaseCloud';
 import { offlineQueueService } from '../services/offlineQueueService';
 import { capitalizeName } from './calculatorUtils';
 import { broadcastNewSale } from './salesSyncService';
+import { scopedKey } from '../hooks/store/accountScope';
 
 const SALES_KEY = 'bodega_sales_v1';
+const PENDING_SALES_QUEUE_KEY = '_pending_sale_uploads';
 const EPSILON = 0.01;
 
 // UUID v4 regex - productos sin formato UUID no se envian al RPC de Supabase
@@ -182,6 +184,7 @@ export async function processSaleTransaction({
     const currentUser = useAuthStore.getState().currentUser;
     const sale = {
         id: finalSaleId || crypto.randomUUID(),
+        idempotency_key: idempotencyKey,
         tipo: fiadoAmountUsd > 0 ? 'VENTA_FIADA' : 'VENTA',
         status: saleMode === 'online' ? 'COMPLETADA' : (saleMode === 'pending_verification' ? 'PENDIENTE_VERIFICACION' : 'PENDIENTE_SYNC'),
         vendedorId: currentUser?.id || null,
@@ -190,23 +193,18 @@ export async function processSaleTransaction({
         meseroId: meseroId || null,
         meseroNombre: capitalizeName(meseroNombre) || null,
         tableName: tableName || null,
-        items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight })),
+        items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, priceUsd: i.priceUsd, costBs: i.costBs || 0, costUsd: i.costUsd || 0, isWeight: i.isWeight, exactBs: i.exactBs ?? null })),
         cartSubtotalUsd: cartSubtotalUsd,
         discountType: discountData?.type || null,
         discountValue: discountData?.value || 0,
         discountAmountUsd: discountData?.amountUsd || 0,
         totalUsd: cartTotalUsd,
-        totalBs: (() => {
-            const bsPayments = payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
-            if (bsPayments?.length > 0) {
-                const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && effectiveRate ? p.amountUsd * effectiveRate : 0) || 0), 0);
-                if (sumPaidBs > 0) return round2(sumPaidBs);
-            }
-            if (cartTotalUsd > 0 && effectiveRate > 0) {
-                return round2(cartTotalUsd * effectiveRate);
-            }
-            return cartTotalBs;
-        })(),
+        // Precio real de la venta en Bs (dual-aware, de buildCartTotals).
+        // ANTES se guardaba la suma BRUTA de pagos Bs sin descontar el vuelto:
+        // pagar Bs 600 por una venta de Bs 500 guardaba totalBs=600 y tickets,
+        // cierres y reportes inflaban los ingresos en Bs. El Bs realmente
+        // recibido (neto de vuelto) lo calcula getSaleBs desde payments+changeBs.
+        totalBs: cartTotalBs,
         totalCop: copEnabled && tasaCop > 0 ? cartTotalUsd * tasaCop : 0,
         payments,
         rate: effectiveRate,
@@ -236,14 +234,15 @@ export async function processSaleTransaction({
 
     // Guardarraíl: Encolar ID de venta para asegurar subida a la nube
     try {
-        const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+        const pendingQueueStr = localStorage.getItem(scopedKey(PENDING_SALES_QUEUE_KEY)) || '[]';
         let pendingQueue = [];
         try { pendingQueue = JSON.parse(pendingQueueStr); } catch (_) { pendingQueue = []; }
         if (!pendingQueue.includes(finalPersistedSale.id)) {
             pendingQueue.push(finalPersistedSale.id);
-            localStorage.setItem('_pending_sale_uploads', JSON.stringify(pendingQueue));
+            localStorage.setItem(scopedKey(PENDING_SALES_QUEUE_KEY), JSON.stringify(pendingQueue));
+            localStorage.setItem(scopedKey('_pending_sale_uploads_initialized'), '1');
         }
-    } catch (_) {}
+    } catch (_) { /* queue persistence is best effort */ }
 
     // Sincronizar venta a otros dispositivos (Broadcast P2P + persist individual en DB)
     supabase.auth.getSession().then(({ data: { session } }) => {

@@ -68,12 +68,39 @@
 
 /* ── BASE TIPOGRAFÍA Y FONDO ── */
 html,
-body {
+body,
+#root {
   background-color: #F8FAFC;
   color: #334155;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+  min-width: 0;
+  min-height: 100%;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Espacio uniforme para navegación flotante y barras del sistema. */
+.pb-app-nav {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+
+/* Evita que formularios y botones queden debajo del teclado virtual. */
+@media (max-height: 680px) and (orientation: landscape) {
+  .compact-landscape-pad { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+}
+
+button, input, select, textarea {
+  max-width: 100%;
+}
+
+button {
+  touch-action: manipulation;
 }
 
 /* ── SCROLLBAR PERSONALIZADO ── */

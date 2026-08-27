@@ -1,13 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../hooks/store/authStore';
 import { useConfirm } from '../../hooks/useConfirm.jsx';
 import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
+import SuperAdminModal from './SuperAdminModal';
 
 export default function LockScreen() {
-  const { usuarios, login, loginWithBiometric, verifyPin } = useAuthStore();
+  const { usuarios, loginWithBiometric, verifyPin, loginAsSuperAdmin } = useAuthStore();
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showSuperModal, setShowSuperModal] = useState(false);
   const confirm = useConfirm();
+
+  // Contador de clicks en logo para abrir modal super admin (10 clics en 2.5s)
+  const logoClickCount = useRef(0);
+  const logoClickTimer = useRef(null);
+
+  const handleLogoClick = useCallback(() => {
+    logoClickCount.current += 1;
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(10);
+    }
+    clearTimeout(logoClickTimer.current);
+    if (logoClickCount.current >= 10) {
+      logoClickCount.current = 0;
+      setShowSuperModal(true);
+    } else {
+      logoClickTimer.current = setTimeout(() => {
+        logoClickCount.current = 0;
+      }, 2500);
+    }
+  }, []);
 
   // Verificar PIN sin activar sesión
   const handlePinVerify = async (pin, userId) => {
@@ -53,7 +75,12 @@ export default function LockScreen() {
         {/* Header */}
         <div className="text-center mb-14">
           <div className="flex justify-center mb-6">
-            <img src="/logo.png" alt="Logo" className="h-24 sm:h-32 w-auto object-contain drop-shadow-md" />
+            <img
+              src="/logo.png"
+              alt="Logo"
+              onClick={handleLogoClick}
+              className="h-24 sm:h-32 w-auto object-contain drop-shadow-md cursor-pointer select-none active:scale-95 transition-transform"
+            />
           </div>
           <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-500">
             Quien esta{' '}
@@ -95,6 +122,17 @@ export default function LockScreen() {
         onVerifyPin={handlePinVerify}
         onLoginComplete={handleLoginComplete}
         onBiometricLogin={handleBiometricLogin}
+      />
+
+      {/* Super Admin Modal */}
+      <SuperAdminModal
+        isOpen={showSuperModal}
+        onClose={() => setShowSuperModal(false)}
+        onSuccess={async (password) => {
+          const ok = await loginAsSuperAdmin(password);
+          if (ok) setShowSuperModal(false);
+          return ok;
+        }}
       />
     </div>
   );

@@ -6,9 +6,14 @@
  */
 
 const ACCOUNT_KEY = 'poolbar_cloud_email';
+const ACCOUNT_ID_KEY = 'poolbar_cloud_user_id';
 
 export function getAccountEmail() {
     return localStorage.getItem(ACCOUNT_KEY) || '';
+}
+
+export function getAccountId() {
+    return localStorage.getItem(ACCOUNT_ID_KEY) || '';
 }
 
 /**

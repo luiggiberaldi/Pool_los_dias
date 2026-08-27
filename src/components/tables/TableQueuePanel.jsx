@@ -15,7 +15,7 @@ import { showToast } from '../Toast';
  */
 export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     const { tables, activeSessions, subscribeToRealtime, unsubscribeFromRealtime } = useTablesStore();
-    const { orders, orderItems, subscribeToRealtime: subscribeOrders } = useOrdersStore();
+    const { orders, orderItems, subscribeToRealtime: subscribeOrders, syncOrders } = useOrdersStore();
     const config = useTablesStore(s => s.config);
     const activeCashSession = useCashStore(s => s.activeCashSession);
     const paidHoursOffsets = useTablesStore(s => s.paidHoursOffsets);
@@ -27,8 +27,11 @@ export function TableQueuePanel({ onCheckoutTable, effectiveRate = 1 }) {
     useEffect(() => {
         subscribeToRealtime();
         subscribeOrders();
+        // Pull fresco al montar: garantiza que la cuenta incluya consumos añadidos
+        // desde otro dispositivo justo antes de abrir el cobro.
+        syncOrders();
         return () => {}; // don't unsubscribe — shared channel
-    }, [subscribeToRealtime, subscribeOrders]);
+    }, [subscribeToRealtime, subscribeOrders, syncOrders]);
 
     const pendingSessions = activeSessions.filter(s => s.status === 'CHECKOUT');
 

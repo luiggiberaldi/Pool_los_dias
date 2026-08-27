@@ -439,7 +439,7 @@ export default function SettingsView({ onClose: _onClose, theme, toggleTheme, tr
             </div>
 
             {/* ── Body ── */}
-            <div className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))]">
+            <div className="flex-1 min-h-0 overflow-y-auto pb-app-nav">
                 <div className="max-w-lg md:max-w-xl lg:max-w-2xl mx-auto p-4 space-y-4">
 
                     {/* Section header accent */}

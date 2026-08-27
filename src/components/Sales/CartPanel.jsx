@@ -206,37 +206,37 @@ export default function CartPanel({
                     )}
                 </button>
 
-                <div data-tour="cart-total" className="flex justify-between items-end px-1 sm:px-0 pt-1">
-                    <div className="flex flex-col">
-                        <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest hidden sm:inline">Total Venta</span>
-                        {discountData?.active && (
-                            <div className="flex flex-col mt-0.5 fade-in slide-in-from-left-2 animate-in duration-300">
-                                <span className="text-[11px] sm:text-xs font-bold text-slate-400 line-through decoration-red-400/70">
-                                    Subtotal: ${cartSubtotalUsd.toFixed(2)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="text-right flex items-center gap-3 sm:block w-full sm:w-auto justify-between">
-                        <div className="flex flex-col items-start sm:items-end">
-                            <span className="text-[10px] sm:text-xs font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase sm:hidden">Total (Ref)</span>
-                            <span className="text-[11px] sm:text-xs font-bold text-slate-500 sm:hidden">{formatBs(cartTotalBs)} Bs</span>
+                <div data-tour="cart-total" className="space-y-1.5">
+                    {discountData?.active && (
+                        <div className="flex justify-between items-center px-1 animate-in fade-in duration-300">
+                            <span className="text-[11px] font-bold text-slate-400">Subtotal</span>
+                            <span className="text-[11px] font-bold text-slate-400 line-through decoration-red-400/70">${cartSubtotalUsd.toFixed(2)}</span>
                         </div>
-                        <p className={`text-2xl sm:text-3xl font-black leading-none tracking-tight transition-colors ${discountData?.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-white'}`}>
-                            ${cartTotalUsd.toFixed(2)}
-                        </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className={`rounded-xl sm:rounded-2xl px-3 py-2 border ${discountData?.active
+                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/50'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'}`}>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total $</span>
+                            <p className={`text-xl sm:text-2xl font-black leading-none mt-0.5 ${discountData?.active
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-slate-800 dark:text-white'}`}>
+                                ${cartTotalUsd.toFixed(2)}
+                            </p>
+                        </div>
+                        <div className="rounded-xl sm:rounded-2xl px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50">
+                            <span className="text-[9px] font-black text-emerald-600/70 uppercase tracking-widest">Bolívares</span>
+                            <p className="text-xl sm:text-2xl font-black leading-none mt-0.5 text-emerald-600 dark:text-emerald-400">
+                                {formatBs(cartTotalBs)}
+                            </p>
+                        </div>
                     </div>
-                </div>
-
-                <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/50 rounded-xl sm:rounded-2xl">
-                    <span className="text-[11px] sm:text-xs font-black text-emerald-600 dark:text-emerald-500 tracking-widest uppercase">Bolívares</span>
-                    <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">{formatBs(cartTotalBs)} Bs</span>
                 </div>
 
                 {copEnabled && (
-                    <div className="hidden sm:flex justify-between items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl sm:rounded-2xl">
-                        <span className="text-[11px] sm:text-xs font-black text-amber-600 dark:text-amber-500 tracking-widest uppercase">Pesos (COP)</span>
-                        <span className="text-xl font-black text-amber-600 dark:text-amber-400">{(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <div className="flex justify-between items-center px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/50 rounded-xl">
+                        <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Pesos (COP)</span>
+                        <span className="text-sm font-black text-amber-600 dark:text-amber-400">{(cartTotalUsd * tasaCop).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                 )}
 
@@ -248,7 +248,8 @@ export default function CartPanel({
                     <div className="absolute inset-0 bg-emerald-500 rounded-xl sm:rounded-2xl shadow-emerald-500/30 shadow-lg blur-[2px] opacity-70 group-active:opacity-100 group-hover:blur-[4px] transition-all"></div>
                     <div className="relative w-full py-3 sm:py-4 bg-emerald-500 text-white font-black text-sm sm:text-lg rounded-xl sm:rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 tracking-wide">
                         <CheckCircle size={18} className="sm:w-[22px] sm:h-[22px] opacity-80" />
-                        PROCESAR COBRO
+                        COBRAR
+                        <span className="absolute right-3 bg-white/20 text-white/90 text-[9px] font-black px-1.5 py-0.5 rounded border border-white/30">F9</span>
                     </div>
                 </button>
             </div>

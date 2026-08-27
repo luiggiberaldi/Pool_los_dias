@@ -11,6 +11,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { showToast } from '../components/Toast';
 import { ShoppingCart, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { round2 } from '../utils/dinero';
 import { useProductContext } from '../context/ProductContext';
 
 // Components
@@ -78,7 +79,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         isActive, setProductsSilent, cart, cartRef, setCart
     });
     const isLoading = isLoadingProducts || isLoadingLocal;
-    const currentFloat = useMemo(() => buildCurrentFloat(salesData), [salesData, buildCurrentFloat]);
+    const currentFloat = useMemo(() => buildCurrentFloat(salesData, activeCashSession?.opened_at || null), [salesData, buildCurrentFloat, activeCashSession]);
 
     // ── Cart totals ──
     const { subtotalUsd: cartSubtotalUsd, subtotalBs: cartSubtotalBs, discountAmountUsd, discountAmountBs, totalUsd: cartTotalUsd, totalBs: cartTotalBs } = useMemo(() =>
@@ -247,7 +248,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
         handleSetSearchTerm('');
         setHierarchyPending(null);
         setTimeout(() => { searchInputRef.current?.blur(); setCartSelectedIndex(0); }, 50);
-    }, [triggerHaptic, effectiveRate, playAdd, playError, cartRef, setCart]);
+    }, [triggerHaptic, effectiveRate, playAdd, playError, cartRef, setCart, products]);
 
     const updateQty = (id, delta) => {
         triggerHaptic && triggerHaptic();
@@ -310,39 +311,50 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
     }
 
     return (
-        <div className="flex-1 min-h-0 flex flex-col dark:bg-slate-950 p-2 sm:p-4 sm:pb-4 overflow-hidden relative">
-
-            <SalesHeader effectiveRate={effectiveRate} useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
-                customRate={customRate} setCustomRate={setCustomRate}
-                showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
-                setShowKeyboardHelp={setShowKeyboardHelp} triggerHaptic={triggerHaptic} />
+        <div className="flex-1 min-h-0 flex flex-col dark:bg-slate-950 p-1 sm:p-2 sm:pb-2 overflow-hidden relative">
 
             <TableQueuePanel onCheckoutTable={setTableCheckoutData} effectiveRate={effectiveRate} />
 
             {!activeCashSession ? (
-                <CajaCerradaOverlay cartCount={cart.length} onOpenApertura={() => onNavigate && onNavigate('inicio')} />
+                <>
+                    <SalesHeader effectiveRate={effectiveRate} useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
+                        customRate={customRate} setCustomRate={setCustomRate}
+                        showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
+                        setShowKeyboardHelp={setShowKeyboardHelp} triggerHaptic={triggerHaptic} />
+                    <CajaCerradaOverlay cartCount={cart.length} onOpenApertura={() => onNavigate && onNavigate('inicio')} />
+                </>
             ) : (
                 <>
-                    <div className="flex-1 min-h-0 flex flex-col lg:flex-row lg:gap-4">
-                        <div className="flex-1 min-h-0 flex flex-col lg:min-w-0 overflow-y-auto lg:overflow-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
-                            <div className="shrink-0 mb-3 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-100 dark:border-slate-800">
-                                <SearchBar ref={searchInputRef} searchTerm={searchTerm} onSearchChange={handleSetSearchTerm}
-                                    onKeyDown={handleSearchKeyDown} onPasteBarcode={handlePasteBarcode}
-                                    searchResults={searchResults} selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
-                                    effectiveRate={effectiveRate} addToCart={addToCart} allProducts={products}
-                                    isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
-                                    hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
-                                    weightPending={weightPending} setWeightPending={setWeightPending} />
+                    <div className="flex-1 min-h-0 flex flex-col md:flex-row md:gap-3 lg:gap-4">
+                        <div className="flex-1 min-h-0 flex flex-col md:min-w-0 overflow-y-auto md:overflow-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+                            <div className="shrink-0 mb-2 flex items-stretch gap-2">
+                                <div className="flex-1 min-w-0 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl p-2.5 sm:p-3 shadow-sm border border-slate-100 dark:border-slate-800">
+                                    <SearchBar ref={searchInputRef} searchTerm={searchTerm} onSearchChange={handleSetSearchTerm}
+                                        onKeyDown={handleSearchKeyDown} onPasteBarcode={handlePasteBarcode}
+                                        searchResults={searchResults} selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex}
+                                        effectiveRate={effectiveRate} addToCart={addToCart} allProducts={products}
+                                        isRecording={isRecording} isProcessingAudio={isProcessingAudio} startRecording={startRecording} stopRecording={stopRecording}
+                                        hierarchyPending={hierarchyPending} setHierarchyPending={setHierarchyPending}
+                                        weightPending={weightPending} setWeightPending={setWeightPending} />
+                                </div>
+                                <SalesHeader effectiveRate={effectiveRate} useAutoRate={useAutoRate} setUseAutoRate={setUseAutoRate}
+                                    customRate={customRate} setCustomRate={setCustomRate}
+                                    showRateConfig={showRateConfig} setShowRateConfig={setShowRateConfig}
+                                    setShowKeyboardHelp={setShowKeyboardHelp} triggerHaptic={triggerHaptic} />
                             </div>
                             {!showCheckout && !showReceipt && (
                                 <CategoryBar selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
                                     filteredByCategory={filteredByCategory} addToCart={addToCart}
                                     triggerHaptic={triggerHaptic} searchTerm={searchTerm}
-                                    onOpenCustomAmount={() => setShowCustomAmountModal(true)} products={products} />
+                                    onOpenCustomAmount={() => setShowCustomAmountModal(true)} products={products}
+                                    effectiveRate={effectiveRate}
+                                    cartCount={cartItemCount}
+                                    onClearCart={() => { triggerHaptic && triggerHaptic(); setShowClearCartConfirm(true); }}
+                                    onOpenHelp={() => setShowKeyboardHelp(true)} />
                             )}
                         </div>
 
-                        <div className="hidden lg:flex lg:w-[380px] lg:shrink-0 lg:flex-col">
+                        <div className="hidden md:flex md:w-[320px] lg:w-[380px] md:shrink-0 md:flex-col">
                             <CartPanel cart={cart} effectiveRate={effectiveRate}
                                 cartSubtotalUsd={cartSubtotalUsd} cartSubtotalBs={cartSubtotalBs}
                                 cartTotalUsd={cartTotalUsd} cartTotalBs={cartTotalBs} cartItemCount={cartItemCount}
@@ -356,7 +368,7 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     </div>
 
                     {/* Mobile Cart FAB & Sheet */}
-                    <div className="lg:hidden">
+                    <div className="md:hidden">
                         {cart.length > 0 && !isCartSheetOpen && !showCheckout && !showReceipt && (
                             <button onClick={() => { triggerHaptic && triggerHaptic(); setIsCartSheetOpen(true); }}
                                 className="fixed bottom-[max(5rem,env(safe-area-inset-bottom)+4.5rem)] left-4 right-4 bg-emerald-500 hover:bg-emerald-600 text-white p-4 rounded-2xl shadow-xl shadow-emerald-500/30 flex items-center justify-between z-40 active:scale-95 transition-all animate-in slide-in-from-bottom">
@@ -522,14 +534,14 @@ export default function SalesView({ rates: _rates, triggerHaptic, onNavigate, is
                     const _ro2 = (_pro || {})[tableCheckoutData.session?.id] || 0;
                     const fb = calculateFullTableBreakdown(tableCheckoutData.session, seats, tableCheckoutData.elapsed, config, tableCheckoutData.currentItems || [], null, tableCheckoutData.frozenDivisor || null, isTimeFree, _ho2, _ro2);
                     finalTotalBs = fb ? calculateBreakdownTotalBs(fb, config, effectiveRate, products) : finalTotal * effectiveRate;
-                    // Ajustar por descuento si aplica
-                    if (discData.active && discData.amountUsd > 0) {
-                        finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
+                    // Ajustar por descuento si aplica — proporcional, consistente con buildCartTotals
+                    if (discData.active && discData.amountUsd > 0 && finalTotal > 0) {
+                        finalTotalBs = round2(finalTotalBs * (finalTotal / (finalTotal + discData.amountUsd)));
                     }
                 } else {
                     finalTotalBs = calculateGrandTotalBs(tableCheckoutData.timeCost, tableCheckoutData.totalConsumption, tableCheckoutData.session?.game_mode, config, effectiveRate, null, calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate, products));
-                    if (discData.active && discData.amountUsd > 0) {
-                        finalTotalBs = finalTotalBs - (discData.amountUsd * effectiveRate);
+                    if (discData.active && discData.amountUsd > 0 && finalTotal > 0) {
+                        finalTotalBs = round2(finalTotalBs * (finalTotal / (finalTotal + discData.amountUsd)));
                     }
                 }
                 return (

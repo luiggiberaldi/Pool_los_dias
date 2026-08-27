@@ -14,13 +14,9 @@ export async function generatePartialSessionTicketPDF({ table, session, elapsed,
     if (cfg.printerType !== 'system') {
         const hasWebSerialConfigured = cfg.printerType && cfg.printerType !== 'system';
         if (hasWebSerialConfigured) {
-            try {
-                const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
-                if (printed) return;
-                throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
-            } catch (err) {
-                throw err;
-            }
+            const printed = await printPreCuentaEscPos({ table, session, elapsed, timeCost, currentItems, grandTotal, tasaUSD, config, hoursOffset, roundsOffset });
+            if (printed) return;
+            throw new Error('Puerto no disponible. Ve a Configuración → Impresora y pulsa "Detectar impresora".');
         }
         const tryEscPos = 'serial' in navigator;
         if (tryEscPos) {
@@ -227,7 +223,7 @@ hr { border: none; border-top: 1px dashed #ced4da; margin: 2mm 0; }
             try {
                 printWindow.onafterprint = () => printWindow.close();
                 printWindow.print();
-            } catch(_) {}
+            } catch(_) { /* print fallback is best effort */ }
         }
     }, 1500);
 }

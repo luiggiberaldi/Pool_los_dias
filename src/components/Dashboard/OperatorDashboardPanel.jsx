@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTablesStore } from '../../hooks/store/useTablesStore';
 import { useOrdersStore } from '../../hooks/store/useOrdersStore';
 import { useAuthStore } from '../../hooks/store/authStore';
@@ -95,11 +95,11 @@ export default function OperatorDashboardPanel({ onNavigate }) {
         setTopMeseros([]);
     };
 
-    const getStaffName = (staffId) => {
+    const getStaffName = useCallback((staffId) => {
         if (!staffId || !cachedUsers?.length) return null;
         const u = cachedUsers.find(u => u.id === staffId);
         return u?.name || u?.nombre || null;
-    };
+    }, [cachedUsers]);
 
     const activeTables = useMemo(() =>
         activeSessions
@@ -111,7 +111,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
                 ownerName: getStaffName(s.opened_by),
             }))
             .sort((a, b) => b.elapsedMin - a.elapsedMin),
-        [activeSessions, tables, now, cachedUsers] // eslint-disable-line react-hooks/exhaustive-deps
+        [activeSessions, tables, now, getStaffName]
     );
 
     const checkoutTables = useMemo(() =>
@@ -173,7 +173,7 @@ export default function OperatorDashboardPanel({ onNavigate }) {
             const totalUsd = gameCost + seatTimeCost + consumptionCost;
             return totalUsd >= HIGH_BILL_THRESHOLD ? { session: s, totalUsd } : null;
         }).filter(Boolean).sort((a, b) => b.totalUsd - a.totalUsd),
-        [activeSessions, orders, orderItems, now, config] // eslint-disable-line react-hooks/exhaustive-deps
+        [activeSessions, orders, orderItems, now, config, paidHoursOffsets, paidRoundsOffsets]
     );
 
     const hasAnyAlert = timeAlerts.length > 0 || inactivityAlerts.length > 0 || highBillAlerts.length > 0;

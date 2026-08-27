@@ -115,14 +115,12 @@ export function useCloudAuthLogic() {
         const { error } = await supabaseCloud
             .from('cloud_backups')
             .upsert({
+                user_id: session.user.id,
                 email: email.toLowerCase(),
                 backup_data: backupData,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'email' });
-        if (error) {
-            console.warn('[CloudAuth] cloud_backups upsert failed:', error.message);
-            // Don't throw — this is non-critical and should not block login
-        }
+        if (error) throw error;
 
         try {
             const { data: { session } } = await supabaseCloud.auth.getSession();
@@ -158,33 +156,45 @@ export function useCloudAuthLogic() {
     };
 
     const registerDevice = async (email) => {
-        await supabaseCloud.from('account_devices').upsert({
+        const { data: { session } } = await supabaseCloud.auth.getSession();
+        if (!session?.user?.id) throw new Error('No hay sesión cloud activa');
+        const { error } = await supabaseCloud.from('account_devices').upsert({
+            user_id: session.user.id,
             email: email.toLowerCase(),
             device_id: deviceId || 'UNKNOWN',
-            device_alias: `Dispositivo ${navigator.platform || 'Web'}`,
+            device_alias: localDeviceAlias.trim() || `Dispositivo ${navigator.platform || 'Web'}`,
             last_seen: new Date().toISOString()
         }, { onConflict: 'email,device_id' });
+        if (error) throw error;
     };
 
     // ─── ACTION HANDLERS ────────────────────────────────
     const handleDataConflictChoice = async (choice) => {
         if (!dataConflictPending) return;
         const { email, cloudBackup, localBackup } = dataConflictPending;
-        setDataConflictPending(null);
         setImportStatus('loading');
         setStatusMessage('Aplicando elección...');
         try {
             if (choice === 'cloud') {
                 await applyCloudBackup(cloudBackup);
-                showToast('Datos de la nube restaurados. Reiniciando...', 'success');
-                setTimeout(() => window.location.reload(), 1500);
+                await registerDevice(email);
+                showToast('Datos de la nube restaurados correctamente.', 'success');
+                setImportStatus('success');
+                setStatusMessage('Datos de la nube restaurados.');
             } else {
                 await uploadLocalBackup(email, localBackup);
+                await registerDevice(email);
                 showToast('Datos locales guardados en la nube', 'success');
+                setImportStatus('success');
+                setStatusMessage('Datos locales guardados.');
             }
+            localStorage.removeItem('pda_explicit_login');
+            localStorage.setItem('poolbar_cloud_email', email);
+            localStorage.setItem('pool_had_cloud_session', 'true');
+            setDataConflictPending(null);
             setIsCloudConfigured(true);
             auditLog('NUBE', 'CONFLICTO_RESUELTO', `Resuelto: ${choice}`);
-            setImportStatus(null);
+            setTimeout(() => window.location.reload(), 1200);
         } catch (err) {
             showToast(err.message || 'Error resolviendo', 'error');
             setImportStatus('error');
@@ -193,19 +203,82 @@ export function useCloudAuthLogic() {
 
     const handleUnlinkSpecificDevice = async (deviceToUnlinkId) => {
         if (!inputEmail || !deviceToUnlinkId) return;
+        localStorage.setItem('pda_explicit_login', 'true');
         setImportStatus('loading');
         setStatusMessage('Desvinculando equipo...');
         try {
-            await supabaseCloud.from('account_devices')
-                .delete()
-                .eq('email', inputEmail.toLowerCase())
-                .eq('device_id', deviceToUnlinkId);
+            let { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+            if (!session?.user?.id && inputPassword) {
+                const { data: signInData, error: signInErr } = await supabaseCloud.auth.signInWithPassword({
+                    email: inputEmail.trim().toLowerCase(),
+                    password: inputPassword
+                });
+                if (!signInErr && signInData?.session?.user?.id) {
+                    session = signInData.session;
+                }
+            }
+
+            if (!session?.user?.id) {
+                setDeviceLimitError(null);
+                setBlockedDevices([]);
+                await supabaseCloud.auth.signOut().catch(() => {});
+                showToast('Sesión cloud expirada. Inicia sesión nuevamente.', 'error');
+                return;
+            }
+
+            const { error } = await supabaseCloud.rpc('remove_my_device', { p_device_id: deviceToUnlinkId });
+            if (error) {
+                if (error.code === '42883' || /function .*remove_my_device.*does not exist/i.test(error.message || '')) {
+                    throw new Error('Falta aplicar module1_device_admin_rpc.sql en Supabase.');
+                }
+                if (error.code === '42501' || /401|permission denied|unauthori[sz]ed/i.test(error.message || '')) {
+                    await supabaseCloud.auth.signOut().catch(() => {});
+                    setDeviceLimitError(null);
+                    setBlockedDevices([]);
+                    throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+                }
+                throw error;
+            }
             setDeviceLimitError(null);
             setBlockedDevices([]);
-            showToast(`Equipo desvinculado. Volviendo a intentar...`, 'success');
+            showToast(`Equipo desvinculado. Reintentando conexión...`, 'success');
             await handleSaveCloudAccount();
         } catch (err) {
             showToast(err.message || 'Error desvinculando', 'error');
+            setImportStatus('error');
+        }
+    };
+
+    const handleUnlinkAllOtherDevices = async () => {
+        if (!inputEmail) return;
+        localStorage.setItem('pda_explicit_login', 'true');
+        setImportStatus('loading');
+        setStatusMessage('Expulsando equipos anteriores...');
+        try {
+            let { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+            if (!session?.user?.id && inputPassword) {
+                const { data: signInData, error: signInErr } = await supabaseCloud.auth.signInWithPassword({
+                    email: inputEmail.trim().toLowerCase(),
+                    password: inputPassword
+                });
+                if (!signInErr && signInData?.session?.user?.id) {
+                    session = signInData.session;
+                }
+            }
+            if (!session?.user?.id) {
+                throw new Error('Sesión cloud expirada. Inicia sesión nuevamente.');
+            }
+
+            const otherDevices = blockedDevices.filter(d => d.device_id !== deviceLimitError?.currentId);
+            for (const d of otherDevices) {
+                await supabaseCloud.rpc('remove_my_device', { p_device_id: d.device_id });
+            }
+            setDeviceLimitError(null);
+            setBlockedDevices([]);
+            showToast('Equipos anteriores desvinculados.', 'success');
+            await handleSaveCloudAccount();
+        } catch (err) {
+            showToast(err.message || 'Error expulsando equipos', 'error');
             setImportStatus('error');
         }
     };
@@ -231,10 +304,11 @@ export function useCloudAuthLogic() {
 
             if (supabaseCloud) {
                 if (isCloudLogin) {
-                    const { error: err } = await supabaseCloud.auth.signInWithPassword({
+                    const { data: signInData, error: err } = await supabaseCloud.auth.signInWithPassword({
                         email: emailToUse, password: inputPassword,
                     });
                     if (err) throw new Error('Error al iniciar: ' + err.message);
+                    if (!signInData?.session?.user?.id) throw new Error('La sesión cloud no fue emitida.');
                 } else {
                     const { data, error: err } = await supabaseCloud.auth.signUp({
                         email: emailToUse, password: inputPassword,
@@ -258,40 +332,40 @@ export function useCloudAuthLogic() {
             localStorage.setItem('pda_device_alias', finalAlias);
             localStorage.setItem('pda_explicit_login', 'true'); // Bandera para evitar que App.jsx tumba nuestra sesión antes de registrar
 
-            try {
-                const { data: rpcResult } = await supabaseCloud.rpc('register_and_check_device', {
-                    p_email: emailToUse,
-                    p_device_id: deviceId || 'UNKNOWN',
-                    p_device_alias: finalAlias
-                });
+            const { data: rpcResult, error: rpcError } = await supabaseCloud.rpc('register_and_check_device', {
+                p_email: emailToUse,
+                p_device_id: deviceId || 'UNKNOWN',
+                p_device_alias: finalAlias
+            });
+            if (rpcError) throw new Error('No se pudo validar la licencia o el dispositivo.');
 
-                if (rpcResult === 'license_inactive') {
-                    throw new Error('Licencia suspendida por el administrador.');
+            if (rpcResult === 'license_inactive') {
+                throw new Error('Licencia suspendida por el administrador.');
+            }
+            if (rpcResult === 'license_expired') {
+                throw new Error('Licencia vencida. Contacta a soporte para renovar tu acceso.');
+            }
+            if (rpcResult === 'limit_reached') {
+                const [{ data: activeDevices, error: devicesError }, { data: licRows }] = await Promise.all([
+                    supabaseCloud.rpc('get_my_devices'),
+                    supabaseCloud.rpc('get_my_license_status')
+                ]);
+                if (devicesError) {
+                    if (devicesError.code === '42883') {
+                        throw new Error('Falta aplicar la migración de administración de dispositivos en Supabase.');
+                    }
+                    if (devicesError.code === '42501' || /401|permission denied|unauthori[sz]ed|JWT/i.test(`${devicesError.code || ''} ${devicesError.message || ''}`)) {
+                        await supabaseCloud.auth.signOut().catch(() => {});
+                        throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+                    }
+                    throw devicesError;
                 }
-                if (rpcResult === 'license_expired') {
-                    throw new Error('Licencia vencida. Contacta a soporte para renovar tu acceso.');
-                }
-                if (rpcResult === 'limit_reached') {
-                    // Obtener lista de dispositivos activos y mostrar pantalla de bloqueo
-                    const { data: activeDevices } = await supabaseCloud
-                        .from('account_devices')
-                        .select('device_id, device_alias, last_seen')
-                        .eq('email', emailToUse)
-                        .order('last_seen', { ascending: false });
-                    const { data: licRow } = await supabaseCloud
-                        .from('cloud_licenses')
-                        .select('max_devices')
-                        .eq('email', emailToUse)
-                        .maybeSingle();
-                    setBlockedDevices(activeDevices || []);
-                    setDeviceLimitError({ limit: licRow?.max_devices ?? 6, currentId: deviceId });
-                    setImportStatus(null);
-                    setStatusMessage('');
-                    return;
-                }
-            } catch (rpcErr) {
-               // Silenciar error si RPC aun no existe (fallback)
-               console.warn("RPC Device Check falló", rpcErr);
+                const maxDevices = licRows?.[0]?.max_devices ?? 6;
+                setBlockedDevices(activeDevices || []);
+                setDeviceLimitError({ limit: maxDevices, currentId: deviceId });
+                setImportStatus(null);
+                setStatusMessage('');
+                return;
             }
 
             setStatusMessage('Consultando nube...');
@@ -317,10 +391,13 @@ export function useCloudAuthLogic() {
                 setStatusMessage('Restaurando nube...');
                 await applyCloudBackup(cloudBackup);
                 await registerDevice(emailToUse);
+                localStorage.removeItem('pda_explicit_login');
+                localStorage.setItem('poolbar_cloud_email', emailToUse);
+                localStorage.setItem('pool_had_cloud_session', 'true');
                 setIsCloudConfigured(true);
                 showToast('Datos restaurados desde la nube', 'success');
                 setImportStatus('success');
-                setTimeout(() => window.location.reload(), 1500);
+                setTimeout(() => window.location.reload(), 1200);
                 return;
             }
 
@@ -328,34 +405,25 @@ export function useCloudAuthLogic() {
             if (supabaseCloud) {
                 await uploadLocalBackup(emailToUse, localBackup);
                 if (!isCloudLogin) {
-                    try {
-                        // Licencia de fábrica: 7 días, máximo 6 equipos vinculados
-                        const trialExpiry = new Date();
-                        trialExpiry.setDate(trialExpiry.getDate() + 7);
-                        const { error: licErr } = await supabaseCloud.from('cloud_licenses').upsert({
-                            email: emailToUse,
-                            device_id: deviceId || 'UNKNOWN',
-                            license_type: 'trial',
-                            days_remaining: 7,
-                            max_devices: 6,
-                            valid_until: trialExpiry.toISOString(),
-                            business_name: businessName || 'Pool Los Diaz',
-                            phone: inputPhone || '',
-                            active: true,
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'email' });
-                        if (licErr) console.warn('[Registro] Error al crear licencia de fábrica:', licErr.message);
-                    } catch (e) {
-                        console.warn('[Registro] Excepción al crear licencia de fábrica:', e);
-                    }
+                    const { error: licenseError } = await supabaseCloud.rpc('ensure_trial_license', {
+                        p_email: emailToUse,
+                        p_device_id: deviceId || 'UNKNOWN',
+                        p_business_name: businessName || 'Pool Los Diaz',
+                        p_phone: inputPhone || ''
+                    });
+                    if (licenseError) throw licenseError;
                 }
                 await registerDevice(emailToUse);
             }
 
+            localStorage.removeItem('pda_explicit_login');
+            localStorage.setItem('poolbar_cloud_email', emailToUse);
+            localStorage.setItem('pool_had_cloud_session', 'true');
             setIsCloudConfigured(true);
             showToast('Sincronizado', 'success');
             setImportStatus(null);
             setStatusMessage('');
+            setTimeout(() => window.location.reload(), 1200);
 
         } catch (error) {
             showToast(error.message, 'error');
@@ -402,6 +470,7 @@ export function useCloudAuthLogic() {
         localDeviceAlias, setLocalDeviceAlias,
         handleDataConflictChoice,
         handleUnlinkSpecificDevice,
+        handleUnlinkAllOtherDevices,
         handleSaveCloudAccount,
         handleResetPasswordRequest
     };

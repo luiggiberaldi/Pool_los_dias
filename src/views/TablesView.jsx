@@ -106,7 +106,7 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
 
     if (loading) {
         return (
-            <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto w-full">
+            <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-6 gap-4 sm:gap-6 overflow-y-auto w-full pb-app-nav">
                 <div className="h-20 w-1/3 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-2xl"></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3, 4].map(k => (
@@ -118,7 +118,7 @@ export default function TablesView({ triggerHaptic: _triggerHaptic, isActive }) 
     }
 
     return (
-        <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar w-full relative">
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar w-full relative pb-app-nav">
 
             {/* ── STICKY HEADER + FILTERS ── */}
             <div className="sticky top-0 z-20 bg-[#F8FAFC]/90 dark:bg-[#0f172a]/90 backdrop-blur-xl px-6 pt-4 pb-3 border-b border-slate-200/50 dark:border-white/5">

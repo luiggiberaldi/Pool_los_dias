@@ -7,7 +7,8 @@ export const createRealtimeActions = (set, get, tablesCache, scopedKey) => ({
 
         // Scope channel by userId to prevent cross-account notification leaks
         const userId = useAuthStore.getState().cloudSession?.user?.id;
-        const channelName = userId ? `pool_tables_sync_v2:${userId}` : 'pool_tables_sync_v2';
+        if (!userId) return;
+        const channelName = `pool_tables_sync_v2:${userId}`;
 
         const debouncedSync = () => {
             clearTimeout(get()._syncTimeout);

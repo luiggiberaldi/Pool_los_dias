@@ -50,12 +50,17 @@ let globalSubscription = null;
 let globalSubscriptionUserId = null; // Track which user the subscription belongs to
 let syncBroadcastChannel = null;
 let syncBroadcastUserId = null;
+let backupRequestChannel = null;
+let salesRealtimeCleanup = null;
+let heartbeatInterval = null;
 let isSyncingFromCloud = false;
 let syncingFromCloudCount = 0;      // Counter-based guard (safer than boolean)
 let isInitialSyncCompleted = false;  // BLOQUEO DE ARRANQUE: No subir nada hasta descargar
 let pendingPush = {};
 let isVisibilityBound = false;
 let visibilityDebounceTimer = null;
+let salesSyncAuthPausedUntil = 0;
+const SALES_SYNC_AUTH_PAUSE_MS = 30_000;
 
 const IMPORT_GUARD_KEY = '_poolbar_import_guard';
 const SYNC_QUEUE_KEY_BASE = '_poolbar_sync_queue';
@@ -68,10 +73,35 @@ const hasImportGuard = () => sessionStorage.getItem(IMPORT_GUARD_KEY) === '1';
 /** Canal Broadcast para sync_documents P2P (0 WAL egress) */
 function _getSyncBroadcastChannel(userId) {
     if (syncBroadcastChannel && syncBroadcastUserId === userId) return syncBroadcastChannel;
-    if (syncBroadcastChannel) syncBroadcastChannel.unsubscribe();
+    if (syncBroadcastChannel) supabaseCloud.removeChannel(syncBroadcastChannel);
     syncBroadcastChannel = supabaseCloud.channel(`sync_docs:${userId}`);
     syncBroadcastUserId = userId;
     return syncBroadcastChannel;
+}
+
+function cleanupCloudSyncResources() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
+    if (salesRealtimeCleanup) {
+        salesRealtimeCleanup();
+        salesRealtimeCleanup = null;
+    }
+    if (backupRequestChannel) {
+        supabaseCloud.removeChannel(backupRequestChannel);
+        backupRequestChannel = null;
+    }
+    if (globalSubscription) {
+        supabaseCloud.removeChannel(globalSubscription);
+        globalSubscription = null;
+        globalSubscriptionUserId = null;
+    }
+    if (syncBroadcastChannel) {
+        supabaseCloud.removeChannel(syncBroadcastChannel);
+        syncBroadcastChannel = null;
+        syncBroadcastUserId = null;
+    }
 }
 
 // Gestión de Cola Offline
@@ -97,6 +127,12 @@ export const removeFromSyncQueue = (key) => {
  */
 export const processSyncQueue = async () => {
     if (!isInitialSyncCompleted) return;
+    if (Date.now() < salesSyncAuthPausedUntil) return;
+    const { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+        if (!session?.user?.id) {
+            console.warn('[CloudSync] Cola pausada: sesión cloud no autorizada.');
+            return;
+        }
     const queue = getSyncQueue();
     if (queue.length === 0) return;
 
@@ -181,6 +217,7 @@ export const forcePushToCloud = async () => {
         };
         
         const { error: backupError } = await supabaseCloud.from('cloud_backups').upsert({
+            user_id: session.user.id,
             email: session.user.email,
             backup_data: backupData,
             updated_at: new Date().toISOString()
@@ -247,6 +284,7 @@ export const pushFullBackupToCloud = async () => {
         };
 
         const { error } = await supabaseCloud.from('cloud_backups').upsert({
+            user_id: session.user.id,
             email: session.user.email,
             backup_data: backupData,
             updated_at: new Date().toISOString()
@@ -333,6 +371,11 @@ export const pushCloudSync = async (key, value, force = false) => {
         } catch (_) { /* non-fatal: la DB ya tiene el dato */ }
 
     } catch (e) {
+        const message = e?.message || '';
+        if (/401|JWT|token.*(expired|invalid)|unauthori[sz]ed/i.test(message)) {
+            console.warn('[CloudSync] Sesión no autorizada; cola pausada hasta renovar sesión.');
+            return;
+        }
         console.warn('[CloudSync] Falló envío. Encolado para reintento:', key);
         addToSyncQueue(key);
     }
@@ -457,38 +500,44 @@ if (typeof document !== 'undefined' && !isVisibilityBound) {
 
 export function useCloudSync() {
     const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+    const [cloudUserId, setCloudUserId] = useState(null);
     const isInitialized = useRef(false);
 
-    // Check Supabase session to determine cloud configuration status
+    // Check Supabase session and account identity. The user id is a dependency
+    // so switching accounts tears down the old tenant resources first.
     useEffect(() => {
         supabaseCloud.auth.getSession().then(({ data: { session } }) => {
             setIsCloudConfigured(!!session);
+            setCloudUserId(session?.user?.id || null);
         }).catch(() => {});
         const { data: { subscription } } = supabaseCloud.auth.onAuthStateChange((_event, session) => {
             setIsCloudConfigured(!!session);
+            setCloudUserId(session?.user?.id || null);
         });
         return () => subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
-        if (!isCloudConfigured) {
-            if (globalSubscription) {
-                globalSubscription.unsubscribe();
-                globalSubscription = null;
-                isInitialized.current = false;
-            }
-            // Si no hay nube instalada, el motor local es el maestro
+        let disposed = false;
+
+        if (!isCloudConfigured || !cloudUserId) {
+            cleanupCloudSyncResources();
+            isInitialized.current = false;
             isInitialSyncCompleted = true;
             window.dispatchEvent(new CustomEvent('sync_initial_completed'));
-            return;
+            return () => { disposed = true; };
         }
 
-        if (isInitialized.current) return;
+        if (isInitialized.current && globalSubscriptionUserId === cloudUserId) return () => { disposed = true; };
+
+        cleanupCloudSyncResources();
+        isInitialized.current = false;
+        isInitialSyncCompleted = false;
 
         const initSync = async () => {
             try {
-                let session = (await supabaseCloud.auth.getSession()).data.session;
-                if (!session?.user?.id) return;
+                const session = (await supabaseCloud.auth.getSession()).data.session;
+                if (disposed || !session?.user?.id || session.user.id !== cloudUserId) return;
 
                 isInitialized.current = true;
                 const userId = session.user.id;
@@ -536,17 +585,30 @@ export function useCloudSync() {
                 console.log('[CloudSync] Motor de sincronización listo (Pull Finalizado).');
 
                 // Procesar cualquier cambio que se haya intentado subir durante el arranque
-                processSyncQueue();
+                if (isCloudConfigured && cloudUserId) processSyncQueue();
 
                 // Pull incremental de ventas (solo nuevas desde último sync)
                 const { pullNewSales, syncPendingSalesToCloud, subscribeSalesRealtime, applyIncomingSale } = await import('../utils/salesSyncService');
                 await pullNewSales(userId);
-                await syncPendingSalesToCloud(userId);
+                const salesSynced = Date.now() >= salesSyncAuthPausedUntil
+                    ? await syncPendingSalesToCloud(userId)
+                    : 0;
+
+                if (salesSynced === 0) {
+                    const { data: currentSession } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+                    if (!currentSession?.session) salesSyncAuthPausedUntil = Date.now() + SALES_SYNC_AUTH_PAUSE_MS;
+                }
+                const { offlineQueueService } = await import('../services/offlineQueueService');
+                const { data: authCheck } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+                if (authCheck?.session?.user?.id === userId) {
+                    await offlineQueueService.resumeAfterAuth().catch(() => {});
+                }
+                if (disposed) return;
 
                 // ── Suscripción Broadcast P2P (0 WAL egress) ─────────────────
                 // Reemplaza postgres_changes en sync_documents por broadcast
                 if (globalSubscription && globalSubscriptionUserId !== userId) {
-                    globalSubscription.unsubscribe();
+                    supabaseCloud.removeChannel(globalSubscription);
                     globalSubscription = null;
                     globalSubscriptionUserId = null;
                 }
@@ -580,10 +642,10 @@ export function useCloudSync() {
                 }
 
                 // Suscripción Broadcast para ventas en tiempo real (0 DB egress)
-                subscribeSalesRealtime(userId, applyIncomingSale);
+                salesRealtimeCleanup = subscribeSalesRealtime(userId, applyIncomingSale);
 
                 // Suscripción a solicitudes de backup del admin
-                supabaseCloud
+                backupRequestChannel = supabaseCloud
                     .channel(`backup-requests:${userId}`)
                     .on('broadcast', { event: 'request' }, async ({ payload }) => {
                         if (payload?.email?.toLowerCase() === session.user.email?.toLowerCase()) {
@@ -592,18 +654,17 @@ export function useCloudSync() {
                         }
                     })
                     .subscribe();
-
                 // Heartbeat Sync Daemon: reintento silencioso cada 30 segundos
-                const heartbeatInterval = setInterval(async () => {
-                    if (isInitialSyncCompleted) {
+                heartbeatInterval = setInterval(async () => {
+                    if (isInitialSyncCompleted && !disposed) {
                         try {
                             const { syncPendingSalesToCloud } = await import('../utils/salesSyncService');
-                            await syncPendingSalesToCloud(userId);
-                        } catch (_) {}
+                            const { data: { session: heartbeatSession } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+                            if (heartbeatSession?.user?.id === userId)                    if (Date.now() >= salesSyncAuthPausedUntil) await syncPendingSalesToCloud(userId);
+
+                        } catch (_) { /* heartbeat failure is retried on the next interval */ }
                     }
                 }, 30_000);
-
-                return () => clearInterval(heartbeatInterval);
 
             } catch (err) {
                 console.error('[CloudSync] Error inicialización P2P:', err);
@@ -612,7 +673,13 @@ export function useCloudSync() {
         };
 
         initSync();
-    }, [isCloudConfigured]);
+        return () => {
+            disposed = true;
+            cleanupCloudSyncResources();
+            isInitialized.current = false;
+            isInitialSyncCompleted = false;
+        };
+    }, [isCloudConfigured, cloudUserId]);
 
     return {
         forcePullFromCloud,

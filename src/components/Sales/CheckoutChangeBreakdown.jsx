@@ -10,10 +10,15 @@ export default function CheckoutChangeBreakdown({
     changeUsdGiven, setChangeUsdGiven,
     changeBsGiven, setChangeBsGiven,
     effectiveRate,
+    checkoutRate,
     currentFloatUsd, currentFloatBs,
 }) {
+    // El vuelto se desglosa a la TASA DE LIQUIDACIÓN (la misma del banner Bs),
+    // no a la tasa viva — si el cliente pagó precio Bs dual, su vuelto en Bs
+    // también debe valuarse a esa tasa implícita.
+    const settleRate = checkoutRate || effectiveRate || 1;
     return (
-        <div data-tour="checkout-remaining" className="px-3 py-2">
+        <div data-tour="checkout-remaining" className="sticky top-0 z-20 px-3 py-2 bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm">
             <div className={`p-3.5 rounded-xl border-2 transition-all ${isPaid
                 ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
                 : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800'
@@ -52,7 +57,7 @@ export default function CheckoutChangeBreakdown({
                                         const v = e.target.value;
                                         const usd = Math.min(Math.max(0, parseFloat(v) || 0), changeUsd);
                                         setChangeUsdGiven(v);
-                                        setChangeBsGiven(Math.max(0, mulR(subR(changeUsd, usd), effectiveRate)).toFixed(0));
+                                        setChangeBsGiven(Math.max(0, mulR(subR(changeUsd, usd), settleRate)).toFixed(0));
                                     }}
                                     className="w-full py-2 px-3 pr-10 rounded-lg border-2 border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/30"
                                 />
@@ -65,10 +70,10 @@ export default function CheckoutChangeBreakdown({
                                     value={changeBsGiven}
                                     onChange={e => {
                                         const v = e.target.value;
-                                        const bsTotal = mulR(changeUsd, effectiveRate);
+                                        const bsTotal = mulR(changeUsd, settleRate);
                                         const bs = Math.min(Math.max(0, parseFloat(v) || 0), bsTotal);
                                         setChangeBsGiven(v);
-                                        setChangeUsdGiven(Math.max(0, subR(changeUsd, divR(bs, effectiveRate))).toFixed(2));
+                                        setChangeUsdGiven(Math.max(0, subR(changeUsd, divR(bs, settleRate))).toFixed(2));
                                     }}
                                     className="w-full py-2 px-3 pr-8 rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-white dark:bg-slate-900 font-black text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
                                 />
@@ -80,7 +85,7 @@ export default function CheckoutChangeBreakdown({
                                 className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 active:scale-95 transition-all border border-emerald-200 dark:border-emerald-800">
                                 Todo $
                             </button>
-                            <button onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven(mulR(changeUsd, effectiveRate).toFixed(0)); }}
+                            <button onClick={() => { setChangeUsdGiven('0'); setChangeBsGiven(mulR(changeUsd, settleRate).toFixed(0)); }}
                                 className="flex-1 py-1.5 rounded-lg text-[9px] font-black bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 active:scale-95 transition-all border border-blue-200 dark:border-blue-800">
                                 Todo Bs
                             </button>

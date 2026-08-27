@@ -160,7 +160,7 @@ export const useOrdersStore = create((set, get) => ({
         }
         // Forzar recreación del canal broadcast en el próximo subscribe
         if (ordersBroadcastChannel) {
-            try { ordersBroadcastChannel.unsubscribe(); } catch (_) {}
+            try { ordersBroadcastChannel.unsubscribe(); } catch (_) { /* channel already closed */ }
             ordersBroadcastChannel = null;
             ordersBroadcastUserId = null;
         }
@@ -169,6 +169,7 @@ export const useOrdersStore = create((set, get) => ({
     syncOrders: async () => {
         try {
             const userId = await getAuthUserId();
+            if (!userId) return { orders: get().orders, orderItems: get().orderItems };
 
             // Filtro de seguridad: solo órdenes OPEN de las últimas 48h para evitar
             // acumular cientos de IDs que superan el límite de URL de PostgREST
@@ -178,9 +179,8 @@ export const useOrdersStore = create((set, get) => ({
                 .from('orders')
                 .select('id, table_id, table_session_id, status, exchange_rate_used, user_id, created_at')
                 .eq('status', 'OPEN')
-                .gte('created_at', since);
-            // NO filtrar por user_id — todos los dispositivos deben ver todas las órdenes
-            // El aislamiento por cuenta ya lo garantiza RLS + el vínculo con table_sessions
+                .gte('created_at', since)
+                .eq('user_id', userId);
 
             const { data: openOrders, error: orderError } = await query;
             if (orderError) throw orderError;
@@ -241,6 +241,7 @@ export const useOrdersStore = create((set, get) => ({
 
         let order = get().getOrderBySessionId(sessionId);
         const userId = await getAuthUserId();
+        if (!userId) throw new Error('No hay sesión cloud autenticada');
 
         try {
             if (!order) {

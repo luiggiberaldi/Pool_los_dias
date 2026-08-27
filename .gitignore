@@ -80,6 +80,26 @@ future_plans/
 android/
 server/
 scripts/
+# Estas pruebas son parte del criterio técnico y deben permanecer versionables.
+!scripts/
+!scripts/test-legacy-sales-assignment.mjs
+!scripts/prepare-legacy-sales-approvals.mjs
+!scripts/manage-legacy-sales-approvals.mjs
+!scripts/test-legacy-sales-approvals.mjs
+!scripts/test-e2e-flow.mjs
+!scripts/reconcile-backup-sales.mjs
+!scripts/test-backup-reconciliation.mjs
+!scripts/prepare-backup-conflict-review.mjs
+!scripts/close-backup-conflicts-keep-both.mjs
+!scripts/repair-module1-orphan-orders.mjs
+!scripts/test-module1-orphan-orders.mjs
+!scripts/test-module1-operational-flow.mjs
+!scripts/run-module1-e2e-current-project.mjs
+!scripts/test-backup-conflict-review.mjs
+!scripts/apply-module4-checkout-idempotency.mjs
+!scripts/test-module5-backup-readiness.mjs
+# Captura potencialmente sensible generada solo cuando falla el E2E.
+e2e-flow-failure.png
 
 # Herramientas de agente y configs de deploy privadas
 .agent/

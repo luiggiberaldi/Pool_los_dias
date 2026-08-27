@@ -1,129 +1,48 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../../hooks/store/authStore';
-import { useCashStore } from '../../hooks/store/cashStore';
 import UserCard from './UserCard';
 import LoginPinModal from './LoginPinModal';
-import { LogOut, DownloadCloud, ShieldCheck, X, Eye, EyeOff } from 'lucide-react';
-import { supabaseCloud } from '../../config/supabaseCloud';
-import { useConfirm } from '../../hooks/useConfirm.jsx';
-
-// ── Modal super admin ─────────────────────────────────────────────────────────
-function SuperAdminModal({ isOpen, onClose, onSuccess }) {
-    const [password, setPassword] = useState('');
-    const [showPw, setShowPw] = useState(false);
-    const [error, setError] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const inputRef = useRef(null);
-
-    useEffect(() => {
-        if (isOpen) {
-            setPassword('');
-            setError(false);
-            setTimeout(() => inputRef.current?.focus(), 100);
-        }
-    }, [isOpen]);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!password || loading) return;
-        setLoading(true);
-        setError(false);
-        const ok = await onSuccess(password);
-        setLoading(false);
-        if (!ok) {
-            setError(true);
-            setPassword('');
-            setTimeout(() => inputRef.current?.focus(), 50);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-sky-500" />
-                        <span className="font-bold text-slate-800 text-lg">Acceso Admin</span>
-                    </div>
-                    <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    <div className="relative">
-                        <input
-                            ref={inputRef}
-                            type={showPw ? 'text' : 'password'}
-                            value={password}
-                            onChange={e => { setPassword(e.target.value); setError(false); }}
-                            placeholder="Contraseña maestra"
-                            className={`w-full px-4 py-3 rounded-xl border-2 text-slate-800 outline-none transition-colors pr-11
-                                ${error ? 'border-red-400 bg-red-50' : 'border-slate-200 focus:border-sky-400 bg-slate-50'}`}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPw(v => !v)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        >
-                            {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                    </div>
-
-                    {error && (
-                        <p className="text-sm text-red-500 text-center -mt-2">Contraseña incorrecta</p>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={!password || loading}
-                        className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-xl shadow-md shadow-sky-500/30 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                        {loading ? 'Verificando...' : 'Entrar'}
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
-}
+import SuperAdminModal from './SuperAdminModal';
+import { DownloadCloud } from 'lucide-react';
 
 export default function LoginScreen() {
-    const { cachedUsers, login, loginWithBiometric, verifyPin, syncUsers, logout, loginAsSuperAdmin } = useAuthStore();
-    const { activeCashSession } = useCashStore();
-    const confirm = useConfirm();
-
+    const { cachedUsers, loginWithBiometric, verifyPin, syncUsers, loginAsSuperAdmin } = useAuthStore();
+    const visibleUsers = cachedUsers.filter(user => user.active !== false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [showSuperModal, setShowSuperModal] = useState(false);
 
-    // Contador de clicks en logo para abrir modal super admin
+    // Contador de clicks en logo para abrir modal super admin (10 clics en 2.5s)
     const logoClickCount = useRef(0);
     const logoClickTimer = useRef(null);
 
     const handleLogoClick = useCallback(() => {
         logoClickCount.current += 1;
+        if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(10);
+        }
         clearTimeout(logoClickTimer.current);
         if (logoClickCount.current >= 10) {
             logoClickCount.current = 0;
             setShowSuperModal(true);
         } else {
-            logoClickTimer.current = setTimeout(() => { logoClickCount.current = 0; }, 2000);
+            logoClickTimer.current = setTimeout(() => {
+                logoClickCount.current = 0;
+            }, 2500);
         }
     }, []);
 
-    const handleForceSync = async () => {
+    const handleForceSync = useCallback(async () => {
         setIsSyncing(true);
         await syncUsers();
         setIsSyncing(false);
-    };
+    }, [syncUsers]);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
-        // Siempre sincronizar al montar para tener usuarios actualizados
-        handleForceSync();
-    }, []);
+        // Diferir la sincronización evita actualizar estado durante el commit inicial.
+        const timer = setTimeout(() => { handleForceSync(); }, 0);
+        return () => clearTimeout(timer);
+    }, [handleForceSync]);
 
     // Verificar PIN sin activar sesión (para dar chance al prompt biométrico)
     const handlePinVerify = async (pin, userId) => {
@@ -143,19 +62,6 @@ export default function LoginScreen() {
         return success;
     };
 
-    const handleCloudLogout = async () => {
-        const ok = await confirm({
-            title: '¿Cerrar sesión remota?',
-            message: 'Se borrará todo caché.',
-            confirmText: 'Sí, cerrar sesión',
-            variant: 'logout'
-        });
-        if (!ok) return;
-        await logout();
-        await supabaseCloud.auth.signOut();
-        window.location.reload();
-    };
-
     return (
         <div className="fixed inset-0 z-[300] bg-slate-50 text-slate-800 font-sans" style={{ overflowY: 'auto' }}>
             {/* Background glow — decorativo, no interfiere con layout */}
@@ -173,7 +79,7 @@ export default function LoginScreen() {
                         src="/logo.png"
                         alt="Logo"
                         onClick={handleLogoClick}
-                        className="w-auto object-contain drop-shadow-xl cursor-pointer select-none"
+                        className="w-auto object-contain drop-shadow-xl cursor-pointer select-none active:scale-95 transition-transform"
                         style={{ height: 'clamp(110px, 28vw, 180px)' }}
                     />
                     <h1 className="text-2xl sm:text-3xl font-light tracking-[0.15em] text-slate-500">
@@ -183,7 +89,7 @@ export default function LoginScreen() {
 
                 {/* ── GRID DE USUARIOS ── */}
                 <div className="w-full flex-1 flex items-center justify-center py-4">
-                    {cachedUsers.length === 0 ? (
+                    {visibleUsers.length === 0 ? (
                         <div className="text-center text-slate-500 max-w-xs w-full">
                             <p className="mb-4 text-sm">No hay usuarios en caché.</p>
                             <button
@@ -199,9 +105,9 @@ export default function LoginScreen() {
                         /* Flex wrap: se ajusta automáticamente al número de cards (1,2,3,N).
                            En móvil max 2 por fila; en pantallas más grandes toda en fila. */
                         <div
-                            className={`flex flex-wrap justify-center gap-8 sm:gap-12 ${cachedUsers.length <= 2 ? 'max-w-xs sm:max-w-sm' : 'max-w-[320px] sm:max-w-md md:max-w-lg'}`}
+                            className={`flex flex-wrap justify-center gap-8 sm:gap-12 ${visibleUsers.length <= 2 ? 'max-w-xs sm:max-w-sm' : 'max-w-[320px] sm:max-w-md md:max-w-lg'}`}
                         >
-                            {cachedUsers.map(user => (
+                            {visibleUsers.map(user => (
                                 <div
                                     key={user.id}
                                     style={{ flexBasis: 'calc(50% - 16px)', maxWidth: '130px', minWidth: '100px' }}

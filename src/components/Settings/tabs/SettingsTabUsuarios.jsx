@@ -45,14 +45,33 @@ function CloudLicenseViewer({ adminEmail, showToast }) {
     const confirm = useConfirm();
 
     const loadData = async () => {
+        const { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+        if (!session?.user?.id) {
+            setDevices([]);
+            setLicense(null);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             const [devRes, licRes] = await Promise.all([
-                supabaseCloud.from('account_devices').select('*').eq('email', adminEmail).order('created_at', { ascending: true }),
-                supabaseCloud.from('cloud_licenses').select('*').eq('email', adminEmail).maybeSingle()
+                supabaseCloud.from('account_devices').select('*').eq('user_id', session.user.id).order('created_at', { ascending: true }),
+                supabaseCloud.rpc('get_my_license_status')
             ]);
+            if (devRes.error || licRes.error) {
+                const authError = [devRes.error, licRes.error].find(error =>
+                    /401|42501|permission denied|unauthori[sz]ed|JWT/i.test(`${error?.code || ''} ${error?.message || ''}`)
+                );
+                if (authError) {
+                    setDevices([]);
+                    setLicense(null);
+                    await supabaseCloud.auth.signOut().catch(() => {});
+                    showToast('Sesión cloud expirada. Inicia sesión nuevamente.', 'error');
+                    return;
+                }
+            }
             if (!devRes.error && devRes.data) setDevices(devRes.data);
-            if (!licRes.error && licRes.data) setLicense(licRes.data);
+            if (!licRes.error && licRes.data) setLicense(Array.isArray(licRes.data) ? licRes.data[0] : licRes.data);
         } catch {
             // Sin conexión — no bloquear UI
         }
@@ -73,14 +92,15 @@ function CloudLicenseViewer({ adminEmail, showToast }) {
             variant: 'unlink',
         });
         if (!ok) return;
-        const { error } = await supabaseCloud
-            .from('account_devices')
-            .delete()
-            .eq('email', adminEmail)
-            .eq('device_id', deviceId);
+        const { data: { session } } = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+        if (!session?.user?.id) {
+            showToast('Sesión cloud expirada. Inicia sesión nuevamente.', 'error');
+            return;
+        }
+        const { error } = await supabaseCloud.rpc('remove_my_device', { p_device_id: deviceId });
             
         if (error) {
-            showToast('Error al desvincular', 'error');
+            showToast(error.message || 'Error al desvincular', 'error');
         } else {
             showToast('Dispositivo desvinculado', 'success');
             loadData();

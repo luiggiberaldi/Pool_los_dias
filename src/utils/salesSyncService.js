@@ -15,11 +15,39 @@ import { storageService } from './storageService';
 import { scopedKey } from '../hooks/store/accountScope';
 
 const SALES_KEY = 'bodega_sales_v1';
+const PENDING_SALES_QUEUE_KEY_BASE = '_pending_sale_uploads';
 const LAST_SALES_PULL_KEY_BASE = '_cloud_last_sales_pull_at';
+const getPendingSalesQueueKey = () => scopedKey(PENDING_SALES_QUEUE_KEY_BASE);
 const getLastSalesPullKey = () => scopedKey(LAST_SALES_PULL_KEY_BASE);
+const getPendingSalesKnownKey = () => scopedKey('_pending_sale_uploads_initialized');
 
 let salesBroadcastChannel = null;
 let salesBroadcastUserId = null;
+let salesAuthPausedUntil = 0;
+const SALES_AUTH_RETRY_DELAY = 30_000;
+let lastSalesSyncToastAt = 0;
+let lastSalesSyncToastCount = 0;
+
+function isAuthError(error) {
+    const text = `${error?.code || ''} ${error?.status || ''} ${error?.message || ''} ${error?.details || ''}`;
+    return /401|PGRST301|JWT|token.*(expired|invalid)|unauthori[sz]ed/i.test(text);
+}
+
+async function getAuthorizedSession() {
+    if (Date.now() < salesAuthPausedUntil) return null;
+    const result = await supabaseCloud.auth.getSession().catch(() => ({ data: {} }));
+    let session = result.data?.session;
+    if (!session?.user?.id) return null;
+    if (session.expires_at && session.expires_at * 1000 <= Date.now() + 30_000) {
+        const refreshed = await supabaseCloud.auth.refreshSession().catch(() => ({ error: true, data: {} }));
+        if (refreshed.error) {
+            salesAuthPausedUntil = Date.now() + SALES_AUTH_RETRY_DELAY;
+            return null;
+        }
+        session = refreshed.data?.session || session;
+    }
+    return session;
+}
 
 function getSalesBroadcastChannel(userId) {
     if (salesBroadcastChannel && salesBroadcastUserId === userId) {
@@ -68,11 +96,11 @@ export async function broadcastNewSale(sale, userId) {
 
             if (!error) {
                 // Limpiar de la cola de pendientes si se subió con éxito
-                const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+                const pendingQueueStr = localStorage.getItem(getPendingSalesQueueKey()) || '[]';
                 let pendingQueue = [];
                 try { pendingQueue = JSON.parse(pendingQueueStr); } catch (_) { pendingQueue = []; }
                 const updatedQueue = pendingQueue.filter(id => id !== sale.id);
-                localStorage.setItem('_pending_sale_uploads', JSON.stringify(updatedQueue));
+                localStorage.setItem(getPendingSalesQueueKey(), JSON.stringify(updatedQueue));
             }
         } catch (e) {
             console.warn('[SalesSync] Persist en DB falló:', e?.message);
@@ -85,21 +113,30 @@ export async function broadcastNewSale(sale, userId) {
  * Incluye Safety Snapshot automático antes de subir.
  */
 export async function syncPendingSalesToCloud(userId) {
-    if (!userId) return 0;
+    if (!userId || Date.now() < salesAuthPausedUntil) return 0;
     try {
-        const pendingQueueStr = localStorage.getItem('_pending_sale_uploads') || '[]';
+        const session = await getAuthorizedSession();
+        if (!session || session.user.id !== userId) return 0;
+        const pendingQueueStr = localStorage.getItem(getPendingSalesQueueKey()) || '[]';
         let pendingIds = [];
         try { pendingIds = JSON.parse(pendingQueueStr); } catch (_) { pendingIds = []; }
 
         const localSales = await storageService.getItem(SALES_KEY, []);
 
-        // Sincronización Universal: incluir TODAS las ventas y registros de caja (abiertos o cerrados)
-        if (localSales.length > 0) {
-            localSales.forEach(s => {
-                if (s.id && !pendingIds.includes(s.id)) pendingIds.push(s.id);
-            });
+        // Migración segura de colas antiguas: versiones previas metían todo el
+        // historial (p.ej. 1.656 ventas) en esta cola. No se sube ni notifica ese
+        // lote automáticamente: se descarta la cola heredada; las ventas nuevas
+        // seguirán entrando mediante checkoutProcessor con su ID explícito.
+        const queueInitialized = localStorage.getItem(getPendingSalesKnownKey()) === '1';
+        if (!queueInitialized) {
+            localStorage.setItem(getPendingSalesQueueKey(), '[]');
+            localStorage.setItem(getPendingSalesKnownKey(), '1');
+            return 0;
         }
 
+        // Solo procesar ventas explícitamente pendientes y que aún existan localmente.
+        const localIds = new Set(localSales.map(s => s.id).filter(Boolean));
+        pendingIds = [...new Set(pendingIds)].filter(id => localIds.has(id));
         if (!pendingIds.length) return 0;
 
         // Guardarraíl: Triple Snapshot de resguardo antes de cualquier operación
@@ -109,14 +146,14 @@ export async function syncPendingSalesToCloud(userId) {
             await storageService.setItem('bodega_sales_backup_safety', localSales);
             try {
                 localStorage.setItem('bodega_sales_backup_ls_' + ts.substring(0, 16), JSON.stringify(localSales.slice(0, 20)));
-            } catch (_) {}
+            } catch (_) { /* optional local operation */ }
         }
 
         const pendingSet = new Set(pendingIds);
         const pendingSales = localSales.filter(s => pendingSet.has(s.id));
 
         if (!pendingSales.length) {
-            localStorage.setItem('_pending_sale_uploads', '[]');
+            localStorage.setItem(getPendingSalesQueueKey(), '[]');
             return 0;
         }
 
@@ -132,26 +169,53 @@ export async function syncPendingSalesToCloud(userId) {
                     updated_at: new Date().toISOString(),
                 }, { onConflict: 'user_id,collection,doc_id' });
 
-                if (!error) {
-                    uploadedIds.push(sale.id);
+                if (error) {
+                    if (isAuthError(error)) {
+                        salesAuthPausedUntil = Date.now() + SALES_AUTH_RETRY_DELAY;
+                        console.warn('[SalesSync] Sesión no autorizada; se pausa la cola completa.');
+                        break;
+                    }
+                    if (isAuthError(error)) {
+                        salesAuthPausedUntil = Date.now() + SALES_AUTH_RETRY_DELAY;
+                        console.warn('[SalesSync] Sesión no autorizada; se pausa la cola completa.');
+                        break;
+                    }
+                    console.warn(`[SalesSync] Fallo en upsert de venta ${sale.id}:`, error.message);
+                    continue;
                 }
+                uploadedIds.push(sale.id);
             } catch (e) {
+                if (isAuthError(e)) {
+                    salesAuthPausedUntil = Date.now() + SALES_AUTH_RETRY_DELAY;
+                    console.warn('[SalesSync] Sesión no autorizada; se pausa la cola completa.');
+                    break;
+                }
                 console.warn(`[SalesSync] Fallo en upsert de venta ${sale.id}:`, e?.message);
             }
         }
 
         if (uploadedIds.length > 0) {
             const remaining = pendingIds.filter(id => !uploadedIds.includes(id));
-            localStorage.setItem('_pending_sale_uploads', JSON.stringify(remaining));
+            localStorage.setItem(getPendingSalesQueueKey(), JSON.stringify(remaining));
             console.log(`[SalesSync] ✓ ${uploadedIds.length} venta(s) sincronizada(s) exitosamente con la nube.`);
-            try {
-                const { showToast } = await import('../components/Toast');
-                showToast(`🟢 ${uploadedIds.length} venta(s) sincronizadas con la nube`, 'success', 4000);
-            } catch (_) {}
+            // Evitar notificaciones repetidas si dos eventos de arranque/foco
+            // completan el mismo lote casi simultáneamente.
+            const now = Date.now();
+            const isDuplicateNotification = now - lastSalesSyncToastAt < 5000
+                && lastSalesSyncToastCount === uploadedIds.length;
+            if (!isDuplicateNotification) {
+                lastSalesSyncToastAt = now;
+                lastSalesSyncToastCount = uploadedIds.length;
+                try {
+                    const { showToast } = await import('../components/Toast');
+                    showToast(`🟢 ${uploadedIds.length} venta(s) sincronizada(s) con la nube`, 'success', 4000);
+                } catch (_) { /* optional local operation */ }
+            }
         }
 
         return uploadedIds.length;
     } catch (e) {
+        if (isAuthError(e)) salesAuthPausedUntil = Date.now() + SALES_AUTH_RETRY_DELAY;
         console.warn('[SalesSync] syncPendingSalesToCloud falló:', e?.message);
         return 0;
     }

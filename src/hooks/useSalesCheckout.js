@@ -238,9 +238,11 @@ export function useSalesCheckout({
         // covers the shown total we must honor it — never trigger a false fiado.
         const _totalPaidCheck = sumR(payments.map(p => p.amountUsd));
         const _shownTotal = round2(tableCheckoutData.grandTotal || 0);
-        console.log('[TableCheckout] effectiveCartTotal:', effectiveCartTotal, 'recalcCartTotal:', recalcCartTotal, '_totalPaidCheck:', _totalPaidCheck, '_shownTotal:', _shownTotal);
-        console.log('[TableCheckout] payments:', JSON.stringify(payments.map(p => ({ method: p.methodLabel, currency: p.currency, input: p.amountInput, usd: p.amountUsd, bs: p.amountBs }))));
-        console.log('[TableCheckout] effectiveRate (BCV):', effectiveRate, 'discountAmt:', discountAmt);
+        if (import.meta.env?.DEV) {
+            console.log('[TableCheckout] effectiveCartTotal:', effectiveCartTotal, 'recalcCartTotal:', recalcCartTotal, '_totalPaidCheck:', _totalPaidCheck, '_shownTotal:', _shownTotal);
+            console.log('[TableCheckout] payments:', JSON.stringify(payments.map(p => ({ method: p.methodLabel, currency: p.currency, input: p.amountInput, usd: p.amountUsd, bs: p.amountBs }))));
+            console.log('[TableCheckout] effectiveRate (BCV):', effectiveRate, 'discountAmt:', discountAmt);
+        }
         if (effectiveCartTotal > _totalPaidCheck && _totalPaidCheck >= _shownTotal - EPSILON) {
             // User paid what was shown — snap to paid amount
             effectiveCartTotal = round2(_totalPaidCheck);
@@ -263,10 +265,10 @@ export function useSalesCheckout({
                     session?.game_mode, cfg, effectiveRate,
                     calculateSessionCostBreakdown(tableCheckoutData.elapsed, session?.game_mode, cfg, session?.hours_paid, session?.extended_times, hoursOff, roundsOff),
                     calculateConsumptionBs(tableCheckoutData.currentItems || [], effectiveRate, products)                ) + calculateSeatTimeCostBs(seats, cfg, effectiveRate);
-                console.log('[TableCheckout] Bs guard: totalBsPaid:', totalBsPaid, 'shownBs:', shownBs);
+                if (import.meta.env?.DEV) console.log('[TableCheckout] Bs guard: totalBsPaid:', totalBsPaid, 'shownBs:', shownBs);
                 if (totalBsPaid >= shownBs - 1) {
                     // User covered the Bs total — snap USD to cover the cart
-                    console.log('[TableCheckout] Bs guard: snapping effectiveCartTotal from', effectiveCartTotal, 'to', _totalPaidCheck);
+                    if (import.meta.env?.DEV) console.log('[TableCheckout] Bs guard: snapping effectiveCartTotal from', effectiveCartTotal, 'to', _totalPaidCheck);
                     effectiveCartTotal = round2(_totalPaidCheck);
                 }
             }
@@ -306,7 +308,7 @@ export function useSalesCheckout({
                     const { supabaseCloud } = await import('../config/supabaseCloud');
                     const { data } = await supabaseCloud.from('staff_users').select('id, name, role').eq('id', tableCheckoutData.session.opened_by).single();
                     if (data) openerUser = data;
-                } catch (_) {}
+                } catch (_) { /* optional cloud lookup */ }
             }
             const openerRole = (openerUser?.role || openerUser?.rol || '').toUpperCase();
             if (openerRole === 'MESERO' || openerRole === 'BARRA') {

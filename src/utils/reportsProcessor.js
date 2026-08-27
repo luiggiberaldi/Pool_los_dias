@@ -1,5 +1,6 @@
 import { FinancialEngine } from '../core/FinancialEngine';
 import { getLocalISODate } from './dateHelpers';
+import { getSaleBs } from './calculatorUtils';
 
 export function calculateReportsData(allSales, from, to, bcvRate, products, selectedRange, activeCashSession) {
     let salesForStats = [];
@@ -24,12 +25,14 @@ export function calculateReportsData(allSales, from, to, bcvRate, products, sele
                 return !isNaN(saleMs) && saleMs >= openedAtMs;
             });
 
-            historySales = allSales.filter(s => {
-                if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
-                if (s.cajaCerrada) return false;
-                const saleMs = new Date(s.timestamp).getTime();
-                return !isNaN(saleMs) && saleMs >= openedAtMs;
-            });
+        historySales = allSales.filter(s => {
+            if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
+            // Operaciones de caja no son ventas: evita filas fantasma de $0.00 en el historial
+            if (s.tipo === 'APERTURA_CAJA' || s.tipo === 'CIERRE_CAJA') return false;
+            if (s.cajaCerrada) return false;
+            const saleMs = new Date(s.timestamp).getTime();
+            return !isNaN(saleMs) && saleMs >= openedAtMs;
+        });
         }
     } else {
         // Ventas de Mercancía (para Totales, Profit, Top Productos)
@@ -49,13 +52,17 @@ export function calculateReportsData(allSales, from, to, bcvRate, products, sele
 
         historySales = allSales.filter(s => {
             if (s.tipo === 'AJUSTE_ENTRADA' || s.tipo === 'AJUSTE_SALIDA') return false;
+            // Operaciones de caja no son ventas: evita filas fantasma de $0.00 en el historial
+            if (s.tipo === 'APERTURA_CAJA' || s.tipo === 'CIERRE_CAJA') return false;
             const dateStr = getLocalISODate(new Date(s.timestamp));
             return dateStr >= from && dateStr <= to;
         });
     }
 
     const totalUsd = salesForStats.reduce((s, sale) => s + (sale.totalUsd || 0), 0);
-    const totalBs = salesForStats.reduce((s, sale) => s + (sale.totalBs || 0), 0);
+    // Bs vía getSaleBs: neto de vuelto y dual-aware (un solo criterio con Dashboard).
+    // Históricos con totalBs guardado bruto (vuelto incluido) quedan corregidos aquí.
+    const totalBs = salesForStats.reduce((s, sale) => s + getSaleBs(sale), 0);
     const totalItems = salesForStats.reduce((s, sale) => s + (sale.items ? sale.items.reduce((is, i) => is + i.qty, 0) : 0), 0);
     const profit = FinancialEngine.calculateAggregateProfit(salesForStats, bcvRate, products);
     const paymentBreakdown = FinancialEngine.calculatePaymentBreakdown(salesForCashFlow);
@@ -132,11 +139,13 @@ export function groupSalesByCierreId(allSales, from, to) {
             const dateObj = new Date(c.cierreId);
 
             // Filtrar para métricas generales (stats) y flujo de caja (cashflow)
-            const salesForStats = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA');
-            const salesForCashFlow = c.sales.filter(s => s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'PAGO_PROVEEDOR');
+            // ANULADA excluida: una venta anulada dentro del turno no puede inflar el cierre.
+            const salesForStats = c.sales.filter(s => s.status !== 'ANULADA' && (s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA'));
+            const salesForCashFlow = c.sales.filter(s => s.status !== 'ANULADA' && (s.tipo === 'VENTA' || s.tipo === 'VENTA_FIADA' || s.tipo === 'COBRO_DEUDA' || s.tipo === 'PAGO_PROVEEDOR'));
 
             const totalUsd = salesForStats.reduce((acc, s) => acc + (s.totalUsd || 0), 0);
-            const totalBs = salesForStats.reduce((acc, s) => acc + (s.totalBs || 0), 0);
+            // Bs vía getSaleBs: neto de vuelto (criterio único con Métricas/Dashboard)
+            const totalBs = salesForStats.reduce((acc, s) => acc + getSaleBs(s), 0);
             const totalItems = salesForStats.reduce((acc, s) => acc + (s.items ? s.items.reduce((is, it) => is + it.qty, 0) : 0), 0);
             
             // Reconstruir desglose de pago de esta caja

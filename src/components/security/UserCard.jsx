@@ -11,7 +11,7 @@ const toTitleCase = (str) => {
 export default function UserCard({ user, onClick }) {
   const role = user?.role || user?.rol || 'CAJERO';
   const name = user?.name || user?.nombre || 'Desconocido';
-  const isAdmin = role === 'ADMIN';
+  const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER'].includes(String(role).trim().toUpperCase());
 
   return (
     <div onClick={onClick} className="cursor-pointer outline-none focus:outline-none active:scale-95 transition-transform duration-200">
@@ -29,7 +29,7 @@ export default function UserCard({ user, onClick }) {
 
               {/* Fake thickness layers (3D depth) */}
               <div className="absolute inset-0 bg-black/40 rounded-3xl translate-y-4 translate-x-4 blur-xl" />
-              <div className={`absolute inset-0 rounded-3xl translate-y-2 translate-x-1 ${role === 'ADMIN' ? 'bg-indigo-500/20' : role === 'MESERO' ? 'bg-orange-500/20' : role === 'BARRA' ? 'bg-violet-500/20' : 'bg-emerald-500/20'}`} />
+              <div className={`absolute inset-0 rounded-3xl translate-y-2 translate-x-1 ${isAdmin ? 'bg-indigo-500/20' : role === 'MESERO' ? 'bg-orange-500/20' : role === 'BARRA' ? 'bg-violet-500/20' : 'bg-emerald-500/20'}`} />
 
               {/* Admin Crown */}
               {isAdmin && (
@@ -57,8 +57,8 @@ export default function UserCard({ user, onClick }) {
             <h3 className="text-lg font-bold text-slate-800 drop-shadow-sm">
               {toTitleCase(name)}
             </h3>
-            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${role === 'ADMIN' ? 'text-sky-500' : role === 'MESERO' ? 'text-orange-500' : role === 'BARRA' ? 'text-violet-500' : 'text-teal-500'}`}>
-              {role === 'ADMIN' ? 'Administrador' : role === 'MESERO' ? 'Mesero' : role === 'BARRA' ? 'Barra' : 'Cajero'}
+            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${isAdmin ? 'text-sky-500' : role === 'MESERO' ? 'text-orange-500' : role === 'BARRA' ? 'text-violet-500' : 'text-teal-500'}`}>
+              {isAdmin ? 'Administrador' : role === 'MESERO' ? 'Mesero' : role === 'BARRA' ? 'Barra' : 'Cajero'}
             </span>
           </CardItem>
 

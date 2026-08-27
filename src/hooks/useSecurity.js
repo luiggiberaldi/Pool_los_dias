@@ -3,8 +3,6 @@ import { storageService } from '../utils/storageService';
 import { supabaseCloud as supabase } from '../config/supabaseCloud';
 
 const APP_VERSION = '1.0.0';
-const PRODUCT_ID = 'bodega';
-
 const DEMO_DURATION_MS = 168 * 60 * 60 * 1000; // 168 horas (7 días)
 
 // FIX 2: Ofuscación XOR + btoa para tokens en localStorage
@@ -121,13 +119,9 @@ export function useSecurity() {
         });
     }, []);
 
-    // Heartbeat + chequeo de revocación en tiempo real: Desactivado.
-    // Esta lógica dependía de la tabla antigua 'licenses' y los RPC 'heartbeat_device' 
-    // que ya no existen en el nuevo proyecto de Supabase (Cloud Suite).
-    useEffect(() => {
-        // Mantenemos este effect vacio por compatibilidad estructural
-        // Para la lógica nueva en la nube, ver useCloudAuthLogic.js
-    }, [isPremium, isDemo, deviceId]);
+    // La verificación de licencia legacy se desactivó: la tabla `licenses` fue
+    // retirada del contrato actual. La licencia cloud se valida en useAppInit.
+
 
     // Countdown timer para demo
     useEffect(() => {
@@ -158,21 +152,8 @@ export function useSecurity() {
 
             // Si localStorage fue borrado, intentar restaurar desde servidor
             if (!raw) {
-                try {
-                    const { data: remoteLicense } = await supabase
-                        .from('licenses')
-                        .select('type, active, expires_at')
-                        .eq('device_id', deviceId)
-                        .eq('product_id', PRODUCT_ID)
-                        .maybeSingle();
-
-                    if (remoteLicense?.active === true) {
-                        // Restaurar desde servidor
-                        window.location.reload();
-                        return;
-                    }
-                } catch { /* ignore remote check errors */ }
-                // Si no hay licencia activa en servidor y estaba premium → revocar
+                // No consultar `licenses`: es una tabla legacy no expuesta en el
+                // contrato actual. La sesión cloud controla el acceso vigente.
                 if (isPremium) {
                     setIsPremium(false);
                     setIsDemo(false);
@@ -214,41 +195,8 @@ export function useSecurity() {
         const storedToken = rawStored ? decodeToken(rawStored) : null;
 
         if (!storedToken) {
-            // Fallback: verificar si existe licencia activa en Supabase (ej: reactivada remotamente)
-            try {
-                const { data: remoteLicense, error } = await supabase
-                    .from('licenses')
-                    .select('type, active, expires_at, code')
-                    .eq('device_id', currentDeviceId)
-                    .eq('product_id', PRODUCT_ID)
-                    .maybeSingle();
-
-                if (remoteLicense && remoteLicense.active === true) {
-                    const isTimeLimited = (remoteLicense.type === 'demo7');
-                    const expiresAt = remoteLicense.expires_at ? new Date(remoteLicense.expires_at).getTime() : null;
-
-                    if (isTimeLimited && expiresAt) {
-                        if (Date.now() < expiresAt) {
-                            const token = { deviceId: currentDeviceId, type: 'demo7', expires: expiresAt, isDemo: true };
-                            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                            setIsPremium(true);
-                            setIsDemo(true);
-                            setDemoExpires(expiresAt);
-                        }
-                    } else if (remoteLicense.type === 'permanent') {
-                        // Permanente — restaurar token con datos del servidor
-                        const token = { deviceId: currentDeviceId, type: 'permanent', code: remoteLicense.code };
-                        localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                        setIsPremium(true);
-                        setIsDemo(false);
-                    }
-                    setLoading(false);
-                    return;
-                }
-            } catch (e) {
-                // Sin red — no se puede restaurar
-            }
-
+            // La tabla legacy `licenses` no forma parte del contrato vigente.
+            // Sin token local, el módulo cloud controla la sesión por separado.
             setIsPremium(false);
             setLoading(false);
             return;
@@ -316,31 +264,8 @@ export function useSecurity() {
             } catch { /* ignore */ }
         }
 
-        // Migración silenciosa: asegurar registro en Supabase via RPC seguro
-        if (isPremiumConfirmed) {
-            const migrateToSupabase = async () => {
-                try {
-                    // Registrar dispositivo si no existe (RPC seguro, no INSERT directo)
-                    const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
-                    await supabase.rpc('auto_register_device', {
-                        p_device_id: currentDeviceId,
-                        p_product_id: PRODUCT_ID,
-                        p_client_name: clientName
-                    });
-                    // Enviar heartbeat para actualizar last_seen
-                    await supabase.rpc('heartbeat_device', {
-                        p_device_id: currentDeviceId,
-                        p_product_id: PRODUCT_ID,
-                        p_client_name: clientName
-                    });
-                } catch (e) {
-                    // Silencioso — nunca afecta la app
-                }
-            }
-
-            migrateToSupabase()  // llamar sin await para no bloquear
-        }
-
+        // La licencia legacy local no crea ni modifica registros cloud.
+        // El acceso cloud y el límite de dispositivos se validan en useAppInit.
         setLoading(false);
     };
 
@@ -356,28 +281,6 @@ export function useSecurity() {
         }
 
         const currentDeviceId = deviceId || localStorage.getItem('pda_device_id');
-
-        // Verificar en servidor (por si borraron IndexedDB)
-        try {
-            const { data: existingDemo } = await supabase
-                .from('licenses')
-                .select('id, type')
-                .eq('device_id', currentDeviceId)
-                .eq('product_id', PRODUCT_ID)
-                .neq('type', 'registered')
-                .maybeSingle();
-
-            if (existingDemo) {
-                await storageService.setItem('pda_demo_flag_v1', {
-                    used: true,
-                    ts: Date.now(),
-                    deviceId: currentDeviceId,
-                });
-                return { success: false, status: 'DEMO_USED' };
-            }
-        } catch (e) {
-            // Sin red → solo validar local
-        }
 
         const expires = Date.now() + DEMO_DURATION_MS;
         const demoToken = {
@@ -401,16 +304,8 @@ export function useSecurity() {
         setDemoExpires(expires);
         setDemoUsed(true);
 
-        // Reportar demo a Supabase via RPC seguro (silencioso)
-        try {
-            await supabase.rpc('activate_demo_secure', {
-                p_device_id: currentDeviceId,
-                p_product_id: PRODUCT_ID
-            });
-        } catch (e) {
-            // Nunca bloquear si falla la red
-        }
-
+        // La demo legacy queda local y no usa RPCs inexistentes ni concede
+        // privilegios cloud. El acceso cloud requiere sesión Supabase válida.
         return { success: true, status: 'DEMO_ACTIVATED' };
     };
 
@@ -420,51 +315,11 @@ export function useSecurity() {
      */
     const unlockApp = async (inputCode) => {
         try {
-            const cleanCode = (inputCode || "").trim().toUpperCase().replace(/O/g, '0');
-            // FIX: Validar el código directamente contra la base de datos para ignorar fallos de Edge Functions
-            const { data: license, error } = await supabase
-                .from('licenses')
-                .select('type, active, expires_at, code')
-                .eq('device_id', deviceId)
-                .eq('product_id', PRODUCT_ID)
-                .maybeSingle();
-
-            if (error || !license || license.code !== cleanCode) {
-                return { success: false, status: 'INVALID_CODE' };
-            }
-
-            const { type, active, expires_at } = license;
-            
-            if (!active) {
-                return { success: false, status: 'LICENSE_REVOKED' };
-            }
-
-            const isTimeLimited = (type === 'demo7');
-            let expiresAt = expires_at ? new Date(expires_at).getTime() : null;
-
-            if (isTimeLimited) {
-                if (!expiresAt) {
-                    expiresAt = Date.now() + 168 * 60 * 60 * 1000;
-                    try {
-                        supabase.from('licenses').update({ expires_at: new Date(expiresAt).toISOString() })
-                            .eq('device_id', deviceId).eq('product_id', PRODUCT_ID).then();
-                    } catch (e) { /* ignore */ }
-                }
-
-                const token = { deviceId, code: inputCode, type: 'demo7', expires: expiresAt };
-                localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-                setIsPremium(true);
-                setIsDemo(true);
-                setDemoExpires(expiresAt);
-                return { success: true, status: 'PREMIUM_ACTIVATED' };
-            }
-
-            // Permanente
-            const token = { deviceId, code: inputCode, type: 'permanent' };
-            localStorage.setItem('pda_premium_token', encodeToken(JSON.stringify(token)));
-            setIsPremium(true);
-            setIsDemo(false);
-            return { success: true, status: 'PREMIUM_ACTIVATED' };
+            const cleanCode = (inputCode || '').trim().toUpperCase().replace(/O/g, '0');
+            // La activación legacy no está disponible en el contrato cloud actual.
+            // Se evita consultar la tabla retirada `licenses` (401/unauthorized).
+            if (!cleanCode) return { success: false, status: 'INVALID_CODE' };
+            return { success: false, status: 'LEGACY_LICENSE_UNAVAILABLE' };
             
         } catch (err) {
             console.error('Error validating license:', err);
@@ -478,15 +333,19 @@ export function useSecurity() {
      * Fuerza un heartbeat manual para sincronizar cambios como el nombre del negocio de inmediato.
      */
     const forceHeartbeat = async () => {
-        const clientName = localStorage.getItem('business_name') || localStorage.getItem('restaurant_name') || '';
         try {
-            await supabase.rpc('heartbeat_device', {
-                p_device_id: deviceId || localStorage.getItem('pda_device_id'),
-                p_product_id: PRODUCT_ID,
-                p_client_name: clientName
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user?.email) return false;
+            const { data, error } = await supabase.rpc('register_and_check_device', {
+                p_email: session.user.email,
+                p_device_id: deviceId || localStorage.getItem('pda_device_id') || 'UNKNOWN',
+                p_device_alias: localStorage.getItem('pda_device_alias') || 'Dispositivo'
             });
-        } catch(e) {
-            console.error('Error forcing heartbeat:', e);
+            if (error) throw error;
+            return data === 'ok';
+        } catch (e) {
+            console.error('Error forcing device heartbeat:', e);
+            return false;
         }
     };
 

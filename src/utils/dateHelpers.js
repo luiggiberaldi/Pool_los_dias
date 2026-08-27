@@ -5,6 +5,17 @@ export function getLocalISODate(d = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
+/**
+ * Normaliza un rango personalizado: completa faltantes e invierte si viene invertido
+ * (Desde > Hasta) para que el filtro de reportes siempre tenga un rango válido.
+ */
+export function normalizeDateRange(from, to) {
+    const todayStr = getLocalISODate(new Date());
+    const f = from || todayStr;
+    const t = to || f;
+    return f <= t ? { from: f, to: t } : { from: t, to: f };
+}
+
 export function getDateRange(rangeId) {
     const now = new Date();
     const todayStr = getLocalISODate(now);

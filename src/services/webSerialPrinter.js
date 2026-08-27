@@ -8,7 +8,7 @@
  * Open Drawer: [27, 112, 0, 50, 250]
  */
 
-import { capitalizeName } from '../utils/calculatorUtils';
+import { capitalizeName, getSaleBs } from '../utils/calculatorUtils';
 import { lookupPrinter } from './printerDatabase';
 import { calculateTimeCostBs, formatHoursPaid, calculateFullTableBreakdown } from '../utils/tableBillingEngine';
 import { round2 } from '../utils/dinero';
@@ -460,11 +460,32 @@ function escposEncoder() {
             return api;
         },
         row(left, right, width = 32) {
-            // Si el contenido total desborda, recortar 'left' para preservar 'right'
-            const maxLeft = width - right.length - 1;
-            const safeLeft = left.length > maxLeft ? left.substring(0, maxLeft - 1) + '…' : left;
-            const space = Math.max(1, width - safeLeft.length - right.length);
-            chunks.push(encoder.encode(safeLeft + ' '.repeat(space) + right));
+            const maxLeft = Math.max(1, width - right.length - 1);
+            const words = String(left || '').split(/\s+/);
+            let line = '';
+            for (const word of words) {
+                if (!word) continue;
+                if (line && line.length + word.length + 1 > maxLeft) {
+                    chunks.push(encoder.encode(line));
+                    chunks.push(new Uint8Array([LF]));
+                    line = '';
+                }
+                if (word.length > maxLeft && !line) {
+                    for (let i = 0; i < word.length; i += maxLeft) {
+                        const part = word.slice(i, i + maxLeft);
+                        if (i + maxLeft < word.length) {
+                            chunks.push(encoder.encode(part));
+                            chunks.push(new Uint8Array([LF]));
+                        } else {
+                            line = part;
+                        }
+                    }
+                } else {
+                    line += (line ? ' ' : '') + word;
+                }
+            }
+            const space = Math.max(1, width - line.length - right.length);
+            chunks.push(encoder.encode(line + ' '.repeat(space) + right));
             chunks.push(new Uint8Array([LF]));
             return api;
         },
@@ -533,9 +554,8 @@ export async function printReceiptEscPos(sale, bcvRate) {
         const unitStr  = '$' + item.priceUsd.toFixed(2);
         const subtotal = '$' + (item.priceUsd * item.qty).toFixed(2);
         const detail   = '  ' + qty + ' x ' + unitStr;
-        // Nombre: font normal, negrita, truncado a W chars
-        const name = item.name.length > W ? item.name.substring(0, W - 1) + '…' : item.name;
-        p.bold(true).text(name).newline();
+        // Nombre completo: se imprime sin truncar; el detalle puede ocupar varias líneas.
+        p.bold(true).text(item.name || '').newline();
         // Detalle: font pequeña para aprovechar los 42 chars
         p.bold(true).smallFont(true).row(detail, subtotal, WS);
         p.smallFont(false);
@@ -546,14 +566,8 @@ export async function printReceiptEscPos(sale, bcvRate) {
     // Totales
     p.align(1).bigText(true).bold(true);
     p.text('$' + (sale.totalUsd || 0).toFixed(2)).newline();
-    const bsPaymentsEsc = sale.payments?.filter(pm => pm.currency === 'BS' || pm.methodId?.includes('_bs') || pm.methodId === 'pago_movil' || pm.methodId === 'punto_de_venta');
-    let displayTotalBsEsc = sale.totalBs || 0;
-    if (bsPaymentsEsc?.length > 0) {
-        const sumPaidBs = bsPaymentsEsc.reduce((acc, pm) => acc + (pm.amountInput || pm.amountBs || (pm.amountUsd && rate ? pm.amountUsd * rate : 0) || 0), 0);
-        if (sumPaidBs > 0) displayTotalBsEsc = sumPaidBs;
-    } else if (sale.totalUsd > 0 && rate > 0) {
-        displayTotalBsEsc = sale.totalUsd * rate;
-    }
+    // Total Bs neto de vuelto y dual-aware (un solo criterio con Reportes/Dashboard)
+    const displayTotalBsEsc = getSaleBs(sale) || (sale.totalUsd > 0 && rate > 0 ? sale.totalUsd * rate : (sale.totalBs || 0));
     p.text(formatBsSimple(displayTotalBsEsc) + ' Bs').newline();
     if (sale.copEnabled && sale.tasaCop > 0) {
         const cop = sale.totalCop || (sale.totalUsd * sale.tasaCop);
@@ -585,7 +599,6 @@ export async function printReceiptEscPos(sale, bcvRate) {
     }
 
     p.line('-', W);
-    p.align(0).text('Tasa BCV: ' + formatBsSimple(rate) + ' Bs/$').newline();
     p.newline();
     p.align(1).bold(true).text('Gracias por tu compra!').newline();
     p.bold(true).text('Comprobante de control interno').newline();

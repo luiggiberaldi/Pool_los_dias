@@ -21,6 +21,8 @@ export function useProductPagination({ products, effectiveRate, triggerHaptic })
         return 'todos';
     });
 
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Listen for navigation filter changes when already mounted
     useEffect(() => {
         const handler = () => {
@@ -34,7 +36,6 @@ export function useProductPagination({ products, effectiveRate, triggerHaptic })
         window.addEventListener('nav_inventory_filter', handler);
         return () => window.removeEventListener('nav_inventory_filter', handler);
     }, []);
-    const [currentPage, setCurrentPage] = useState(1);
     const [viewMode, setViewMode] = useState(() => localStorage.getItem('bodega_inventory_view') || 'grid');
     const [sortField, setSortField] = useState(null);
     const [sortDir, setSortDir] = useState('asc');

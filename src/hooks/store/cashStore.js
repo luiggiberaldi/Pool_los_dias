@@ -61,6 +61,7 @@ export const useCashStore = create((set, get) => ({
 
         try {
             const userId = await getAuthUserId();
+            if (!userId) return;
             let query = supabaseCloud
                 .from('cash_sessions')
                 .select('*')
@@ -146,7 +147,8 @@ export const useCashStore = create((set, get) => ({
     _subscribeRealtime: () => {
         if (cashRealtimeChannel) return;
         const userId = useAuthStore.getState().cloudSession?.user?.id;
-        const channelName = userId ? `cash_sessions_realtime:${userId}` : 'cash_sessions_realtime';
+        if (!userId) return;
+        const channelName = `cash_sessions_realtime:${userId}`;
         cashRealtimeChannel = supabaseCloud
             .channel(channelName)
             .on('postgres_changes', {
@@ -208,7 +210,10 @@ export const useCashStore = create((set, get) => ({
             status: sessionPayload.status,
             notes: JSON.stringify({ base_bs: sessionPayload.base_bs }),
         };
-        if (userId) supabasePayload.user_id = userId;
+        if (!userId) {
+            throw new Error('No hay cuenta cloud autenticada para abrir caja');
+        }
+        supabasePayload.user_id = userId;
 
         try {
             const { error } = await supabaseCloud.from('cash_sessions').insert(supabasePayload);

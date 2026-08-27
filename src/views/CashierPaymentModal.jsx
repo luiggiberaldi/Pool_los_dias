@@ -104,11 +104,13 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
     // Change calculations
     const rUsd = parseFloat(receivedUSD || '0');
     const rBs = parseFloat(receivedBs || '0');
-    const totalReceivedInUSD = round2(rUsd + divR(rBs, rates));
-
-    const changeUSD = totalReceivedInUSD > grandTotal ? round2(subR(totalReceivedInUSD, grandTotal)) : 0;
     const _cBs = calculateConsumptionBs(currentItems, rates, products);
     const grandTotalBs = calculateGrandTotalBs(timeCost, totalConsumption, session.game_mode, config, rates, null, _cBs);
+    // Tasa de liquidación dual: respeta el precio Bs fijado (piña/hora) al evaluar el pago.
+    const checkoutRate = (grandTotal > 0 && grandTotalBs > 0) ? divR(grandTotalBs, grandTotal) : rates;
+    const totalReceivedInUSD = round2(rUsd + divR(rBs, checkoutRate));
+
+    const changeUSD = totalReceivedInUSD > grandTotal ? round2(subR(totalReceivedInUSD, grandTotal)) : 0;
     // Bs remaining/change proportional to USD ratio (Bs prices are independent from $ × tasa)
     const remainingUSD = totalReceivedInUSD < grandTotal ? round2(subR(grandTotal, totalReceivedInUSD)) : 0;
     const remainingBs = grandTotal > 0 ? round2((remainingUSD / grandTotal) * grandTotalBs) : 0;
@@ -170,27 +172,37 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                 }
             }
 
-            // 3. Preparar array de pagos
+            // 3. Preparar array de pagos — methodIds canónicos (mismos buckets que el PDV)
+            // para que el arqueo de caja cuente estos cobros en efectivo_usd / efectivo_bs.
+            // FIADO: NO se envía como pago — al dejar el total sin cubrir y con cliente
+            // seleccionado, processSaleTransaction crea VENTA_FIADA y registra la deuda.
             const paymentPayload = [];
-            if (isFiado) {
-                paymentPayload.push({ methodId: 'FIADO', amountUsd: grandTotal, currency: 'USD' });
-            } else {
+            if (!isFiado) {
+                const bsMethodId = method === 'PUNTO' ? 'punto_venta' : method === 'PAGO MOVIL' ? 'pago_movil' : 'efectivo_bs';
                 if (rUsd > 0) {
                     paymentPayload.push({
-                        methodId: method === 'EFECTIVO' ? 'EFECTIVO' : method,
-                        amountUsd: rUsd,
+                        methodId: 'efectivo_usd',
+                        methodLabel: 'Efectivo $',
+                        amountInput: round2(rUsd),
+                        amountInputCurrency: 'USD',
+                        amountUsd: round2(rUsd),
+                        amountBs: round2(mulR(rUsd, rates)),
                         currency: 'USD'
                     });
                 }
                 if (rBs > 0) {
                     paymentPayload.push({
-                        methodId: method,
+                        methodId: bsMethodId,
+                        methodLabel: method === 'PUNTO' ? 'Punto de Venta' : method === 'PAGO MOVIL' ? 'Pago Móvil' : 'Efectivo Bs',
+                        amountInput: round2(rBs),
+                        amountInputCurrency: 'BS',
                         amountUsd: round2(divR(rBs, rates)),
-                        currency: 'VES'
+                        amountBs: round2(rBs),
+                        currency: 'BS'
                     });
                 }
                 if (rUsd === 0 && rBs === 0 && grandTotal === 0) {
-                    paymentPayload.push({ methodId: method, amountUsd: 0, currency: 'USD' });
+                    paymentPayload.push({ methodId: 'efectivo_usd', amountUsd: 0, amountBs: 0, currency: 'USD' });
                 }
             }
 
@@ -203,7 +215,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                         const { supabaseCloud } = await import('../config/supabaseCloud');
                         const { data } = await supabaseCloud.from('staff_users').select('id, name, role').eq('id', session.opened_by).single();
                         if (data) openerUser = data;
-                    } catch (_) {}
+                    } catch (_) { /* optional cloud lookup */ }
                 }
                 if (openerUser?.role === 'MESERO' || openerUser?.rol === 'MESERO' || openerUser?.role === 'BARRA' || openerUser?.rol === 'BARRA') {
                     meseroUser = openerUser;
@@ -223,7 +235,7 @@ export default function CashierPaymentModal({ session, table, config, rates, cur
                 tasaCop: tasaCop || 0,
                 copEnabled: copEnabled || false,
                 discountData: null,
-                useAutoRate: useAutoRate || true,
+                useAutoRate: !!useAutoRate,
                 meseroId: meseroUser?.id || null,
                 meseroNombre: meseroUser?.name || meseroUser?.nombre || null,
                 tableName: table?.name || null,

@@ -112,7 +112,7 @@ export default function CheckoutModal({
     const splitMeta = splitPeople ? { people: splitPeople, perPerson: [] } : null;
 
     const {
-        barValues, totalPaidUsd,
+        barValues, totalPaidUsd, checkoutRate,
         remainingUsd, remainingBs, changeUsd, changeBs,
         isPaid, handleBarChange, fillBar, handleConfirm,
         changeUsdGiven, setChangeUsdGiven,
@@ -132,7 +132,7 @@ export default function CheckoutModal({
         const val = barValues[method.id] || '';
         const hasValue = parseFloat(val) > 0;
         const equivUsd = method.currency === 'BS' && hasValue
-            ? (parseFloat(val) / effectiveRate).toFixed(2)
+            ? (parseFloat(val) / checkoutRate).toFixed(2)
             : method.currency === 'COP' && hasValue && tasaCop
             ? (parseFloat(val) / tasaCop).toFixed(2)
             : null;
@@ -318,7 +318,7 @@ export default function CheckoutModal({
                 )}
 
                 {/* -- TOTAL BIMONEDA -- */}
-                <div data-tour="checkout-total" className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
+                <div data-tour="checkout-total" className="sticky top-0 z-30 px-4 py-4 bg-gradient-to-b from-slate-50/95 to-white/95 dark:from-slate-900/95 dark:to-slate-950/95 backdrop-blur-sm border-b border-slate-100 dark:border-slate-800">
                     {discountData?.active && (
                         <div className="flex flex-col items-center justify-center space-y-1 mb-3 pb-3 border-b border-slate-200/50 dark:border-slate-800/50">
                             <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
@@ -392,7 +392,7 @@ export default function CheckoutModal({
                     {/* Resultado visual simple */}
                     {splitPeople && cartTotalUsd > 0 && (() => {
                         const perPersonUsd = divR(cartTotalUsd, splitPeople);
-                        const perPersonBs = divR(cartTotalUsd * effectiveRate, splitPeople);
+                        const perPersonBs = divR(cartTotalUsd * checkoutRate, splitPeople);
                         return (
                             <div className="mt-2 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 rounded-xl flex items-center justify-between">
                                 <div>
@@ -438,7 +438,9 @@ export default function CheckoutModal({
                                 Bolívares (Bs)
                             </h3>
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${sectionStyles.BS.titleBg} ${sectionStyles.BS.title}`}>
-                                Tasa: {formatBs(effectiveRate)}
+                                {Math.abs(checkoutRate - effectiveRate) > 0.5
+                                    ? `Tasa: ${formatBs(effectiveRate)} · Liquida: ${formatBs(checkoutRate)}`
+                                    : `Tasa: ${formatBs(effectiveRate)}`}
                             </span>
                         </div>
                         {methodsBs.map(m => renderPaymentBar(m, sectionStyles.BS))}
@@ -469,6 +471,7 @@ export default function CheckoutModal({
                     changeUsdGiven={changeUsdGiven} setChangeUsdGiven={setChangeUsdGiven}
                     changeBsGiven={changeBsGiven} setChangeBsGiven={setChangeBsGiven}
                     effectiveRate={effectiveRate}
+                    checkoutRate={checkoutRate}
                     currentFloatUsd={currentFloatUsd} currentFloatBs={currentFloatBs}
                 />
 

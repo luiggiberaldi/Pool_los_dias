@@ -1,4 +1,5 @@
-import { formatBs, capitalizeName } from './calculatorUtils';
+import { formatBs, capitalizeName, getSaleBs } from './calculatorUtils';
+import { round2 } from './dinero';
 import { printReceiptEscPos, getWebSerialConfig } from '../services/webSerialPrinter';
 import { showToast } from '../components/Toast';
 
@@ -34,7 +35,7 @@ function _printThermalHTML(sale, bcvRate) {
     // Usa 58mm auto — el navegador calcula el largo automáticamente.
     const cssPageSize = '58mm auto';
     const cssBodyWidth = '48mm';
-    const cssLogoW = '44mm';
+    const cssLogoW = '50mm';
     const fDisclaimer = '7.5px';
     const fTiny = '9px';     // Secundaria (detalles, RIF, c/u)
     const fSmall = '10px';   // Info general (fechas, nro)
@@ -46,7 +47,7 @@ function _printThermalHTML(sale, bcvRate) {
 
     // ── OBTENER CONFIGURACIÓN DEL NEGOCIO ──
     const settings = {
-        name: localStorage.getItem('business_name') || 'Pool Los Diaz',
+        name: 'POOL BAR LOS DIAZ',
         rif: localStorage.getItem('business_rif') || '',
         address: localStorage.getItem('business_address') || '',
         phone: localStorage.getItem('business_phone') || '',
@@ -65,7 +66,7 @@ function _printThermalHTML(sale, bcvRate) {
         const unit = item.isWeight ? 'Kg' : 'u';
         const sub = item.priceUsd * item.qty;
         const subBs = sub * rate;
-        const name = item.name.length > 22 ? item.name.substring(0, 22) + '...' : item.name;
+        const name = item.name || '';
         return `
             <tr>
                 <td style="text-align:left;font-size:${fBase};padding:2px 0;">${qty}${unit}</td>
@@ -102,7 +103,7 @@ function _printThermalHTML(sale, bcvRate) {
                 <td style="color:#dc3545;font-weight:bold;font-size:11px;text-align:right;">$${sale.fiadoUsd.toFixed(2)}</td>
             </tr><tr>
                 <td></td>
-                <td style="color:#dc3545;font-size:9px;text-align:right;">Bs ${formatBs(sale.fiadoUsd * fiadoRate)} (tasa actual)</td>
+                <td style="color:#dc3545;font-size:9px;text-align:right;">Bs ${formatBs(sale.fiadoUsd * fiadoRate)}</td>
             </tr></table>
         </div>` : '';
 
@@ -209,12 +210,6 @@ function _printThermalHTML(sale, bcvRate) {
 
     <hr class="dash">
 
-    <!-- Tasa -->
-    <div class="center" style="font-size:${fTiny};color:#000;margin:4px 0;">
-        <div style="margin-bottom:2px;">Tasa BCV: Bs ${formatBs(rate)} por $1</div>
-        ${sale.tasaCop > 0 ? `<div>Tasa COP: ${sale.tasaCop.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} por $1</div>` : ''}
-    </div>
-
     <!-- Total -->
     <div style="margin:8px 0;">
         ${sale.discountAmountUsd > 0 ? `
@@ -232,14 +227,9 @@ function _printThermalHTML(sale, bcvRate) {
         <div class="center bold" style="font-size:${fSmall};color:#000;margin-bottom:4px;">TOTAL A PAGAR</div>
         <div class="total-usd">$${parseFloat(sale.totalUsd || 0).toFixed(2)}</div>
         ${(() => {
-            const bsPayments = sale.payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
-            let displayTotalBs = sale.totalBs || 0;
-            if (bsPayments?.length > 0) {
-                const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || (p.amountUsd && rate ? p.amountUsd * rate : 0) || 0), 0);
-                if (sumPaidBs > 0) displayTotalBs = sumPaidBs;
-            } else if (sale.totalUsd > 0 && rate > 0) {
-                displayTotalBs = sale.totalUsd * rate;
-            }
+            // Total Bs neto de vuelto y dual-aware (un solo criterio con Reportes/Dashboard).
+            // ANTES sumaba amountInput brutos: imprimiría Bs 600 para una venta de Bs 500 con vuelto.
+            const displayTotalBs = getSaleBs(sale) || (sale.totalUsd > 0 && rate > 0 ? round2(sale.totalUsd * rate) : (sale.totalBs || 0));
             return `<div class="total-bs" style="margin-bottom:${sale.copEnabled && sale.tasaCop > 0 ? '2px' : '4px'}">Bs ${formatBs(displayTotalBs)}</div>`;
         })()}
         ${sale.copEnabled && sale.tasaCop > 0 ? `<div class="total-bs" style="font-size:13px;">COP ${(sale.totalCop || (sale.totalUsd * sale.tasaCop)).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>` : ''}
@@ -253,6 +243,18 @@ function _printThermalHTML(sale, bcvRate) {
         <div style="font-size:${fTiny};color:#000;font-weight:bold;margin-bottom:4px;">PAGOS REALIZADOS</div>
         <table>${paymentsHtml}</table>
         ${fiadoHtml}
+    </div>
+    <hr class="dash">
+    ` : ''}
+
+    <!-- Vuelto Entregado (antes ausente en el térmico HTML: el cajero no tenía referencia del cambio) -->
+    ${((sale.changeUsd || 0) > 0 || (sale.changeBs || 0) > 0) ? `
+    <div style="margin:4px 0;">
+        <div style="font-size:${fTiny};color:#000;font-weight:bold;margin-bottom:4px;">VUELTO ENTREGADO</div>
+        <table>
+            ${sale.changeUsd > 0 ? `<tr><td style="font-size:11px;">En Dólares</td><td style="font-size:11px;font-weight:bold;color:#107c41;text-align:right;">$${sale.changeUsd.toFixed(2)}</td></tr>` : ''}
+            ${sale.changeBs > 0 ? `<tr><td style="font-size:11px;">En Bolívares</td><td style="font-size:11px;font-weight:bold;color:#107c41;text-align:right;">Bs ${formatBs(sale.changeBs)}</td></tr>` : ''}
+        </table>
     </div>
     <hr class="dash">
     ` : ''}
@@ -304,7 +306,7 @@ function _printThermalHTML(sale, bcvRate) {
             try {
                 printWindow.onafterprint = () => printWindow.close();
                 printWindow.print();
-            } catch(_) {}
+            } catch(_) { /* print fallback is best effort */ }
         }
     }, 1500);
 }

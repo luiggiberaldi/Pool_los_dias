@@ -12,6 +12,7 @@ import CierreHistoryCard from '../components/Reports/CierreHistoryCard';
 import TransactionRow from '../components/Reports/TransactionRow';
 import PaymentBreakdownCard from '../components/Reports/PaymentBreakdownCard';
 import { useReportsData } from '../hooks/useReportsData';
+import { useCashStore } from '../hooks/store/cashStore';
 
 const RANGE_OPTIONS = [
     { id: 'shift', label: 'Turno Actual' },
@@ -25,6 +26,7 @@ const RANGE_OPTIONS = [
 export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, isActive }) {
     const { products, setProducts, effectiveRate: bcvRate, copEnabled, tasaCop } = useProductContext();
     const { loadCart } = useCart();
+    const activeCashSession = useCashStore(s => s.activeCashSession);
     const [activeTab, setActiveTab] = useState('metrics');
     const [selectedRange, setSelectedRange] = useState('shift');
     const [customFrom, setCustomFrom] = useState('');
@@ -160,7 +162,7 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
     }
 
     return (
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 md:space-y-5 pb-32">
+        <div className="flex-1 min-h-0 p-3 sm:p-4 md:p-6 space-y-4 md:space-y-5 pb-app-nav">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-xl md:text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
@@ -425,8 +427,10 @@ export default function ReportsView({ rates: _rates, triggerHaptic, onNavigate, 
                         <div className="mt-8">
                             <EmptyState
                                 icon={BarChart3}
-                                title="Sin ventas en este periodo"
-                                description="Selecciona otro rango de fechas o usa el boton Personalizado para buscar mas atras."
+                                title={selectedRange === 'shift' && !activeCashSession ? 'Sin caja abierta' : 'Sin ventas en este periodo'}
+                                description={selectedRange === 'shift' && !activeCashSession
+                                    ? 'El turno actual no tiene una apertura de caja activa. Abre caja o cambia a otro rango de fechas.'
+                                    : 'Selecciona otro rango de fechas o usa el boton Personalizado para buscar mas atras.'}
                             />
                         </div>
                     )}

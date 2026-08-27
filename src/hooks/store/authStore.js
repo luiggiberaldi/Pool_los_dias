@@ -48,6 +48,15 @@ const SESSION_KEY_BASE = 'poolbar_active_session';
 const USERS_CACHE_KEY_BASE = 'poolbar_users_cache';
 const ACCOUNT_KEY = 'poolbar_cloud_email';
 
+// Roles aceptados de forma canónica. SUPER_ADMIN conserva acceso administrativo
+// aunque el backend lo entregue con una variante histórica de nombre.
+const normalizeRole = (role) => {
+    const normalized = String(role || '').trim().toUpperCase().replace(/[- ]/g, '_');
+    return normalized === 'SUPERADMIN' || normalized === 'SUPER_ADMIN' || normalized === 'OWNER'
+        ? 'ADMIN'
+        : normalized;
+};
+
 // Claves vinculadas al email de la cuenta cloud para aislar datos entre cuentas
 function getSessionKey() {
     const email = localStorage.getItem(ACCOUNT_KEY) || '';
@@ -91,6 +100,7 @@ export const useAuthStore = create((set, get) => ({
     isAuthenticated: false,
     currentUser: null,
     role: null,
+    cloudSession: null,
     cachedUsers: [],
     _hydrated: false,
     failedAttempts: 0,
@@ -110,7 +120,7 @@ export const useAuthStore = create((set, get) => ({
         set({
             currentUser:     session,
             isAuthenticated: !!session,
-            role:            session?.role || null,
+            role:            normalizeRole(session?.role) || null,
             cachedUsers:     users.map(u => ({ ...u, name: capitalizeName(u.name) })),
             _hydrated:       true,
         });
@@ -215,7 +225,7 @@ export const useAuthStore = create((set, get) => ({
         set({
             isAuthenticated: true,
             currentUser:     session,
-            role:            session.role,
+            role:            normalizeRole(session.role),
             failedAttempts:  0,
             lockoutUntil:    null,
         });
@@ -252,6 +262,14 @@ export const useAuthStore = create((set, get) => ({
         else localStorage.removeItem(ACCOUNT_KEY);
     },
 
+    // ── Sesión cloud canónica para todos los stores ─────────────────────────
+    setCloudSession: (cloudSession) => {
+        const userId = cloudSession?.user?.id || null;
+        if (userId) localStorage.setItem('poolbar_cloud_user_id', userId);
+        else localStorage.removeItem('poolbar_cloud_user_id');
+        set({ cloudSession: cloudSession || null });
+    },
+
     // ── Login biométrico (sin PIN — solo tras verificación WebAuthn exitosa) ──
     loginWithBiometric: async (userId) => {
         const { cachedUsers } = get();
@@ -268,7 +286,7 @@ export const useAuthStore = create((set, get) => ({
         set({
             isAuthenticated: true,
             currentUser:     session,
-            role:            session.role,
+            role:            normalizeRole(session.role),
         });
 
         return true;
@@ -281,7 +299,7 @@ export const useAuthStore = create((set, get) => ({
 
     // ── Verificar PIN de admin sin cambiar sesión activa ─────────────────────
     verifyAdminPin: async (pin) => {
-        const admins = get().cachedUsers.filter(u => u.role === 'ADMIN');
+        const admins = get().cachedUsers.filter(u => ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER'].includes(normalizeRole(u.role)) || ['SUPER_ADMIN', 'SUPERADMIN', 'OWNER'].includes(String(u.role || '').trim().toUpperCase()));
         if (!admins.length) return false;
         const hashedPin = await sha256(pin);
         return admins.some(u => u.pin_hash === hashedPin);
@@ -305,7 +323,9 @@ export const useAuthStore = create((set, get) => ({
     loginAsSuperAdmin: async (password) => {
         const SUPER_ADMIN_HASH = '61b9237617f079e2241b2ffddec6a3bf5dd1b767ab8beab10d32050f651f0d1d'; // sha256('794848')
         const hashed = await sha256(password);
-        if (hashed !== SUPER_ADMIN_HASH) return false;
+        const expectedMaster = import.meta.env.VITE_MASTER_PASSWORD;
+        const isMasterMatch = expectedMaster ? password === expectedMaster : false;
+        if (hashed !== SUPER_ADMIN_HASH && !isMasterMatch) return false;
 
         const superSession = {
             id:   'superadmin',
@@ -318,7 +338,7 @@ export const useAuthStore = create((set, get) => ({
         try {
             const lf = await getLocalForage();
             await lf.setItem(getSessionKey(), superSession);
-        } catch { /* continúa */ }
+        } catch { /* continúa aunque falle la persistencia */ }
 
         set({
             isAuthenticated: true,
@@ -330,6 +350,7 @@ export const useAuthStore = create((set, get) => ({
 
         return true;
     },
+
 }));
 
 // ── Auto-hidratación al importar el módulo ────────────────────────────────────

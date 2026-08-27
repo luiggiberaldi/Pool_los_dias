@@ -74,10 +74,15 @@ export function OverpayAlertModal({
     const d = overpayAlertData;
     const isCurrency = d.type === 'currency';
     const isRound    = d.type === 'round';
+    const isMulti    = d.type === 'multipago';
 
-    const title    = isCurrency ? '¿Te equivocaste de campo?' : isRound ? '¿Número por error?' : '¿Monto correcto?';
+    const title    = isCurrency ? '¿Te equivocaste de campo?'
+        : isMulti ? 'Sobrepago en multipago'
+        : isRound ? '¿Número por error?' : '¿Monto correcto?';
     const subtitle = isCurrency
         ? `Parece que ingresaste bolívares en el campo de ${d.methodLabel}`
+        : isMulti
+        ? `${d.methodCount} métodos juntos exceden el total — revisa si sobró un campo`
         : isRound
         ? 'El monto parece un número redondeado por error'
         : `El pago es ${d.ratio}× el total de la compra`;
@@ -112,11 +117,22 @@ export function OverpayAlertModal({
                             {isCurrency ? formatBs(d.enteredAmount) : `$${totalPaidUsd.toFixed(2)}`}
                         </span>
                     </div>
+                    {isMulti && (
+                        <div className="flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                            <span className="text-sm font-bold text-amber-600 dark:text-amber-400">Sobrepago</span>
+                            <span className="text-base font-black text-amber-600">${(d.overpayUsd || 0).toFixed(2)} de más</span>
+                        </div>
+                    )}
                     <div className="border-t border-red-200/50 dark:border-red-800/20 pt-3">
                         {isCurrency ? (
                             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">
                                 Ingresaste <span className="font-black text-red-600">{formatBs(d.enteredAmount)}</span> en el campo de dólares.
                                 El total en Bs sería <span className="font-black text-slate-800 dark:text-white">{formatBs(d.expectedBs)}</span>.
+                            </p>
+                        ) : isMulti ? (
+                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">
+                            Estás pagando <span className="font-black text-red-600">${totalPaidUsd.toFixed(2)}</span> con {d.methodCount} métodos para una compra de <span className="font-black text-slate-800 dark:text-white">${cartTotalUsd.toFixed(2)}</span>.
+                                Si es correcto, el vuelto sería <span className="font-black text-amber-600">${(d.overpayUsd || 0).toFixed(2)}</span>.
                             </p>
                         ) : isRound ? (
                             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 text-center">

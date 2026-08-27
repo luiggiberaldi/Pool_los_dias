@@ -57,7 +57,10 @@ export const getSaleBs = (s) => {
     const bsPayments = s.payments?.filter(p => p.currency === 'BS' || p.methodId?.includes('_bs') || p.methodId === 'pago_movil' || p.methodId === 'punto_de_venta');
     if (bsPayments?.length > 0) {
         const sumPaidBs = bsPayments.reduce((acc, p) => acc + (p.amountInput || p.amountBs || 0), 0);
-        if (sumPaidBs > 0) return round2(sumPaidBs);
+        // Neto de vuelto: el cambio entregado en Bs sale de la gaveta y NO es ingreso.
+        // Sin este ajuste, pagar Bs 600 por una venta de Bs 500 inflaba el reporte en Bs 100.
+        const netBs = round2(sumPaidBs - Math.abs(s.changeBs || 0));
+        if (netBs > 0) return netBs;
     }
 
     // REGLA 2: Respetar Precios Independientes de Mesas (pricePerHourBs / pricePinaBs)

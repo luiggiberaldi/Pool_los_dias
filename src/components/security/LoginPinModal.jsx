@@ -16,9 +16,10 @@ const getBioAvailable = async () => {
 
 // Cache mobile detection (doesn't change)
 const _isMobile = isMobileDevice();
+const isAdminRole = (role) => ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER'].includes(String(role || '').trim().toUpperCase());
 
 export default function LoginPinModal({ isOpen, onClose, user, onSubmit, onVerifyPin, onLoginComplete, onBiometricLogin }) {
-    const targetPinLength = (user?.role === 'ADMIN' || user?.rol === 'ADMIN') ? 6 : 4;
+    const targetPinLength = isAdminRole(user?.role || user?.rol) ? 6 : 4;
     const [pinDisplay, setPinDisplay] = useState(0); // just the length, for rendering dots
     const [error, setError]           = useState(false);
     const [processing, setProcessing] = useState(false);

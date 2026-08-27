@@ -77,8 +77,6 @@ useEffect(() => {
         commitCurrentPerson();
     }
 }, [totalPaidUsd, splitPeople, splitPaid, cartTotalUsd, splitBaseTotal, commitCurrentPerson]);
-*/
-
 // ============================================================
 // JSX: Split Tracker UI completa (reemplaza la sección "DIVIDIR CUENTA")
 // ============================================================
@@ -174,7 +172,7 @@ useEffect(() => {
             </div>
             <div className="flex gap-2">
                 <button disabled={splitPaid <= 0}
-                    onClick={() => { /* undo logic */ }}
+                    onClick={() => { undo logic }}
                     className="flex-1 py-1.5 rounded-xl text-xs font-black border border-violet-300 text-violet-500 disabled:opacity-30">
                     − Quitar última
                 </button>

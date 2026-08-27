@@ -28,6 +28,10 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
                         .update({ status: 'CLOSED', closed_at: new Date().toISOString(), total_cost_usd: 0 })
                         .eq('id', orphan.id);
                 } catch { /* ignorar */ }
+                // Cancelar también la orden huérfana para no dejar órdenes OPEN fantasma (48h)
+                try {
+                    await useOrdersStore.getState().cancelOrderBySessionId(orphan.id);
+                } catch { /* ignorar: el trigger DB resuelve */ }
             }
         }
 
@@ -47,7 +51,10 @@ export const createSessionActions = (set, get, tablesCache, scopedKey) => ({
             ...(gameMode === 'PINA' && seats && seats.length > 1 ? { extended_times: -1 } : {}),
             ...(seats && seats.length > 0 ? { seats, guest_count: seats.length } : {}),
         };
-        if (userId) sessionPayload.user_id = userId;
+        if (!userId) {
+            throw new Error('No hay cuenta cloud autenticada para abrir la mesa');
+        }
+        sessionPayload.user_id = userId;
 
         const optimisticSession = sessionPayload;
 
